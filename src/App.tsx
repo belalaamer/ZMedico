@@ -39,6 +39,15 @@ import Prescriptions from "@/pages/medical/Prescriptions";
 import PrescriptionDetail from "@/pages/medical/PrescriptionDetail";
 import DocumentsCenter from "@/pages/medical/DocumentsCenter";
 import PatientDental from "@/pages/patients/PatientDental";
+import Departments from "@/pages/hr/Departments";
+import Positions from "@/pages/hr/Positions";
+import Staff from "@/pages/hr/Staff";
+import StaffDetail from "@/pages/hr/StaffDetail";
+import Schedules from "@/pages/hr/Schedules";
+import Attendance from "@/pages/hr/Attendance";
+import Leaves from "@/pages/hr/Leaves";
+import Payroll from "@/pages/hr/Payroll";
+import Performance from "@/pages/hr/Performance";
 
 const queryClient = new QueryClient();
 
@@ -84,6 +93,15 @@ const App = () => (
                   <Route path="/medical/diagnoses" element={<Diagnoses />} />
                   <Route path="/medical/medications" element={<Medications />} />
                   <Route path="/medical/procedures" element={<ProceduresPage />} />
+                  <Route path="/hr/departments" element={<Departments />} />
+                  <Route path="/hr/positions" element={<Positions />} />
+                  <Route path="/hr/staff" element={<Staff />} />
+                  <Route path="/hr/staff/:id" element={<StaffDetail />} />
+                  <Route path="/hr/schedules" element={<Schedules />} />
+                  <Route path="/hr/attendance" element={<Attendance />} />
+                  <Route path="/hr/leaves" element={<Leaves />} />
+                  <Route path="/hr/payroll" element={<Payroll />} />
+                  <Route path="/hr/performance" element={<Performance />} />
                   <Route path="/branches" element={<Placeholder titleKey="branches" />} />
                   <Route path="/settings" element={<Placeholder titleKey="settings" />} />
                 </Route>

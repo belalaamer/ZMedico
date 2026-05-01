@@ -1,10 +1,31 @@
-import { NavLink } from "react-router-dom";
-import { LayoutDashboard, Calendar, Users, Bell, Wallet, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote } from "lucide-react";
+import { NavLink, useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useBranch } from "@/contexts/BranchContext";
 import { cn } from "@/lib/utils";
 
 export function Sidebar() {
   const { t, lang } = useI18n();
+  const { currentBranchId } = useBranch();
+  const { pathname } = useLocation();
+  const [alertCount, setAlertCount] = useState(0);
+  const inventoryOpen = pathname.startsWith("/inventory");
+
+  useEffect(() => {
+    let q = supabase.from("stock_alerts").select("*", { count: "exact", head: true }).eq("is_resolved", false);
+    if (currentBranchId) q = q.eq("branch_id", currentBranchId);
+    q.then(({ count }) => setAlertCount(count ?? 0));
+    const ch = supabase.channel("inv-alerts")
+      .on("postgres_changes", { event: "*", schema: "public", table: "stock_alerts" }, () => {
+        let q2 = supabase.from("stock_alerts").select("*", { count: "exact", head: true }).eq("is_resolved", false);
+        if (currentBranchId) q2 = q2.eq("branch_id", currentBranchId);
+        q2.then(({ count }) => setAlertCount(count ?? 0));
+      }).subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [currentBranchId]);
+
   const items = [
     { to: "/", icon: LayoutDashboard, label: t("dashboard"), end: true },
     { to: "/calendar", icon: Calendar, label: t("calendar"), badge: null },
@@ -14,9 +35,16 @@ export function Sidebar() {
     { to: "/treasury", icon: Banknote, label: t("treasury") },
     { to: "/expenses", icon: Receipt, label: t("expenses") },
     { to: "/reminders", icon: Bell, label: t("reminders") },
-    { to: "/inventory", icon: Boxes, label: t("inventory") },
     { to: "/branches", icon: Building2, label: t("branches") },
     { to: "/settings", icon: Settings, label: t("settings") },
+  ];
+  const inventoryItems = [
+    { to: "/inventory/stock", icon: BarChart3, label: t("stockOverview") },
+    { to: "/inventory/products", icon: Package, label: t("products") },
+    { to: "/inventory/categories", icon: FolderTree, label: t("categories") },
+    { to: "/inventory/suppliers", icon: Truck, label: t("suppliers") },
+    { to: "/inventory/purchase-orders", icon: ClipboardList, label: t("purchaseOrders") },
+    { to: "/inventory/alerts", icon: AlertTriangle, label: t("alerts"), badge: alertCount },
   ];
 
   return (
@@ -31,7 +59,7 @@ export function Sidebar() {
         </div>
       </div>
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-        {items.map((it) => (
+        {items.slice(0, 8).map((it) => (
           <NavLink
             key={it.to}
             to={it.to}
@@ -39,6 +67,54 @@ export function Sidebar() {
             className={({ isActive }) =>
               cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                isActive
+                  ? "bg-white text-sidebar-primary-foreground shadow-card"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-white"
+              )
+            }
+          >
+            <it.icon className="size-[18px] shrink-0" />
+            <span className="flex-1 truncate">{it.label}</span>
+          </NavLink>
+        ))}
+
+        {/* Inventory section */}
+        <div className="pt-2">
+          <div className={cn(
+            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold",
+            inventoryOpen ? "text-white" : "text-sidebar-foreground/80"
+          )}>
+            <Boxes className="size-[18px] shrink-0" />
+            <span className="flex-1 truncate">{t("inventoryHub")}</span>
+            {alertCount > 0 && (
+              <span className="bg-destructive text-destructive-foreground text-[10px] rounded-full px-1.5 py-0.5 font-bold">{alertCount}</span>
+            )}
+          </div>
+          <div className="ms-3 ps-3 border-s border-sidebar-border/40 mt-1 space-y-1">
+            {inventoryItems.map((it) => (
+              <NavLink key={it.to} to={it.to}
+                className={({ isActive }) => cn(
+                  "flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors",
+                  isActive ? "bg-white text-sidebar-primary-foreground shadow-card" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-white"
+                )}>
+                <it.icon className="size-4 shrink-0" />
+                <span className="flex-1 truncate">{it.label}</span>
+                {it.badge && it.badge > 0 ? (
+                  <span className="bg-destructive text-destructive-foreground text-[10px] rounded-full px-1.5 py-0.5 font-bold">{it.badge}</span>
+                ) : null}
+              </NavLink>
+            ))}
+          </div>
+        </div>
+
+        {items.slice(8).map((it) => (
+          <NavLink
+            key={it.to}
+            to={it.to}
+            end={it.end}
+            className={({ isActive }) =>
+              cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mt-1",
                 isActive
                   ? "bg-white text-sidebar-primary-foreground shadow-card"
                   : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-white"

@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, Calendar, Users, Bell, Wallet, Boxes, Settings, Stethoscope, Building2 } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Bell, Wallet, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { cn } from "@/lib/utils";
 
@@ -9,8 +9,11 @@ export function Sidebar() {
     { to: "/", icon: LayoutDashboard, label: t("dashboard"), end: true },
     { to: "/calendar", icon: Calendar, label: t("calendar"), badge: null },
     { to: "/patients", icon: Users, label: t("patients"), badge: null },
+    { to: "/invoices", icon: FileText, label: t("invoices") },
+    { to: "/payments", icon: CreditCard, label: t("payments") },
+    { to: "/treasury", icon: Banknote, label: t("treasury") },
+    { to: "/expenses", icon: Receipt, label: t("expenses") },
     { to: "/reminders", icon: Bell, label: t("reminders") },
-    { to: "/finances", icon: Wallet, label: t("finances") },
     { to: "/inventory", icon: Boxes, label: t("inventory") },
     { to: "/branches", icon: Building2, label: t("branches") },
     { to: "/settings", icon: Settings, label: t("settings") },

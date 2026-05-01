@@ -28,6 +28,12 @@ import StockOverview from "@/pages/inventory/StockOverview";
 import PurchaseOrders from "@/pages/inventory/PurchaseOrders";
 import PurchaseOrderDetail from "@/pages/inventory/PurchaseOrderDetail";
 import Alerts from "@/pages/inventory/Alerts";
+import Specialties from "@/pages/medical/Specialties";
+import Diagnoses from "@/pages/medical/Diagnoses";
+import Medications from "@/pages/medical/Medications";
+import ProceduresPage from "@/pages/medical/Procedures";
+import MedicalRecords from "@/pages/medical/MedicalRecords";
+import QuickConsult from "@/pages/medical/QuickConsult";
 
 const queryClient = new QueryClient();
 
@@ -62,6 +68,12 @@ const App = () => (
                   <Route path="/inventory/purchase-orders" element={<PurchaseOrders />} />
                   <Route path="/inventory/purchase-orders/:id" element={<PurchaseOrderDetail />} />
                   <Route path="/inventory/alerts" element={<Alerts />} />
+                  <Route path="/medical/records" element={<MedicalRecords />} />
+                  <Route path="/medical/quick-consult" element={<QuickConsult />} />
+                  <Route path="/medical/specialties" element={<Specialties />} />
+                  <Route path="/medical/diagnoses" element={<Diagnoses />} />
+                  <Route path="/medical/medications" element={<Medications />} />
+                  <Route path="/medical/procedures" element={<ProceduresPage />} />
                   <Route path="/branches" element={<Placeholder titleKey="branches" />} />
                   <Route path="/settings" element={<Placeholder titleKey="settings" />} />
                 </Route>

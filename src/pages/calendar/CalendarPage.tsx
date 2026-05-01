@@ -13,6 +13,19 @@ import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+function statusLabel(s: Appt["status"], t: (k: any) => string) {
+  const map: Record<Appt["status"], string> = {
+    scheduled: "statusScheduled",
+    confirmed: "statusConfirmed",
+    in_progress: "statusInProgress",
+    completed: "statusCompleted",
+    cancelled: "statusCancelled",
+    no_show: "statusNoShow",
+    departed: "statusDeparted",
+  };
+  return t(map[s]);
+}
+
 type Appt = {
   id: string;
   patient_id: string;

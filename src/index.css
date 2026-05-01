@@ -145,5 +145,4 @@ html { font-family: "Inter", system-ui, sans-serif; }
   .status-departed { @apply bg-destructive/15 text-destructive border-destructive/30; }
   .status-new { @apply bg-primary/15 text-primary border-primary/30; }
   .status-cancelled { @apply bg-muted text-muted-foreground border-border; }
-  }
 }

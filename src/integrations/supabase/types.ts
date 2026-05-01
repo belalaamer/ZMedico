@@ -353,6 +353,7 @@ export type Database = {
           id: string
           invoice_id: string
           item_type: Database["public"]["Enums"]["invoice_item_type"]
+          product_id: string | null
           quantity: number
           total: number
           unit_price: number
@@ -364,6 +365,7 @@ export type Database = {
           id?: string
           invoice_id: string
           item_type?: Database["public"]["Enums"]["invoice_item_type"]
+          product_id?: string | null
           quantity?: number
           total?: number
           unit_price?: number
@@ -375,6 +377,7 @@ export type Database = {
           id?: string
           invoice_id?: string
           item_type?: Database["public"]["Enums"]["invoice_item_type"]
+          product_id?: string | null
           quantity?: number
           total?: number
           unit_price?: number
@@ -385,6 +388,13 @@ export type Database = {
             columns: ["invoice_id"]
             isOneToOne: false
             referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -1173,6 +1183,7 @@ export type Database = {
         }
         Returns: string
       }
+      check_expiry_alerts: { Args: never; Returns: number }
       default_treasury_for_branch: {
         Args: { _branch_id: string }
         Returns: string

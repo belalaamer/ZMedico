@@ -245,7 +245,6 @@ export const dict = {
     transactionHistory: "Transaction history",
     purchaseHistory: "Purchase history",
     stockByBranch: "Stock by branch",
-    duplicate: "Duplicate",
     productImage: "Product image",
     insufficientStock: "Insufficient stock",
     transferSameBranchError: "Source and destination branches must differ",
@@ -256,7 +255,6 @@ export const dict = {
     ml: "ml",
     g: "g",
     overviewTab: "Overview",
-    description: "Description",
   },
   ar: {
     appName: "زد ميديكو",

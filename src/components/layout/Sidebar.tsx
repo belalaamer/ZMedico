@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useBranch } from "@/contexts/BranchContext";
@@ -12,6 +12,7 @@ export function Sidebar() {
   const { pathname } = useLocation();
   const [alertCount, setAlertCount] = useState(0);
   const inventoryOpen = pathname.startsWith("/inventory");
+  const medicalOpen = pathname.startsWith("/medical");
 
   useEffect(() => {
     let q = supabase.from("stock_alerts").select("*", { count: "exact", head: true }).eq("is_resolved", false);
@@ -45,6 +46,14 @@ export function Sidebar() {
     { to: "/inventory/suppliers", icon: Truck, label: t("suppliers") },
     { to: "/inventory/purchase-orders", icon: ClipboardList, label: t("purchaseOrders") },
     { to: "/inventory/alerts", icon: AlertTriangle, label: t("alerts"), badge: alertCount },
+  ];
+  const medicalItems = [
+    { to: "/medical/records", icon: FileText, label: t("medicalRecords") },
+    { to: "/medical/quick-consult", icon: Zap, label: t("quickConsult") },
+    { to: "/medical/specialties", icon: Stethoscope, label: t("specialties") },
+    { to: "/medical/diagnoses", icon: HeartPulse, label: t("diagnoses") },
+    { to: "/medical/medications", icon: Pill, label: t("medications") },
+    { to: "/medical/procedures", icon: Activity, label: t("proceduresCatalog") },
   ];
 
   return (
@@ -102,6 +111,29 @@ export function Sidebar() {
                 {it.badge && it.badge > 0 ? (
                   <span className="bg-destructive text-destructive-foreground text-[10px] rounded-full px-1.5 py-0.5 font-bold">{it.badge}</span>
                 ) : null}
+              </NavLink>
+            ))}
+          </div>
+        </div>
+
+        {/* Medical section */}
+        <div className="pt-2">
+          <div className={cn(
+            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold",
+            medicalOpen ? "text-white" : "text-sidebar-foreground/80"
+          )}>
+            <Stethoscope className="size-[18px] shrink-0" />
+            <span className="flex-1 truncate">{t("medical")}</span>
+          </div>
+          <div className="ms-3 ps-3 border-s border-sidebar-border/40 mt-1 space-y-1">
+            {medicalItems.map((it) => (
+              <NavLink key={it.to} to={it.to}
+                className={({ isActive }) => cn(
+                  "flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors",
+                  isActive ? "bg-white text-sidebar-primary-foreground shadow-card" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-white"
+                )}>
+                <it.icon className="size-4 shrink-0" />
+                <span className="flex-1 truncate">{it.label}</span>
               </NavLink>
             ))}
           </div>

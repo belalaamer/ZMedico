@@ -1,0 +1,49 @@
+import { ReactNode } from "react";
+import { NavLink } from "react-router-dom";
+import { Settings, Building2, Calendar, FileText, CreditCard, Briefcase, Bell, Mail, MessageSquare, Phone, Languages, ShieldCheck, Users, HardDrive, ScrollText, Info } from "lucide-react";
+import { useI18n } from "@/contexts/I18nContext";
+import { cn } from "@/lib/utils";
+
+export default function SettingsLayout({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
+  const items = [
+    { to: "/settings/general", icon: Building2, label: t("clinicProfile") },
+    { to: "/settings/appointments", icon: Calendar, label: t("appointmentSettings") },
+    { to: "/settings/invoices", icon: FileText, label: t("invoiceSettings") },
+    { to: "/settings/payments", icon: CreditCard, label: t("paymentMethods") },
+    { to: "/settings/services", icon: Briefcase, label: t("servicesMgmt") },
+    { to: "/settings/notifications", icon: Bell, label: t("notificationSettings") },
+    { to: "/settings/templates/email", icon: Mail, label: t("emailTemplates") },
+    { to: "/settings/templates/sms", icon: MessageSquare, label: t("smsTemplates") },
+    { to: "/settings/templates/whatsapp", icon: Phone, label: t("whatsappTemplates") },
+    { to: "/settings/languages", icon: Languages, label: t("languageSettings") },
+    { to: "/settings/roles", icon: ShieldCheck, label: t("rolePermissions") },
+    { to: "/settings/users", icon: Users, label: t("userManagement") },
+    { to: "/settings/backup", icon: HardDrive, label: t("backupExport") },
+    { to: "/settings/audit", icon: ScrollText, label: t("auditLogs") },
+    { to: "/settings/system", icon: Info, label: t("systemInfo") },
+  ];
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
+      <aside className="space-y-1">
+        <div className="flex items-center gap-2 px-2 py-3">
+          <Settings className="size-5 text-primary" />
+          <h2 className="text-lg font-bold">{t("settingsHub")}</h2>
+        </div>
+        <nav className="space-y-0.5">
+          {items.map((it) => (
+            <NavLink key={it.to} to={it.to}
+              className={({ isActive }) => cn(
+                "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                isActive ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-muted"
+              )}>
+              <it.icon className="size-4 shrink-0" />
+              <span className="truncate">{it.label}</span>
+            </NavLink>
+          ))}
+        </nav>
+      </aside>
+      <main className="min-w-0">{children}</main>
+    </div>
+  );
+}

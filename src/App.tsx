@@ -55,6 +55,19 @@ import MedicalReports from "@/pages/reports/MedicalReports";
 import HRReports from "@/pages/reports/HRReports";
 import InventoryReports from "@/pages/reports/InventoryReports";
 import ScheduledReports from "@/pages/reports/ScheduledReports";
+import GeneralSettings from "@/pages/settings/GeneralSettings";
+import AppointmentSettings from "@/pages/settings/AppointmentSettings";
+import InvoiceSettings from "@/pages/settings/InvoiceSettings";
+import PaymentMethodsPage from "@/pages/settings/PaymentMethods";
+import ServicesPage from "@/pages/settings/Services";
+import NotificationSettings from "@/pages/settings/NotificationSettings";
+import Templates from "@/pages/settings/Templates";
+import LanguagesPage from "@/pages/settings/Languages";
+import RolePermissions from "@/pages/settings/RolePermissions";
+import UserManagement from "@/pages/settings/UserManagement";
+import BackupExport from "@/pages/settings/BackupExport";
+import AuditLogs from "@/pages/settings/AuditLogs";
+import SystemInfo from "@/pages/settings/SystemInfo";
 
 const queryClient = new QueryClient();
 
@@ -117,7 +130,22 @@ const App = () => (
                   <Route path="/reports/inventory" element={<InventoryReports />} />
                   <Route path="/reports/scheduled" element={<ScheduledReports />} />
                   <Route path="/branches" element={<Placeholder titleKey="branches" />} />
-                  <Route path="/settings" element={<Placeholder titleKey="settings" />} />
+                  <Route path="/settings" element={<GeneralSettings />} />
+                  <Route path="/settings/general" element={<GeneralSettings />} />
+                  <Route path="/settings/appointments" element={<AppointmentSettings />} />
+                  <Route path="/settings/invoices" element={<InvoiceSettings />} />
+                  <Route path="/settings/payments" element={<PaymentMethodsPage />} />
+                  <Route path="/settings/services" element={<ServicesPage />} />
+                  <Route path="/settings/notifications" element={<NotificationSettings />} />
+                  <Route path="/settings/templates/email" element={<Templates kind="email" />} />
+                  <Route path="/settings/templates/sms" element={<Templates kind="sms" />} />
+                  <Route path="/settings/templates/whatsapp" element={<Templates kind="whatsapp" />} />
+                  <Route path="/settings/languages" element={<LanguagesPage />} />
+                  <Route path="/settings/roles" element={<RolePermissions />} />
+                  <Route path="/settings/users" element={<UserManagement />} />
+                  <Route path="/settings/backup" element={<BackupExport />} />
+                  <Route path="/settings/audit" element={<AuditLogs />} />
+                  <Route path="/settings/system" element={<SystemInfo />} />
                 </Route>
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />

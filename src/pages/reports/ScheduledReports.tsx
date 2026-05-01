@@ -74,7 +74,7 @@ export default function ScheduledReports() {
           <DialogContent>
             <DialogHeader><DialogTitle>{t("createSchedule")}</DialogTitle></DialogHeader>
             <div className="space-y-3">
-              <div><Label>{t("name")}</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+              <div><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
               <div><Label>{t("reportTemplate")}</Label>
                 <Select value={form.template_id} onValueChange={(v) => setForm({ ...form, template_id: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -111,7 +111,7 @@ export default function ScheduledReports() {
       </div>
       <Card><CardContent className="pt-6 overflow-x-auto">
         <Table><TableHeader><TableRow>
-          <TableHead>{t("name")}</TableHead><TableHead>{t("reportTemplate")}</TableHead>
+          <TableHead>Name</TableHead><TableHead>{t("reportTemplate")}</TableHead>
           <TableHead>{t("frequency")}</TableHead><TableHead>{t("fileFormat")}</TableHead>
           <TableHead>{t("nextRun")}</TableHead><TableHead>{t("active")}</TableHead><TableHead></TableHead>
         </TableRow></TableHeader>
@@ -119,7 +119,7 @@ export default function ScheduledReports() {
           <TableRow key={r.id}>
             <TableCell className="font-medium">{r.name}</TableCell>
             <TableCell>{lang === "ar" ? r.report_templates?.name_ar : r.report_templates?.name_en}</TableCell>
-            <TableCell>{t(r.frequency)}</TableCell>
+            <TableCell>{t(r.frequency as any)}</TableCell>
             <TableCell className="uppercase text-xs">{r.format}</TableCell>
             <TableCell>{formatDateTime(r.next_run_at, lang)}</TableCell>
             <TableCell><Switch checked={r.is_active} onCheckedChange={(v) => toggle(r.id, v)} /></TableCell>

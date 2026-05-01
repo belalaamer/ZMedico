@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Search, Package, Edit3, Power, Copy } from "lucide-react";
+import { Plus, Search, Package, Edit3, Power, Copy, Upload, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,20 @@ export default function Products() {
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<Product | null>(null);
   const [form, setForm] = useState(emptyForm());
+  const [uploading, setUploading] = useState(false);
+
+  const handleImageUpload = async (file: File) => {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { toast.error("Max 5MB"); return; }
+    setUploading(true);
+    const ext = file.name.split(".").pop() || "jpg";
+    const path = `${crypto.randomUUID()}.${ext}`;
+    const { error } = await supabase.storage.from("product-images").upload(path, file, { upsert: false, contentType: file.type });
+    if (error) { setUploading(false); toast.error(error.message); return; }
+    const { data: pub } = supabase.storage.from("product-images").getPublicUrl(path);
+    setForm((f) => ({ ...f, image_url: pub.publicUrl }));
+    setUploading(false);
+  };
 
   const load = async () => {
     const [{ data: ps }, { data: cs }, { data: ss }] = await Promise.all([
@@ -207,7 +221,30 @@ export default function Products() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2"><Label>{t("imageUrl")}</Label><Input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} maxLength={500} /></div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>{t("productImage")}</Label>
+                  <div className="flex items-center gap-3">
+                    <div className="size-20 rounded-lg bg-muted flex items-center justify-center overflow-hidden border border-border shrink-0">
+                      {form.image_url ? <img src={form.image_url} alt="" className="size-full object-cover" /> : <Package className="size-7 text-muted-foreground" />}
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <label className="inline-flex items-center justify-center gap-2 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent px-3 py-2 cursor-pointer">
+                          <Upload className="size-4" />
+                          {uploading ? "…" : t("uploadImage")}
+                          <input type="file" accept="image/*" className="hidden" disabled={uploading}
+                            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f); e.currentTarget.value = ""; }} />
+                        </label>
+                        {form.image_url && (
+                          <Button type="button" variant="ghost" size="sm" onClick={() => setForm({ ...form, image_url: "" })}>
+                            <X className="me-1 size-4" />{t("removeImage")}
+                          </Button>
+                        )}
+                      </div>
+                      <Input value={form.image_url} placeholder={t("imageUrl")} onChange={(e) => setForm({ ...form, image_url: e.target.value })} maxLength={500} />
+                    </div>
+                  </div>
+                </div>
                 <div className="space-y-2"><Label>{t("costPrice")}</Label><Input type="number" min={0} step="0.01" value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: Number(e.target.value) })} /></div>
                 <div className="space-y-2"><Label>{t("sellingPrice")}</Label><Input type="number" min={0} step="0.01" value={form.selling_price} onChange={(e) => setForm({ ...form, selling_price: Number(e.target.value) })} /></div>
                 <div className="space-y-2"><Label>{t("minStock")}</Label><Input type="number" min={0} value={form.min_stock_level} onChange={(e) => setForm({ ...form, min_stock_level: Number(e.target.value) })} /></div>

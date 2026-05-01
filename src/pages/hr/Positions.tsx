@@ -1,0 +1,108 @@
+import { useEffect, useState } from "react";
+import { Plus, Edit3, Briefcase } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useI18n } from "@/contexts/I18nContext";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+export default function Positions() {
+  const { t, lang } = useI18n();
+  const [items, setItems] = useState<any[]>([]);
+  const [depts, setDepts] = useState<any[]>([]);
+  const [filterDept, setFilterDept] = useState<string>("all");
+  const [open, setOpen] = useState(false);
+  const [edit, setE] = useState<any>(null);
+  const [form, setForm] = useState({ title_en: "", title_ar: "", department_id: "", description_en: "", description_ar: "", salary_range_min: "", salary_range_max: "" });
+
+  const load = async () => {
+    const { data } = await supabase.from("staff_positions").select("*").order("title_en");
+    setItems(data ?? []);
+    const { data: d } = await supabase.from("departments").select("id,name_en,name_ar");
+    setDepts(d ?? []);
+  };
+  useEffect(() => { load(); }, []);
+
+  const openNew = () => { setE(null); setForm({ title_en: "", title_ar: "", department_id: "", description_en: "", description_ar: "", salary_range_min: "", salary_range_max: "" }); setOpen(true); };
+  const openEdit = (p: any) => { setE(p); setForm({ title_en: p.title_en, title_ar: p.title_ar, department_id: p.department_id ?? "", description_en: p.description_en ?? "", description_ar: p.description_ar ?? "", salary_range_min: p.salary_range_min?.toString() ?? "", salary_range_max: p.salary_range_max?.toString() ?? "" }); setOpen(true); };
+  const save = async () => {
+    if (!form.title_en.trim() || !form.title_ar.trim()) { toast.error("Title required"); return; }
+    const payload: any = {
+      title_en: form.title_en.trim(), title_ar: form.title_ar.trim(),
+      department_id: form.department_id || null,
+      description_en: form.description_en || null, description_ar: form.description_ar || null,
+      salary_range_min: form.salary_range_min ? Number(form.salary_range_min) : null,
+      salary_range_max: form.salary_range_max ? Number(form.salary_range_max) : null,
+    };
+    const { error } = edit
+      ? await supabase.from("staff_positions").update(payload).eq("id", edit.id)
+      : await supabase.from("staff_positions").insert(payload);
+    if (error) return toast.error(error.message);
+    toast.success(t("save")); setOpen(false); load();
+  };
+
+  const deptName = (id: string | null) => { const d = depts.find((x) => x.id === id); return d ? (lang === "ar" ? d.name_ar : d.name_en) : "—"; };
+  const filtered = filterDept === "all" ? items : items.filter((p) => p.department_id === filterDept);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("positions")}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{filtered.length}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Select value={filterDept} onValueChange={setFilterDept}>
+            <SelectTrigger className="w-48"><SelectValue placeholder={t("department")} /></SelectTrigger>
+            <SelectContent><SelectItem value="all">{t("filterAll") || "All"}</SelectItem>{depts.map((d) => <SelectItem key={d.id} value={d.id}>{lang === "ar" ? d.name_ar : d.name_en}</SelectItem>)}</SelectContent>
+          </Select>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground" onClick={openNew}><Plus className="me-2 size-4" />{t("addPosition")}</Button></DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader><DialogTitle>{edit ? t("position") : t("newPosition")}</DialogTitle></DialogHeader>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2"><Label>{t("titleEn")}</Label><Input value={form.title_en} onChange={(e) => setForm({ ...form, title_en: e.target.value })} maxLength={120} /></div>
+                <div className="space-y-2"><Label>{t("titleAr")}</Label><Input dir="rtl" value={form.title_ar} onChange={(e) => setForm({ ...form, title_ar: e.target.value })} maxLength={120} /></div>
+                <div className="space-y-2 sm:col-span-2"><Label>{t("department")}</Label>
+                  <Select value={form.department_id || "none"} onValueChange={(v) => setForm({ ...form, department_id: v === "none" ? "" : v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent><SelectItem value="none">— {t("none")} —</SelectItem>{depts.map((d) => <SelectItem key={d.id} value={d.id}>{lang === "ar" ? d.name_ar : d.name_en}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2"><Label>{t("salaryMin")}</Label><Input type="number" value={form.salary_range_min} onChange={(e) => setForm({ ...form, salary_range_min: e.target.value })} /></div>
+                <div className="space-y-2"><Label>{t("salaryMax")}</Label><Input type="number" value={form.salary_range_max} onChange={(e) => setForm({ ...form, salary_range_max: e.target.value })} /></div>
+                <div className="space-y-2 sm:col-span-2"><Label>{t("description")}</Label><Input value={form.description_en} onChange={(e) => setForm({ ...form, description_en: e.target.value })} maxLength={300} /></div>
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button>
+                <Button className="gradient-primary text-primary-foreground" onClick={save}>{t("save")}</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+      <Card className="shadow-card overflow-hidden">
+        {filtered.length === 0 ? <div className="p-10 text-center text-muted-foreground">{t("noPositions")}</div> : (
+          <div className="divide-y divide-border">
+            {filtered.map((p) => (
+              <div key={p.id} className="flex items-center gap-4 p-4">
+                <div className="size-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center"><Briefcase className="size-5" /></div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium truncate">{lang === "ar" ? p.title_ar : p.title_en}</div>
+                  <div className="text-xs text-muted-foreground">{deptName(p.department_id)}</div>
+                </div>
+                {(p.salary_range_min || p.salary_range_max) && <Badge variant="outline">{p.salary_range_min ?? "—"} – {p.salary_range_max ?? "—"}</Badge>}
+                <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Edit3 className="size-4" /></Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}

@@ -30,6 +30,8 @@ export default function Dashboard() {
   const [patientCount, setPatientCount] = useState<number>(0);
   const [todayRevenue, setTodayRevenue] = useState<number>(0);
   const [pendingInvoices, setPendingInvoices] = useState<number>(0);
+  const [todayConsults, setTodayConsults] = useState<number>(0);
+  const [draftRecords, setDraftRecords] = useState<number>(0);
 
   useEffect(() => {
     const start = new Date(); start.setHours(0,0,0,0);
@@ -51,6 +53,15 @@ export default function Dashboard() {
     let iq = supabase.from("invoices").select("*", { count: "exact", head: true }).in("status", ["pending", "partial"]);
     if (currentBranchId) iq = iq.eq("branch_id", currentBranchId);
     iq.then(({ count }) => setPendingInvoices(count ?? 0));
+
+    const today = new Date().toISOString().slice(0, 10);
+    let cq = supabase.from("medical_records").select("*", { count: "exact", head: true }).eq("visit_date", today);
+    if (currentBranchId) cq = cq.eq("branch_id", currentBranchId);
+    cq.then(({ count }) => setTodayConsults(count ?? 0));
+
+    let dq = supabase.from("medical_records").select("*", { count: "exact", head: true }).eq("status", "draft");
+    if (currentBranchId) dq = dq.eq("branch_id", currentBranchId);
+    dq.then(({ count }) => setDraftRecords(count ?? 0));
   }, [currentBranchId]);
 
   return (
@@ -113,6 +124,36 @@ export default function Dashboard() {
           </div>
           <Button asChild variant="outline" size="sm" className="mt-4">
             <Link to="/invoices">{t("invoices")}</Link>
+          </Button>
+        </Card>
+
+        <Card className="p-5 shadow-card border-border/60 hover:shadow-elegant transition-shadow">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-sm text-muted-foreground">{t("todaysConsultations")}</div>
+              <div className="mt-2 text-3xl font-bold tabular-nums text-primary">{todayConsults}</div>
+            </div>
+            <div className="size-11 rounded-xl bg-gradient-to-br from-primary to-primary-glow text-white flex items-center justify-center">
+              <FileText className="size-5" />
+            </div>
+          </div>
+          <Button asChild variant="outline" size="sm" className="mt-4">
+            <Link to="/medical/quick-consult">{t("quickConsult")}</Link>
+          </Button>
+        </Card>
+
+        <Card className="p-5 shadow-card border-border/60 hover:shadow-elegant transition-shadow">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-sm text-muted-foreground">{t("pendingRecords")}</div>
+              <div className="mt-2 text-3xl font-bold tabular-nums text-warning">{draftRecords}</div>
+            </div>
+            <div className="size-11 rounded-xl bg-gradient-to-br from-info to-info text-white flex items-center justify-center">
+              <Clock className="size-5" />
+            </div>
+          </div>
+          <Button asChild variant="outline" size="sm" className="mt-4">
+            <Link to="/medical/records">{t("medicalRecords")}</Link>
           </Button>
         </Card>
       </div>

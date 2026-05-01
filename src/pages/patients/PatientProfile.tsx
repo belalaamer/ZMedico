@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, FileText, CreditCard, Phone, Mail, MapPin, Calendar } from "lucide-react";
+import { ArrowLeft, FileText, CreditCard, Phone, Mail, MapPin, Calendar, Stethoscope } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney, formatDate, formatDateTime } from "@/lib/format";
 import { CreateInvoiceDialog } from "../invoices/CreateInvoiceDialog";
+import PatientMedicalTab from "./PatientMedicalTab";
 
 const statusClass: Record<string, string> = {
   draft: "status-cancelled", pending: "status-review", paid: "status-completed", partial: "status-progress", cancelled: "status-departed",
@@ -50,9 +51,12 @@ export default function PatientProfile() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <Button asChild variant="ghost" size="sm"><Link to="/patients"><ArrowLeft className="me-2 size-4" />{t("patients")}</Link></Button>
-        <Button className="gradient-primary text-primary-foreground" onClick={() => setCreateOpen(true)}>
-          <FileText className="me-2 size-4" />{t("createInvoice")}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline" size="sm"><Link to={`/patients/${patient.id}/dental`}><Stethoscope className="me-2 size-4"/>{t("dentalChart")}</Link></Button>
+          <Button className="gradient-primary text-primary-foreground" onClick={() => setCreateOpen(true)}>
+            <FileText className="me-2 size-4" />{t("createInvoice")}
+          </Button>
+        </div>
       </div>
 
       <Card className="p-6 shadow-card">
@@ -88,6 +92,7 @@ export default function PatientProfile() {
       <Tabs defaultValue="overview">
         <TabsList>
           <TabsTrigger value="overview">{t("overview")}</TabsTrigger>
+          <TabsTrigger value="medical">{t("medicalTab")}</TabsTrigger>
           <TabsTrigger value="invoices">{t("invoices")}</TabsTrigger>
           <TabsTrigger value="payments">{t("paymentHistory")}</TabsTrigger>
         </TabsList>
@@ -102,6 +107,10 @@ export default function PatientProfile() {
               {patient.notes && <div className="sm:col-span-2"><div className="text-muted-foreground text-xs">{t("notes")}</div><div className="whitespace-pre-wrap">{patient.notes}</div></div>}
             </div>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="medical" className="mt-4">
+          <PatientMedicalTab patientId={patient.id} />
         </TabsContent>
 
         <TabsContent value="invoices" className="mt-4">

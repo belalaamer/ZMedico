@@ -2030,6 +2030,98 @@ export type Database = {
           },
         ]
       }
+      report_schedules: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          filters: Json
+          format: Database["public"]["Enums"]["report_format"]
+          frequency: Database["public"]["Enums"]["report_frequency"]
+          id: string
+          is_active: boolean
+          last_run_at: string | null
+          name: string
+          next_run_at: string
+          recipients: string[]
+          template_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          filters?: Json
+          format?: Database["public"]["Enums"]["report_format"]
+          frequency: Database["public"]["Enums"]["report_frequency"]
+          id?: string
+          is_active?: boolean
+          last_run_at?: string | null
+          name: string
+          next_run_at?: string
+          recipients?: string[]
+          template_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          filters?: Json
+          format?: Database["public"]["Enums"]["report_format"]
+          frequency?: Database["public"]["Enums"]["report_frequency"]
+          id?: string
+          is_active?: boolean
+          last_run_at?: string | null
+          name?: string
+          next_run_at?: string
+          recipients?: string[]
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_schedules_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "report_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      report_templates: {
+        Row: {
+          category: Database["public"]["Enums"]["report_category"]
+          created_at: string
+          created_by: string | null
+          description_ar: string | null
+          description_en: string | null
+          id: string
+          is_active: boolean
+          is_system: boolean
+          name_ar: string
+          name_en: string
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["report_category"]
+          created_at?: string
+          created_by?: string | null
+          description_ar?: string | null
+          description_en?: string | null
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          name_ar: string
+          name_en: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["report_category"]
+          created_at?: string
+          created_by?: string | null
+          description_ar?: string | null
+          description_en?: string | null
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          name_ar?: string
+          name_en?: string
+        }
+        Relationships: []
+      }
       salary_adjustments: {
         Row: {
           amount: number
@@ -2067,6 +2159,41 @@ export type Database = {
             columns: ["payroll_id"]
             isOneToOne: false
             referencedRelation: "payroll"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saved_reports: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          filters: Json
+          id: string
+          name: string
+          template_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          filters?: Json
+          id?: string
+          name: string
+          template_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          filters?: Json
+          id?: string
+          name?: string
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_reports_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "report_templates"
             referencedColumns: ["id"]
           },
         ]
@@ -2706,6 +2833,14 @@ export type Database = {
       payroll_status: "draft" | "approved" | "paid"
       po_status: "draft" | "pending" | "partial" | "received" | "cancelled"
       prescription_status: "active" | "completed" | "cancelled"
+      report_category:
+        | "financial"
+        | "operational"
+        | "medical"
+        | "hr"
+        | "inventory"
+      report_format: "pdf" | "excel" | "both"
+      report_frequency: "daily" | "weekly" | "monthly"
       salary_adjustment_type: "bonus" | "deduction" | "allowance" | "penalty"
       staff_status: "active" | "on_leave" | "terminated" | "suspended"
       tooth_status:
@@ -2900,6 +3035,15 @@ export const Constants = {
       payroll_status: ["draft", "approved", "paid"],
       po_status: ["draft", "pending", "partial", "received", "cancelled"],
       prescription_status: ["active", "completed", "cancelled"],
+      report_category: [
+        "financial",
+        "operational",
+        "medical",
+        "hr",
+        "inventory",
+      ],
+      report_format: ["pdf", "excel", "both"],
+      report_frequency: ["daily", "weekly", "monthly"],
       salary_adjustment_type: ["bonus", "deduction", "allowance", "penalty"],
       staff_status: ["active", "on_leave", "terminated", "suspended"],
       tooth_status: [

@@ -48,6 +48,13 @@ import Attendance from "@/pages/hr/Attendance";
 import Leaves from "@/pages/hr/Leaves";
 import Payroll from "@/pages/hr/Payroll";
 import Performance from "@/pages/hr/Performance";
+import ReportsDashboard from "@/pages/reports/ReportsDashboard";
+import FinancialReports from "@/pages/reports/FinancialReports";
+import OperationalReports from "@/pages/reports/OperationalReports";
+import MedicalReports from "@/pages/reports/MedicalReports";
+import HRReports from "@/pages/reports/HRReports";
+import InventoryReports from "@/pages/reports/InventoryReports";
+import ScheduledReports from "@/pages/reports/ScheduledReports";
 
 const queryClient = new QueryClient();
 
@@ -102,6 +109,13 @@ const App = () => (
                   <Route path="/hr/leaves" element={<Leaves />} />
                   <Route path="/hr/payroll" element={<Payroll />} />
                   <Route path="/hr/performance" element={<Performance />} />
+                  <Route path="/reports" element={<ReportsDashboard />} />
+                  <Route path="/reports/financial" element={<FinancialReports />} />
+                  <Route path="/reports/operational" element={<OperationalReports />} />
+                  <Route path="/reports/medical" element={<MedicalReports />} />
+                  <Route path="/reports/hr" element={<HRReports />} />
+                  <Route path="/reports/inventory" element={<InventoryReports />} />
+                  <Route path="/reports/scheduled" element={<ScheduledReports />} />
                   <Route path="/branches" element={<Placeholder titleKey="branches" />} />
                   <Route path="/settings" element={<Placeholder titleKey="settings" />} />
                 </Route>

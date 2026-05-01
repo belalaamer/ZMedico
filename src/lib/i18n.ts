@@ -535,7 +535,6 @@ export const dict = {
     statusRejected: "Rejected",
     leaveTypes: "Leave Types",
     addLeaveType: "Add Leave Type",
-    code: "Code",
     defaultDays: "Default Days",
     isPaid: "Paid",
     payroll: "Payroll",

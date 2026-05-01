@@ -3,24 +3,49 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import { I18nProvider } from "@/contexts/I18nContext";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { BranchProvider } from "@/contexts/BranchContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
+import AppShell from "@/components/layout/AppShell";
+import AuthPage from "@/pages/auth/Auth";
+import Dashboard from "@/pages/dashboard/Dashboard";
+import PatientsPage from "@/pages/patients/Patients";
+import CalendarPage from "@/pages/calendar/CalendarPage";
+import Placeholder from "@/pages/Placeholder";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+    <I18nProvider>
+      <AuthProvider>
+        <BranchProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Routes>
+                <Route path="/auth" element={<AuthPage />} />
+                <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/patients" element={<PatientsPage />} />
+                  <Route path="/calendar" element={<CalendarPage />} />
+                  <Route path="/reminders" element={<Placeholder titleKey="reminders" />} />
+                  <Route path="/finances" element={<Placeholder titleKey="finances" />} />
+                  <Route path="/inventory" element={<Placeholder titleKey="inventory" />} />
+                  <Route path="/branches" element={<Placeholder titleKey="branches" />} />
+                  <Route path="/settings" element={<Placeholder titleKey="settings" />} />
+                </Route>
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </TooltipProvider>
+        </BranchProvider>
+      </AuthProvider>
+    </I18nProvider>
   </QueryClientProvider>
 );
 

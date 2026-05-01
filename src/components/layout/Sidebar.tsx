@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap, FolderOpen } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useBranch } from "@/contexts/BranchContext";
@@ -50,6 +50,8 @@ export function Sidebar() {
   const medicalItems = [
     { to: "/medical/records", icon: FileText, label: t("medicalRecords") },
     { to: "/medical/quick-consult", icon: Zap, label: t("quickConsult") },
+    { to: "/medical/prescriptions", icon: Pill, label: t("prescriptions") },
+    { to: "/medical/documents", icon: FolderOpen, label: t("documentsCenter") },
     { to: "/medical/specialties", icon: Stethoscope, label: t("specialties") },
     { to: "/medical/diagnoses", icon: HeartPulse, label: t("diagnoses") },
     { to: "/medical/medications", icon: Pill, label: t("medications") },

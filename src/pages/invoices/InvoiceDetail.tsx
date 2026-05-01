@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Printer, CreditCard, X, Copy } from "lucide-react";
+import { ArrowLeft, Printer, CreditCard, X, Copy, Download } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney, formatDate, formatDateTime } from "@/lib/format";
 import { RecordPaymentDialog } from "../payments/RecordPaymentDialog";
+import { generateInvoicePdf } from "@/lib/invoicePdf";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -55,6 +56,15 @@ export default function InvoiceDetail() {
     load();
   };
 
+  const downloadPdf = async () => {
+    let branch = null;
+    if (inv.branch_id) {
+      const { data } = await supabase.from("branches").select("name_en,name_ar,address,phone").eq("id", inv.branch_id).maybeSingle();
+      branch = data;
+    }
+    generateInvoicePdf({ invoice: inv, items, payments: pays, patient: inv.patients, branch, lang, t: t as any });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap print:hidden">
@@ -66,6 +76,7 @@ export default function InvoiceDetail() {
             </Button>
           )}
           <Button variant="outline" onClick={() => window.print()}><Printer className="me-2 size-4" />{t("print")}</Button>
+          <Button variant="outline" onClick={downloadPdf}><Download className="me-2 size-4" />{t("downloadPdf")}</Button>
           {inv.status !== "cancelled" && (
             <AlertDialog>
               <AlertDialogTrigger asChild>

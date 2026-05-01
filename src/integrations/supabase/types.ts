@@ -101,6 +101,236 @@ export type Database = {
         }
         Relationships: []
       }
+      expense_categories: {
+        Row: {
+          branch_id: string | null
+          created_at: string
+          id: string
+          name_ar: string
+          name_en: string
+        }
+        Insert: {
+          branch_id?: string | null
+          created_at?: string
+          id?: string
+          name_ar: string
+          name_en: string
+        }
+        Update: {
+          branch_id?: string | null
+          created_at?: string
+          id?: string
+          name_ar?: string
+          name_en?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_categories_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expenses: {
+        Row: {
+          amount: number
+          branch_id: string
+          category_id: string | null
+          created_at: string
+          created_by: string | null
+          description_ar: string | null
+          description_en: string
+          expense_date: string
+          id: string
+          payment_method: Database["public"]["Enums"]["expense_method"]
+          receipt_image: string | null
+          treasury_id: string | null
+        }
+        Insert: {
+          amount: number
+          branch_id: string
+          category_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description_ar?: string | null
+          description_en: string
+          expense_date?: string
+          id?: string
+          payment_method?: Database["public"]["Enums"]["expense_method"]
+          receipt_image?: string | null
+          treasury_id?: string | null
+        }
+        Update: {
+          amount?: number
+          branch_id?: string
+          category_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description_ar?: string | null
+          description_en?: string
+          expense_date?: string
+          id?: string
+          payment_method?: Database["public"]["Enums"]["expense_method"]
+          receipt_image?: string | null
+          treasury_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "expense_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_treasury_id_fkey"
+            columns: ["treasury_id"]
+            isOneToOne: false
+            referencedRelation: "treasury"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_counters: {
+        Row: {
+          last_value: number
+          year: number
+        }
+        Insert: {
+          last_value?: number
+          year: number
+        }
+        Update: {
+          last_value?: number
+          year?: number
+        }
+        Relationships: []
+      }
+      invoice_items: {
+        Row: {
+          created_at: string
+          description_ar: string | null
+          description_en: string
+          id: string
+          invoice_id: string
+          item_type: Database["public"]["Enums"]["invoice_item_type"]
+          quantity: number
+          total: number
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          description_ar?: string | null
+          description_en: string
+          id?: string
+          invoice_id: string
+          item_type?: Database["public"]["Enums"]["invoice_item_type"]
+          quantity?: number
+          total?: number
+          unit_price?: number
+        }
+        Update: {
+          created_at?: string
+          description_ar?: string | null
+          description_en?: string
+          id?: string
+          invoice_id?: string
+          item_type?: Database["public"]["Enums"]["invoice_item_type"]
+          quantity?: number
+          total?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          branch_id: string | null
+          created_at: string
+          created_by: string | null
+          discount: number
+          due_date: string | null
+          id: string
+          invoice_date: string
+          invoice_number: string
+          notes: string | null
+          paid_amount: number
+          patient_id: string
+          status: Database["public"]["Enums"]["invoice_status"]
+          subtotal: number
+          tax: number
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          branch_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          discount?: number
+          due_date?: string | null
+          id?: string
+          invoice_date?: string
+          invoice_number: string
+          notes?: string | null
+          paid_amount?: number
+          patient_id: string
+          status?: Database["public"]["Enums"]["invoice_status"]
+          subtotal?: number
+          tax?: number
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          discount?: number
+          due_date?: string | null
+          id?: string
+          invoice_date?: string
+          invoice_number?: string
+          notes?: string | null
+          paid_amount?: number
+          patient_id?: string
+          status?: Database["public"]["Enums"]["invoice_status"]
+          subtotal?: number
+          tax?: number
+          total?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       patients: {
         Row: {
           address: string | null
@@ -175,6 +405,80 @@ export type Database = {
           },
         ]
       }
+      payments: {
+        Row: {
+          amount: number
+          branch_id: string | null
+          created_at: string
+          id: string
+          invoice_id: string | null
+          notes: string | null
+          patient_id: string
+          payment_date: string
+          payment_method: Database["public"]["Enums"]["payment_method"]
+          received_by: string | null
+          reference_number: string | null
+          treasury_id: string | null
+        }
+        Insert: {
+          amount: number
+          branch_id?: string | null
+          created_at?: string
+          id?: string
+          invoice_id?: string | null
+          notes?: string | null
+          patient_id: string
+          payment_date?: string
+          payment_method?: Database["public"]["Enums"]["payment_method"]
+          received_by?: string | null
+          reference_number?: string | null
+          treasury_id?: string | null
+        }
+        Update: {
+          amount?: number
+          branch_id?: string | null
+          created_at?: string
+          id?: string
+          invoice_id?: string | null
+          notes?: string | null
+          patient_id?: string
+          payment_date?: string
+          payment_method?: Database["public"]["Enums"]["payment_method"]
+          received_by?: string | null
+          reference_number?: string | null
+          treasury_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_treasury_id_fkey"
+            columns: ["treasury_id"]
+            isOneToOne: false
+            referencedRelation: "treasury"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -213,6 +517,100 @@ export type Database = {
           },
         ]
       }
+      treasury: {
+        Row: {
+          branch_id: string
+          created_at: string
+          currency: string
+          current_balance: number
+          id: string
+          is_active: boolean
+          name_ar: string
+          name_en: string
+          updated_at: string
+        }
+        Insert: {
+          branch_id: string
+          created_at?: string
+          currency?: string
+          current_balance?: number
+          id?: string
+          is_active?: boolean
+          name_ar: string
+          name_en: string
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string
+          created_at?: string
+          currency?: string
+          current_balance?: number
+          id?: string
+          is_active?: boolean
+          name_ar?: string
+          name_en?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "treasury_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      treasury_transactions: {
+        Row: {
+          amount: number
+          balance_after: number
+          created_at: string
+          created_by: string | null
+          description_ar: string | null
+          description_en: string
+          id: string
+          reference_id: string | null
+          reference_type: string | null
+          transaction_type: Database["public"]["Enums"]["treasury_tx_type"]
+          treasury_id: string
+        }
+        Insert: {
+          amount: number
+          balance_after: number
+          created_at?: string
+          created_by?: string | null
+          description_ar?: string | null
+          description_en: string
+          id?: string
+          reference_id?: string | null
+          reference_type?: string | null
+          transaction_type: Database["public"]["Enums"]["treasury_tx_type"]
+          treasury_id: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          created_at?: string
+          created_by?: string | null
+          description_ar?: string | null
+          description_en?: string
+          id?: string
+          reference_id?: string | null
+          reference_type?: string | null
+          transaction_type?: Database["public"]["Enums"]["treasury_tx_type"]
+          treasury_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "treasury_transactions_treasury_id_fkey"
+            columns: ["treasury_id"]
+            isOneToOne: false
+            referencedRelation: "treasury"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -239,12 +637,38 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_treasury_tx: {
+        Args: {
+          _amount: number
+          _by: string
+          _desc_ar: string
+          _desc_en: string
+          _ref_id: string
+          _ref_type: string
+          _treasury_id: string
+          _type: Database["public"]["Enums"]["treasury_tx_type"]
+        }
+        Returns: string
+      }
+      default_treasury_for_branch: {
+        Args: { _branch_id: string }
+        Returns: string
+      }
+      generate_invoice_number: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
         Returns: boolean
+      }
+      recalc_invoice_payments: {
+        Args: { _invoice_id: string }
+        Returns: undefined
+      }
+      recalc_invoice_subtotal: {
+        Args: { _invoice_id: string }
+        Returns: undefined
       }
     }
     Enums: {
@@ -257,7 +681,12 @@ export type Database = {
         | "cancelled"
         | "no_show"
         | "departed"
+      expense_method: "cash" | "card" | "bank_transfer"
       gender: "male" | "female"
+      invoice_item_type: "service" | "product" | "procedure"
+      invoice_status: "draft" | "pending" | "paid" | "partial" | "cancelled"
+      payment_method: "cash" | "card" | "bank_transfer" | "insurance" | "wallet"
+      treasury_tx_type: "income" | "expense" | "transfer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -395,7 +824,12 @@ export const Constants = {
         "no_show",
         "departed",
       ],
+      expense_method: ["cash", "card", "bank_transfer"],
       gender: ["male", "female"],
+      invoice_item_type: ["service", "product", "procedure"],
+      invoice_status: ["draft", "pending", "paid", "partial", "cancelled"],
+      payment_method: ["cash", "card", "bank_transfer", "insurance", "wallet"],
+      treasury_tx_type: ["income", "expense", "transfer"],
     },
   },
 } as const

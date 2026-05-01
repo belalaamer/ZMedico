@@ -14,6 +14,11 @@ import Dashboard from "@/pages/dashboard/Dashboard";
 import PatientsPage from "@/pages/patients/Patients";
 import CalendarPage from "@/pages/calendar/CalendarPage";
 import Placeholder from "@/pages/Placeholder";
+import Invoices from "@/pages/invoices/Invoices";
+import InvoiceDetail from "@/pages/invoices/InvoiceDetail";
+import Payments from "@/pages/payments/Payments";
+import Treasury from "@/pages/treasury/Treasury";
+import Expenses from "@/pages/expenses/Expenses";
 
 const queryClient = new QueryClient();
 
@@ -32,8 +37,12 @@ const App = () => (
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/patients" element={<PatientsPage />} />
                   <Route path="/calendar" element={<CalendarPage />} />
+                  <Route path="/invoices" element={<Invoices />} />
+                  <Route path="/invoices/:id" element={<InvoiceDetail />} />
+                  <Route path="/payments" element={<Payments />} />
+                  <Route path="/treasury" element={<Treasury />} />
+                  <Route path="/expenses" element={<Expenses />} />
                   <Route path="/reminders" element={<Placeholder titleKey="reminders" />} />
-                  <Route path="/finances" element={<Placeholder titleKey="finances" />} />
                   <Route path="/inventory" element={<Placeholder titleKey="inventory" />} />
                   <Route path="/branches" element={<Placeholder titleKey="branches" />} />
                   <Route path="/settings" element={<Placeholder titleKey="settings" />} />

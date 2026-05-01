@@ -14,6 +14,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
 
+export function statusLabel(s: string, t: (k: any) => string) {
+  const map: Record<string, string> = { active: "statusActive", on_leave: "statusOnLeave", terminated: "statusTerminated", suspended: "statusSuspended" };
+  return map[s] ? t(map[s]) : s;
+}
+
 export default function Staff() {
   const { t, lang } = useI18n();
   const { branches, currentBranchId } = useBranch();
@@ -181,7 +186,7 @@ export default function Staff() {
                 <div className="text-xs text-muted-foreground truncate">{s.employee_id} · {posName(s.position_id)}</div>
                 <div className="text-[11px] text-muted-foreground truncate">{deptName(s.department_id)} · {formatMoney(s.salary, lang, s.salary_currency)}</div>
               </div>
-              <Badge variant="outline" className={s.status === "active" ? "status-completed" : "status-departed"}>{t(`status${s.status.charAt(0).toUpperCase()}${s.status.slice(1).replace("_l","L")}` as any) || s.status}</Badge>
+              <Badge variant="outline" className={s.status === "active" ? "status-completed" : "status-departed"}>{statusLabel(s.status, t)}</Badge>
             </Card>
           </Link>
         ))}

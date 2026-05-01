@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -128,9 +130,6 @@ All colors MUST be HSL.
   .shadow-elegant { box-shadow: var(--shadow-elegant); }
   .text-balance { text-wrap: balance; }
 }
-
-/* Arabic font */
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 
 html { font-family: "Inter", system-ui, sans-serif; }
 

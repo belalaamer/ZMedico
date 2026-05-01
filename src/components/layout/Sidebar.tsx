@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap, FolderOpen } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap, FolderOpen, Briefcase, UserCog, Clock, CalendarDays, DollarSign, Star } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useBranch } from "@/contexts/BranchContext";
@@ -13,6 +13,7 @@ export function Sidebar() {
   const [alertCount, setAlertCount] = useState(0);
   const inventoryOpen = pathname.startsWith("/inventory");
   const medicalOpen = pathname.startsWith("/medical");
+  const hrOpen = pathname.startsWith("/hr");
 
   useEffect(() => {
     let q = supabase.from("stock_alerts").select("*", { count: "exact", head: true }).eq("is_resolved", false);
@@ -56,6 +57,16 @@ export function Sidebar() {
     { to: "/medical/diagnoses", icon: HeartPulse, label: t("diagnoses") },
     { to: "/medical/medications", icon: Pill, label: t("medications") },
     { to: "/medical/procedures", icon: Activity, label: t("proceduresCatalog") },
+  ];
+  const hrItems = [
+    { to: "/hr/staff", icon: UserCog, label: t("staffDirectory") },
+    { to: "/hr/departments", icon: Building2, label: t("departments") },
+    { to: "/hr/positions", icon: Briefcase, label: t("positions") },
+    { to: "/hr/schedules", icon: CalendarDays, label: t("schedules") },
+    { to: "/hr/attendance", icon: Clock, label: t("attendance") },
+    { to: "/hr/leaves", icon: FileText, label: t("leaves") },
+    { to: "/hr/payroll", icon: DollarSign, label: t("payroll") },
+    { to: "/hr/performance", icon: Star, label: t("performance") },
   ];
 
   return (
@@ -129,6 +140,29 @@ export function Sidebar() {
           </div>
           <div className="ms-3 ps-3 border-s border-sidebar-border/40 mt-1 space-y-1">
             {medicalItems.map((it) => (
+              <NavLink key={it.to} to={it.to}
+                className={({ isActive }) => cn(
+                  "flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors",
+                  isActive ? "bg-white text-sidebar-primary-foreground shadow-card" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-white"
+                )}>
+                <it.icon className="size-4 shrink-0" />
+                <span className="flex-1 truncate">{it.label}</span>
+              </NavLink>
+            ))}
+          </div>
+        </div>
+
+        {/* HR section */}
+        <div className="pt-2">
+          <div className={cn(
+            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold",
+            hrOpen ? "text-white" : "text-sidebar-foreground/80"
+          )}>
+            <UserCog className="size-[18px] shrink-0" />
+            <span className="flex-1 truncate">{t("hr")}</span>
+          </div>
+          <div className="ms-3 ps-3 border-s border-sidebar-border/40 mt-1 space-y-1">
+            {hrItems.map((it) => (
               <NavLink key={it.to} to={it.to}
                 className={({ isActive }) => cn(
                   "flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors",

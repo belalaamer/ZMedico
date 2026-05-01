@@ -20,6 +20,14 @@ import InvoiceDetail from "@/pages/invoices/InvoiceDetail";
 import Payments from "@/pages/payments/Payments";
 import Treasury from "@/pages/treasury/Treasury";
 import Expenses from "@/pages/expenses/Expenses";
+import Products from "@/pages/inventory/Products";
+import ProductDetail from "@/pages/inventory/ProductDetail";
+import Categories from "@/pages/inventory/Categories";
+import Suppliers from "@/pages/inventory/Suppliers";
+import StockOverview from "@/pages/inventory/StockOverview";
+import PurchaseOrders from "@/pages/inventory/PurchaseOrders";
+import PurchaseOrderDetail from "@/pages/inventory/PurchaseOrderDetail";
+import Alerts from "@/pages/inventory/Alerts";
 
 const queryClient = new QueryClient();
 
@@ -45,7 +53,15 @@ const App = () => (
                   <Route path="/treasury" element={<Treasury />} />
                   <Route path="/expenses" element={<Expenses />} />
                   <Route path="/reminders" element={<Placeholder titleKey="reminders" />} />
-                  <Route path="/inventory" element={<Placeholder titleKey="inventory" />} />
+                  <Route path="/inventory" element={<StockOverview />} />
+                  <Route path="/inventory/stock" element={<StockOverview />} />
+                  <Route path="/inventory/products" element={<Products />} />
+                  <Route path="/inventory/products/:id" element={<ProductDetail />} />
+                  <Route path="/inventory/categories" element={<Categories />} />
+                  <Route path="/inventory/suppliers" element={<Suppliers />} />
+                  <Route path="/inventory/purchase-orders" element={<PurchaseOrders />} />
+                  <Route path="/inventory/purchase-orders/:id" element={<PurchaseOrderDetail />} />
+                  <Route path="/inventory/alerts" element={<Alerts />} />
                   <Route path="/branches" element={<Placeholder titleKey="branches" />} />
                   <Route path="/settings" element={<Placeholder titleKey="settings" />} />
                 </Route>

@@ -1,0 +1,275 @@
+import { useEffect, useMemo, useState } from "react";
+import { Plus, Search, Package, Edit3, Power, Copy } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useI18n } from "@/contexts/I18nContext";
+import { useBranch } from "@/contexts/BranchContext";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { formatMoney } from "@/lib/format";
+
+const UNITS = ["piece", "box", "bottle", "session", "ml", "g"];
+
+type Product = any;
+
+function emptyForm() {
+  return {
+    sku: "", barcode: "", name_en: "", name_ar: "", description_en: "", description_ar: "",
+    category_id: "", supplier_id: "", unit: "piece",
+    cost_price: 0, selling_price: 0, min_stock_level: 10, max_stock_level: "" as any,
+    expiry_tracking: false, image_url: "",
+  };
+}
+
+export default function Products() {
+  const { t, lang } = useI18n();
+  const { currentBranchId } = useBranch();
+  const [items, setItems] = useState<Product[]>([]);
+  const [cats, setCats] = useState<any[]>([]);
+  const [sups, setSups] = useState<any[]>([]);
+  const [stocks, setStocks] = useState<Record<string, number>>({});
+  const [q, setQ] = useState("");
+  const [catFilter, setCatFilter] = useState<string>("all");
+  const [activeFilter, setActiveFilter] = useState<string>("all");
+  const [open, setOpen] = useState(false);
+  const [edit, setEdit] = useState<Product | null>(null);
+  const [form, setForm] = useState(emptyForm());
+
+  const load = async () => {
+    const [{ data: ps }, { data: cs }, { data: ss }] = await Promise.all([
+      supabase.from("products").select("*").order("created_at", { ascending: false }),
+      supabase.from("product_categories").select("*").eq("is_active", true).order("name_en"),
+      supabase.from("suppliers").select("*").eq("is_active", true).order("name_en"),
+    ]);
+    setItems(ps ?? []); setCats(cs ?? []); setSups(ss ?? []);
+    if (currentBranchId) {
+      const { data: inv } = await supabase.from("inventory").select("product_id, quantity").eq("branch_id", currentBranchId);
+      const map: Record<string, number> = {};
+      (inv ?? []).forEach((x: any) => { map[x.product_id] = Number(x.quantity); });
+      setStocks(map);
+    } else {
+      const { data: inv } = await supabase.from("inventory").select("product_id, quantity");
+      const map: Record<string, number> = {};
+      (inv ?? []).forEach((x: any) => { map[x.product_id] = (map[x.product_id] ?? 0) + Number(x.quantity); });
+      setStocks(map);
+    }
+  };
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId]);
+
+  const openNew = () => { setEdit(null); setForm(emptyForm()); setOpen(true); };
+  const openEdit = (p: Product) => {
+    setEdit(p);
+    setForm({
+      sku: p.sku ?? "", barcode: p.barcode ?? "",
+      name_en: p.name_en, name_ar: p.name_ar,
+      description_en: p.description_en ?? "", description_ar: p.description_ar ?? "",
+      category_id: p.category_id ?? "", supplier_id: p.supplier_id ?? "",
+      unit: p.unit ?? "piece", cost_price: Number(p.cost_price), selling_price: Number(p.selling_price),
+      min_stock_level: p.min_stock_level, max_stock_level: p.max_stock_level ?? "",
+      expiry_tracking: !!p.expiry_tracking, image_url: p.image_url ?? "",
+    });
+    setOpen(true);
+  };
+
+  const duplicate = (p: Product) => {
+    setEdit(null);
+    setForm({
+      sku: "", barcode: "",
+      name_en: p.name_en + " (copy)", name_ar: p.name_ar,
+      description_en: p.description_en ?? "", description_ar: p.description_ar ?? "",
+      category_id: p.category_id ?? "", supplier_id: p.supplier_id ?? "",
+      unit: p.unit, cost_price: Number(p.cost_price), selling_price: Number(p.selling_price),
+      min_stock_level: p.min_stock_level, max_stock_level: p.max_stock_level ?? "",
+      expiry_tracking: !!p.expiry_tracking, image_url: p.image_url ?? "",
+    });
+    setOpen(true);
+  };
+
+  const save = async () => {
+    if (!form.name_en.trim() || !form.name_ar.trim()) { toast.error("Name required"); return; }
+    const payload: any = {
+      barcode: form.barcode || null,
+      name_en: form.name_en.trim(), name_ar: form.name_ar.trim(),
+      description_en: form.description_en || null, description_ar: form.description_ar || null,
+      category_id: form.category_id || null, supplier_id: form.supplier_id || null,
+      unit: form.unit, cost_price: Number(form.cost_price) || 0, selling_price: Number(form.selling_price) || 0,
+      min_stock_level: Number(form.min_stock_level) || 0,
+      max_stock_level: form.max_stock_level === "" ? null : Number(form.max_stock_level),
+      expiry_tracking: form.expiry_tracking, image_url: form.image_url || null,
+    };
+    if (edit) {
+      const { error } = await supabase.from("products").update(payload).eq("id", edit.id);
+      if (error) { toast.error(error.message); return; }
+    } else {
+      if (form.sku) payload.sku = form.sku;
+      const { error } = await supabase.from("products").insert(payload);
+      if (error) { toast.error(error.message); return; }
+    }
+    toast.success(t("save")); setOpen(false); load();
+  };
+
+  const toggleActive = async (p: Product) => {
+    const { error } = await supabase.from("products").update({ is_active: !p.is_active }).eq("id", p.id);
+    if (error) { toast.error(error.message); return; }
+    load();
+  };
+
+  const filtered = useMemo(() => items.filter((p) => {
+    if (q) {
+      const text = `${p.name_en} ${p.name_ar} ${p.sku} ${p.barcode ?? ""}`.toLowerCase();
+      if (!text.includes(q.toLowerCase())) return false;
+    }
+    if (catFilter !== "all" && p.category_id !== catFilter) return false;
+    if (activeFilter === "active" && !p.is_active) return false;
+    if (activeFilter === "inactive" && p.is_active) return false;
+    return true;
+  }), [items, q, catFilter, activeFilter]);
+
+  const stockStatus = (p: Product) => {
+    const qty = stocks[p.id] ?? 0;
+    if (qty <= 0) return { label: t("outOfStock"), cls: "status-departed" };
+    if (qty <= p.min_stock_level) return { label: t("lowStock"), cls: "status-progress" };
+    return { label: t("inStock"), cls: "status-completed" };
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("products")}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{filtered.length}</p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative w-56">
+            <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("search")} className="ps-9" />
+          </div>
+          <Select value={catFilter} onValueChange={setCatFilter}>
+            <SelectTrigger className="w-44"><SelectValue placeholder={t("category")} /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("category")}: {t("none")}</SelectItem>
+              {cats.map((c) => <SelectItem key={c.id} value={c.id}>{lang === "ar" ? c.name_ar : c.name_en}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={activeFilter} onValueChange={setActiveFilter}>
+            <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("status")}</SelectItem>
+              <SelectItem value="active">{t("active")}</SelectItem>
+              <SelectItem value="inactive">{t("inactive")}</SelectItem>
+            </SelectContent>
+          </Select>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button className="gradient-primary text-primary-foreground" onClick={openNew}><Plus className="me-2 size-4" />{t("addProduct")}</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader><DialogTitle>{edit ? t("editProduct") : t("newProduct")}</DialogTitle></DialogHeader>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2"><Label>{t("sku")}</Label><Input value={form.sku} placeholder="auto" disabled={!!edit} onChange={(e) => setForm({ ...form, sku: e.target.value })} maxLength={40} /></div>
+                <div className="space-y-2"><Label>{t("barcode")}</Label><Input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} maxLength={80} /></div>
+                <div className="space-y-2"><Label>{t("nameEn")}</Label><Input value={form.name_en} onChange={(e) => setForm({ ...form, name_en: e.target.value })} maxLength={150} /></div>
+                <div className="space-y-2"><Label>{t("nameAr")}</Label><Input dir="rtl" value={form.name_ar} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} maxLength={150} /></div>
+                <div className="space-y-2">
+                  <Label>{t("category")}</Label>
+                  <Select value={form.category_id || "none"} onValueChange={(v) => setForm({ ...form, category_id: v === "none" ? "" : v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">— {t("none")} —</SelectItem>
+                      {cats.map((c) => <SelectItem key={c.id} value={c.id}>{lang === "ar" ? c.name_ar : c.name_en}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("supplier")}</Label>
+                  <Select value={form.supplier_id || "none"} onValueChange={(v) => setForm({ ...form, supplier_id: v === "none" ? "" : v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">— {t("none")} —</SelectItem>
+                      {sups.map((s) => <SelectItem key={s.id} value={s.id}>{lang === "ar" ? s.name_ar : s.name_en}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("unit")}</Label>
+                  <Select value={form.unit} onValueChange={(v) => setForm({ ...form, unit: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {UNITS.map((u) => <SelectItem key={u} value={u}>{t(u === "piece" ? "pieces" : u as any)}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2"><Label>{t("imageUrl")}</Label><Input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} maxLength={500} /></div>
+                <div className="space-y-2"><Label>{t("costPrice")}</Label><Input type="number" min={0} step="0.01" value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: Number(e.target.value) })} /></div>
+                <div className="space-y-2"><Label>{t("sellingPrice")}</Label><Input type="number" min={0} step="0.01" value={form.selling_price} onChange={(e) => setForm({ ...form, selling_price: Number(e.target.value) })} /></div>
+                <div className="space-y-2"><Label>{t("minStock")}</Label><Input type="number" min={0} value={form.min_stock_level} onChange={(e) => setForm({ ...form, min_stock_level: Number(e.target.value) })} /></div>
+                <div className="space-y-2"><Label>{t("maxStock")}</Label><Input type="number" min={0} value={form.max_stock_level} onChange={(e) => setForm({ ...form, max_stock_level: e.target.value as any })} /></div>
+                <div className="space-y-2 sm:col-span-2"><Label>{t("description")} (EN)</Label><Textarea value={form.description_en} onChange={(e) => setForm({ ...form, description_en: e.target.value })} maxLength={500} rows={2} /></div>
+                <div className="space-y-2 sm:col-span-2"><Label>{t("description")} (AR)</Label><Textarea dir="rtl" value={form.description_ar} onChange={(e) => setForm({ ...form, description_ar: e.target.value })} maxLength={500} rows={2} /></div>
+                <div className="flex items-center justify-between sm:col-span-2 border border-border rounded-lg px-3 py-2">
+                  <Label>{t("expiryTracking")}</Label>
+                  <Switch checked={form.expiry_tracking} onCheckedChange={(v) => setForm({ ...form, expiry_tracking: v })} />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button>
+                <Button className="gradient-primary text-primary-foreground" onClick={save}>{t("save")}</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+
+      <Card className="shadow-card overflow-hidden">
+        {filtered.length === 0 ? (
+          <div className="p-10 text-center text-muted-foreground">{t("noProducts")}</div>
+        ) : (
+          <div className="divide-y divide-border">
+            {filtered.map((p) => {
+              const st = stockStatus(p);
+              const cat = cats.find((c) => c.id === p.category_id);
+              return (
+                <div key={p.id} className="flex items-center gap-4 p-4">
+                  <div className="size-12 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
+                    {p.image_url ? <img src={p.image_url} alt={p.name_en} className="size-full object-cover" /> : <Package className="size-5 text-muted-foreground" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Link to={`/inventory/products/${p.id}`} className="font-medium hover:text-primary truncate">{lang === "ar" ? p.name_ar : p.name_en}</Link>
+                      <Badge variant="outline" className="text-[10px]">{p.sku}</Badge>
+                      {!p.is_active && <Badge variant="outline" className="status-departed text-[10px]">{t("inactive")}</Badge>}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {cat ? (lang === "ar" ? cat.name_ar : cat.name_en) : "—"}
+                      {p.barcode && <> · {p.barcode}</>}
+                    </div>
+                  </div>
+                  <div className="text-end text-sm">
+                    <div className="text-muted-foreground text-[11px]">{t("costPrice")} / {t("sellingPrice")}</div>
+                    <div className="tabular-nums">{formatMoney(p.cost_price, lang)} / <span className="font-semibold text-primary">{formatMoney(p.selling_price, lang)}</span></div>
+                  </div>
+                  <div className="text-end">
+                    <div className="text-[11px] text-muted-foreground">{t("stock")}</div>
+                    <div className="font-semibold tabular-nums">{stocks[p.id] ?? 0}</div>
+                  </div>
+                  <Badge variant="outline" className={st.cls}>{st.label}</Badge>
+                  <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Edit3 className="size-4" /></Button>
+                  <Button variant="ghost" size="icon" onClick={() => duplicate(p)}><Copy className="size-4" /></Button>
+                  <Button variant="ghost" size="icon" onClick={() => toggleActive(p)}><Power className="size-4" /></Button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}

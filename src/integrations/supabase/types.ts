@@ -200,6 +200,136 @@ export type Database = {
           },
         ]
       }
+      inventory: {
+        Row: {
+          available_quantity: number | null
+          branch_id: string
+          created_at: string
+          id: string
+          last_restocked_at: string | null
+          product_id: string
+          quantity: number
+          reserved_quantity: number
+          updated_at: string
+        }
+        Insert: {
+          available_quantity?: number | null
+          branch_id: string
+          created_at?: string
+          id?: string
+          last_restocked_at?: string | null
+          product_id: string
+          quantity?: number
+          reserved_quantity?: number
+          updated_at?: string
+        }
+        Update: {
+          available_quantity?: number | null
+          branch_id?: string
+          created_at?: string
+          id?: string
+          last_restocked_at?: string | null
+          product_id?: string
+          quantity?: number
+          reserved_quantity?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_transactions: {
+        Row: {
+          batch_number: string | null
+          branch_id: string
+          created_at: string
+          created_by: string | null
+          expiry_date: string | null
+          id: string
+          notes_ar: string | null
+          notes_en: string | null
+          product_id: string
+          quantity: number
+          quantity_after: number
+          quantity_before: number
+          reference_id: string | null
+          reference_type: string | null
+          transaction_type: Database["public"]["Enums"]["inventory_tx_type"]
+          unit_cost: number | null
+        }
+        Insert: {
+          batch_number?: string | null
+          branch_id: string
+          created_at?: string
+          created_by?: string | null
+          expiry_date?: string | null
+          id?: string
+          notes_ar?: string | null
+          notes_en?: string | null
+          product_id: string
+          quantity: number
+          quantity_after?: number
+          quantity_before?: number
+          reference_id?: string | null
+          reference_type?: string | null
+          transaction_type: Database["public"]["Enums"]["inventory_tx_type"]
+          unit_cost?: number | null
+        }
+        Update: {
+          batch_number?: string | null
+          branch_id?: string
+          created_at?: string
+          created_by?: string | null
+          expiry_date?: string | null
+          id?: string
+          notes_ar?: string | null
+          notes_en?: string | null
+          product_id?: string
+          quantity?: number
+          quantity_after?: number
+          quantity_before?: number
+          reference_id?: string | null
+          reference_type?: string | null
+          transaction_type?: Database["public"]["Enums"]["inventory_tx_type"]
+          unit_cost?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_transactions_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_transactions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_transactions_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_counters: {
         Row: {
           last_value: number
@@ -479,6 +609,158 @@ export type Database = {
           },
         ]
       }
+      po_counters: {
+        Row: {
+          last_value: number
+          year: number
+        }
+        Insert: {
+          last_value?: number
+          year: number
+        }
+        Update: {
+          last_value?: number
+          year?: number
+        }
+        Relationships: []
+      }
+      product_categories: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name_ar: string
+          name_en: string
+          parent_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name_ar: string
+          name_en: string
+          parent_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name_ar?: string
+          name_en?: string
+          parent_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_categories_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "product_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_sku_counter: {
+        Row: {
+          id: number
+          last_value: number
+        }
+        Insert: {
+          id?: number
+          last_value?: number
+        }
+        Update: {
+          id?: number
+          last_value?: number
+        }
+        Relationships: []
+      }
+      products: {
+        Row: {
+          barcode: string | null
+          category_id: string | null
+          cost_price: number
+          created_at: string
+          description_ar: string | null
+          description_en: string | null
+          expiry_tracking: boolean
+          id: string
+          image_url: string | null
+          is_active: boolean
+          max_stock_level: number | null
+          min_stock_level: number
+          name_ar: string
+          name_en: string
+          selling_price: number
+          sku: string
+          supplier_id: string | null
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          barcode?: string | null
+          category_id?: string | null
+          cost_price?: number
+          created_at?: string
+          description_ar?: string | null
+          description_en?: string | null
+          expiry_tracking?: boolean
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          max_stock_level?: number | null
+          min_stock_level?: number
+          name_ar: string
+          name_en: string
+          selling_price?: number
+          sku: string
+          supplier_id?: string | null
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          barcode?: string | null
+          category_id?: string | null
+          cost_price?: number
+          created_at?: string
+          description_ar?: string | null
+          description_en?: string | null
+          expiry_tracking?: boolean
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          max_stock_level?: number | null
+          min_stock_level?: number
+          name_ar?: string
+          name_en?: string
+          selling_price?: number
+          sku?: string
+          supplier_id?: string | null
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "product_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -516,6 +798,230 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      purchase_order_items: {
+        Row: {
+          created_at: string
+          id: string
+          product_id: string
+          purchase_order_id: string
+          quantity_ordered: number
+          quantity_received: number
+          total: number
+          unit_cost: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          product_id: string
+          purchase_order_id: string
+          quantity_ordered?: number
+          quantity_received?: number
+          total?: number
+          unit_cost?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          product_id?: string
+          purchase_order_id?: string
+          quantity_ordered?: number
+          quantity_received?: number
+          total?: number
+          unit_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_items_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_orders: {
+        Row: {
+          branch_id: string
+          created_at: string
+          created_by: string | null
+          expected_date: string | null
+          id: string
+          notes: string | null
+          order_date: string
+          po_number: string
+          status: Database["public"]["Enums"]["po_status"]
+          subtotal: number
+          supplier_id: string
+          tax: number
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          branch_id: string
+          created_at?: string
+          created_by?: string | null
+          expected_date?: string | null
+          id?: string
+          notes?: string | null
+          order_date?: string
+          po_number: string
+          status?: Database["public"]["Enums"]["po_status"]
+          subtotal?: number
+          supplier_id: string
+          tax?: number
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string
+          created_at?: string
+          created_by?: string | null
+          expected_date?: string | null
+          id?: string
+          notes?: string | null
+          order_date?: string
+          po_number?: string
+          status?: Database["public"]["Enums"]["po_status"]
+          subtotal?: number
+          supplier_id?: string
+          tax?: number
+          total?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_orders_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_alerts: {
+        Row: {
+          alert_type: Database["public"]["Enums"]["alert_type"]
+          branch_id: string
+          created_at: string
+          id: string
+          is_resolved: boolean
+          product_id: string
+          quantity: number
+          resolved_at: string | null
+          resolved_by: string | null
+        }
+        Insert: {
+          alert_type: Database["public"]["Enums"]["alert_type"]
+          branch_id: string
+          created_at?: string
+          id?: string
+          is_resolved?: boolean
+          product_id: string
+          quantity?: number
+          resolved_at?: string | null
+          resolved_by?: string | null
+        }
+        Update: {
+          alert_type?: Database["public"]["Enums"]["alert_type"]
+          branch_id?: string
+          created_at?: string
+          id?: string
+          is_resolved?: boolean
+          product_id?: string
+          quantity?: number
+          resolved_at?: string | null
+          resolved_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_alerts_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_alerts_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_alerts_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      suppliers: {
+        Row: {
+          address: string | null
+          contact_person: string | null
+          created_at: string
+          email: string | null
+          id: string
+          is_active: boolean
+          name_ar: string
+          name_en: string
+          notes: string | null
+          phone: string | null
+          tax_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          contact_person?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name_ar: string
+          name_en: string
+          notes?: string | null
+          phone?: string | null
+          tax_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          contact_person?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name_ar?: string
+          name_en?: string
+          notes?: string | null
+          phone?: string | null
+          tax_number?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       treasury: {
         Row: {
@@ -650,11 +1156,30 @@ export type Database = {
         }
         Returns: string
       }
+      apply_inventory_tx: {
+        Args: {
+          _batch: string
+          _branch_id: string
+          _by: string
+          _expiry: string
+          _notes_ar: string
+          _notes_en: string
+          _product_id: string
+          _ref_id: string
+          _ref_type: string
+          _signed_qty: number
+          _type: Database["public"]["Enums"]["inventory_tx_type"]
+          _unit_cost: number
+        }
+        Returns: string
+      }
       default_treasury_for_branch: {
         Args: { _branch_id: string }
         Returns: string
       }
       generate_invoice_number: { Args: never; Returns: string }
+      generate_po_number: { Args: never; Returns: string }
+      generate_product_sku: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -670,8 +1195,20 @@ export type Database = {
         Args: { _invoice_id: string }
         Returns: undefined
       }
+      recalc_po_subtotal: { Args: { _po_id: string }; Returns: undefined }
+      receive_po_item: {
+        Args: {
+          _batch: string
+          _by: string
+          _expiry: string
+          _po_item_id: string
+          _qty: number
+        }
+        Returns: undefined
+      }
     }
     Enums: {
+      alert_type: "low_stock" | "out_of_stock" | "expiring_soon" | "expired"
       app_role: "admin" | "doctor" | "receptionist" | "staff"
       appointment_status:
         | "scheduled"
@@ -683,9 +1220,18 @@ export type Database = {
         | "departed"
       expense_method: "cash" | "card" | "bank_transfer"
       gender: "male" | "female"
+      inventory_tx_type:
+        | "purchase"
+        | "sale"
+        | "adjustment"
+        | "transfer_in"
+        | "transfer_out"
+        | "return"
+        | "expiry"
       invoice_item_type: "service" | "product" | "procedure"
       invoice_status: "draft" | "pending" | "paid" | "partial" | "cancelled"
       payment_method: "cash" | "card" | "bank_transfer" | "insurance" | "wallet"
+      po_status: "draft" | "pending" | "partial" | "received" | "cancelled"
       treasury_tx_type: "income" | "expense" | "transfer"
     }
     CompositeTypes: {
@@ -814,6 +1360,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      alert_type: ["low_stock", "out_of_stock", "expiring_soon", "expired"],
       app_role: ["admin", "doctor", "receptionist", "staff"],
       appointment_status: [
         "scheduled",
@@ -826,9 +1373,19 @@ export const Constants = {
       ],
       expense_method: ["cash", "card", "bank_transfer"],
       gender: ["male", "female"],
+      inventory_tx_type: [
+        "purchase",
+        "sale",
+        "adjustment",
+        "transfer_in",
+        "transfer_out",
+        "return",
+        "expiry",
+      ],
       invoice_item_type: ["service", "product", "procedure"],
       invoice_status: ["draft", "pending", "paid", "partial", "cancelled"],
       payment_method: ["cash", "card", "bank_transfer", "insurance", "wallet"],
+      po_status: ["draft", "pending", "partial", "received", "cancelled"],
       treasury_tx_type: ["income", "expense", "transfer"],
     },
   },

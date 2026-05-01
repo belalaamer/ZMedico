@@ -37,7 +37,7 @@ export default function MedicalRecords() {
               const p = r.patients;
               const name = lang === "ar" ? `${p?.first_name_ar ?? p?.first_name_en ?? ""} ${p?.last_name_ar ?? p?.last_name_en ?? ""}`.trim() : `${p?.first_name_en ?? ""} ${p?.last_name_en ?? ""}`.trim();
               return (
-                <div key={r.id} className="flex items-center gap-4 p-4">
+                <Link key={r.id} to={`/medical/records/${r.id}`} className="flex items-center gap-4 p-4 hover:bg-muted/40 transition-colors">
                   <FileText className="size-5 text-muted-foreground" />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium">{name} <span className="text-xs text-muted-foreground">#{p?.patient_code}</span></div>
@@ -45,7 +45,7 @@ export default function MedicalRecords() {
                   </div>
                   <Badge variant="outline">{t(("visit_" + r.visit_type) as any) ?? r.visit_type}</Badge>
                   <Badge variant="outline" className={r.status === "completed" ? "status-completed" : r.status === "reviewed" ? "status-progress" : "status-cancelled"}>{r.status}</Badge>
-                </div>
+                </Link>
               );
             })}
           </div>

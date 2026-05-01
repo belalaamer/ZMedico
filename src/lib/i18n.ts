@@ -707,6 +707,7 @@ export const dict = {
     requiresReference: "Requires reference",
     processingFeePct: "Fee %",
     processingFeeFixed: "Fixed fee",
+    displayOrder: "Order",
     addPaymentMethod: "Add payment method",
     addService: "Add service",
     addTemplate: "Add template",

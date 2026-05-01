@@ -19,11 +19,11 @@ export function ReportFilterBar({
     <Card>
       <CardContent className="pt-6 flex flex-wrap items-end gap-3">
         <div>
-          <Label className="text-xs">{t("from")}</Label>
+          <Label className="text-xs">{t("fromDate")}</Label>
           <Input type="date" value={start} onChange={(e) => setStart(e.target.value)} className="w-40" />
         </div>
         <div>
-          <Label className="text-xs">{t("to")}</Label>
+          <Label className="text-xs">{t("toDate")}</Label>
           <Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="w-40" />
         </div>
         {extra}

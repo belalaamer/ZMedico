@@ -42,7 +42,7 @@ export default function BackupExport() {
             <p className="text-sm text-muted-foreground">Export full snapshot of core tables as JSON.</p>
             <Button className="gradient-primary text-primary-foreground" onClick={exportAllJson}><Download className="me-2 size-4" />{t("backupNow")}</Button>
           </Card>
-          <Card className="p-5 space-y-3"><div className="flex items-center gap-2"><Download className="size-5 text-primary" /><h3 className="font-semibold">{t("export")}</h3></div>
+          <Card className="p-5 space-y-3"><div className="flex items-center gap-2"><Download className="size-5 text-primary" /><h3 className="font-semibold">Export</h3></div>
             <div className="grid gap-2">
               <Button variant="outline" onClick={() => exportTable("patients", "patients.xlsx")}>{t("exportPatients")}</Button>
               <Button variant="outline" onClick={() => exportTable("invoices", "invoices.xlsx")}>{t("exportInvoices")}</Button>

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Phone, Mail, User as UserIcon } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Link } from "react-router-dom";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -167,7 +168,7 @@ export default function PatientsPage() {
                 ? `${p.first_name_ar ?? p.first_name_en} ${p.last_name_ar ?? p.last_name_en ?? ""}`.trim()
                 : `${p.first_name_en} ${p.last_name_en ?? ""}`.trim();
               return (
-                <div key={p.id} className="flex items-center gap-4 p-4 hover:bg-muted/40 transition-colors">
+                <Link key={p.id} to={`/patients/${p.id}`} className="flex items-center gap-4 p-4 hover:bg-muted/40 transition-colors">
                   <div className="size-10 rounded-full gradient-primary text-primary-foreground flex items-center justify-center font-semibold">
                     {name.slice(0,1).toUpperCase()}
                   </div>
@@ -183,7 +184,7 @@ export default function PatientsPage() {
                     </div>
                   </div>
                   <Badge variant="outline" className="status-progress">{t("statusInProgress")}</Badge>
-                </div>
+                </Link>
               );
             })}
           </div>

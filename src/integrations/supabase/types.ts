@@ -14,6 +14,65 @@ export type Database = {
   }
   public: {
     Tables: {
+      appointment_settings: {
+        Row: {
+          allow_online_booking: boolean
+          auto_confirm_after_minutes: number | null
+          branch_id: string | null
+          buffer_minutes: number
+          cancellation_deadline_hours: number
+          created_at: string
+          id: string
+          max_appointments_per_slot: number
+          max_future_booking_days: number
+          min_advance_booking_hours: number
+          reminder_hours_before: number[]
+          require_confirmation: boolean
+          slot_duration_minutes: number
+          updated_at: string
+        }
+        Insert: {
+          allow_online_booking?: boolean
+          auto_confirm_after_minutes?: number | null
+          branch_id?: string | null
+          buffer_minutes?: number
+          cancellation_deadline_hours?: number
+          created_at?: string
+          id?: string
+          max_appointments_per_slot?: number
+          max_future_booking_days?: number
+          min_advance_booking_hours?: number
+          reminder_hours_before?: number[]
+          require_confirmation?: boolean
+          slot_duration_minutes?: number
+          updated_at?: string
+        }
+        Update: {
+          allow_online_booking?: boolean
+          auto_confirm_after_minutes?: number | null
+          branch_id?: string | null
+          buffer_minutes?: number
+          cancellation_deadline_hours?: number
+          created_at?: string
+          id?: string
+          max_appointments_per_slot?: number
+          max_future_booking_days?: number
+          min_advance_booking_hours?: number
+          reminder_hours_before?: number[]
+          require_confirmation?: boolean
+          slot_duration_minutes?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_settings_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: true
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       appointments: {
         Row: {
           branch_id: string | null
@@ -152,6 +211,63 @@ export type Database = {
           },
         ]
       }
+      audit_logs: {
+        Row: {
+          action: string
+          branch_id: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          ip_address: string | null
+          new_values: Json | null
+          old_values: Json | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          branch_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          ip_address?: string | null
+          new_values?: Json | null
+          old_values?: Json | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          branch_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          ip_address?: string | null
+          new_values?: Json | null
+          old_values?: Json | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       branches: {
         Row: {
           address: string | null
@@ -178,6 +294,166 @@ export type Database = {
           phone?: string | null
         }
         Relationships: []
+      }
+      clinic_profile: {
+        Row: {
+          address_ar: string | null
+          address_en: string | null
+          branch_id: string | null
+          city: string | null
+          clinic_name_ar: string
+          clinic_name_en: string
+          commercial_registration_number: string | null
+          country: string | null
+          created_at: string
+          description_ar: string | null
+          description_en: string | null
+          email: string | null
+          favicon_url: string | null
+          google_maps_url: string | null
+          id: string
+          logo_url: string | null
+          phone: string | null
+          phone_secondary: string | null
+          postal_code: string | null
+          social_facebook: string | null
+          social_instagram: string | null
+          social_twitter: string | null
+          social_whatsapp: string | null
+          social_youtube: string | null
+          tagline_ar: string | null
+          tagline_en: string | null
+          tax_registration_number: string | null
+          updated_at: string
+          website: string | null
+          working_days: number[]
+          working_hours_end: string
+          working_hours_start: string
+        }
+        Insert: {
+          address_ar?: string | null
+          address_en?: string | null
+          branch_id?: string | null
+          city?: string | null
+          clinic_name_ar?: string
+          clinic_name_en?: string
+          commercial_registration_number?: string | null
+          country?: string | null
+          created_at?: string
+          description_ar?: string | null
+          description_en?: string | null
+          email?: string | null
+          favicon_url?: string | null
+          google_maps_url?: string | null
+          id?: string
+          logo_url?: string | null
+          phone?: string | null
+          phone_secondary?: string | null
+          postal_code?: string | null
+          social_facebook?: string | null
+          social_instagram?: string | null
+          social_twitter?: string | null
+          social_whatsapp?: string | null
+          social_youtube?: string | null
+          tagline_ar?: string | null
+          tagline_en?: string | null
+          tax_registration_number?: string | null
+          updated_at?: string
+          website?: string | null
+          working_days?: number[]
+          working_hours_end?: string
+          working_hours_start?: string
+        }
+        Update: {
+          address_ar?: string | null
+          address_en?: string | null
+          branch_id?: string | null
+          city?: string | null
+          clinic_name_ar?: string
+          clinic_name_en?: string
+          commercial_registration_number?: string | null
+          country?: string | null
+          created_at?: string
+          description_ar?: string | null
+          description_en?: string | null
+          email?: string | null
+          favicon_url?: string | null
+          google_maps_url?: string | null
+          id?: string
+          logo_url?: string | null
+          phone?: string | null
+          phone_secondary?: string | null
+          postal_code?: string | null
+          social_facebook?: string | null
+          social_instagram?: string | null
+          social_twitter?: string | null
+          social_whatsapp?: string | null
+          social_youtube?: string | null
+          tagline_ar?: string | null
+          tagline_en?: string | null
+          tax_registration_number?: string | null
+          updated_at?: string
+          website?: string | null
+          working_days?: number[]
+          working_hours_end?: string
+          working_hours_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clinic_profile_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: true
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clinic_settings: {
+        Row: {
+          branch_id: string | null
+          created_at: string
+          description_ar: string | null
+          description_en: string | null
+          id: string
+          is_public: boolean
+          setting_key: string
+          setting_type: Database["public"]["Enums"]["setting_value_type"]
+          setting_value: string | null
+          updated_at: string
+        }
+        Insert: {
+          branch_id?: string | null
+          created_at?: string
+          description_ar?: string | null
+          description_en?: string | null
+          id?: string
+          is_public?: boolean
+          setting_key: string
+          setting_type?: Database["public"]["Enums"]["setting_value_type"]
+          setting_value?: string | null
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string | null
+          created_at?: string
+          description_ar?: string | null
+          description_en?: string | null
+          id?: string
+          is_public?: boolean
+          setting_key?: string
+          setting_type?: Database["public"]["Enums"]["setting_value_type"]
+          setting_value?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clinic_settings_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       dental_chart: {
         Row: {
@@ -307,6 +583,51 @@ export type Database = {
           id?: string
           name_ar?: string
           name_en?: string
+        }
+        Relationships: []
+      }
+      email_templates: {
+        Row: {
+          body_ar: string
+          body_en: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name_ar: string
+          name_en: string
+          subject_ar: string
+          subject_en: string
+          template_key: string
+          updated_at: string
+          variables: string[] | null
+        }
+        Insert: {
+          body_ar?: string
+          body_en?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name_ar: string
+          name_en: string
+          subject_ar?: string
+          subject_en?: string
+          template_key: string
+          updated_at?: string
+          variables?: string[] | null
+        }
+        Update: {
+          body_ar?: string
+          body_en?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name_ar?: string
+          name_en?: string
+          subject_ar?: string
+          subject_en?: string
+          template_key?: string
+          updated_at?: string
+          variables?: string[] | null
         }
         Relationships: []
       }
@@ -619,6 +940,80 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_settings: {
+        Row: {
+          branch_id: string | null
+          created_at: string
+          default_payment_terms_days: number
+          default_tax_rate: number
+          id: string
+          invoice_footer_ar: string | null
+          invoice_footer_en: string | null
+          invoice_notes_ar: string | null
+          invoice_notes_en: string | null
+          invoice_prefix: string
+          invoice_start_number: number
+          invoice_suffix: string | null
+          reset_number_yearly: boolean
+          show_logo_on_invoice: boolean
+          show_payment_qr: boolean
+          show_tax_id: boolean
+          terms_conditions_ar: string | null
+          terms_conditions_en: string | null
+          updated_at: string
+        }
+        Insert: {
+          branch_id?: string | null
+          created_at?: string
+          default_payment_terms_days?: number
+          default_tax_rate?: number
+          id?: string
+          invoice_footer_ar?: string | null
+          invoice_footer_en?: string | null
+          invoice_notes_ar?: string | null
+          invoice_notes_en?: string | null
+          invoice_prefix?: string
+          invoice_start_number?: number
+          invoice_suffix?: string | null
+          reset_number_yearly?: boolean
+          show_logo_on_invoice?: boolean
+          show_payment_qr?: boolean
+          show_tax_id?: boolean
+          terms_conditions_ar?: string | null
+          terms_conditions_en?: string | null
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string | null
+          created_at?: string
+          default_payment_terms_days?: number
+          default_tax_rate?: number
+          id?: string
+          invoice_footer_ar?: string | null
+          invoice_footer_en?: string | null
+          invoice_notes_ar?: string | null
+          invoice_notes_en?: string | null
+          invoice_prefix?: string
+          invoice_start_number?: number
+          invoice_suffix?: string | null
+          reset_number_yearly?: boolean
+          show_logo_on_invoice?: boolean
+          show_payment_qr?: boolean
+          show_tax_id?: boolean
+          terms_conditions_ar?: string | null
+          terms_conditions_en?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_settings_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: true
+            referencedRelation: "branches"
             referencedColumns: ["id"]
           },
         ]
@@ -1078,6 +1473,77 @@ export type Database = {
           },
         ]
       }
+      notification_settings: {
+        Row: {
+          birthday_discount_percentage: number
+          branch_id: string | null
+          created_at: string
+          email_sender_address: string | null
+          email_sender_name: string | null
+          follow_up_days_after: number
+          id: string
+          reminder_channel: Database["public"]["Enums"]["notification_channel"]
+          send_appointment_cancellation: boolean
+          send_appointment_confirmation: boolean
+          send_appointment_reminders: boolean
+          send_birthday_greeting: boolean
+          send_follow_up_reminder: boolean
+          send_invoice_notification: boolean
+          send_payment_receipt: boolean
+          sms_sender_id: string | null
+          updated_at: string
+          whatsapp_business_number: string | null
+        }
+        Insert: {
+          birthday_discount_percentage?: number
+          branch_id?: string | null
+          created_at?: string
+          email_sender_address?: string | null
+          email_sender_name?: string | null
+          follow_up_days_after?: number
+          id?: string
+          reminder_channel?: Database["public"]["Enums"]["notification_channel"]
+          send_appointment_cancellation?: boolean
+          send_appointment_confirmation?: boolean
+          send_appointment_reminders?: boolean
+          send_birthday_greeting?: boolean
+          send_follow_up_reminder?: boolean
+          send_invoice_notification?: boolean
+          send_payment_receipt?: boolean
+          sms_sender_id?: string | null
+          updated_at?: string
+          whatsapp_business_number?: string | null
+        }
+        Update: {
+          birthday_discount_percentage?: number
+          branch_id?: string | null
+          created_at?: string
+          email_sender_address?: string | null
+          email_sender_name?: string | null
+          follow_up_days_after?: number
+          id?: string
+          reminder_channel?: Database["public"]["Enums"]["notification_channel"]
+          send_appointment_cancellation?: boolean
+          send_appointment_confirmation?: boolean
+          send_appointment_reminders?: boolean
+          send_birthday_greeting?: boolean
+          send_follow_up_reminder?: boolean
+          send_invoice_notification?: boolean
+          send_payment_receipt?: boolean
+          sms_sender_id?: string | null
+          updated_at?: string
+          whatsapp_business_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_settings_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: true
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       patient_documents: {
         Row: {
           created_at: string
@@ -1215,6 +1681,59 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "patients_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_methods: {
+        Row: {
+          branch_id: string | null
+          code: string
+          created_at: string
+          display_order: number
+          id: string
+          is_active: boolean
+          name_ar: string
+          name_en: string
+          processing_fee_fixed: number
+          processing_fee_percentage: number
+          requires_reference: boolean
+          type: Database["public"]["Enums"]["payment_method_type"]
+        }
+        Insert: {
+          branch_id?: string | null
+          code: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          name_ar: string
+          name_en: string
+          processing_fee_fixed?: number
+          processing_fee_percentage?: number
+          requires_reference?: boolean
+          type?: Database["public"]["Enums"]["payment_method_type"]
+        }
+        Update: {
+          branch_id?: string | null
+          code?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          name_ar?: string
+          name_en?: string
+          processing_fee_fixed?: number
+          processing_fee_percentage?: number
+          requires_reference?: boolean
+          type?: Database["public"]["Enums"]["payment_method_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_methods_branch_id_fkey"
             columns: ["branch_id"]
             isOneToOne: false
             referencedRelation: "branches"
@@ -2198,6 +2717,143 @@ export type Database = {
           },
         ]
       }
+      service_categories: {
+        Row: {
+          color: string | null
+          created_at: string
+          description_ar: string | null
+          description_en: string | null
+          display_order: number
+          icon: string | null
+          id: string
+          is_active: boolean
+          name_ar: string
+          name_en: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          description_ar?: string | null
+          description_en?: string | null
+          display_order?: number
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          name_ar: string
+          name_en: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          description_ar?: string | null
+          description_en?: string | null
+          display_order?: number
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          name_ar?: string
+          name_en?: string
+        }
+        Relationships: []
+      }
+      services: {
+        Row: {
+          available_online: boolean
+          category_id: string | null
+          code: string | null
+          cost_price: number | null
+          created_at: string
+          default_duration_minutes: number
+          default_price: number
+          description_ar: string | null
+          description_en: string | null
+          display_order: number
+          id: string
+          is_active: boolean
+          name_ar: string
+          name_en: string
+          requires_appointment: boolean
+        }
+        Insert: {
+          available_online?: boolean
+          category_id?: string | null
+          code?: string | null
+          cost_price?: number | null
+          created_at?: string
+          default_duration_minutes?: number
+          default_price?: number
+          description_ar?: string | null
+          description_en?: string | null
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          name_ar: string
+          name_en: string
+          requires_appointment?: boolean
+        }
+        Update: {
+          available_online?: boolean
+          category_id?: string | null
+          code?: string | null
+          cost_price?: number | null
+          created_at?: string
+          default_duration_minutes?: number
+          default_price?: number
+          description_ar?: string | null
+          description_en?: string | null
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          name_ar?: string
+          name_en?: string
+          requires_appointment?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "services_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "service_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sms_templates: {
+        Row: {
+          body_ar: string
+          body_en: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name_ar: string
+          name_en: string
+          template_key: string
+          variables: string[] | null
+        }
+        Insert: {
+          body_ar?: string
+          body_en?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name_ar: string
+          name_en: string
+          template_key: string
+          variables?: string[] | null
+        }
+        Update: {
+          body_ar?: string
+          body_en?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name_ar?: string
+          name_en?: string
+          template_key?: string
+          variables?: string[] | null
+        }
+        Relationships: []
+      }
       staff_positions: {
         Row: {
           created_at: string
@@ -2464,6 +3120,39 @@ export type Database = {
         }
         Relationships: []
       }
+      system_languages: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          is_default: boolean
+          is_rtl: boolean
+          name_ar: string
+          name_en: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          is_rtl?: boolean
+          name_ar: string
+          name_en: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          is_rtl?: boolean
+          name_ar?: string
+          name_en?: string
+        }
+        Relationships: []
+      }
       treasury: {
         Row: {
           branch_id: string
@@ -2554,6 +3243,50 @@ export type Database = {
             columns: ["treasury_id"]
             isOneToOne: false
             referencedRelation: "treasury"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_activity_logs: {
+        Row: {
+          activity_type: string
+          created_at: string
+          description_ar: string | null
+          description_en: string | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          ip_address: string | null
+          user_id: string | null
+        }
+        Insert: {
+          activity_type: string
+          created_at?: string
+          description_ar?: string | null
+          description_en?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          ip_address?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          activity_type?: string
+          created_at?: string
+          description_ar?: string | null
+          description_en?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          ip_address?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_activity_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -2660,6 +3393,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      whatsapp_templates: {
+        Row: {
+          body_ar: string
+          body_en: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name_ar: string
+          name_en: string
+          template_key: string
+          variables: string[] | null
+        }
+        Insert: {
+          body_ar?: string
+          body_en?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name_ar: string
+          name_en: string
+          template_key: string
+          variables?: string[] | null
+        }
+        Update: {
+          body_ar?: string
+          body_en?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name_ar?: string
+          name_en?: string
+          template_key?: string
+          variables?: string[] | null
+        }
+        Relationships: []
       }
       work_schedules: {
         Row: {
@@ -2829,7 +3598,15 @@ export type Database = {
       invoice_status: "draft" | "pending" | "paid" | "partial" | "cancelled"
       leave_request_status: "pending" | "approved" | "rejected" | "cancelled"
       medical_record_status: "draft" | "completed" | "reviewed"
+      notification_channel: "email" | "sms" | "whatsapp" | "push"
       payment_method: "cash" | "card" | "bank_transfer" | "insurance" | "wallet"
+      payment_method_type:
+        | "cash"
+        | "card"
+        | "bank_transfer"
+        | "wallet"
+        | "insurance"
+        | "other"
       payroll_status: "draft" | "approved" | "paid"
       po_status: "draft" | "pending" | "partial" | "received" | "cancelled"
       prescription_status: "active" | "completed" | "cancelled"
@@ -2842,6 +3619,7 @@ export type Database = {
       report_format: "pdf" | "excel" | "both"
       report_frequency: "daily" | "weekly" | "monthly"
       salary_adjustment_type: "bonus" | "deduction" | "allowance" | "penalty"
+      setting_value_type: "string" | "number" | "boolean" | "json"
       staff_status: "active" | "on_leave" | "terminated" | "suspended"
       tooth_status:
         | "healthy"
@@ -3031,7 +3809,16 @@ export const Constants = {
       invoice_status: ["draft", "pending", "paid", "partial", "cancelled"],
       leave_request_status: ["pending", "approved", "rejected", "cancelled"],
       medical_record_status: ["draft", "completed", "reviewed"],
+      notification_channel: ["email", "sms", "whatsapp", "push"],
       payment_method: ["cash", "card", "bank_transfer", "insurance", "wallet"],
+      payment_method_type: [
+        "cash",
+        "card",
+        "bank_transfer",
+        "wallet",
+        "insurance",
+        "other",
+      ],
       payroll_status: ["draft", "approved", "paid"],
       po_status: ["draft", "pending", "partial", "received", "cancelled"],
       prescription_status: ["active", "completed", "cancelled"],
@@ -3045,6 +3832,7 @@ export const Constants = {
       report_format: ["pdf", "excel", "both"],
       report_frequency: ["daily", "weekly", "monthly"],
       salary_adjustment_type: ["bonus", "deduction", "allowance", "penalty"],
+      setting_value_type: ["string", "number", "boolean", "json"],
       staff_status: ["active", "on_leave", "terminated", "suspended"],
       tooth_status: [
         "healthy",

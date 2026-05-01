@@ -8,89 +8,101 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* ZMedico — Medical Purple Theme */
+    --background: 220 25% 97%;
+    --foreground: 222 30% 15%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 222 30% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 222 30% 15%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 268 56% 24%;            /* #3a1a5e */
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 262 52% 47%;       /* lighter purple */
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 263 50% 96%;
+    --secondary-foreground: 268 56% 24%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 220 20% 95%;
+    --muted-foreground: 220 10% 45%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 263 60% 94%;
+    --accent-foreground: 268 56% 24%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 75% 55%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --success: 145 60% 42%;
+    --success-foreground: 0 0% 100%;
 
-    --radius: 0.5rem;
+    --warning: 35 92% 55%;
+    --warning-foreground: 0 0% 100%;
 
-    --sidebar-background: 0 0% 98%;
+    --info: 210 80% 52%;
+    --info-foreground: 0 0% 100%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    --border: 220 20% 90%;
+    --input: 220 20% 90%;
+    --ring: 262 52% 47%;
 
-    --sidebar-primary: 240 5.9% 10%;
+    --radius: 0.75rem;
 
-    --sidebar-primary-foreground: 0 0% 98%;
+    --gradient-primary: linear-gradient(135deg, hsl(268 56% 24%), hsl(262 52% 47%));
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%), hsl(220 25% 98%));
+    --shadow-card: 0 2px 12px -4px hsl(268 56% 24% / 0.08);
+    --shadow-elegant: 0 10px 30px -10px hsl(268 56% 24% / 0.25);
 
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 268 56% 24%;
+    --sidebar-foreground: 263 30% 88%;
+    --sidebar-primary: 0 0% 100%;
+    --sidebar-primary-foreground: 268 56% 24%;
+    --sidebar-accent: 268 50% 32%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 268 40% 30%;
+    --sidebar-ring: 262 52% 47%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --background: 268 30% 8%;
+    --foreground: 220 20% 95%;
+    --card: 268 30% 11%;
+    --card-foreground: 220 20% 95%;
+    --popover: 268 30% 11%;
+    --popover-foreground: 220 20% 95%;
+    --primary: 262 52% 60%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 262 52% 70%;
+    --secondary: 268 25% 18%;
+    --secondary-foreground: 220 20% 95%;
+    --muted: 268 25% 18%;
+    --muted-foreground: 220 15% 65%;
+    --accent: 268 25% 22%;
+    --accent-foreground: 220 20% 95%;
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 145 55% 50%;
+    --success-foreground: 0 0% 100%;
+    --warning: 35 88% 60%;
+    --warning-foreground: 0 0% 10%;
+    --info: 210 80% 60%;
+    --info-foreground: 0 0% 100%;
+    --border: 268 25% 20%;
+    --input: 268 25% 20%;
+    --ring: 262 52% 60%;
+    --gradient-primary: linear-gradient(135deg, hsl(262 52% 35%), hsl(262 52% 55%));
+    --gradient-card: linear-gradient(180deg, hsl(268 30% 11%), hsl(268 30% 9%));
+    --shadow-card: 0 2px 12px -4px hsl(0 0% 0% / 0.4);
+    --shadow-elegant: 0 10px 30px -10px hsl(0 0% 0% / 0.6);
+    --sidebar-background: 268 35% 10%;
+    --sidebar-foreground: 263 20% 80%;
+    --sidebar-primary: 262 52% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 268 30% 16%;
+    --sidebar-accent-foreground: 220 20% 95%;
+    --sidebar-border: 268 30% 18%;
+    --sidebar-ring: 262 52% 60%;
   }
 }
 
@@ -100,6 +112,38 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  html[dir="rtl"] body {
+    font-family: "Cairo", "Tajawal", system-ui, sans-serif;
+  }
+}
+
+@layer utilities {
+  .gradient-primary { background: var(--gradient-primary); }
+  .gradient-card { background: var(--gradient-card); }
+  .shadow-card { box-shadow: var(--shadow-card); }
+  .shadow-elegant { box-shadow: var(--shadow-elegant); }
+  .text-balance { text-wrap: balance; }
+}
+
+/* Arabic font */
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+html { font-family: "Inter", system-ui, sans-serif; }
+
+/* RTL-aware logical spacing helpers already supported by Tailwind via [dir] */
+[dir="rtl"] .lucide { transform: scaleX(1); }
+
+/* Status badge utility classes */
+@layer components {
+  .status-completed { @apply bg-success/15 text-success border-success/30; }
+  .status-progress { @apply bg-info/15 text-info border-info/30; }
+  .status-review { @apply bg-warning/15 text-warning border-warning/30; }
+  .status-departed { @apply bg-destructive/15 text-destructive border-destructive/30; }
+  .status-new { @apply bg-primary/15 text-primary border-primary/30; }
+  .status-cancelled { @apply bg-muted text-muted-foreground border-border; }
   }
 }

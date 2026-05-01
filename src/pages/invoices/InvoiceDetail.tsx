@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { formatMoney, formatDate, formatDateTime } from "@/lib/format";
 import { RecordPaymentDialog } from "../payments/RecordPaymentDialog";
 import { generateInvoicePdf } from "@/lib/invoicePdf";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -24,6 +25,7 @@ const statusClass: Record<string, string> = {
 export default function InvoiceDetail() {
   const { id } = useParams();
   const { t, lang } = useI18n();
+  const { user } = useAuth();
   const [inv, setInv] = useState<Inv | null>(null);
   const [items, setItems] = useState<any[]>([]);
   const [pays, setPays] = useState<any[]>([]);
@@ -50,6 +52,31 @@ export default function InvoiceDetail() {
   const statusLabel = ({ draft: t("statusDraft"), pending: t("statusPending"), paid: t("statusPaid"), partial: t("statusPartial"), cancelled: t("statusCancelled") } as any)[inv.status];
 
   const cancelInvoice = async () => {
+    // Restore inventory for product items first
+    if (inv.status !== "draft" && inv.branch_id) {
+      const productItems = items.filter((it: any) => it.item_type === "product" && it.product_id);
+      for (const it of productItems) {
+        const qty = Number(it.quantity) || 0;
+        if (qty > 0) {
+          const { error: txErr } = await (supabase as any).rpc("apply_inventory_tx", {
+            _product_id: it.product_id,
+            _branch_id: inv.branch_id,
+            _type: "return",
+            _signed_qty: qty,
+            _unit_cost: null,
+            _ref_type: "invoice_cancel",
+            _ref_id: inv.id,
+            _notes_en: `Cancelled invoice ${inv.invoice_number}`,
+            _notes_ar: `إلغاء فاتورة ${inv.invoice_number}`,
+            _expiry: null,
+            _batch: null,
+            _by: user?.id ?? null,
+          });
+          if (txErr) toast.error(txErr.message);
+        }
+      }
+      if (productItems.length) toast.success(t("inventoryRestored"));
+    }
     const { error } = await supabase.from("invoices").update({ status: "cancelled" }).eq("id", inv.id);
     if (error) { toast.error(error.message); return; }
     toast.success("Cancelled");

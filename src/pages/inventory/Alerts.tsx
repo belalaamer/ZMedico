@@ -27,6 +27,8 @@ export default function Alerts() {
   const [branches, setBranches] = useState<Record<string, any>>({});
 
   const load = async () => {
+    // Run expiry check on each load (lightweight; idempotent)
+    try { await (supabase as any).rpc("check_expiry_alerts"); } catch { /* ignore */ }
     let q = supabase.from("stock_alerts").select("*").eq("is_resolved", false).order("created_at", { ascending: false });
     if (currentBranchId) q = q.eq("branch_id", currentBranchId);
     const [{ data: al }, { data: ps }, { data: bs }] = await Promise.all([

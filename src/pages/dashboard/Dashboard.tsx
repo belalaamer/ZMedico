@@ -191,7 +191,7 @@ export default function Dashboard() {
       )}
       {to && !loading && (
         <Button asChild variant="ghost" size="sm" className="mt-2 -ml-2 h-7 px-2 text-xs">
-          <Link to={to}>{t("view") ?? "→"}</Link>
+          <Link to={to}>→</Link>
         </Button>
       )}
     </Card>

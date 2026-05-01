@@ -71,7 +71,7 @@ export function Sidebar() {
   ];
 
   return (
-    <aside className="hidden md:flex w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground border-e border-sidebar-border">
+    <aside className="hidden md:flex w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground border-e border-sidebar-border h-screen sticky top-0">
       <div className="h-16 flex items-center gap-3 px-5 border-b border-sidebar-border">
         <div className="size-9 rounded-xl bg-white/10 backdrop-blur flex items-center justify-center">
           <Stethoscope className="size-5 text-white" />

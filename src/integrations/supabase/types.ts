@@ -1617,14 +1617,16 @@ export type Database = {
       patients: {
         Row: {
           address: string | null
+          blood_type: string | null
           branch_id: string | null
           city: string | null
           created_at: string
           created_by: string | null
+          deleted_at: string | null
           dob: string | null
           email: string | null
           first_name_ar: string | null
-          first_name_en: string
+          first_name_en: string | null
           gender: Database["public"]["Enums"]["gender"] | null
           id: string
           last_name_ar: string | null
@@ -1633,19 +1635,22 @@ export type Database = {
           notes: string | null
           patient_code: number
           phone: string | null
+          phone2: string | null
           referral_source: string | null
           updated_at: string
         }
         Insert: {
           address?: string | null
+          blood_type?: string | null
           branch_id?: string | null
           city?: string | null
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           dob?: string | null
           email?: string | null
           first_name_ar?: string | null
-          first_name_en: string
+          first_name_en?: string | null
           gender?: Database["public"]["Enums"]["gender"] | null
           id?: string
           last_name_ar?: string | null
@@ -1654,19 +1659,22 @@ export type Database = {
           notes?: string | null
           patient_code?: number
           phone?: string | null
+          phone2?: string | null
           referral_source?: string | null
           updated_at?: string
         }
         Update: {
           address?: string | null
+          blood_type?: string | null
           branch_id?: string | null
           city?: string | null
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           dob?: string | null
           email?: string | null
           first_name_ar?: string | null
-          first_name_en?: string
+          first_name_en?: string | null
           gender?: Database["public"]["Enums"]["gender"] | null
           id?: string
           last_name_ar?: string | null
@@ -1675,6 +1683,7 @@ export type Database = {
           notes?: string | null
           patient_code?: number
           phone?: string | null
+          phone2?: string | null
           referral_source?: string | null
           updated_at?: string
         }

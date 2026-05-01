@@ -1,0 +1,170 @@
+import { useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { ArrowLeft, FileText, CreditCard, Phone, Mail, MapPin, Calendar } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useI18n } from "@/contexts/I18nContext";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { formatMoney, formatDate, formatDateTime } from "@/lib/format";
+import { CreateInvoiceDialog } from "../invoices/CreateInvoiceDialog";
+
+const statusClass: Record<string, string> = {
+  draft: "status-cancelled", pending: "status-review", paid: "status-completed", partial: "status-progress", cancelled: "status-departed",
+};
+
+export default function PatientProfile() {
+  const { id } = useParams();
+  const { t, lang } = useI18n();
+  const [patient, setPatient] = useState<any>(null);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [createOpen, setCreateOpen] = useState(false);
+
+  const load = async () => {
+    if (!id) return;
+    const [{ data: p, error: pe }, { data: invs }, { data: pays }] = await Promise.all([
+      supabase.from("patients").select("*").eq("id", id).maybeSingle(),
+      supabase.from("invoices").select("*").eq("patient_id", id).order("invoice_date", { ascending: false }),
+      supabase.from("payments").select("*, invoices(invoice_number)").eq("patient_id", id).order("created_at", { ascending: false }),
+    ]);
+    if (pe) toast.error(pe.message);
+    setPatient(p); setInvoices(invs ?? []); setPayments(pays ?? []);
+  };
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
+
+  if (!patient) return <div className="text-center text-muted-foreground py-10">…</div>;
+
+  const name = lang === "ar"
+    ? `${patient.first_name_ar ?? patient.first_name_en} ${patient.last_name_ar ?? patient.last_name_en ?? ""}`.trim()
+    : `${patient.first_name_en} ${patient.last_name_en ?? ""}`.trim();
+
+  const totalPaid = payments.reduce((s, p) => s + Number(p.amount), 0);
+  const totalOutstanding = invoices
+    .filter((i) => i.status !== "cancelled")
+    .reduce((s, i) => s + (Number(i.total) - Number(i.paid_amount)), 0);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <Button asChild variant="ghost" size="sm"><Link to="/patients"><ArrowLeft className="me-2 size-4" />{t("patients")}</Link></Button>
+        <Button className="gradient-primary text-primary-foreground" onClick={() => setCreateOpen(true)}>
+          <FileText className="me-2 size-4" />{t("createInvoice")}
+        </Button>
+      </div>
+
+      <Card className="p-6 shadow-card">
+        <div className="flex items-start gap-4 flex-wrap">
+          <div className="size-16 rounded-full gradient-primary text-primary-foreground flex items-center justify-center text-2xl font-bold">
+            {name.slice(0, 1).toUpperCase()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-2xl font-bold">{name}</h1>
+              <Badge variant="outline">#{patient.patient_code}</Badge>
+            </div>
+            <div className="text-sm text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
+              {patient.phone && <span className="flex items-center gap-1"><Phone className="size-3" />{patient.phone}</span>}
+              {patient.email && <span className="flex items-center gap-1"><Mail className="size-3" />{patient.email}</span>}
+              {patient.city && <span className="flex items-center gap-1"><MapPin className="size-3" />{patient.city}</span>}
+              {patient.dob && <span className="flex items-center gap-1"><Calendar className="size-3" />{formatDate(patient.dob, lang)}</span>}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4 text-end">
+            <div>
+              <div className="text-xs text-muted-foreground">{t("paid")}</div>
+              <div className="text-lg font-bold tabular-nums text-success">{formatMoney(totalPaid, lang)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">{t("remaining")}</div>
+              <div className="text-lg font-bold tabular-nums text-warning">{formatMoney(totalOutstanding, lang)}</div>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <Tabs defaultValue="overview">
+        <TabsList>
+          <TabsTrigger value="overview">{t("overview")}</TabsTrigger>
+          <TabsTrigger value="invoices">{t("invoices")}</TabsTrigger>
+          <TabsTrigger value="payments">{t("paymentHistory")}</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="mt-4">
+          <Card className="p-6 shadow-card">
+            <div className="grid sm:grid-cols-2 gap-4 text-sm">
+              <div><div className="text-muted-foreground text-xs">{t("gender")}</div><div>{patient.gender ? t(patient.gender as any) : "—"}</div></div>
+              <div><div className="text-muted-foreground text-xs">{t("nationality")}</div><div>{patient.nationality ?? "—"}</div></div>
+              <div><div className="text-muted-foreground text-xs">{t("address")}</div><div>{patient.address ?? "—"}</div></div>
+              <div><div className="text-muted-foreground text-xs">{t("referralSource")}</div><div>{patient.referral_source ?? "—"}</div></div>
+              {patient.notes && <div className="sm:col-span-2"><div className="text-muted-foreground text-xs">{t("notes")}</div><div className="whitespace-pre-wrap">{patient.notes}</div></div>}
+            </div>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="invoices" className="mt-4">
+          <Card className="shadow-card overflow-hidden">
+            {invoices.length === 0 ? (
+              <div className="p-10 text-center text-muted-foreground">{t("noInvoices")}</div>
+            ) : (
+              <div className="divide-y divide-border">
+                {invoices.map((inv) => {
+                  const remaining = +(Number(inv.total) - Number(inv.paid_amount)).toFixed(2);
+                  const statusLabel = ({ draft: t("statusDraft"), pending: t("statusPending"), paid: t("statusPaid"), partial: t("statusPartial"), cancelled: t("statusCancelled") } as any)[inv.status];
+                  return (
+                    <Link key={inv.id} to={`/invoices/${inv.id}`} className="flex items-center gap-4 p-4 hover:bg-muted/40 transition-colors">
+                      <FileText className="size-5 text-muted-foreground" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium">{inv.invoice_number}</div>
+                        <div className="text-xs text-muted-foreground">{formatDate(inv.invoice_date, lang)}</div>
+                      </div>
+                      <Badge variant="outline" className={statusClass[inv.status]}>{statusLabel}</Badge>
+                      <div className="text-end">
+                        <div className="font-semibold tabular-nums">{formatMoney(inv.total, lang)}</div>
+                        {remaining > 0 && <div className="text-xs text-warning tabular-nums">{formatMoney(remaining, lang)}</div>}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="payments" className="mt-4">
+          <Card className="shadow-card overflow-hidden">
+            {payments.length === 0 ? (
+              <div className="p-10 text-center text-muted-foreground">{t("noPayments")}</div>
+            ) : (
+              <div className="divide-y divide-border">
+                {payments.map((pay) => (
+                  <div key={pay.id} className="flex items-center gap-4 p-4">
+                    <div className="size-9 rounded-lg bg-success/10 text-success flex items-center justify-center">
+                      <CreditCard className="size-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium tabular-nums">{formatMoney(pay.amount, lang)}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {formatDateTime(pay.created_at, lang)} · {t(pay.payment_method as any) ?? pay.payment_method}
+                        {pay.invoices?.invoice_number && <> · <Link to={`/invoices/${pay.invoice_id}`} className="text-primary hover:underline">{pay.invoices.invoice_number}</Link></>}
+                      </div>
+                    </div>
+                    {pay.reference_number && <Badge variant="outline" className="text-[10px]">{pay.reference_number}</Badge>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      <CreateInvoiceDialog
+        open={createOpen} onOpenChange={setCreateOpen}
+        presetPatientId={patient.id}
+        onSaved={() => { setCreateOpen(false); load(); }}
+      />
+    </div>
+  );
+}

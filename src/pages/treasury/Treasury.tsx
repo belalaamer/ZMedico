@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Banknote, ArrowDownToLine, ArrowUpFromLine, TrendingUp } from "lucide-react";
+import { Banknote, ArrowDownToLine, ArrowUpFromLine, TrendingUp, ArrowLeftRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney, formatDateTime } from "@/lib/format";
+import { TransferDialog } from "./TransferDialog";
 
 export default function Treasury() {
   const { t, lang } = useI18n();
@@ -22,6 +23,7 @@ export default function Treasury() {
   const [txs, setTxs] = useState<any[]>([]);
   const [adj, setAdj] = useState({ open: false, type: "income", amount: 0, desc_en: "", desc_ar: "", treasury_id: "" });
   const [today, setToday] = useState({ income: 0, expense: 0 });
+  const [transferOpen, setTransferOpen] = useState(false);
 
   const load = async () => {
     let tq = supabase.from("treasury").select("*").order("created_at");
@@ -71,7 +73,11 @@ export default function Treasury() {
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("treasury")}</h1>
         </div>
-        <Dialog open={adj.open} onOpenChange={(v) => setAdj({ ...adj, open: v })}>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setTransferOpen(true)} disabled={treasuries.length < 2}>
+            <ArrowLeftRight className="me-2 size-4" />{t("transferFunds")}
+          </Button>
+          <Dialog open={adj.open} onOpenChange={(v) => setAdj({ ...adj, open: v })}>
           <DialogTrigger asChild>
             <Button className="gradient-primary text-primary-foreground">{t("adjust")}</Button>
           </DialogTrigger>
@@ -116,6 +122,7 @@ export default function Treasury() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -181,6 +188,12 @@ export default function Treasury() {
           )}
         </Card>
       </div>
+
+      <TransferDialog
+        open={transferOpen} onOpenChange={setTransferOpen}
+        treasuries={treasuries}
+        onSaved={() => { setTransferOpen(false); load(); }}
+      />
     </div>
   );
 }

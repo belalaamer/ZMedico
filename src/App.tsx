@@ -12,6 +12,7 @@ import AppShell from "@/components/layout/AppShell";
 import AuthPage from "@/pages/auth/Auth";
 import Dashboard from "@/pages/dashboard/Dashboard";
 import PatientsPage from "@/pages/patients/Patients";
+import PatientProfile from "@/pages/patients/PatientProfile";
 import CalendarPage from "@/pages/calendar/CalendarPage";
 import Placeholder from "@/pages/Placeholder";
 import Invoices from "@/pages/invoices/Invoices";
@@ -36,6 +37,7 @@ const App = () => (
                 <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/patients" element={<PatientsPage />} />
+                  <Route path="/patients/:id" element={<PatientProfile />} />
                   <Route path="/calendar" element={<CalendarPage />} />
                   <Route path="/invoices" element={<Invoices />} />
                   <Route path="/invoices/:id" element={<InvoiceDetail />} />

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, Wallet, ArrowDownToLine, Receipt, CalendarCheck, Coins, PiggyBank } from "lucide-react";
+import { TrendingUp, Wallet, ArrowDownToLine, Receipt, CalendarCheck, Coins, PiggyBank, FileText, Clock } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useBranch } from "@/contexts/BranchContext";
@@ -28,6 +28,8 @@ export default function Dashboard() {
   const { currentBranchId } = useBranch();
   const [todayCount, setTodayCount] = useState<number>(0);
   const [patientCount, setPatientCount] = useState<number>(0);
+  const [todayRevenue, setTodayRevenue] = useState<number>(0);
+  const [pendingInvoices, setPendingInvoices] = useState<number>(0);
 
   useEffect(() => {
     const start = new Date(); start.setHours(0,0,0,0);
@@ -40,6 +42,15 @@ export default function Dashboard() {
     let pq = supabase.from("patients").select("*", { count: "exact", head: true });
     if (currentBranchId) pq = pq.eq("branch_id", currentBranchId);
     pq.then(({ count }) => setPatientCount(count ?? 0));
+
+    let rq = supabase.from("payments").select("amount")
+      .gte("created_at", start.toISOString()).lte("created_at", end.toISOString());
+    if (currentBranchId) rq = rq.eq("branch_id", currentBranchId);
+    rq.then(({ data }) => setTodayRevenue((data ?? []).reduce((s: number, r: any) => s + Number(r.amount), 0)));
+
+    let iq = supabase.from("invoices").select("*", { count: "exact", head: true }).in("status", ["pending", "partial"]);
+    if (currentBranchId) iq = iq.eq("branch_id", currentBranchId);
+    iq.then(({ count }) => setPendingInvoices(count ?? 0));
   }, [currentBranchId]);
 
   return (
@@ -70,6 +81,40 @@ export default function Dashboard() {
             </div>
           </Card>
         ))}
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-4">
+        <Card className="p-5 shadow-card border-border/60 hover:shadow-elegant transition-shadow">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-sm text-muted-foreground">{t("todayRevenue")}</div>
+              <div className="mt-2 text-3xl font-bold tabular-nums text-success">{formatEGP(todayRevenue, lang)}</div>
+              <div className="text-xs text-muted-foreground mt-1">{t("todayRevenueDesc")}</div>
+            </div>
+            <div className="size-11 rounded-xl bg-gradient-to-br from-success to-success text-white flex items-center justify-center">
+              <Wallet className="size-5" />
+            </div>
+          </div>
+          <Button asChild variant="outline" size="sm" className="mt-4">
+            <Link to="/payments">{t("payments")}</Link>
+          </Button>
+        </Card>
+
+        <Card className="p-5 shadow-card border-border/60 hover:shadow-elegant transition-shadow">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-sm text-muted-foreground">{t("pendingInvoices")}</div>
+              <div className="mt-2 text-3xl font-bold tabular-nums text-warning">{pendingInvoices}</div>
+              <div className="text-xs text-muted-foreground mt-1">{t("pendingInvoicesDesc")}</div>
+            </div>
+            <div className="size-11 rounded-xl bg-gradient-to-br from-warning to-warning text-white flex items-center justify-center">
+              <Clock className="size-5" />
+            </div>
+          </div>
+          <Button asChild variant="outline" size="sm" className="mt-4">
+            <Link to="/invoices">{t("invoices")}</Link>
+          </Button>
+        </Card>
       </div>
 
       <div className="grid md:grid-cols-3 gap-4">

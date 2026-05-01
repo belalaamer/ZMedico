@@ -56,7 +56,7 @@ export default function GeneralSettings() {
             <div><Label>{t("nameAr2")}</Label><Input dir="rtl" value={form.clinic_name_ar} onChange={e => setForm({ ...form, clinic_name_ar: e.target.value })} /></div>
             <div><Label>{t("tagline2")} (EN)</Label><Input value={form.tagline_en ?? ""} onChange={e => setForm({ ...form, tagline_en: e.target.value })} /></div>
             <div><Label>{t("tagline2")} (AR)</Label><Input dir="rtl" value={form.tagline_ar ?? ""} onChange={e => setForm({ ...form, tagline_ar: e.target.value })} /></div>
-            <div className="sm:col-span-2"><Label>{t("logo")} URL</Label><Input value={form.logo_url ?? ""} onChange={e => setForm({ ...form, logo_url: e.target.value })} /></div>
+            <div className="sm:col-span-2"><Label>Logo URL</Label><Input value={form.logo_url ?? ""} onChange={e => setForm({ ...form, logo_url: e.target.value })} /></div>
             <div><Label>{t("phone")}</Label><Input value={form.phone ?? ""} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
             <div><Label>{t("email")}</Label><Input value={form.email ?? ""} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
             <div className="sm:col-span-2"><Label>{t("address")} (AR)</Label><Textarea dir="rtl" value={form.address_ar ?? ""} onChange={e => setForm({ ...form, address_ar: e.target.value })} /></div>

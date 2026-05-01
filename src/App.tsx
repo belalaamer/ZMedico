@@ -34,6 +34,11 @@ import Medications from "@/pages/medical/Medications";
 import ProceduresPage from "@/pages/medical/Procedures";
 import MedicalRecords from "@/pages/medical/MedicalRecords";
 import QuickConsult from "@/pages/medical/QuickConsult";
+import MedicalRecordEditor from "@/pages/medical/MedicalRecordEditor";
+import Prescriptions from "@/pages/medical/Prescriptions";
+import PrescriptionDetail from "@/pages/medical/PrescriptionDetail";
+import DocumentsCenter from "@/pages/medical/DocumentsCenter";
+import PatientDental from "@/pages/patients/PatientDental";
 
 const queryClient = new QueryClient();
 
@@ -69,7 +74,12 @@ const App = () => (
                   <Route path="/inventory/purchase-orders/:id" element={<PurchaseOrderDetail />} />
                   <Route path="/inventory/alerts" element={<Alerts />} />
                   <Route path="/medical/records" element={<MedicalRecords />} />
+                  <Route path="/medical/records/:id" element={<MedicalRecordEditor />} />
                   <Route path="/medical/quick-consult" element={<QuickConsult />} />
+                  <Route path="/medical/prescriptions" element={<Prescriptions />} />
+                  <Route path="/medical/prescriptions/:id" element={<PrescriptionDetail />} />
+                  <Route path="/medical/documents" element={<DocumentsCenter />} />
+                  <Route path="/patients/:id/dental" element={<PatientDental />} />
                   <Route path="/medical/specialties" element={<Specialties />} />
                   <Route path="/medical/diagnoses" element={<Diagnoses />} />
                   <Route path="/medical/medications" element={<Medications />} />

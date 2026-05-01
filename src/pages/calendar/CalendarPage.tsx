@@ -192,7 +192,7 @@ export default function CalendarPage() {
                         {a.procedure || "—"} {a.room ? `· ${a.room}` : ""} · {a.duration_minutes} min
                       </div>
                     </div>
-                    <Badge variant="outline" className={statusClass[a.status]}>{t(`status${a.status.charAt(0).toUpperCase() + a.status.slice(1).replace("_","")}` as any) ?? a.status}</Badge>
+                    <Badge variant="outline" className={statusClass[a.status]}>{statusLabel(a.status, t)}</Badge>
                   </div>
                 );
               })}

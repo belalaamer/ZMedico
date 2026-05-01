@@ -74,6 +74,84 @@ export type Database = {
           },
         ]
       }
+      attendance: {
+        Row: {
+          branch_id: string | null
+          check_in_method:
+            | Database["public"]["Enums"]["attendance_method"]
+            | null
+          check_in_time: string | null
+          check_out_method:
+            | Database["public"]["Enums"]["attendance_method"]
+            | null
+          check_out_time: string | null
+          created_at: string
+          created_by: string | null
+          date: string
+          id: string
+          notes: string | null
+          overtime_hours: number
+          staff_id: string
+          status: Database["public"]["Enums"]["attendance_status"]
+          working_hours: number | null
+        }
+        Insert: {
+          branch_id?: string | null
+          check_in_method?:
+            | Database["public"]["Enums"]["attendance_method"]
+            | null
+          check_in_time?: string | null
+          check_out_method?:
+            | Database["public"]["Enums"]["attendance_method"]
+            | null
+          check_out_time?: string | null
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          id?: string
+          notes?: string | null
+          overtime_hours?: number
+          staff_id: string
+          status?: Database["public"]["Enums"]["attendance_status"]
+          working_hours?: number | null
+        }
+        Update: {
+          branch_id?: string | null
+          check_in_method?:
+            | Database["public"]["Enums"]["attendance_method"]
+            | null
+          check_in_time?: string | null
+          check_out_method?:
+            | Database["public"]["Enums"]["attendance_method"]
+            | null
+          check_out_time?: string | null
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          id?: string
+          notes?: string | null
+          overtime_hours?: number
+          staff_id?: string
+          status?: Database["public"]["Enums"]["attendance_status"]
+          working_hours?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       branches: {
         Row: {
           address: string | null
@@ -155,6 +233,50 @@ export type Database = {
           },
         ]
       }
+      departments: {
+        Row: {
+          branch_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          manager_id: string | null
+          name_ar: string
+          name_en: string
+          updated_at: string
+        }
+        Insert: {
+          branch_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          manager_id?: string | null
+          name_ar: string
+          name_en: string
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          manager_id?: string | null
+          name_ar?: string
+          name_en?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "departments_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       diagnoses: {
         Row: {
           category: string | null
@@ -185,6 +307,21 @@ export type Database = {
           id?: string
           name_ar?: string
           name_en?: string
+        }
+        Relationships: []
+      }
+      employee_id_counter: {
+        Row: {
+          id: number
+          last_value: number
+        }
+        Insert: {
+          id?: number
+          last_value?: number
+        }
+        Update: {
+          id?: number
+          last_value?: number
         }
         Relationships: []
       }
@@ -557,6 +694,117 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      leave_requests: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          end_date: string
+          id: string
+          leave_type_id: string
+          reason_ar: string | null
+          reason_en: string | null
+          rejection_reason: string | null
+          staff_id: string
+          start_date: string
+          status: Database["public"]["Enums"]["leave_request_status"]
+          total_days: number
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          end_date: string
+          id?: string
+          leave_type_id: string
+          reason_ar?: string | null
+          reason_en?: string | null
+          rejection_reason?: string | null
+          staff_id: string
+          start_date: string
+          status?: Database["public"]["Enums"]["leave_request_status"]
+          total_days?: number
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          end_date?: string
+          id?: string
+          leave_type_id?: string
+          reason_ar?: string | null
+          reason_en?: string | null
+          rejection_reason?: string | null
+          staff_id?: string
+          start_date?: string
+          status?: Database["public"]["Enums"]["leave_request_status"]
+          total_days?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_requests_leave_type_id_fkey"
+            columns: ["leave_type_id"]
+            isOneToOne: false
+            referencedRelation: "leave_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_requests_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leave_types: {
+        Row: {
+          code: string
+          created_at: string
+          default_days: number
+          description_ar: string | null
+          description_en: string | null
+          id: string
+          is_active: boolean
+          is_paid: boolean
+          max_consecutive_days: number | null
+          name_ar: string
+          name_en: string
+          requires_approval: boolean
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          default_days?: number
+          description_ar?: string | null
+          description_en?: string | null
+          id?: string
+          is_active?: boolean
+          is_paid?: boolean
+          max_consecutive_days?: number | null
+          name_ar: string
+          name_en: string
+          requires_approval?: boolean
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          default_days?: number
+          description_ar?: string | null
+          description_en?: string | null
+          id?: string
+          is_active?: boolean
+          is_paid?: boolean
+          max_consecutive_days?: number | null
+          name_ar?: string
+          name_en?: string
+          requires_approval?: boolean
+        }
+        Relationships: []
       }
       medical_history: {
         Row: {
@@ -1044,6 +1292,158 @@ export type Database = {
             columns: ["treasury_id"]
             isOneToOne: false
             referencedRelation: "treasury"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll: {
+        Row: {
+          actual_working_days: number
+          base_salary: number
+          bonuses: number
+          branch_id: string | null
+          created_at: string
+          created_by: string | null
+          deductions: number
+          id: string
+          leave_deductions: number
+          net_salary: number
+          notes: string | null
+          overtime_amount: number
+          overtime_hours: number
+          paid_at: string | null
+          paid_by: string | null
+          payment_reference: string | null
+          period_month: number
+          period_year: number
+          staff_id: string
+          status: Database["public"]["Enums"]["payroll_status"]
+          updated_at: string
+          working_days: number
+        }
+        Insert: {
+          actual_working_days?: number
+          base_salary?: number
+          bonuses?: number
+          branch_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          deductions?: number
+          id?: string
+          leave_deductions?: number
+          net_salary?: number
+          notes?: string | null
+          overtime_amount?: number
+          overtime_hours?: number
+          paid_at?: string | null
+          paid_by?: string | null
+          payment_reference?: string | null
+          period_month: number
+          period_year: number
+          staff_id: string
+          status?: Database["public"]["Enums"]["payroll_status"]
+          updated_at?: string
+          working_days?: number
+        }
+        Update: {
+          actual_working_days?: number
+          base_salary?: number
+          bonuses?: number
+          branch_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          deductions?: number
+          id?: string
+          leave_deductions?: number
+          net_salary?: number
+          notes?: string | null
+          overtime_amount?: number
+          overtime_hours?: number
+          paid_at?: string | null
+          paid_by?: string | null
+          payment_reference?: string | null
+          period_month?: number
+          period_year?: number
+          staff_id?: string
+          status?: Database["public"]["Enums"]["payroll_status"]
+          updated_at?: string
+          working_days?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      performance_reviews: {
+        Row: {
+          areas_for_improvement_ar: string | null
+          areas_for_improvement_en: string | null
+          created_at: string
+          goals_ar: string | null
+          goals_en: string | null
+          id: string
+          rating: number | null
+          review_period_end: string
+          review_period_start: string
+          reviewer_comments: string | null
+          reviewer_id: string | null
+          staff_comments: string | null
+          staff_id: string
+          strengths_ar: string | null
+          strengths_en: string | null
+        }
+        Insert: {
+          areas_for_improvement_ar?: string | null
+          areas_for_improvement_en?: string | null
+          created_at?: string
+          goals_ar?: string | null
+          goals_en?: string | null
+          id?: string
+          rating?: number | null
+          review_period_end: string
+          review_period_start: string
+          reviewer_comments?: string | null
+          reviewer_id?: string | null
+          staff_comments?: string | null
+          staff_id: string
+          strengths_ar?: string | null
+          strengths_en?: string | null
+        }
+        Update: {
+          areas_for_improvement_ar?: string | null
+          areas_for_improvement_en?: string | null
+          created_at?: string
+          goals_ar?: string | null
+          goals_en?: string | null
+          id?: string
+          rating?: number | null
+          review_period_end?: string
+          review_period_start?: string
+          reviewer_comments?: string | null
+          reviewer_id?: string | null
+          staff_comments?: string | null
+          staff_id?: string
+          strengths_ar?: string | null
+          strengths_en?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "performance_reviews_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1630,6 +2030,210 @@ export type Database = {
           },
         ]
       }
+      salary_adjustments: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          id: string
+          payroll_id: string
+          reason_ar: string | null
+          reason_en: string | null
+          type: Database["public"]["Enums"]["salary_adjustment_type"]
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          payroll_id: string
+          reason_ar?: string | null
+          reason_en?: string | null
+          type: Database["public"]["Enums"]["salary_adjustment_type"]
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          payroll_id?: string
+          reason_ar?: string | null
+          reason_en?: string | null
+          type?: Database["public"]["Enums"]["salary_adjustment_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "salary_adjustments_payroll_id_fkey"
+            columns: ["payroll_id"]
+            isOneToOne: false
+            referencedRelation: "payroll"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_positions: {
+        Row: {
+          created_at: string
+          department_id: string | null
+          description_ar: string | null
+          description_en: string | null
+          id: string
+          is_active: boolean
+          salary_range_max: number | null
+          salary_range_min: number | null
+          title_ar: string
+          title_en: string
+        }
+        Insert: {
+          created_at?: string
+          department_id?: string | null
+          description_ar?: string | null
+          description_en?: string | null
+          id?: string
+          is_active?: boolean
+          salary_range_max?: number | null
+          salary_range_min?: number | null
+          title_ar: string
+          title_en: string
+        }
+        Update: {
+          created_at?: string
+          department_id?: string | null
+          description_ar?: string | null
+          description_en?: string | null
+          id?: string
+          is_active?: boolean
+          salary_range_max?: number | null
+          salary_range_min?: number | null
+          title_ar?: string
+          title_en?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_positions_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_profiles: {
+        Row: {
+          address: string | null
+          annual_leave_balance: number
+          bank_account: string | null
+          bank_name: string | null
+          branch_id: string | null
+          contract_end_date: string | null
+          contract_type: Database["public"]["Enums"]["contract_type"]
+          created_at: string
+          date_of_birth: string | null
+          department_id: string | null
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          employee_id: string
+          hire_date: string
+          id: string
+          national_id: string | null
+          position_id: string | null
+          profile_image_url: string | null
+          salary: number
+          salary_currency: string
+          sick_leave_balance: number
+          status: Database["public"]["Enums"]["staff_status"]
+          termination_date: string | null
+          termination_reason: string | null
+          updated_at: string
+          working_hours_per_week: number
+        }
+        Insert: {
+          address?: string | null
+          annual_leave_balance?: number
+          bank_account?: string | null
+          bank_name?: string | null
+          branch_id?: string | null
+          contract_end_date?: string | null
+          contract_type?: Database["public"]["Enums"]["contract_type"]
+          created_at?: string
+          date_of_birth?: string | null
+          department_id?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          employee_id: string
+          hire_date?: string
+          id: string
+          national_id?: string | null
+          position_id?: string | null
+          profile_image_url?: string | null
+          salary?: number
+          salary_currency?: string
+          sick_leave_balance?: number
+          status?: Database["public"]["Enums"]["staff_status"]
+          termination_date?: string | null
+          termination_reason?: string | null
+          updated_at?: string
+          working_hours_per_week?: number
+        }
+        Update: {
+          address?: string | null
+          annual_leave_balance?: number
+          bank_account?: string | null
+          bank_name?: string | null
+          branch_id?: string | null
+          contract_end_date?: string | null
+          contract_type?: Database["public"]["Enums"]["contract_type"]
+          created_at?: string
+          date_of_birth?: string | null
+          department_id?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          employee_id?: string
+          hire_date?: string
+          id?: string
+          national_id?: string | null
+          position_id?: string | null
+          profile_image_url?: string | null
+          salary?: number
+          salary_currency?: string
+          sick_leave_balance?: number
+          status?: Database["public"]["Enums"]["staff_status"]
+          termination_date?: string | null
+          termination_reason?: string | null
+          updated_at?: string
+          working_hours_per_week?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_profiles_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_profiles_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_profiles_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_profiles_position_id_fkey"
+            columns: ["position_id"]
+            isOneToOne: false
+            referencedRelation: "staff_positions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_alerts: {
         Row: {
           alert_type: Database["public"]["Enums"]["alert_type"]
@@ -1930,6 +2534,57 @@ export type Database = {
           },
         ]
       }
+      work_schedules: {
+        Row: {
+          branch_id: string | null
+          created_at: string
+          day_of_week: number
+          end_time: string
+          id: string
+          is_working_day: boolean
+          staff_id: string
+          start_time: string
+          updated_at: string
+        }
+        Insert: {
+          branch_id?: string | null
+          created_at?: string
+          day_of_week: number
+          end_time: string
+          id?: string
+          is_working_day?: boolean
+          staff_id: string
+          start_time: string
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string | null
+          created_at?: string
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          is_working_day?: boolean
+          staff_id?: string
+          start_time?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_schedules_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_schedules_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1970,6 +2625,7 @@ export type Database = {
         Args: { _branch_id: string }
         Returns: string
       }
+      generate_employee_id: { Args: never; Returns: string }
       generate_invoice_number: { Args: never; Returns: string }
       generate_po_number: { Args: never; Returns: string }
       generate_product_sku: { Args: never; Returns: string }
@@ -2011,6 +2667,19 @@ export type Database = {
         | "cancelled"
         | "no_show"
         | "departed"
+      attendance_method:
+        | "manual"
+        | "fingerprint"
+        | "face_recognition"
+        | "qr_code"
+      attendance_status:
+        | "present"
+        | "absent"
+        | "late"
+        | "early_leave"
+        | "half_day"
+        | "on_leave"
+      contract_type: "full_time" | "part_time" | "contract" | "freelance"
       document_type:
         | "lab_result"
         | "xray"
@@ -2031,10 +2700,14 @@ export type Database = {
         | "expiry"
       invoice_item_type: "service" | "product" | "procedure"
       invoice_status: "draft" | "pending" | "paid" | "partial" | "cancelled"
+      leave_request_status: "pending" | "approved" | "rejected" | "cancelled"
       medical_record_status: "draft" | "completed" | "reviewed"
       payment_method: "cash" | "card" | "bank_transfer" | "insurance" | "wallet"
+      payroll_status: "draft" | "approved" | "paid"
       po_status: "draft" | "pending" | "partial" | "received" | "cancelled"
       prescription_status: "active" | "completed" | "cancelled"
+      salary_adjustment_type: "bonus" | "deduction" | "allowance" | "penalty"
+      staff_status: "active" | "on_leave" | "terminated" | "suspended"
       tooth_status:
         | "healthy"
         | "caries"
@@ -2184,6 +2857,21 @@ export const Constants = {
         "no_show",
         "departed",
       ],
+      attendance_method: [
+        "manual",
+        "fingerprint",
+        "face_recognition",
+        "qr_code",
+      ],
+      attendance_status: [
+        "present",
+        "absent",
+        "late",
+        "early_leave",
+        "half_day",
+        "on_leave",
+      ],
+      contract_type: ["full_time", "part_time", "contract", "freelance"],
       document_type: [
         "lab_result",
         "xray",
@@ -2206,10 +2894,14 @@ export const Constants = {
       ],
       invoice_item_type: ["service", "product", "procedure"],
       invoice_status: ["draft", "pending", "paid", "partial", "cancelled"],
+      leave_request_status: ["pending", "approved", "rejected", "cancelled"],
       medical_record_status: ["draft", "completed", "reviewed"],
       payment_method: ["cash", "card", "bank_transfer", "insurance", "wallet"],
+      payroll_status: ["draft", "approved", "paid"],
       po_status: ["draft", "pending", "partial", "received", "cancelled"],
       prescription_status: ["active", "completed", "cancelled"],
+      salary_adjustment_type: ["bonus", "deduction", "allowance", "penalty"],
+      staff_status: ["active", "on_leave", "terminated", "suspended"],
       tooth_status: [
         "healthy",
         "caries",

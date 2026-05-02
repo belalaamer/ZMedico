@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useDataSync } from "@/lib/dataSync";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,6 +75,7 @@ export default function PatientsPage() {
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId]);
+  useDataSync(["patients"], () => { load(); });
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();

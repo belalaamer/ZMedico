@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useDataSync } from "@/lib/dataSync";
 import { Link } from "react-router-dom";
 import { Plus, Search, User } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -52,6 +53,7 @@ export default function Staff() {
     setPositions(pos ?? []);
   };
   useEffect(() => { load(); }, [currentBranchId]);
+  useDataSync(["staff", "departments", "positions"], () => { load(); });
 
   const save = async () => {
     if (!form.profile_id) { toast.error("Profile required"); return; }

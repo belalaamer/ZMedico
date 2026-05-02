@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useDataSync } from "@/lib/dataSync";
 import { Plus, Search, Pencil, Trash2, Building2, Star } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
@@ -49,6 +50,7 @@ export default function Branches() {
     setStaff((s ?? []) as Staff[]);
   };
   useEffect(() => { load(); }, []);
+  useDataSync(["branches"], () => { load(); });
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();

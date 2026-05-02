@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useDataSync } from "@/lib/dataSync";
 import { Link } from "react-router-dom";
 import { Plus, Search, FileText } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -55,6 +56,7 @@ export default function Invoices() {
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId, statusFilter]);
+  useDataSync(["invoices", "payments"], () => { load(); });
 
   const filtered = items.filter((i) => {
     if (!q) return true;

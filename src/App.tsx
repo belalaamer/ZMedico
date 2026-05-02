@@ -71,8 +71,12 @@ import SystemInfo from "@/pages/settings/SystemInfo";
 import Branches from "@/pages/branches/Branches";
 import Reminders from "@/pages/reminders/Reminders";
 import ScheduledReminders from "@/pages/reminders/ScheduledReminders";
+import { attachGlobalRefreshListeners } from "@/lib/dataSync";
 
 const queryClient = new QueryClient();
+
+// Attach focus/visibility listeners that broadcast a global "*" sync event.
+attachGlobalRefreshListeners();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

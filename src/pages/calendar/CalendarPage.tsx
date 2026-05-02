@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useDataSync } from "@/lib/dataSync";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -81,6 +82,7 @@ export default function CalendarPage() {
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [date, currentBranchId]);
+  useDataSync(["appointments", "calendar"], () => { load(); });
 
   useEffect(() => {
     supabase.from("patients").select("id,first_name_en,last_name_en").order("created_at", { ascending: false }).limit(200)

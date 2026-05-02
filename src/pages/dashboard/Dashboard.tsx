@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useDataSync } from "@/lib/dataSync";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -63,8 +64,7 @@ export default function Dashboard() {
   const [recentAppts, setRecentAppts] = useState<any[]>([]);
   const [recentPayments, setRecentPayments] = useState<any[]>([]);
 
-  useEffect(() => {
-    let cancelled = false;
+  const run = useCallback(async () => {
     setLoading(true);
 
     const start = new Date(); start.setHours(0, 0, 0, 0);
@@ -74,7 +74,6 @@ export default function Dashboard() {
 
     const branchEq = (q: any) => (currentBranchId ? q.eq("branch_id", currentBranchId) : q);
 
-    const run = async () => {
       const [
         apptsTodayRes,
         newPtRes,
@@ -109,7 +108,6 @@ export default function Dashboard() {
         branchEq(supabase.from("payments").select("id,amount,payment_method,payment_date,patient:patients(first_name_en,first_name_ar,last_name_en,last_name_ar)")
           .order("created_at", { ascending: false }).limit(5)),
       ]);
-      if (cancelled) return;
 
       const apptRows = (apptsTodayRes.data ?? []) as { status: string }[];
       setTodayAppts(apptRows.length);
@@ -158,22 +156,16 @@ export default function Dashboard() {
       setRecentPayments(recentPayRes.data ?? []);
 
       setLoading(false);
-    };
-
-    run();
-
-    // Refetch when tab regains focus / becomes visible — keeps Dashboard fresh after deletes/edits elsewhere
-    const onFocus = () => { run(); };
-    const onVisible = () => { if (document.visibilityState === "visible") run(); };
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onVisible);
-
-    return () => {
-      cancelled = true;
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
   }, [currentBranchId]);
+
+  // Initial load + refetch on branch change
+  useEffect(() => { run(); }, [run]);
+
+  // Refetch whenever any related data changes anywhere in the app, or on focus/visibility ("*")
+  useDataSync(
+    ["dashboard", "patients", "appointments", "invoices", "payments", "medical_records", "branches", "*"],
+    () => { run(); },
+  );
 
   const isEmpty = useMemo(() =>
     !loading && todayAppts === 0 && newPatientsToday === 0 && todayRevenue === 0 &&

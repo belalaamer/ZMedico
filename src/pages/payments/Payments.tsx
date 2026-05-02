@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useDataSync } from "@/lib/dataSync";
 import { Plus, CreditCard } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ export default function Payments() {
     setItems(data ?? []);
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId]);
+  useDataSync(["payments", "invoices"], () => { load(); });
 
   return (
     <div className="space-y-6">

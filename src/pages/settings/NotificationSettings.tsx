@@ -22,6 +22,7 @@ export default function NotificationSettings() {
     send_birthday_greeting: false, birthday_discount_percentage: 0,
     send_follow_up_reminder: true, follow_up_days_after: 7,
     email_sender_name: "", email_sender_address: "", sms_sender_id: "", whatsapp_business_number: "",
+    whatsapp_api_key: "", whatsapp_api_url: "", sms_api_key: "", sms_api_url: "",
   });
   useEffect(() => {
     if (!branchId) return;
@@ -66,6 +67,10 @@ export default function NotificationSettings() {
           <div><Label>{t("emailSenderAddress")}</Label><Input value={f.email_sender_address ?? ""} onChange={e => setF({ ...f, email_sender_address: e.target.value })} /></div>
           <div><Label>{t("smsSenderId")}</Label><Input value={f.sms_sender_id ?? ""} onChange={e => setF({ ...f, sms_sender_id: e.target.value })} /></div>
           <div><Label>{t("whatsappBusinessNumber")}</Label><Input value={f.whatsapp_business_number ?? ""} onChange={e => setF({ ...f, whatsapp_business_number: e.target.value })} /></div>
+          <div><Label>{t("whatsappApiUrl")}</Label><Input value={f.whatsapp_api_url ?? ""} onChange={e => setF({ ...f, whatsapp_api_url: e.target.value })} placeholder="https://..." /></div>
+          <div><Label>{t("whatsappApiKey")}</Label><Input type="password" value={f.whatsapp_api_key ?? ""} onChange={e => setF({ ...f, whatsapp_api_key: e.target.value })} /></div>
+          <div><Label>{t("smsApiUrl")}</Label><Input value={f.sms_api_url ?? ""} onChange={e => setF({ ...f, sms_api_url: e.target.value })} placeholder="https://..." /></div>
+          <div><Label>{t("smsApiKey")}</Label><Input type="password" value={f.sms_api_key ?? ""} onChange={e => setF({ ...f, sms_api_key: e.target.value })} /></div>
           <div className="sm:col-span-2 flex justify-end"><Button className="gradient-primary text-primary-foreground" onClick={save}>{t("save")}</Button></div>
         </Card>
       </div>

@@ -10,6 +10,7 @@ import { BranchProvider } from "@/contexts/BranchContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AppShell from "@/components/layout/AppShell";
 import AuthPage from "@/pages/auth/Auth";
+import ResetPassword from "@/pages/auth/ResetPassword";
 import Dashboard from "@/pages/dashboard/Dashboard";
 import PatientsPage from "@/pages/patients/Patients";
 import PatientProfile from "@/pages/patients/PatientProfile";
@@ -89,6 +90,7 @@ const App = () => (
             <BrowserRouter>
               <Routes>
                 <Route path="/auth" element={<AuthPage />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/patients" element={<PatientsPage />} />

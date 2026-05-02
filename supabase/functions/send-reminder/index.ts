@@ -138,9 +138,11 @@ Deno.serve(async (req) => {
   let body: { reminder_id?: string; branch_id?: string; due_only?: boolean } = {};
   try { body = await req.json(); } catch { /* allow empty body */ }
 
-  // Bulk send (no specific reminder_id) requires admin or cron secret.
-  if (!body.reminder_id && !isCron && !callerIsAdmin) {
-    return new Response(JSON.stringify({ error: "Forbidden: admin role required for bulk send" }), {
+  // All sends (single or bulk) require admin role or cron secret.
+  // Previously single-id sends were unrestricted, allowing any authenticated
+  // user to enumerate reminders and trigger arbitrary patient messages.
+  if (!isCron && !callerIsAdmin) {
+    return new Response(JSON.stringify({ error: "Forbidden: admin role required" }), {
       status: 403,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

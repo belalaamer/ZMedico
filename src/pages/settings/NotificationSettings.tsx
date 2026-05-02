@@ -26,30 +26,25 @@ export default function NotificationSettings() {
   });
   useEffect(() => {
     if (!branchId) return;
-    // Never fetch sensitive credentials into the browser. Mask their presence only.
+    // Never fetch sensitive credentials (whatsapp_api_key, sms_api_key) into the browser.
+    // We only fetch non-sensitive columns and surface a "configured" indicator for keys.
     supabase
       .from("notification_settings")
-      .select("id,branch_id,send_appointment_reminders,reminder_channel,send_appointment_confirmation,send_appointment_cancellation,send_invoice_notification,send_payment_receipt,send_birthday_greeting,birthday_discount_percentage,send_follow_up_reminder,follow_up_days_after,email_sender_name,email_sender_address,sms_sender_id,whatsapp_business_number,whatsapp_api_url,sms_api_url,whatsapp_api_key,sms_api_key")
+      .select("id,branch_id,send_appointment_reminders,reminder_channel,send_appointment_confirmation,send_appointment_cancellation,send_invoice_notification,send_payment_receipt,send_birthday_greeting,birthday_discount_percentage,send_follow_up_reminder,follow_up_days_after,email_sender_name,email_sender_address,sms_sender_id,whatsapp_business_number,whatsapp_api_url,sms_api_url")
       .eq("branch_id", branchId)
       .maybeSingle()
       .then(({ data }) => {
         if (!data) return;
-        // Replace stored credentials with placeholders so they never enter client memory in plaintext.
-        const masked = {
-          ...data,
-          whatsapp_api_key: data.whatsapp_api_key ? "********" : "",
-          sms_api_key: data.sms_api_key ? "********" : "",
-        };
-        setF({ ...f, ...masked });
+        setF((prev: any) => ({ ...prev, ...data, whatsapp_api_key: "", sms_api_key: "" }));
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [branchId]);
   const save = async () => {
     if (!branchId) return toast.error(t("branch"));
-    // Strip masked placeholder keys so we don't overwrite real stored secrets with "********".
+    // Only write API key fields if the admin entered a new value; otherwise leave the stored secret intact.
     const payload: any = { ...f, branch_id: branchId };
-    if (payload.whatsapp_api_key === "********") delete payload.whatsapp_api_key;
-    if (payload.sms_api_key === "********") delete payload.sms_api_key;
+    if (!payload.whatsapp_api_key) delete payload.whatsapp_api_key;
+    if (!payload.sms_api_key) delete payload.sms_api_key;
     const { error } = await supabase.from("notification_settings").upsert(payload, { onConflict: "branch_id" });
     if (error) return toast.error(error.message);
     toast.success(t("saved"));

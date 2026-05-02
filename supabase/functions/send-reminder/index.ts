@@ -94,10 +94,57 @@ Deno.serve(async (req) => {
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+  // Authenticate caller. Accept either a logged-in user JWT (from the app)
+  // or a shared cron secret (for scheduled invocations).
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const cronSecret = Deno.env.get("SEND_REMINDER_CRON_SECRET");
+  const isCron = !!cronSecret && authHeader === `Bearer ${cronSecret}`;
+
+  let callerIsAdmin = false;
+  if (!isCron) {
+    if (!authHeader.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const token = authHeader.replace("Bearer ", "");
+    const userClient = createClient(SUPABASE_URL, ANON_KEY, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    });
+    const { data: claimsData, error: claimsErr } = await userClient.auth.getClaims(token);
+    if (claimsErr || !claimsData?.claims?.sub) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    // Check admin role for bulk operations
+    const userId = claimsData.claims.sub as string;
+    const adminCheck = createClient(SUPABASE_URL, SERVICE_KEY);
+    const { data: roleRow } = await adminCheck
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .eq("role", "admin")
+      .maybeSingle();
+    callerIsAdmin = !!roleRow;
+  }
+
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
   let body: { reminder_id?: string; branch_id?: string; due_only?: boolean } = {};
   try { body = await req.json(); } catch { /* allow empty body */ }
+
+  // Bulk send (no specific reminder_id) requires admin or cron secret.
+  if (!body.reminder_id && !isCron && !callerIsAdmin) {
+    return new Response(JSON.stringify({ error: "Forbidden: admin role required for bulk send" }), {
+      status: 403,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
   // Build query
   let q = supabase

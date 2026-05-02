@@ -89,7 +89,7 @@ export default function ScheduledReminders() {
 
   const create = async () => {
     if (!form.patient_id || !form.message.trim()) {
-      toast({ title: t("required") ?? "Required", variant: "destructive" }); return;
+      toast({ title: "Required", variant: "destructive" }); return;
     }
     const { error } = await supabase.from("reminders").insert({
       patient_id: form.patient_id,
@@ -163,7 +163,7 @@ export default function ScheduledReminders() {
               <DialogHeader><DialogTitle>{t("sendReminder")}</DialogTitle></DialogHeader>
               <div className="space-y-3">
                 <div>
-                  <Label>{t("patient") ?? "Patient"}</Label>
+                  <Label>{t("patients")}</Label>
                   <Select value={form.patient_id} onValueChange={(v) => setForm({ ...form, patient_id: v })}>
                     <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                     <SelectContent>
@@ -213,7 +213,7 @@ export default function ScheduledReminders() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{t("patient") ?? "Patient"}</TableHead>
+                <TableHead>{t("patients")}</TableHead>
                 <TableHead>{t("reminderType")}</TableHead>
                 <TableHead>{t("scheduledTime")}</TableHead>
                 <TableHead>{t("message")}</TableHead>

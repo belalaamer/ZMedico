@@ -48,8 +48,24 @@ export default function Products() {
   const handleImageUpload = async (file: File) => {
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) { toast.error("Max 5MB"); return; }
+    const ALLOWED_MIME: Record<string, string> = {
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp",
+      "image/gif": "gif",
+    };
+    if (!ALLOWED_MIME[file.type]) {
+      toast.error("Only JPEG, PNG, WebP, or GIF images are allowed");
+      return;
+    }
+    const ext = ALLOWED_MIME[file.type];
+    const declaredExt = (file.name.split(".").pop() || "").toLowerCase();
+    const validExts = new Set(["jpg", "jpeg", "png", "webp", "gif"]);
+    if (declaredExt && !validExts.has(declaredExt)) {
+      toast.error("File extension does not match an allowed image type");
+      return;
+    }
     setUploading(true);
-    const ext = file.name.split(".").pop() || "jpg";
     const path = `${crypto.randomUUID()}.${ext}`;
     const { error } = await supabase.storage.from("product-images").upload(path, file, { upsert: false, contentType: file.type });
     if (error) { setUploading(false); toast.error(error.message); return; }

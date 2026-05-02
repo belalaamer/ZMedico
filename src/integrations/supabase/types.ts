@@ -4197,6 +4197,7 @@ export type Database = {
         Returns: string
       }
       check_expiry_alerts: { Args: never; Returns: number }
+      current_user_branch_id: { Args: never; Returns: string }
       default_treasury_for_branch: {
         Args: { _branch_id: string }
         Returns: string

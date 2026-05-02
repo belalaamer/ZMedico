@@ -40,6 +40,45 @@ type NotifySettings = {
   email_sender_name: string | null;
 };
 
+// SSRF guard: only allow https URLs to public hostnames.
+// Blocks private/link-local/loopback ranges to prevent probing internal
+// cloud metadata or internal services via admin-controlled provider URLs.
+function isPrivateHostname(host: string): boolean {
+  const h = host.toLowerCase();
+  if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".internal") || h.endsWith(".local")) return true;
+  // IPv6 loopback / link-local / unique-local
+  if (h === "::1" || h.startsWith("fe80:") || h.startsWith("fc") || h.startsWith("fd")) return true;
+  // IPv4 dotted quad
+  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (m) {
+    const [a, b] = [parseInt(m[1], 10), parseInt(m[2], 10)];
+    if (a === 10) return true;
+    if (a === 127) return true;
+    if (a === 0) return true;
+    if (a === 169 && b === 254) return true; // link-local incl. AWS IMDS
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
+  }
+  return false;
+}
+
+function validateProviderUrl(raw: string): { ok: true; url: URL } | { ok: false; error: string } {
+  let u: URL;
+  try { u = new URL(raw); } catch { return { ok: false, error: "Invalid provider URL" }; }
+  if (u.protocol !== "https:") return { ok: false, error: "Provider URL must use https" };
+  if (!u.hostname || isPrivateHostname(u.hostname)) {
+    return { ok: false, error: "Provider URL host is not allowed" };
+  }
+  return { ok: true, url: u };
+}
+
+function sanitizeProviderError(text: string): string {
+  // Limit exfiltration surface: truncate and strip control chars.
+  const cleaned = text.replace(/[\x00-\x1f\x7f]+/g, " ").trim();
+  return cleaned.length > 200 ? cleaned.slice(0, 200) + "…" : cleaned;
+}
+
 async function sendOne(
   reminder: Reminder,
   patientPhone: string | null,
@@ -55,8 +94,11 @@ async function sendOne(
     const key = isWa ? cfg?.whatsapp_api_key : cfg?.sms_api_key;
     if (!url || !key) return { ok: false, error: `${isWa ? "WhatsApp" : "SMS"} provider not configured` };
 
+    const v = validateProviderUrl(url);
+    if (!v.ok) return { ok: false, error: `${isWa ? "WhatsApp" : "SMS"} provider URL rejected` };
+
     try {
-      const res = await fetch(url, {
+      const res = await fetch(v.url.toString(), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -69,10 +111,13 @@ async function sendOne(
           text: message,
         }),
       });
-      if (!res.ok) return { ok: false, error: `Provider ${res.status}: ${await res.text()}` };
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        return { ok: false, error: `Provider error ${res.status}${body ? `: ${sanitizeProviderError(body)}` : ""}` };
+      }
       return { ok: true };
     } catch (e) {
-      return { ok: false, error: (e as Error).message };
+      return { ok: false, error: "Provider request failed" };
     }
   }
 

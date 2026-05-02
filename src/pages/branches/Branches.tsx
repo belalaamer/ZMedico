@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDataSync } from "@/lib/dataSync";
-import { Plus, Search, Pencil, Trash2, Building2, Star } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Building2, Star, MapPin } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,12 +15,17 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import LocationMap from "@/components/LocationMap";
+import { Slider } from "@/components/ui/slider";
+import { getCurrentLocation } from "@/lib/geo";
+import { Loader2 } from "lucide-react";
 
 type Branch = {
   id: string; name_ar: string; name_en: string; code: string | null;
   phone: string | null; email: string | null; address: string | null; city: string | null;
   is_main_branch: boolean; is_active: boolean; manager_id: string | null;
   working_hours_start: string | null; working_hours_end: string | null;
+  allowed_latitude: number | null; allowed_longitude: number | null; allowed_radius: number | null;
 };
 
 type Staff = { id: string; full_name: string | null; email: string | null };
@@ -42,6 +47,10 @@ export default function Branches() {
   const [form, setForm] = useState({ ...empty });
   const [editId, setEditId] = useState<string | null>(null);
   const [delId, setDelId] = useState<string | null>(null);
+  const [locBranch, setLocBranch] = useState<Branch | null>(null);
+  const [locCenter, setLocCenter] = useState<{ lat: number; lon: number } | null>(null);
+  const [locRadius, setLocRadius] = useState(100);
+  const [locLoading, setLocLoading] = useState(false);
 
   const load = async () => {
     const { data } = await supabase.from("branches").select("*").order("created_at");
@@ -111,6 +120,40 @@ export default function Branches() {
     if (error) toast({ title: error.message, variant: "destructive" });
     else toast({ title: t("deleted") });
     setDelId(null); load();
+  };
+
+  const openLocation = (b: Branch) => {
+    setLocBranch(b);
+    setLocRadius(b.allowed_radius ?? 100);
+    if (b.allowed_latitude != null && b.allowed_longitude != null) {
+      setLocCenter({ lat: Number(b.allowed_latitude), lon: Number(b.allowed_longitude) });
+    } else {
+      setLocCenter({ lat: 30.0444, lon: 31.2357 }); // Cairo default
+    }
+  };
+
+  const useMyLocation = async () => {
+    setLocLoading(true);
+    try {
+      const c = await getCurrentLocation();
+      setLocCenter({ lat: c.lat, lon: c.lon });
+    } catch (e: any) {
+      toast({ title: e.message, variant: "destructive" });
+    } finally {
+      setLocLoading(false);
+    }
+  };
+
+  const saveLocation = async () => {
+    if (!locBranch || !locCenter) return;
+    const { error } = await supabase.from("branches").update({
+      allowed_latitude: locCenter.lat,
+      allowed_longitude: locCenter.lon,
+      allowed_radius: locRadius,
+    } as any).eq("id", locBranch.id);
+    if (error) { toast({ title: error.message, variant: "destructive" }); return; }
+    toast({ title: t("locationSaved") });
+    setLocBranch(null); load();
   };
 
   const staffName = (id: string | null) => {
@@ -232,6 +275,9 @@ export default function Branches() {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
+                      <Button size="icon" variant="ghost" onClick={() => openLocation(b)} title={t("setLocation")}>
+                        <MapPin className={`size-4 ${b.allowed_latitude ? "text-emerald-600" : "text-muted-foreground"}`} />
+                      </Button>
                       <Button size="icon" variant="ghost" onClick={() => openEdit(b)}><Pencil className="size-4" /></Button>
                       <Button size="icon" variant="ghost" onClick={() => setDelId(b.id)}><Trash2 className="size-4 text-destructive" /></Button>
                     </div>
@@ -258,6 +304,41 @@ export default function Branches() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!locBranch} onOpenChange={(o) => !o && setLocBranch(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><MapPin className="size-5 text-primary" />{t("setLocation")} — {locBranch ? (lang === "ar" ? locBranch.name_ar : locBranch.name_en) : ""}</DialogTitle>
+          </DialogHeader>
+          {locCenter && (
+            <div className="space-y-3">
+              <div className="text-xs text-muted-foreground">{t("pickOnMap")}</div>
+              <LocationMap
+                center={locCenter}
+                radius={locRadius}
+                pickable
+                onPick={(lat, lon) => setLocCenter({ lat, lon })}
+              />
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>Lat: <span className="font-mono">{locCenter.lat.toFixed(6)}</span></div>
+                <div>Lon: <span className="font-mono">{locCenter.lon.toFixed(6)}</span></div>
+              </div>
+              <div>
+                <Label>{t("allowedRadius")}: {locRadius} m</Label>
+                <Slider min={50} max={500} step={10} value={[locRadius]} onValueChange={(v) => setLocRadius(v[0])} className="mt-2" />
+              </div>
+              <Button variant="outline" size="sm" onClick={useMyLocation} disabled={locLoading}>
+                {locLoading ? <Loader2 className="size-4 animate-spin me-1" /> : <MapPin className="size-4 me-1" />}
+                {t("useCurrentLocation")}
+              </Button>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLocBranch(null)}>{t("cancel")}</Button>
+            <Button onClick={saveLocation}>{t("save")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

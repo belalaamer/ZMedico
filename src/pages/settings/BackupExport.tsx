@@ -6,11 +6,34 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { Download, Database } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function BackupExport() {
   const { t } = useI18n();
+  const { user } = useAuth();
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!user) { setIsAdmin(false); return; }
+    supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("role", "admin")
+      .maybeSingle()
+      .then(({ data }) => { if (!cancelled) setIsAdmin(!!data); });
+    return () => { cancelled = true; };
+  }, [user]);
+
+  const guard = () => {
+    if (!isAdmin) { toast.error("Admin access required"); return false; }
+    return true;
+  };
 
   const exportTable = async (table: string, filename: string) => {
+    if (!guard()) return;
     const { data, error } = await (supabase as any).from(table).select("*").limit(10000);
     if (error) return toast.error(error.message);
     const ws = XLSX.utils.json_to_sheet(data ?? []);
@@ -21,6 +44,7 @@ export default function BackupExport() {
   };
 
   const exportAllJson = async () => {
+    if (!guard()) return;
     const tables = ["patients","appointments","invoices","payments","products","medical_records"];
     const out: any = {};
     for (const tbl of tables) {
@@ -37,17 +61,22 @@ export default function BackupExport() {
     <SettingsLayout>
       <div className="space-y-4">
         <h1 className="text-2xl font-bold">{t("backupExport")}</h1>
+        {isAdmin === false && (
+          <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            Backup and export are restricted to administrators.
+          </div>
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Card className="p-5 space-y-3"><div className="flex items-center gap-2"><Database className="size-5 text-primary" /><h3 className="font-semibold">Backup</h3></div>
             <p className="text-sm text-muted-foreground">Export full snapshot of core tables as JSON.</p>
-            <Button className="gradient-primary text-primary-foreground" onClick={exportAllJson}><Download className="me-2 size-4" />{t("backupNow")}</Button>
+            <Button disabled={!isAdmin} className="gradient-primary text-primary-foreground" onClick={exportAllJson}><Download className="me-2 size-4" />{t("backupNow")}</Button>
           </Card>
           <Card className="p-5 space-y-3"><div className="flex items-center gap-2"><Download className="size-5 text-primary" /><h3 className="font-semibold">Export</h3></div>
             <div className="grid gap-2">
-              <Button variant="outline" onClick={() => exportTable("patients", "patients.xlsx")}>{t("exportPatients")}</Button>
-              <Button variant="outline" onClick={() => exportTable("invoices", "invoices.xlsx")}>{t("exportInvoices")}</Button>
-              <Button variant="outline" onClick={() => exportTable("appointments", "appointments.xlsx")}>Export appointments</Button>
-              <Button variant="outline" onClick={() => exportTable("products", "products.xlsx")}>Export products</Button>
+              <Button disabled={!isAdmin} variant="outline" onClick={() => exportTable("patients", "patients.xlsx")}>{t("exportPatients")}</Button>
+              <Button disabled={!isAdmin} variant="outline" onClick={() => exportTable("invoices", "invoices.xlsx")}>{t("exportInvoices")}</Button>
+              <Button disabled={!isAdmin} variant="outline" onClick={() => exportTable("appointments", "appointments.xlsx")}>Export appointments</Button>
+              <Button disabled={!isAdmin} variant="outline" onClick={() => exportTable("products", "products.xlsx")}>Export products</Button>
             </div>
           </Card>
         </div>

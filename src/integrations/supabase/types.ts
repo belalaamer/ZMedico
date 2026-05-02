@@ -2821,6 +2821,153 @@ export type Database = {
         }
         Relationships: []
       }
+      saas_invoice_counters: {
+        Row: {
+          last_value: number
+          year: number
+        }
+        Insert: {
+          last_value?: number
+          year: number
+        }
+        Update: {
+          last_value?: number
+          year?: number
+        }
+        Relationships: []
+      }
+      saas_invoices: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          due_date: string | null
+          id: string
+          invoice_number: string
+          invoice_pdf: string | null
+          paid_at: string | null
+          status: Database["public"]["Enums"]["saas_invoice_status"]
+          subscription_id: string | null
+          tax: number
+          tenant_id: string
+          total: number
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          due_date?: string | null
+          id?: string
+          invoice_number: string
+          invoice_pdf?: string | null
+          paid_at?: string | null
+          status?: Database["public"]["Enums"]["saas_invoice_status"]
+          subscription_id?: string | null
+          tax?: number
+          tenant_id: string
+          total: number
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          due_date?: string | null
+          id?: string
+          invoice_number?: string
+          invoice_pdf?: string | null
+          paid_at?: string | null
+          status?: Database["public"]["Enums"]["saas_invoice_status"]
+          subscription_id?: string | null
+          tax?: number
+          tenant_id?: string
+          total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saas_invoices_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saas_invoices_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saas_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          failed_at: string | null
+          failure_reason: string | null
+          id: string
+          invoice_url: string | null
+          paid_at: string | null
+          payment_method: Database["public"]["Enums"]["saas_payment_method"]
+          payment_provider: Database["public"]["Enums"]["saas_payment_provider"]
+          provider_transaction_id: string | null
+          receipt_url: string | null
+          status: Database["public"]["Enums"]["saas_payment_status"]
+          subscription_id: string | null
+          tenant_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          failed_at?: string | null
+          failure_reason?: string | null
+          id?: string
+          invoice_url?: string | null
+          paid_at?: string | null
+          payment_method?: Database["public"]["Enums"]["saas_payment_method"]
+          payment_provider?: Database["public"]["Enums"]["saas_payment_provider"]
+          provider_transaction_id?: string | null
+          receipt_url?: string | null
+          status?: Database["public"]["Enums"]["saas_payment_status"]
+          subscription_id?: string | null
+          tenant_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          failed_at?: string | null
+          failure_reason?: string | null
+          id?: string
+          invoice_url?: string | null
+          paid_at?: string | null
+          payment_method?: Database["public"]["Enums"]["saas_payment_method"]
+          payment_provider?: Database["public"]["Enums"]["saas_payment_provider"]
+          provider_transaction_id?: string | null
+          receipt_url?: string | null
+          status?: Database["public"]["Enums"]["saas_payment_status"]
+          subscription_id?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saas_payments_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saas_payments_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       salary_adjustments: {
         Row: {
           amount: number
@@ -3255,6 +3402,171 @@ export type Database = {
           },
         ]
       }
+      subscription_addons: {
+        Row: {
+          created_at: string
+          description_ar: string | null
+          description_en: string | null
+          feature_key: string
+          id: string
+          is_active: boolean
+          name_ar: string
+          name_en: string
+          price_monthly: number
+          price_yearly: number
+        }
+        Insert: {
+          created_at?: string
+          description_ar?: string | null
+          description_en?: string | null
+          feature_key: string
+          id?: string
+          is_active?: boolean
+          name_ar: string
+          name_en: string
+          price_monthly?: number
+          price_yearly?: number
+        }
+        Update: {
+          created_at?: string
+          description_ar?: string | null
+          description_en?: string | null
+          feature_key?: string
+          id?: string
+          is_active?: boolean
+          name_ar?: string
+          name_en?: string
+          price_monthly?: number
+          price_yearly?: number
+        }
+        Relationships: []
+      }
+      subscription_plans: {
+        Row: {
+          created_at: string
+          currency: string
+          description_ar: string | null
+          description_en: string | null
+          display_order: number
+          features: Json
+          id: string
+          is_active: boolean
+          is_popular: boolean
+          max_branches: number
+          max_invoices_monthly: number
+          max_patients: number
+          max_staff: number
+          name_ar: string
+          name_en: string
+          price_monthly: number
+          price_yearly: number
+        }
+        Insert: {
+          created_at?: string
+          currency?: string
+          description_ar?: string | null
+          description_en?: string | null
+          display_order?: number
+          features?: Json
+          id?: string
+          is_active?: boolean
+          is_popular?: boolean
+          max_branches?: number
+          max_invoices_monthly?: number
+          max_patients?: number
+          max_staff?: number
+          name_ar: string
+          name_en: string
+          price_monthly?: number
+          price_yearly?: number
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          description_ar?: string | null
+          description_en?: string | null
+          display_order?: number
+          features?: Json
+          id?: string
+          is_active?: boolean
+          is_popular?: boolean
+          max_branches?: number
+          max_invoices_monthly?: number
+          max_patients?: number
+          max_staff?: number
+          name_ar?: string
+          name_en?: string
+          price_monthly?: number
+          price_yearly?: number
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          billing_cycle: Database["public"]["Enums"]["billing_cycle"]
+          cancel_at_period_end: boolean
+          cancelled_at: string | null
+          created_at: string
+          current_period_end: string
+          current_period_start: string
+          id: string
+          paymob_subscription_id: string | null
+          plan_id: string
+          status: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          billing_cycle?: Database["public"]["Enums"]["billing_cycle"]
+          cancel_at_period_end?: boolean
+          cancelled_at?: string | null
+          created_at?: string
+          current_period_end?: string
+          current_period_start?: string
+          id?: string
+          paymob_subscription_id?: string | null
+          plan_id: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          billing_cycle?: Database["public"]["Enums"]["billing_cycle"]
+          cancel_at_period_end?: boolean
+          cancelled_at?: string | null
+          created_at?: string
+          current_period_end?: string
+          current_period_start?: string
+          id?: string
+          paymob_subscription_id?: string | null
+          plan_id?: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppliers: {
         Row: {
           address: string | null
@@ -3332,6 +3644,167 @@ export type Database = {
           name_en?: string
         }
         Relationships: []
+      }
+      tenant_addons: {
+        Row: {
+          addon_id: string
+          created_at: string
+          id: string
+          status: Database["public"]["Enums"]["addon_status"]
+          tenant_id: string
+        }
+        Insert: {
+          addon_id: string
+          created_at?: string
+          id?: string
+          status?: Database["public"]["Enums"]["addon_status"]
+          tenant_id: string
+        }
+        Update: {
+          addon_id?: string
+          created_at?: string
+          id?: string
+          status?: Database["public"]["Enums"]["addon_status"]
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_addons_addon_id_fkey"
+            columns: ["addon_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_addons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_addons_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenant_usage: {
+        Row: {
+          branches_count: number
+          created_at: string
+          id: string
+          invoices_count: number
+          patients_count: number
+          period_end: string
+          period_start: string
+          staff_count: number
+          storage_used_mb: number
+          tenant_id: string
+        }
+        Insert: {
+          branches_count?: number
+          created_at?: string
+          id?: string
+          invoices_count?: number
+          patients_count?: number
+          period_end: string
+          period_start: string
+          staff_count?: number
+          storage_used_mb?: number
+          tenant_id: string
+        }
+        Update: {
+          branches_count?: number
+          created_at?: string
+          id?: string
+          invoices_count?: number
+          patients_count?: number
+          period_end?: string
+          period_start?: string
+          staff_count?: number
+          storage_used_mb?: number
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_usage_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenants: {
+        Row: {
+          billing_address: string | null
+          billing_city: string | null
+          billing_country: string | null
+          billing_email: string | null
+          billing_phone: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          owner_id: string | null
+          plan_id: string | null
+          slug: string
+          subscription_ends_at: string | null
+          subscription_status: Database["public"]["Enums"]["subscription_status"]
+          tax_id: string | null
+          trial_ends_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          billing_address?: string | null
+          billing_city?: string | null
+          billing_country?: string | null
+          billing_email?: string | null
+          billing_phone?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          owner_id?: string | null
+          plan_id?: string | null
+          slug: string
+          subscription_ends_at?: string | null
+          subscription_status?: Database["public"]["Enums"]["subscription_status"]
+          tax_id?: string | null
+          trial_ends_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          billing_address?: string | null
+          billing_city?: string | null
+          billing_country?: string | null
+          billing_email?: string | null
+          billing_phone?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          owner_id?: string | null
+          plan_id?: string | null
+          slug?: string
+          subscription_ends_at?: string | null
+          subscription_status?: Database["public"]["Enums"]["subscription_status"]
+          tax_id?: string | null
+          trial_ends_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenants_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenants_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       treasury: {
         Row: {
@@ -3705,6 +4178,7 @@ export type Database = {
       generate_invoice_number: { Args: never; Returns: string }
       generate_po_number: { Args: never; Returns: string }
       generate_product_sku: { Args: never; Returns: string }
+      generate_saas_invoice_number: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -3712,6 +4186,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_tenant_owner: { Args: { _tenant_id: string }; Returns: boolean }
       recalc_invoice_payments: {
         Args: { _invoice_id: string }
         Returns: undefined
@@ -3733,6 +4208,7 @@ export type Database = {
       }
     }
     Enums: {
+      addon_status: "active" | "cancelled"
       alert_type: "low_stock" | "out_of_stock" | "expiring_soon" | "expired"
       app_role: "admin" | "doctor" | "receptionist" | "staff"
       appointment_status:
@@ -3755,6 +4231,7 @@ export type Database = {
         | "early_leave"
         | "half_day"
         | "on_leave"
+      billing_cycle: "monthly" | "yearly"
       contract_type: "full_time" | "part_time" | "contract" | "freelance"
       document_type:
         | "lab_result"
@@ -3806,9 +4283,19 @@ export type Database = {
         | "inventory"
       report_format: "pdf" | "excel" | "both"
       report_frequency: "daily" | "weekly" | "monthly"
+      saas_invoice_status: "draft" | "sent" | "paid" | "void"
+      saas_payment_method: "card" | "bank_transfer" | "cash"
+      saas_payment_provider: "stripe" | "paymob" | "fawry" | "manual"
+      saas_payment_status: "pending" | "completed" | "failed" | "refunded"
       salary_adjustment_type: "bonus" | "deduction" | "allowance" | "penalty"
       setting_value_type: "string" | "number" | "boolean" | "json"
       staff_status: "active" | "on_leave" | "terminated" | "suspended"
+      subscription_status:
+        | "trial"
+        | "active"
+        | "past_due"
+        | "cancelled"
+        | "expired"
       tooth_status:
         | "healthy"
         | "caries"
@@ -3947,6 +4434,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      addon_status: ["active", "cancelled"],
       alert_type: ["low_stock", "out_of_stock", "expiring_soon", "expired"],
       app_role: ["admin", "doctor", "receptionist", "staff"],
       appointment_status: [
@@ -3972,6 +4460,7 @@ export const Constants = {
         "half_day",
         "on_leave",
       ],
+      billing_cycle: ["monthly", "yearly"],
       contract_type: ["full_time", "part_time", "contract", "freelance"],
       document_type: [
         "lab_result",
@@ -4028,9 +4517,20 @@ export const Constants = {
       ],
       report_format: ["pdf", "excel", "both"],
       report_frequency: ["daily", "weekly", "monthly"],
+      saas_invoice_status: ["draft", "sent", "paid", "void"],
+      saas_payment_method: ["card", "bank_transfer", "cash"],
+      saas_payment_provider: ["stripe", "paymob", "fawry", "manual"],
+      saas_payment_status: ["pending", "completed", "failed", "refunded"],
       salary_adjustment_type: ["bonus", "deduction", "allowance", "penalty"],
       setting_value_type: ["string", "number", "boolean", "json"],
       staff_status: ["active", "on_leave", "terminated", "suspended"],
+      subscription_status: [
+        "trial",
+        "active",
+        "past_due",
+        "cancelled",
+        "expired",
+      ],
       tooth_status: [
         "healthy",
         "caries",

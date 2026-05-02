@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
-import { Settings, Building2, Calendar, FileText, CreditCard, Briefcase, Bell, Mail, MessageSquare, Phone, Languages, ShieldCheck, Users, HardDrive, ScrollText, Info } from "lucide-react";
+import { Settings, Building2, Calendar, FileText, CreditCard, Briefcase, Bell, Mail, MessageSquare, Phone, Languages, ShieldCheck, Users, HardDrive, ScrollText, Info, GitBranch } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { cn } from "@/lib/utils";
 
@@ -8,6 +8,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
   const { t } = useI18n();
   const items = [
     { to: "/settings/general", icon: Building2, label: t("clinicProfile") },
+    { to: "/settings/branches", icon: GitBranch, label: t("branches") },
     { to: "/settings/appointments", icon: Calendar, label: t("appointmentSettings") },
     { to: "/settings/invoices", icon: FileText, label: t("invoiceSettings") },
     { to: "/settings/payments", icon: CreditCard, label: t("paymentMethods") },

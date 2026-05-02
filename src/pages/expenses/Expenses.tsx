@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useDataSync } from "@/lib/dataSync";
 import { Plus, Receipt } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,6 +39,7 @@ export default function Expenses() {
     supabase.from("expense_categories").select("*").order("name_en").then(({ data }) => setCats(data ?? []));
     /* eslint-disable-next-line */
   }, [currentBranchId]);
+  useDataSync(["expenses"], () => { load(); });
 
   const save = async () => {
     if (!currentBranchId) { toast.error("Select a branch"); return; }

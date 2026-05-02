@@ -50,7 +50,7 @@ export default function Expenses() {
       category_id: form.category_id || null,
       amount: form.amount,
       description_en: form.description_en,
-      description_ar: form.description_ar || null,
+      description_ar: form.description_en,
       expense_date: form.expense_date,
       payment_method: form.payment_method,
       created_by: user?.id ?? null,
@@ -90,12 +90,8 @@ export default function Expenses() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>{t("description")} (EN)</Label>
-                <Input value={form.description_en} onChange={(e) => setForm({ ...form, description_en: e.target.value })} maxLength={200} />
-              </div>
-              <div className="space-y-2">
-                <Label>{t("description")} (AR)</Label>
-                <Textarea dir="rtl" value={form.description_ar} onChange={(e) => setForm({ ...form, description_ar: e.target.value })} maxLength={500} rows={2} />
+                <Label>{t("description")}</Label>
+                <Textarea value={form.description_en} onChange={(e) => setForm({ ...form, description_en: e.target.value, description_ar: e.target.value })} maxLength={500} rows={2} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">

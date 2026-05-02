@@ -110,12 +110,8 @@ export default function Treasury() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>{t("description")} (EN)</Label>
-                <Input value={adj.desc_en} onChange={(e) => setAdj({ ...adj, desc_en: e.target.value })} maxLength={200} />
-              </div>
-              <div className="space-y-2">
-                <Label>{t("description")} (AR)</Label>
-                <Input dir="rtl" value={adj.desc_ar} onChange={(e) => setAdj({ ...adj, desc_ar: e.target.value })} maxLength={200} />
+                <Label>{t("description")}</Label>
+                <Input value={adj.desc_en} onChange={(e) => setAdj({ ...adj, desc_en: e.target.value, desc_ar: e.target.value })} maxLength={200} />
               </div>
             </div>
             <DialogFooter>

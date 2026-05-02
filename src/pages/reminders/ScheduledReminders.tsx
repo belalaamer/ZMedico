@@ -62,6 +62,7 @@ export default function ScheduledReminders() {
     setPatients((p ?? []) as Patient[]);
   };
   useEffect(() => { load(); }, [currentBranchId]);
+  useDataSync(["patients", "reminders"], () => load());
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();

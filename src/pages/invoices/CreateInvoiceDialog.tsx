@@ -33,6 +33,7 @@ export function CreateInvoiceDialog({
   const [products, setProducts] = useState<any[]>([]);
   const [stocks, setStocks] = useState<Record<string, number>>({});
   const [patientId, setPatientId] = useState<string>(presetPatientId ?? "");
+  const [patientSelectOpen, setPatientSelectOpen] = useState(false);
   const [date, setDate] = useState<string>(new Date().toISOString().slice(0,10));
   const [discountPct, setDiscountPct] = useState<number>(0);
   const [taxPct, setTaxPct] = useState<number>(0);
@@ -43,8 +44,20 @@ export function CreateInvoiceDialog({
   useEffect(() => { setPatientId(presetPatientId ?? ""); }, [presetPatientId, open]);
 
   const loadPatients = () => {
-    supabase.from("patients").select("id,first_name_en,last_name_en,patient_code").is("deleted_at", null).order("created_at", { ascending: false }).limit(500)
-      .then(({ data }) => setPatients((data ?? []).map((p: any) => ({ id: p.id, label: `#${p.patient_code} · ${p.first_name_en} ${p.last_name_en ?? ""}`.trim() }))));
+    supabase
+      .from("patients")
+      .select("id,first_name_en,last_name_en,patient_code,deleted_at")
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(500)
+      .then(({ data }) => {
+        // Defensive client-side filter in case the column was just updated
+        const rows = (data ?? []).filter((p: any) => p.deleted_at == null);
+        setPatients(rows.map((p: any) => ({
+          id: p.id,
+          label: `#${p.patient_code} · ${p.first_name_en} ${p.last_name_en ?? ""}`.trim(),
+        })));
+      });
   };
 
   useEffect(() => {
@@ -54,7 +67,9 @@ export function CreateInvoiceDialog({
       .then(({ data }) => setProducts(data ?? []));
   }, [open]);
 
-  useDataSync(["patients"], () => { if (open) loadPatients(); });
+  // Always refetch on patient changes — keeps the cached list fresh even
+  // if the dialog is opened later in the session.
+  useDataSync(["patients"], () => { loadPatients(); });
 
   useEffect(() => {
     if (!open) return;
@@ -158,7 +173,15 @@ export function CreateInvoiceDialog({
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>{t("patientName")}</Label>
-            <Select value={patientId} onValueChange={setPatientId}>
+            <Select
+              value={patientId}
+              onValueChange={setPatientId}
+              open={patientSelectOpen}
+              onOpenChange={(o) => {
+                setPatientSelectOpen(o);
+                if (o) loadPatients();
+              }}
+            >
               <SelectTrigger><SelectValue placeholder={t("selectPatient")} /></SelectTrigger>
               <SelectContent>
                 {patients.map((p) => <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>)}

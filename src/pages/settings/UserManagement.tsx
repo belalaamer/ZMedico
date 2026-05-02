@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, UserPlus, Trash2 } from "lucide-react";
+import { Search, UserPlus, Trash2, Copy, KeyRound } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
@@ -30,6 +30,15 @@ export default function UserManagement() {
   const [invName, setInvName] = useState("");
   const [invRole, setInvRole] = useState<Role>("staff");
   const [saving, setSaving] = useState(false);
+
+  // Create-user dialog state
+  const [createOpen, setCreateOpen] = useState(false);
+  const [cEmail, setCEmail] = useState("");
+  const [cName, setCName] = useState("");
+  const [cRole, setCRole] = useState<Role>("staff");
+  const [cPassword, setCPassword] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createdInfo, setCreatedInfo] = useState<{ email: string; password: string } | null>(null);
 
   const load = async () => {
     const { data: ps } = await supabase.from("profiles").select("*");
@@ -79,6 +88,43 @@ export default function UserManagement() {
     load();
   };
 
+  const createUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const email = cEmail.trim().toLowerCase();
+    if (!email || !email.includes("@")) {
+      toast.error(lang === "ar" ? "أدخل بريداً صالحاً" : "Enter a valid email");
+      return;
+    }
+    setCreating(true);
+    const { data, error } = await supabase.functions.invoke("admin-create-user", {
+      body: {
+        email,
+        full_name: cName.trim() || null,
+        role: cRole,
+        password: cPassword.trim() || undefined,
+      },
+    });
+    setCreating(false);
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.error ?? error?.message ?? "Failed");
+      return;
+    }
+    const info = data as { email: string; password: string };
+    setCreatedInfo({ email: info.email, password: info.password });
+    setCEmail(""); setCName(""); setCRole("staff"); setCPassword("");
+    setCreateOpen(false);
+    load();
+  };
+
+  const copy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(lang === "ar" ? "تم النسخ" : "Copied");
+    } catch {
+      toast.error(lang === "ar" ? "تعذر النسخ" : "Copy failed");
+    }
+  };
+
   const filtered = users.filter(u => !q || (u.full_name ?? "").toLowerCase().includes(q.toLowerCase()) || (u.email ?? "").toLowerCase().includes(q.toLowerCase()));
 
   return (
@@ -94,6 +140,10 @@ export default function UserManagement() {
             <Button onClick={() => setOpen(true)} className="gradient-primary text-primary-foreground">
               <UserPlus className="me-2 size-4" />
               {lang === "ar" ? "دعوة مستخدم" : "Invite user"}
+            </Button>
+            <Button onClick={() => setCreateOpen(true)} variant="outline">
+              <KeyRound className="me-2 size-4" />
+              {lang === "ar" ? "إنشاء مستخدم" : "Create user"}
             </Button>
           </div>
         </div>
@@ -177,6 +227,111 @@ export default function UserManagement() {
                 </Button>
               </DialogFooter>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create user dialog */}
+        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{lang === "ar" ? "إنشاء مستخدم جديد" : "Create a new user"}</DialogTitle>
+              <DialogDescription>
+                {lang === "ar"
+                  ? "سيتم إنشاء الحساب فوراً بكلمة مرور مؤقتة. شارك بيانات الدخول مع المستخدم."
+                  : "The account will be created immediately with a temporary password. Share the credentials with the user."}
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={createUser} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="cEmail">{lang === "ar" ? "البريد الإلكتروني" : "Email"}</Label>
+                <Input id="cEmail" type="email" required value={cEmail} onChange={(e) => setCEmail(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cName">{lang === "ar" ? "الاسم الكامل" : "Full name"}</Label>
+                <Input id="cName" value={cName} onChange={(e) => setCName(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>{lang === "ar" ? "الدور" : "Role"}</Label>
+                <Select value={cRole} onValueChange={(v) => setCRole(v as Role)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {ROLES.map((r) => (
+                      <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cPassword">
+                  {lang === "ar" ? "كلمة مرور (اختياري)" : "Password (optional)"}
+                </Label>
+                <Input
+                  id="cPassword"
+                  type="text"
+                  placeholder={lang === "ar" ? "اتركه فارغاً لتوليد كلمة مرور" : "Leave empty to auto-generate"}
+                  value={cPassword}
+                  onChange={(e) => setCPassword(e.target.value)}
+                />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>{t("cancel")}</Button>
+                <Button type="submit" disabled={creating} className="gradient-primary text-primary-foreground">
+                  {creating
+                    ? (lang === "ar" ? "جارٍ الإنشاء..." : "Creating...")
+                    : (lang === "ar" ? "إنشاء" : "Create")}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Created credentials dialog */}
+        <Dialog open={!!createdInfo} onOpenChange={(o) => !o && setCreatedInfo(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{lang === "ar" ? "تم إنشاء المستخدم" : "User created"}</DialogTitle>
+              <DialogDescription>
+                {lang === "ar"
+                  ? "احفظ كلمة المرور المؤقتة الآن. لن تظهر مجدداً."
+                  : "Save the temporary password now. It will not be shown again."}
+              </DialogDescription>
+            </DialogHeader>
+            {createdInfo && (
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label>{lang === "ar" ? "البريد" : "Email"}</Label>
+                  <div className="flex gap-2">
+                    <Input readOnly value={createdInfo.email} />
+                    <Button type="button" variant="outline" size="icon" onClick={() => copy(createdInfo.email)}>
+                      <Copy className="size-4" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label>{lang === "ar" ? "كلمة المرور المؤقتة" : "Temporary password"}</Label>
+                  <div className="flex gap-2">
+                    <Input readOnly value={createdInfo.password} className="font-mono" />
+                    <Button type="button" variant="outline" size="icon" onClick={() => copy(createdInfo.password)}>
+                      <Copy className="size-4" />
+                    </Button>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => copy(`${lang === "ar" ? "البريد" : "Email"}: ${createdInfo.email}\n${lang === "ar" ? "كلمة المرور" : "Password"}: ${createdInfo.password}`)}
+                >
+                  <Copy className="me-2 size-4" />
+                  {lang === "ar" ? "نسخ بيانات الدخول" : "Copy credentials"}
+                </Button>
+              </div>
+            )}
+            <DialogFooter>
+              <Button onClick={() => setCreatedInfo(null)} className="gradient-primary text-primary-foreground">
+                {lang === "ar" ? "تم" : "Done"}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

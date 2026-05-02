@@ -9,6 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+} from "@/components/ui/dialog";
 import { useI18n } from "@/contexts/I18nContext";
 import { toast } from "sonner";
 
@@ -29,6 +32,9 @@ export default function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,6 +69,22 @@ export default function AuthPage() {
     if (result.error) { toast.error("Google sign-in failed"); return; }
     if (result.redirected) return;
     nav(from, { replace: true });
+  };
+
+  const handleSendReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail || !resetEmail.includes("@")) {
+      toast.error(lang === "ar" ? "أدخل بريداً صالحاً" : "Enter a valid email");
+      return;
+    }
+    setResetLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setResetLoading(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("resetLinkSent"));
+    setResetOpen(false);
   };
 
   return (
@@ -124,6 +146,30 @@ export default function AuthPage() {
                   <Button type="submit" className="w-full gradient-primary text-primary-foreground hover:opacity-95" disabled={loading}>
                     {t("signIn")}
                   </Button>
+                  <div className="text-end">
+                    <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+                      <DialogTrigger asChild>
+                        <button type="button" className="text-xs text-primary hover:underline">
+                          {t("forgotPassword")}
+                        </button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader><DialogTitle>{t("resetPassword")}</DialogTitle></DialogHeader>
+                        <form onSubmit={handleSendReset} className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="rsemail">{t("email")}</Label>
+                            <Input id="rsemail" type="email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} required />
+                          </div>
+                          <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => setResetOpen(false)}>{t("cancel")}</Button>
+                            <Button type="submit" className="gradient-primary text-primary-foreground" disabled={resetLoading}>
+                              {t("sendResetLink")}
+                            </Button>
+                          </DialogFooter>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                 </form>
               </TabsContent>
 

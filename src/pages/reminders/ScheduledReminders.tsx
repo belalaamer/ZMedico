@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Send, RefreshCw, Trash2, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useDataSync } from "@/lib/dataSync";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { useAuth } from "@/contexts/AuthContext";

@@ -23,7 +23,7 @@ export default function ReportsDashboard() {
       const { data: pays } = await pq;
       const revenue = (pays ?? []).reduce((s, r: any) => s + Number(r.amount || 0), 0);
 
-      let ptq = supabase.from("patients").select("id", { count: "exact", head: true }).gte("created_at", monthStart);
+      let ptq = supabase.from("patients").select("id", { count: "exact", head: true }).is("deleted_at", null).gte("created_at", monthStart);
       if (currentBranchId) ptq = ptq.eq("branch_id", currentBranchId);
       const { count: patients } = await ptq;
 

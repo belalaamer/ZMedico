@@ -21,7 +21,7 @@ export default function Suppliers() {
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<Supplier | null>(null);
   const [form, setForm] = useState({
-    name_en: "", name_ar: "", contact_person: "", phone: "", email: "", address: "", tax_number: "", notes: "",
+    name: "", contact_person: "", phone: "", email: "", address: "", tax_number: "", notes: "",
   });
 
   const load = async () => {
@@ -34,11 +34,11 @@ export default function Suppliers() {
   };
   useEffect(() => { load(); }, []);
 
-  const openNew = () => { setEdit(null); setForm({ name_en: "", name_ar: "", contact_person: "", phone: "", email: "", address: "", tax_number: "", notes: "" }); setOpen(true); };
+  const openNew = () => { setEdit(null); setForm({ name: "", contact_person: "", phone: "", email: "", address: "", tax_number: "", notes: "" }); setOpen(true); };
   const openEdit = (s: Supplier) => {
     setEdit(s);
     setForm({
-      name_en: s.name_en, name_ar: s.name_ar, contact_person: s.contact_person ?? "",
+      name: s.name_en || s.name_ar || "", contact_person: s.contact_person ?? "",
       phone: s.phone ?? "", email: s.email ?? "", address: s.address ?? "",
       tax_number: s.tax_number ?? "", notes: s.notes ?? "",
     });
@@ -46,9 +46,10 @@ export default function Suppliers() {
   };
 
   const save = async () => {
-    if (!form.name_en.trim() || !form.name_ar.trim()) { toast.error("Name required"); return; }
+    const name = form.name.trim();
+    if (!name) { toast.error("Name required"); return; }
     const payload: any = {
-      name_en: form.name_en.trim(), name_ar: form.name_ar.trim(),
+      name_en: name, name_ar: name,
       contact_person: form.contact_person || null,
       phone: form.phone || null, email: form.email || null,
       address: form.address || null, tax_number: form.tax_number || null, notes: form.notes || null,
@@ -91,8 +92,7 @@ export default function Suppliers() {
             <DialogContent className="max-w-2xl">
               <DialogHeader><DialogTitle>{edit ? t("supplier") : t("newSupplier")}</DialogTitle></DialogHeader>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-2"><Label>{t("nameEn")}</Label><Input value={form.name_en} onChange={(e) => setForm({ ...form, name_en: e.target.value })} maxLength={120} /></div>
-                <div className="space-y-2"><Label>{t("nameAr")}</Label><Input dir="rtl" value={form.name_ar} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} maxLength={120} /></div>
+                <div className="space-y-2 sm:col-span-2"><Label>{t("name")} / الاسم</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={120} /></div>
                 <div className="space-y-2"><Label>{t("contactPerson")}</Label><Input value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} maxLength={120} /></div>
                 <div className="space-y-2"><Label>{t("phone")}</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} maxLength={40} placeholder="+20..." /></div>
                 <div className="space-y-2"><Label>{t("email")}</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} maxLength={255} /></div>

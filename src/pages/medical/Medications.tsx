@@ -22,7 +22,7 @@ export default function Medications() {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<any>(null);
-  const [form, setForm] = useState({ name_en: "", name_ar: "", generic_name: "", dosage_form: "tablet", strength: "", unit: "piece", instructions_en: "", instructions_ar: "", product_id: "", is_active: true });
+  const [form, setForm] = useState({ name: "", generic_name: "", dosage_form: "tablet", strength: "", unit: "piece", instructions: "", product_id: "", is_active: true });
 
   const load = async () => {
     const [{ data }, { data: p }] = await Promise.all([
@@ -37,25 +37,27 @@ export default function Medications() {
     !q || `${i.name_en} ${i.name_ar} ${i.generic_name ?? ""}`.toLowerCase().includes(q.toLowerCase())
   ), [items, q]);
 
-  const openNew = () => { setEdit(null); setForm({ name_en: "", name_ar: "", generic_name: "", dosage_form: "tablet", strength: "", unit: "piece", instructions_en: "", instructions_ar: "", product_id: "", is_active: true }); setOpen(true); };
+  const openNew = () => { setEdit(null); setForm({ name: "", generic_name: "", dosage_form: "tablet", strength: "", unit: "piece", instructions: "", product_id: "", is_active: true }); setOpen(true); };
   const openEdit = (m: any) => {
     setEdit(m);
     setForm({
-      name_en: m.name_en, name_ar: m.name_ar, generic_name: m.generic_name ?? "",
+      name: m.name_en || m.name_ar || "", generic_name: m.generic_name ?? "",
       dosage_form: m.dosage_form, strength: m.strength ?? "", unit: m.unit ?? "piece",
-      instructions_en: m.instructions_en ?? "", instructions_ar: m.instructions_ar ?? "",
+      instructions: m.instructions_en || m.instructions_ar || "",
       product_id: m.product_id ?? "", is_active: m.is_active,
     });
     setOpen(true);
   };
 
   const save = async () => {
-    if (!form.name_en.trim() || !form.name_ar.trim()) return toast.error("Name required");
+    const name = form.name.trim();
+    const ins = form.instructions.trim();
+    if (!name) return toast.error("Name required");
     const payload = {
-      name_en: form.name_en.trim(), name_ar: form.name_ar.trim(),
+      name_en: name, name_ar: name,
       generic_name: form.generic_name || null,
       dosage_form: form.dosage_form, strength: form.strength || null, unit: form.unit,
-      instructions_en: form.instructions_en || null, instructions_ar: form.instructions_ar || null,
+      instructions_en: ins || null, instructions_ar: ins || null,
       product_id: form.product_id || null, is_active: form.is_active,
     };
     const { error } = edit
@@ -79,8 +81,7 @@ export default function Medications() {
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>{edit ? t("editRecord") : t("addMedicationCat")}</DialogTitle></DialogHeader>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2"><Label>{t("nameEn")}</Label><Input value={form.name_en} onChange={(e) => setForm({ ...form, name_en: e.target.value })} maxLength={150} /></div>
-                <div className="space-y-2"><Label>{t("nameAr")}</Label><Input dir="rtl" value={form.name_ar} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} maxLength={150} /></div>
+                <div className="space-y-2 col-span-2"><Label>{t("name")} / الاسم</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={150} /></div>
                 <div className="space-y-2 col-span-2"><Label>{t("genericName")}</Label><Input value={form.generic_name} onChange={(e) => setForm({ ...form, generic_name: e.target.value })} maxLength={150} /></div>
                 <div className="space-y-2"><Label>{t("dosageForm")}</Label>
                   <Select value={form.dosage_form} onValueChange={(v) => setForm({ ...form, dosage_form: v })}>
@@ -99,8 +100,7 @@ export default function Medications() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2 col-span-2"><Label>{t("instructions")} (EN)</Label><Textarea value={form.instructions_en} onChange={(e) => setForm({ ...form, instructions_en: e.target.value })} maxLength={300} rows={2} /></div>
-                <div className="space-y-2 col-span-2"><Label>{t("instructions")} (AR)</Label><Textarea dir="rtl" value={form.instructions_ar} onChange={(e) => setForm({ ...form, instructions_ar: e.target.value })} maxLength={300} rows={2} /></div>
+                <div className="space-y-2 col-span-2"><Label>{t("instructions")}</Label><Textarea value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} maxLength={300} rows={2} /></div>
                 <div className="flex items-center justify-between border border-border rounded-lg px-3 py-2 col-span-2"><Label>{t("active")}</Label><Switch checked={form.is_active} onCheckedChange={(v) => setForm({ ...form, is_active: v })} /></div>
               </div>
               <DialogFooter><Button variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button><Button className="gradient-primary text-primary-foreground" onClick={save}>{t("save")}</Button></DialogFooter>

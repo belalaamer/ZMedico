@@ -4197,6 +4197,7 @@ export type Database = {
         Returns: string
       }
       check_expiry_alerts: { Args: never; Returns: number }
+      current_user_branch_id: { Args: never; Returns: string }
       default_treasury_for_branch: {
         Args: { _branch_id: string }
         Returns: string
@@ -4237,7 +4238,15 @@ export type Database = {
     Enums: {
       addon_status: "active" | "cancelled"
       alert_type: "low_stock" | "out_of_stock" | "expiring_soon" | "expired"
-      app_role: "admin" | "doctor" | "receptionist" | "staff"
+      app_role:
+        | "admin"
+        | "doctor"
+        | "receptionist"
+        | "staff"
+        | "manager"
+        | "nurse"
+        | "accountant"
+        | "hr"
       appointment_status:
         | "scheduled"
         | "confirmed"
@@ -4463,7 +4472,16 @@ export const Constants = {
     Enums: {
       addon_status: ["active", "cancelled"],
       alert_type: ["low_stock", "out_of_stock", "expiring_soon", "expired"],
-      app_role: ["admin", "doctor", "receptionist", "staff"],
+      app_role: [
+        "admin",
+        "doctor",
+        "receptionist",
+        "staff",
+        "manager",
+        "nurse",
+        "accountant",
+        "hr",
+      ],
       appointment_status: [
         "scheduled",
         "confirmed",

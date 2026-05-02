@@ -26,13 +26,31 @@ export default function NotificationSettings() {
   });
   useEffect(() => {
     if (!branchId) return;
-    supabase.from("notification_settings").select("*").eq("branch_id", branchId).maybeSingle()
-      .then(({ data }) => { if (data) setF({ ...f, ...data }); });
+    // Never fetch sensitive credentials into the browser. Mask their presence only.
+    supabase
+      .from("notification_settings")
+      .select("id,branch_id,send_appointment_reminders,reminder_channel,send_appointment_confirmation,send_appointment_cancellation,send_invoice_notification,send_payment_receipt,send_birthday_greeting,birthday_discount_percentage,send_follow_up_reminder,follow_up_days_after,email_sender_name,email_sender_address,sms_sender_id,whatsapp_business_number,whatsapp_api_url,sms_api_url,whatsapp_api_key,sms_api_key")
+      .eq("branch_id", branchId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!data) return;
+        // Replace stored credentials with placeholders so they never enter client memory in plaintext.
+        const masked = {
+          ...data,
+          whatsapp_api_key: data.whatsapp_api_key ? "********" : "",
+          sms_api_key: data.sms_api_key ? "********" : "",
+        };
+        setF({ ...f, ...masked });
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [branchId]);
   const save = async () => {
     if (!branchId) return toast.error(t("branch"));
-    const { error } = await supabase.from("notification_settings").upsert({ ...f, branch_id: branchId }, { onConflict: "branch_id" });
+    // Strip masked placeholder keys so we don't overwrite real stored secrets with "********".
+    const payload: any = { ...f, branch_id: branchId };
+    if (payload.whatsapp_api_key === "********") delete payload.whatsapp_api_key;
+    if (payload.sms_api_key === "********") delete payload.sms_api_key;
+    const { error } = await supabase.from("notification_settings").upsert(payload, { onConflict: "branch_id" });
     if (error) return toast.error(error.message);
     toast.success(t("saved"));
   };

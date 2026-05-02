@@ -22,7 +22,7 @@ type Branch = {
   working_hours_start: string | null; working_hours_end: string | null;
 };
 
-type Staff = { id: string; first_name_en: string | null; first_name_ar: string | null };
+type Staff = { id: string; full_name: string | null; email: string | null };
 
 const empty = {
   name: "", code: "", phone: "", email: "", address: "", city: "",
@@ -45,7 +45,7 @@ export default function Branches() {
   const load = async () => {
     const { data } = await supabase.from("branches").select("*").order("created_at");
     setItems((data ?? []) as Branch[]);
-    const { data: s } = await supabase.from("staff").select("id, first_name_en, first_name_ar").eq("is_active", true).order("first_name_en");
+    const { data: s } = await supabase.from("profiles").select("id, full_name, email").order("full_name");
     setStaff((s ?? []) as Staff[]);
   };
   useEffect(() => { load(); }, []);
@@ -114,8 +114,7 @@ export default function Branches() {
   const staffName = (id: string | null) => {
     if (!id) return "—";
     const s = staff.find((x) => x.id === id);
-    if (!s) return "—";
-    return lang === "ar" ? (s.first_name_ar || s.first_name_en || "—") : (s.first_name_en || s.first_name_ar || "—");
+    return s?.full_name || s?.email || "—";
   };
 
   return (
@@ -163,7 +162,7 @@ export default function Branches() {
                   <SelectContent>
                     <SelectItem value="none">—</SelectItem>
                     {staff.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>{lang === "ar" ? (s.first_name_ar || s.first_name_en) : (s.first_name_en || s.first_name_ar)}</SelectItem>
+                      <SelectItem key={s.id} value={s.id}>{s.full_name || s.email}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

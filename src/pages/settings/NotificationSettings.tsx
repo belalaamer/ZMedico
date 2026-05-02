@@ -81,9 +81,9 @@ export default function NotificationSettings() {
           <div><Label>{t("smsSenderId")}</Label><Input value={f.sms_sender_id ?? ""} onChange={e => setF({ ...f, sms_sender_id: e.target.value })} /></div>
           <div><Label>{t("whatsappBusinessNumber")}</Label><Input value={f.whatsapp_business_number ?? ""} onChange={e => setF({ ...f, whatsapp_business_number: e.target.value })} /></div>
           <div><Label>{t("whatsappApiUrl")}</Label><Input value={f.whatsapp_api_url ?? ""} onChange={e => setF({ ...f, whatsapp_api_url: e.target.value })} placeholder="https://..." /></div>
-          <div><Label>{t("whatsappApiKey")}</Label><Input type="password" value={f.whatsapp_api_key ?? ""} onChange={e => setF({ ...f, whatsapp_api_key: e.target.value })} /></div>
+          <div><Label>{t("whatsappApiKey")}</Label><Input type="password" autoComplete="new-password" placeholder="••••••••  (leave blank to keep current)" value={f.whatsapp_api_key ?? ""} onChange={e => setF({ ...f, whatsapp_api_key: e.target.value })} /></div>
           <div><Label>{t("smsApiUrl")}</Label><Input value={f.sms_api_url ?? ""} onChange={e => setF({ ...f, sms_api_url: e.target.value })} placeholder="https://..." /></div>
-          <div><Label>{t("smsApiKey")}</Label><Input type="password" value={f.sms_api_key ?? ""} onChange={e => setF({ ...f, sms_api_key: e.target.value })} /></div>
+          <div><Label>{t("smsApiKey")}</Label><Input type="password" autoComplete="new-password" placeholder="••••••••  (leave blank to keep current)" value={f.sms_api_key ?? ""} onChange={e => setF({ ...f, sms_api_key: e.target.value })} /></div>
           <div className="sm:col-span-2 flex justify-end"><Button className="gradient-primary text-primary-foreground" onClick={save}>{t("save")}</Button></div>
         </Card>
       </div>

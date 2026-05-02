@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
@@ -27,11 +26,9 @@ export default function AuthPage() {
   const location = useLocation();
   const from = (location.state as any)?.from?.pathname ?? "/";
 
-  const [tab, setTab] = useState<"signin" | "signup">("signin");
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
   const [resetOpen, setResetOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
@@ -45,23 +42,6 @@ export default function AuthPage() {
     setLoading(false);
     if (error) { toast.error(error.message); return; }
     nav(from, { replace: true });
-  };
-
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const parsed = credSchema.safeParse({ email, password, fullName });
-    if (!parsed.success) { toast.error("Please fill all fields"); return; }
-    setLoading(true);
-    const { error } = await supabase.auth.signUp({
-      email, password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/`,
-        data: { full_name: fullName },
-      },
-    });
-    setLoading(false);
-    if (error) { toast.error(error.message); return; }
-    toast.success("Check your email to confirm your account");
   };
 
   const handleGoogle = async () => {
@@ -125,16 +105,10 @@ export default function AuthPage() {
           </div>
 
           <Card className="p-6 shadow-elegant border-border/60">
-            <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
-              <TabsList className="grid grid-cols-2 w-full mb-6">
-                <TabsTrigger value="signin">{t("signIn")}</TabsTrigger>
-                <TabsTrigger value="signup">{t("signUp")}</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="signin">
-                <h2 className="text-2xl font-bold mb-1">{t("welcomeBack")}</h2>
-                <p className="text-sm text-muted-foreground mb-6">{t("appName")}</p>
-                <form onSubmit={handleSignIn} className="space-y-4">
+            <div>
+              <h2 className="text-2xl font-bold mb-1">{t("welcomeBack")}</h2>
+              <p className="text-sm text-muted-foreground mb-6">{t("appName")}</p>
+              <form onSubmit={handleSignIn} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="email">{t("email")}</Label>
                     <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
@@ -171,30 +145,12 @@ export default function AuthPage() {
                     </Dialog>
                   </div>
                 </form>
-              </TabsContent>
-
-              <TabsContent value="signup">
-                <h2 className="text-2xl font-bold mb-1">{t("createAccount")}</h2>
-                <p className="text-sm text-muted-foreground mb-6">{t("appName")}</p>
-                <form onSubmit={handleSignUp} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">{t("fullName")}</Label>
-                    <Input id="name" value={fullName} onChange={(e) => setFullName(e.target.value)} required maxLength={100} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email2">{t("email")}</Label>
-                    <Input id="email2" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password2">{t("password")}</Label>
-                    <Input id="password2" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
-                  </div>
-                  <Button type="submit" className="w-full gradient-primary text-primary-foreground hover:opacity-95" disabled={loading}>
-                    {t("signUp")}
-                  </Button>
-                </form>
-              </TabsContent>
-            </Tabs>
+              <p className="text-xs text-muted-foreground text-center mt-4">
+                {lang === "ar"
+                  ? "التسجيل عن طريق دعوة المسؤول فقط."
+                  : "New accounts are created by an administrator."}
+              </p>
+            </div>
 
             <div className="relative my-6">
               <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>

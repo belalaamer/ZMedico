@@ -62,6 +62,7 @@ Deno.serve(async (req) => {
     const email = String(body.email ?? "").trim().toLowerCase();
     const full_name = body.full_name ? String(body.full_name).trim() : null;
     const role = String(body.role ?? "staff");
+    const branch_id = body.branch_id ? String(body.branch_id) : null;
     const password: string = body.password
       ? String(body.password)
       : genPassword(14);
@@ -74,13 +75,23 @@ Deno.serve(async (req) => {
     }
     const allowedRoles = [
       "admin", "manager", "doctor", "nurse",
-      "receptionist", "accountant", "staff",
+      "receptionist", "accountant", "hr", "staff",
     ];
     if (!allowedRoles.includes(role)) {
       return new Response(JSON.stringify({ error: "Invalid role" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    if (role === "manager" && !branch_id) {
+      return new Response(
+        JSON.stringify({ error: "Branch is required for manager role" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     // Pre-authorize email so handle_new_user trigger accepts the signup
@@ -121,6 +132,13 @@ Deno.serve(async (req) => {
       { user_id: created.user.id, role },
       { onConflict: "user_id,role" },
     );
+    // Create/update staff profile with branch assignment when provided.
+    if (branch_id) {
+      await admin.from("staff_profiles").upsert(
+        { id: created.user.id, branch_id },
+        { onConflict: "id" },
+      );
+    }
     // Consume invite if still present
     await admin.from("allowed_signup_emails").delete().eq("email", email);
 

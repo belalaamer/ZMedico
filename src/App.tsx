@@ -11,6 +11,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import AppShell from "@/components/layout/AppShell";
 import AuthPage from "@/pages/auth/Auth";
 import ResetPassword from "@/pages/auth/ResetPassword";
+import Pricing from "@/pages/pricing/Pricing";
 import Dashboard from "@/pages/dashboard/Dashboard";
 import PatientsPage from "@/pages/patients/Patients";
 import PatientProfile from "@/pages/patients/PatientProfile";
@@ -91,6 +92,7 @@ const App = () => (
               <Routes>
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/pricing" element={<Pricing />} />
                 <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/patients" element={<PatientsPage />} />

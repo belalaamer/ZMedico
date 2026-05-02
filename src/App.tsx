@@ -68,6 +68,9 @@ import UserManagement from "@/pages/settings/UserManagement";
 import BackupExport from "@/pages/settings/BackupExport";
 import AuditLogs from "@/pages/settings/AuditLogs";
 import SystemInfo from "@/pages/settings/SystemInfo";
+import Branches from "@/pages/branches/Branches";
+import Reminders from "@/pages/reminders/Reminders";
+import ScheduledReminders from "@/pages/reminders/ScheduledReminders";
 
 const queryClient = new QueryClient();
 
@@ -92,7 +95,10 @@ const App = () => (
                   <Route path="/payments" element={<Payments />} />
                   <Route path="/treasury" element={<Treasury />} />
                   <Route path="/expenses" element={<Expenses />} />
-                  <Route path="/reminders" element={<Placeholder titleKey="reminders" />} />
+                  <Route path="/reminders" element={<Reminders />} />
+                  <Route path="/reminders/scheduled" element={<Reminders />}>
+                    <Route index element={<ScheduledReminders />} />
+                  </Route>
                   <Route path="/inventory" element={<StockOverview />} />
                   <Route path="/inventory/stock" element={<StockOverview />} />
                   <Route path="/inventory/products" element={<Products />} />
@@ -129,7 +135,8 @@ const App = () => (
                   <Route path="/reports/hr" element={<HRReports />} />
                   <Route path="/reports/inventory" element={<InventoryReports />} />
                   <Route path="/reports/scheduled" element={<ScheduledReports />} />
-                  <Route path="/branches" element={<Placeholder titleKey="branches" />} />
+                  <Route path="/branches" element={<Branches />} />
+                  <Route path="/settings/branches" element={<Branches />} />
                   <Route path="/settings" element={<GeneralSettings />} />
                   <Route path="/settings/general" element={<GeneralSettings />} />
                   <Route path="/settings/appointments" element={<AppointmentSettings />} />

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Bell, Search, LogOut, Globe, AlertTriangle, PackageX } from "lucide-react";
+import { Bell, Search, LogOut, Globe, Calendar, Wallet, Clock, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -20,32 +20,65 @@ export function Topbar() {
   const { user, signOut } = useAuth();
   const { branches, currentBranchId, setCurrentBranchId } = useBranch();
   const [now, setNow] = useState(new Date());
-  const [alertCount, setAlertCount] = useState(0);
-  const [alertBreakdown, setAlertBreakdown] = useState<Record<string, number>>({});
+  const [notifs, setNotifs] = useState<any[]>([]);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
 
-  const loadAlerts = async () => {
-    const q = supabase.from("stock_alerts").select("alert_type", { count: "exact" }).eq("is_resolved", false);
-    const { data, count } = currentBranchId ? await q.eq("branch_id", currentBranchId) : await q;
-    setAlertCount(count ?? 0);
-    const map: Record<string, number> = {};
-    (data ?? []).forEach((r: any) => { map[r.alert_type] = (map[r.alert_type] ?? 0) + 1; });
-    setAlertBreakdown(map);
+  const loadNotifs = async () => {
+    if (!user?.id) { setNotifs([]); return; }
+    const { data } = await supabase
+      .from("notifications")
+      .select("id,title_en,title_ar,message_en,message_ar,type,related_entity_type,related_entity_id,is_read,created_at")
+      .eq("user_id", user.id)
+      .eq("is_read", false)
+      .order("created_at", { ascending: false })
+      .limit(10);
+    setNotifs(data ?? []);
   };
 
   useEffect(() => {
-    loadAlerts();
+    loadNotifs();
+    if (!user?.id) return;
     const ch = supabase
-      .channel("topbar-alerts")
-      .on("postgres_changes", { event: "*", schema: "public", table: "stock_alerts" }, () => loadAlerts())
+      .channel("topbar-notifications")
+      .on("postgres_changes", { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, () => loadNotifs())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
     // eslint-disable-next-line
-  }, [currentBranchId]);
+  }, [user?.id]);
+
+  const unreadCount = notifs.length;
+  const iconFor = (type: string) => {
+    switch (type) {
+      case "appointment": return <Calendar className="size-4 text-primary" />;
+      case "payment": return <Wallet className="size-4 text-success" />;
+      case "follow_up": return <Clock className="size-4 text-info" />;
+      case "alert": return <AlertTriangle className="size-4 text-warning" />;
+      default: return <Bell className="size-4 text-muted-foreground" />;
+    }
+  };
+  const linkFor = (n: any): string => {
+    if (!n.related_entity_type || !n.related_entity_id) return "#";
+    switch (n.related_entity_type) {
+      case "appointment": return "/calendar";
+      case "patient": return `/patients/${n.related_entity_id}`;
+      case "invoice": return `/invoices/${n.related_entity_id}`;
+      case "payment": return "/payments";
+      default: return "#";
+    }
+  };
+  const markAsRead = async (id: string) => {
+    await supabase.from("notifications").update({ is_read: true, read_at: new Date().toISOString() }).eq("id", id);
+    loadNotifs();
+  };
+  const markAllRead = async () => {
+    if (!user?.id) return;
+    await supabase.from("notifications").update({ is_read: true, read_at: new Date().toISOString() }).eq("user_id", user.id).eq("is_read", false);
+    loadNotifs();
+  };
 
   const time = now.toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US", { hour12: true });
   const initials = (user?.email ?? "U").slice(0, 2).toUpperCase();
@@ -81,57 +114,37 @@ export function Topbar() {
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon" className="relative" aria-label={t("notifications")}>
             <Bell className="size-5" />
-            {alertCount > 0 && (
+            {unreadCount > 0 && (
               <Badge className="absolute -top-1 -end-1 h-5 min-w-5 px-1 text-[10px] bg-destructive text-destructive-foreground border-0">
-                {alertCount > 99 ? "99+" : alertCount}
+                {unreadCount > 99 ? "99+" : unreadCount}
               </Badge>
             )}
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-72">
-          <DropdownMenuLabel>{t("notifications")}</DropdownMenuLabel>
+        <DropdownMenuContent align="end" className="w-80">
+          <div className="flex items-center justify-between px-2 py-1.5">
+            <DropdownMenuLabel className="p-0">{t("notifications")}</DropdownMenuLabel>
+            {unreadCount > 0 && (
+              <button onClick={markAllRead} className="text-xs text-primary hover:underline">{t("markAllRead")}</button>
+            )}
+          </div>
           <DropdownMenuSeparator />
-          {alertCount === 0 ? (
-            <div className="px-3 py-6 text-center text-sm text-muted-foreground">{t("noAlerts")}</div>
+          {unreadCount === 0 ? (
+            <div className="px-3 py-6 text-center text-sm text-muted-foreground">{t("noNotifications")}</div>
           ) : (
-            <>
-              {alertBreakdown.out_of_stock > 0 && (
-                <DropdownMenuItem asChild>
-                  <Link to="/inventory/alerts" className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-2"><PackageX className="size-4 text-destructive" />{t("outOfStock")}</span>
-                    <Badge variant="outline" className="status-departed">{alertBreakdown.out_of_stock}</Badge>
+            <div className="max-h-96 overflow-y-auto">
+              {notifs.map((n) => (
+                <DropdownMenuItem key={n.id} asChild className="cursor-pointer">
+                  <Link to={linkFor(n)} onClick={() => markAsRead(n.id)} className="flex items-start gap-2 py-2">
+                    <div className="mt-0.5">{iconFor(n.type)}</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium truncate">{lang === "ar" ? (n.title_ar || n.title_en) : (n.title_en || n.title_ar)}</div>
+                      <div className="text-xs text-muted-foreground line-clamp-2">{lang === "ar" ? (n.message_ar || n.message_en) : (n.message_en || n.message_ar)}</div>
+                    </div>
                   </Link>
                 </DropdownMenuItem>
-              )}
-              {alertBreakdown.low_stock > 0 && (
-                <DropdownMenuItem asChild>
-                  <Link to="/inventory/alerts" className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-2"><AlertTriangle className="size-4 text-warning" />{t("lowStock")}</span>
-                    <Badge variant="outline" className="status-progress">{alertBreakdown.low_stock}</Badge>
-                  </Link>
-                </DropdownMenuItem>
-              )}
-              {alertBreakdown.expiring_soon > 0 && (
-                <DropdownMenuItem asChild>
-                  <Link to="/inventory/alerts" className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-2"><AlertTriangle className="size-4 text-warning" />{t("expiringSoon")}</span>
-                    <Badge variant="outline" className="status-progress">{alertBreakdown.expiring_soon}</Badge>
-                  </Link>
-                </DropdownMenuItem>
-              )}
-              {alertBreakdown.expired > 0 && (
-                <DropdownMenuItem asChild>
-                  <Link to="/inventory/alerts" className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-2"><PackageX className="size-4 text-destructive" />{t("expired")}</span>
-                    <Badge variant="outline" className="status-departed">{alertBreakdown.expired}</Badge>
-                  </Link>
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link to="/inventory/alerts" className="text-primary">{t("viewAlerts")}</Link>
-              </DropdownMenuItem>
-            </>
+              ))}
+            </div>
           )}
         </DropdownMenuContent>
       </DropdownMenu>

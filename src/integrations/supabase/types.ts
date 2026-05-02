@@ -271,27 +271,54 @@ export type Database = {
       branches: {
         Row: {
           address: string | null
+          city: string | null
+          code: string | null
           created_at: string
+          email: string | null
           id: string
+          is_active: boolean
+          is_main_branch: boolean
+          manager_id: string | null
           name_ar: string
           name_en: string
           phone: string | null
+          updated_at: string
+          working_hours_end: string | null
+          working_hours_start: string | null
         }
         Insert: {
           address?: string | null
+          city?: string | null
+          code?: string | null
           created_at?: string
+          email?: string | null
           id?: string
+          is_active?: boolean
+          is_main_branch?: boolean
+          manager_id?: string | null
           name_ar: string
           name_en: string
           phone?: string | null
+          updated_at?: string
+          working_hours_end?: string | null
+          working_hours_start?: string | null
         }
         Update: {
           address?: string | null
+          city?: string | null
+          code?: string | null
           created_at?: string
+          email?: string | null
           id?: string
+          is_active?: boolean
+          is_main_branch?: boolean
+          manager_id?: string | null
           name_ar?: string
           name_en?: string
           phone?: string | null
+          updated_at?: string
+          working_hours_end?: string | null
+          working_hours_start?: string | null
         }
         Relationships: []
       }
@@ -1544,6 +1571,57 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          message_ar: string
+          message_en: string
+          read_at: string | null
+          related_entity_id: string | null
+          related_entity_type: string | null
+          scheduled_for: string | null
+          sent_at: string | null
+          title_ar: string
+          title_en: string
+          type: Database["public"]["Enums"]["notification_type"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message_ar?: string
+          message_en?: string
+          read_at?: string | null
+          related_entity_id?: string | null
+          related_entity_type?: string | null
+          scheduled_for?: string | null
+          sent_at?: string | null
+          title_ar?: string
+          title_en?: string
+          type?: Database["public"]["Enums"]["notification_type"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message_ar?: string
+          message_en?: string
+          read_at?: string | null
+          related_entity_id?: string | null
+          related_entity_type?: string | null
+          scheduled_for?: string | null
+          sent_at?: string | null
+          title_ar?: string
+          title_en?: string
+          type?: Database["public"]["Enums"]["notification_type"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       patient_documents: {
         Row: {
           created_at: string
@@ -2557,6 +2635,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      reminders: {
+        Row: {
+          appointment_id: string | null
+          branch_id: string | null
+          created_at: string
+          created_by: string | null
+          error_message: string | null
+          id: string
+          message_ar: string
+          message_en: string
+          patient_id: string | null
+          reminder_type: Database["public"]["Enums"]["reminder_channel"]
+          scheduled_time: string
+          sent_at: string | null
+          status: Database["public"]["Enums"]["reminder_status"]
+        }
+        Insert: {
+          appointment_id?: string | null
+          branch_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          error_message?: string | null
+          id?: string
+          message_ar?: string
+          message_en?: string
+          patient_id?: string | null
+          reminder_type?: Database["public"]["Enums"]["reminder_channel"]
+          scheduled_time: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["reminder_status"]
+        }
+        Update: {
+          appointment_id?: string | null
+          branch_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          error_message?: string | null
+          id?: string
+          message_ar?: string
+          message_en?: string
+          patient_id?: string | null
+          reminder_type?: Database["public"]["Enums"]["reminder_channel"]
+          scheduled_time?: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["reminder_status"]
+        }
+        Relationships: []
       }
       report_schedules: {
         Row: {
@@ -3608,6 +3734,12 @@ export type Database = {
       leave_request_status: "pending" | "approved" | "rejected" | "cancelled"
       medical_record_status: "draft" | "completed" | "reviewed"
       notification_channel: "email" | "sms" | "whatsapp" | "push"
+      notification_type:
+        | "appointment"
+        | "payment"
+        | "follow_up"
+        | "system"
+        | "alert"
       payment_method: "cash" | "card" | "bank_transfer" | "insurance" | "wallet"
       payment_method_type:
         | "cash"
@@ -3619,6 +3751,8 @@ export type Database = {
       payroll_status: "draft" | "approved" | "paid"
       po_status: "draft" | "pending" | "partial" | "received" | "cancelled"
       prescription_status: "active" | "completed" | "cancelled"
+      reminder_channel: "sms" | "email" | "whatsapp" | "push"
+      reminder_status: "pending" | "sent" | "failed" | "cancelled"
       report_category:
         | "financial"
         | "operational"
@@ -3819,6 +3953,13 @@ export const Constants = {
       leave_request_status: ["pending", "approved", "rejected", "cancelled"],
       medical_record_status: ["draft", "completed", "reviewed"],
       notification_channel: ["email", "sms", "whatsapp", "push"],
+      notification_type: [
+        "appointment",
+        "payment",
+        "follow_up",
+        "system",
+        "alert",
+      ],
       payment_method: ["cash", "card", "bank_transfer", "insurance", "wallet"],
       payment_method_type: [
         "cash",
@@ -3831,6 +3972,8 @@ export const Constants = {
       payroll_status: ["draft", "approved", "paid"],
       po_status: ["draft", "pending", "partial", "received", "cancelled"],
       prescription_status: ["active", "completed", "cancelled"],
+      reminder_channel: ["sms", "email", "whatsapp", "push"],
+      reminder_status: ["pending", "sent", "failed", "cancelled"],
       report_category: [
         "financial",
         "operational",

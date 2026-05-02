@@ -104,7 +104,7 @@ export default function Dashboard() {
         branchEq(supabase.from("patients").select("id,first_name_en,first_name_ar,last_name_en,last_name_ar,phone,created_at")
           .is("deleted_at", null)
           .order("created_at", { ascending: false }).limit(5)),
-        branchEq(supabase.from("appointments").select("id,scheduled_at,status,patient:patients(first_name_en,first_name_ar,last_name_en,last_name_ar),doctor:profiles!appointments_doctor_id_fkey(full_name)")
+        branchEq(supabase.from("appointments").select("id,scheduled_at,status,doctor_id,patient:patients(first_name_en,first_name_ar,last_name_en,last_name_ar)")
           .order("created_at", { ascending: false }).limit(5)),
         branchEq(supabase.from("payments").select("id,amount,payment_method,payment_date,patient:patients(first_name_en,first_name_ar,last_name_en,last_name_ar)")
           .order("created_at", { ascending: false }).limit(5)),

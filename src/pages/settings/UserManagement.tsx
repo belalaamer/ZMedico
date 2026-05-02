@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, UserPlus, Trash2, Copy, KeyRound } from "lucide-react";
+import { Search, UserPlus, Trash2, Copy, KeyRound, AlertTriangle } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 
-const ROLES = ["admin", "manager", "doctor", "nurse", "receptionist", "accountant", "staff"] as const;
+const ROLES = ["admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr", "staff"] as const;
 type Role = typeof ROLES[number];
 
 export default function UserManagement() {
@@ -25,10 +25,13 @@ export default function UserManagement() {
   const [roles, setRoles] = useState<Record<string, string[]>>({});
   const [q, setQ] = useState("");
   const [invites, setInvites] = useState<any[]>([]);
+  const [branches, setBranches] = useState<any[]>([]);
+  const [staffBranches, setStaffBranches] = useState<Record<string, string | null>>({});
   const [open, setOpen] = useState(false);
   const [invEmail, setInvEmail] = useState("");
   const [invName, setInvName] = useState("");
   const [invRole, setInvRole] = useState<Role>("staff");
+  const [invBranch, setInvBranch] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
   // Create-user dialog state
@@ -37,6 +40,7 @@ export default function UserManagement() {
   const [cName, setCName] = useState("");
   const [cRole, setCRole] = useState<Role>("staff");
   const [cPassword, setCPassword] = useState("");
+  const [cBranch, setCBranch] = useState<string>("");
   const [creating, setCreating] = useState(false);
   const [createdInfo, setCreatedInfo] = useState<{ email: string; password: string } | null>(null);
 
@@ -47,11 +51,23 @@ export default function UserManagement() {
       .from("allowed_signup_emails")
       .select("id,email,role,full_name,created_at")
       .order("created_at", { ascending: false });
+    const { data: brs } = await (supabase as any)
+      .from("branches")
+      .select("id,name_en,name_ar")
+      .eq("is_active", true)
+      .order("name_en");
+    const { data: sps } = await (supabase as any)
+      .from("staff_profiles")
+      .select("id,branch_id");
     setUsers(ps ?? []);
     const m: Record<string, string[]> = {};
     (rs ?? []).forEach((r: any) => { (m[r.user_id] = m[r.user_id] || []).push(r.role); });
     setRoles(m);
     setInvites(inv ?? []);
+    setBranches(brs ?? []);
+    const sb: Record<string, string | null> = {};
+    (sps ?? []).forEach((s: any) => { sb[s.id] = s.branch_id ?? null; });
+    setStaffBranches(sb);
   };
   useEffect(() => { load(); }, []);
 
@@ -60,6 +76,10 @@ export default function UserManagement() {
     const email = invEmail.trim().toLowerCase();
     if (!email || !email.includes("@")) {
       toast.error(lang === "ar" ? "أدخل بريداً صالحاً" : "Enter a valid email");
+      return;
+    }
+    if (invRole === "manager" && !invBranch) {
+      toast.error(lang === "ar" ? "يجب اختيار فرع لدور المدير" : "Branch is required for the manager role");
       return;
     }
     setSaving(true);
@@ -77,7 +97,7 @@ export default function UserManagement() {
         ? "تمت الدعوة. اطلب من المستخدم التسجيل بهذا البريد."
         : "Invited. Ask the user to sign up with this email."
     );
-    setInvEmail(""); setInvName(""); setInvRole("staff"); setOpen(false);
+    setInvEmail(""); setInvName(""); setInvRole("staff"); setInvBranch(""); setOpen(false);
     load();
   };
 
@@ -96,12 +116,18 @@ export default function UserManagement() {
       return;
     }
     setCreating(true);
+    if (cRole === "manager" && !cBranch) {
+      setCreating(false);
+      toast.error(lang === "ar" ? "يجب اختيار فرع لدور المدير" : "Branch is required for the manager role");
+      return;
+    }
     const { data, error } = await supabase.functions.invoke("admin-create-user", {
       body: {
         email,
         full_name: cName.trim() || null,
         role: cRole,
         password: cPassword.trim() || undefined,
+        branch_id: cBranch || undefined,
       },
     });
     setCreating(false);
@@ -111,7 +137,7 @@ export default function UserManagement() {
     }
     const info = data as { email: string; password: string };
     setCreatedInfo({ email: info.email, password: info.password });
-    setCEmail(""); setCName(""); setCRole("staff"); setCPassword("");
+    setCEmail(""); setCName(""); setCRole("staff"); setCPassword(""); setCBranch("");
     setCreateOpen(false);
     load();
   };
@@ -155,7 +181,15 @@ export default function UserManagement() {
                 <div className="font-medium truncate">{u.full_name ?? "—"}</div>
                 <div className="text-xs text-muted-foreground truncate">{u.email}</div>
               </div>
-              <div className="flex gap-1 flex-wrap">{(roles[u.id] ?? []).map(r => <Badge key={r} variant="outline" className="capitalize">{r}</Badge>)}</div>
+              <div className="flex gap-1 flex-wrap items-center">
+                {(roles[u.id] ?? []).map(r => <Badge key={r} variant="outline" className="capitalize">{r}</Badge>)}
+                {(roles[u.id] ?? []).includes("manager") && !staffBranches[u.id] && (
+                  <Badge variant="destructive" className="gap-1">
+                    <AlertTriangle className="size-3" />
+                    {lang === "ar" ? "بدون فرع" : "No branch"}
+                  </Badge>
+                )}
+              </div>
               <Button size="sm" variant="outline">{t("edit")}</Button>
             </div>
           ))}
@@ -220,6 +254,28 @@ export default function UserManagement() {
                   </SelectContent>
                 </Select>
               </div>
+              {invRole === "manager" && (
+                <div className="space-y-2">
+                  <Label>
+                    {lang === "ar" ? "الفرع (مطلوب للمدير)" : "Branch (required for manager)"}
+                  </Label>
+                  <Select value={invBranch} onValueChange={setInvBranch}>
+                    <SelectTrigger><SelectValue placeholder={lang === "ar" ? "اختر فرعاً" : "Select a branch"} /></SelectTrigger>
+                    <SelectContent>
+                      {branches.map((b) => (
+                        <SelectItem key={b.id} value={b.id}>
+                          {lang === "ar" ? b.name_ar : b.name_en}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {lang === "ar"
+                      ? "ملاحظة: عند الدعوة، تأكد من تعيين الفرع للمدير في ملف الموظف بعد التسجيل."
+                      : "Note: After invited user signs up, assign the branch in their staff profile."}
+                  </p>
+                </div>
+              )}
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setOpen(false)}>{t("cancel")}</Button>
                 <Button type="submit" disabled={saving} className="gradient-primary text-primary-foreground">
@@ -261,6 +317,23 @@ export default function UserManagement() {
                   </SelectContent>
                 </Select>
               </div>
+              {cRole === "manager" && (
+                <div className="space-y-2">
+                  <Label>
+                    {lang === "ar" ? "الفرع (مطلوب للمدير)" : "Branch (required for manager)"}
+                  </Label>
+                  <Select value={cBranch} onValueChange={setCBranch}>
+                    <SelectTrigger><SelectValue placeholder={lang === "ar" ? "اختر فرعاً" : "Select a branch"} /></SelectTrigger>
+                    <SelectContent>
+                      {branches.map((b) => (
+                        <SelectItem key={b.id} value={b.id}>
+                          {lang === "ar" ? b.name_ar : b.name_en}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="cPassword">
                   {lang === "ar" ? "كلمة مرور (اختياري)" : "Password (optional)"}

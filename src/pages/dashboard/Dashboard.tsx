@@ -63,6 +63,7 @@ export default function Dashboard() {
   const [recentPatients, setRecentPatients] = useState<any[]>([]);
   const [recentAppts, setRecentAppts] = useState<any[]>([]);
   const [recentPayments, setRecentPayments] = useState<any[]>([]);
+  const [doctorNames, setDoctorNames] = useState<Record<string, string>>({});
 
   const run = useCallback(async () => {
     setLoading(true);
@@ -154,6 +155,17 @@ export default function Dashboard() {
       setRecentPatients(recentPtRes.data ?? []);
       setRecentAppts(recentApptRes.data ?? []);
       setRecentPayments(recentPayRes.data ?? []);
+
+      // Fetch doctor names from profiles for the recent appointments
+      const doctorIds = Array.from(new Set(((recentApptRes.data ?? []) as any[]).map((a) => a.doctor_id).filter(Boolean)));
+      if (doctorIds.length) {
+        const { data: docs } = await supabase.from("profiles").select("id,full_name").in("id", doctorIds);
+        const map: Record<string, string> = {};
+        for (const d of (docs ?? []) as any[]) map[d.id] = d.full_name ?? "";
+        setDoctorNames(map);
+      } else {
+        setDoctorNames({});
+      }
 
       setLoading(false);
   }, [currentBranchId]);

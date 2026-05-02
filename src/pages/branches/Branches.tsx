@@ -1,0 +1,261 @@
+import { useEffect, useMemo, useState } from "react";
+import { Plus, Search, Pencil, Trash2, Building2, Star } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useI18n } from "@/contexts/I18nContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+
+type Branch = {
+  id: string; name_ar: string; name_en: string; code: string | null;
+  phone: string | null; email: string | null; address: string | null; city: string | null;
+  is_main_branch: boolean; is_active: boolean; manager_id: string | null;
+  working_hours_start: string | null; working_hours_end: string | null;
+};
+
+type Staff = { id: string; full_name: string | null; email: string | null };
+
+const empty = {
+  name: "", code: "", phone: "", email: "", address: "", city: "",
+  manager_id: "", working_hours_start: "09:00", working_hours_end: "21:00",
+  is_main_branch: false, is_active: true,
+};
+
+export default function Branches() {
+  const { t, lang } = useI18n();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [items, setItems] = useState<Branch[]>([]);
+  const [staff, setStaff] = useState<Staff[]>([]);
+  const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ ...empty });
+  const [editId, setEditId] = useState<string | null>(null);
+  const [delId, setDelId] = useState<string | null>(null);
+
+  const load = async () => {
+    const { data } = await supabase.from("branches").select("*").order("created_at");
+    setItems((data ?? []) as Branch[]);
+    const { data: s } = await supabase.from("profiles").select("id, full_name, email").order("full_name");
+    setStaff((s ?? []) as Staff[]);
+  };
+  useEffect(() => { load(); }, []);
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return items.filter((b) =>
+      !q || b.name_en.toLowerCase().includes(q) || b.name_ar.includes(q) ||
+      (b.code ?? "").toLowerCase().includes(q) || (b.city ?? "").toLowerCase().includes(q));
+  }, [items, search]);
+
+  const openNew = () => { setEditId(null); setForm({ ...empty }); setOpen(true); };
+  const openEdit = (b: Branch) => {
+    setEditId(b.id);
+    setForm({
+      name: b.name_en || b.name_ar || "",
+      code: b.code ?? "",
+      phone: b.phone ?? "",
+      email: b.email ?? "",
+      address: b.address ?? "",
+      city: b.city ?? "",
+      manager_id: b.manager_id ?? "",
+      working_hours_start: b.working_hours_start ?? "09:00",
+      working_hours_end: b.working_hours_end ?? "21:00",
+      is_main_branch: b.is_main_branch,
+      is_active: b.is_active,
+    });
+    setOpen(true);
+  };
+
+  const save = async () => {
+    if (!form.name.trim()) { toast({ title: t("name"), variant: "destructive" }); return; }
+    const payload: any = {
+      name_en: form.name, name_ar: form.name,
+      code: form.code || null,
+      phone: form.phone || null, email: form.email || null,
+      address: form.address || null, city: form.city || null,
+      manager_id: form.manager_id || null,
+      working_hours_start: form.working_hours_start || null,
+      working_hours_end: form.working_hours_end || null,
+      is_main_branch: form.is_main_branch, is_active: form.is_active,
+    };
+    let error;
+    if (editId) {
+      ({ error } = await supabase.from("branches").update(payload).eq("id", editId));
+    } else {
+      ({ error } = await supabase.from("branches").insert(payload));
+    }
+    if (error) { toast({ title: error.message, variant: "destructive" }); return; }
+    // ensure single main branch
+    if (form.is_main_branch) {
+      await supabase.from("branches").update({ is_main_branch: false }).neq("id", editId ?? "00000000-0000-0000-0000-000000000000");
+    }
+    setOpen(false); load();
+    toast({ title: t("saved") });
+  };
+
+  const remove = async () => {
+    if (!delId) return;
+    const { error } = await supabase.from("branches").delete().eq("id", delId);
+    if (error) toast({ title: error.message, variant: "destructive" });
+    else toast({ title: t("deleted") });
+    setDelId(null); load();
+  };
+
+  const staffName = (id: string | null) => {
+    if (!id) return "—";
+    const s = staff.find((x) => x.id === id);
+    return s?.full_name || s?.email || "—";
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2"><Building2 className="size-6 text-primary" /> {t("branches")}</h1>
+          <p className="text-sm text-muted-foreground">{t("branches")}</p>
+        </div>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button onClick={openNew}><Plus className="size-4 me-1" />{t("add")} {t("branch")}</Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader><DialogTitle>{editId ? t("edit") : t("add")} {t("branch")}</DialogTitle></DialogHeader>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <Label>{t("name")} / الاسم</Label>
+                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              </div>
+              <div>
+                <Label>{t("code")}</Label>
+                <Input value={form.code} placeholder="auto" onChange={(e) => setForm({ ...form, code: e.target.value })} />
+              </div>
+              <div>
+                <Label>{t("phone")}</Label>
+                <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+              </div>
+              <div>
+                <Label>{t("email")}</Label>
+                <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+              </div>
+              <div>
+                <Label>{t("city")}</Label>
+                <Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+              </div>
+              <div className="md:col-span-2">
+                <Label>{t("address")}</Label>
+                <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+              </div>
+              <div>
+                <Label>{t("manager")}</Label>
+                <Select value={form.manager_id || "none"} onValueChange={(v) => setForm({ ...form, manager_id: v === "none" ? "" : v })}>
+                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">—</SelectItem>
+                    {staff.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>{s.full_name || s.email}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label>{t("workingHoursStart") ?? "Open"}</Label>
+                  <Input type="time" value={form.working_hours_start} onChange={(e) => setForm({ ...form, working_hours_start: e.target.value })} />
+                </div>
+                <div>
+                  <Label>{t("workingHoursEnd") ?? "Close"}</Label>
+                  <Input type="time" value={form.working_hours_end} onChange={(e) => setForm({ ...form, working_hours_end: e.target.value })} />
+                </div>
+              </div>
+              <div className="flex items-center justify-between rounded-md border p-3">
+                <div className="flex items-center gap-2"><Star className="size-4 text-primary" /><span className="text-sm font-medium">{t("mainBranch") ?? "Main Branch"}</span></div>
+                <Switch checked={form.is_main_branch} onCheckedChange={(v) => setForm({ ...form, is_main_branch: v })} />
+              </div>
+              <div className="flex items-center justify-between rounded-md border p-3">
+                <span className="text-sm font-medium">{t("active")}</span>
+                <Switch checked={form.is_active} onCheckedChange={(v) => setForm({ ...form, is_active: v })} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setOpen(false)}>{t("cancel")}</Button>
+              <Button onClick={save}>{t("save")}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Search className="size-4 text-muted-foreground" />
+            <Input placeholder={t("search")} value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("name")}</TableHead>
+                <TableHead>{t("code")}</TableHead>
+                <TableHead>{t("city")}</TableHead>
+                <TableHead>{t("manager")}</TableHead>
+                <TableHead>{t("status")}</TableHead>
+                <TableHead className="w-32">{t("actions")}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((b) => (
+                <TableRow key={b.id}>
+                  <TableCell className="font-medium">
+                    {lang === "ar" ? b.name_ar : b.name_en}
+                    {b.is_main_branch && <Badge className="ms-2" variant="secondary"><Star className="size-3 me-1" />{t("mainBranch") ?? "Main"}</Badge>}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">{b.code ?? "—"}</TableCell>
+                  <TableCell>{b.city ?? "—"}</TableCell>
+                  <TableCell>{staffName(b.manager_id)}</TableCell>
+                  <TableCell>
+                    {b.is_active
+                      ? <Badge className="bg-emerald-500/10 text-emerald-600 border-0">{t("active")}</Badge>
+                      : <Badge variant="outline">{t("inactive") ?? "Inactive"}</Badge>}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Button size="icon" variant="ghost" onClick={() => openEdit(b)}><Pencil className="size-4" /></Button>
+                      <Button size="icon" variant="ghost" onClick={() => setDelId(b.id)}><Trash2 className="size-4 text-destructive" /></Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {filtered.length === 0 && (
+                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-10">{t("noData") ?? "No data"}</TableCell></TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={!!delId} onOpenChange={(o) => !o && setDelId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("confirmDelete") ?? "Delete?"}</AlertDialogTitle>
+            <AlertDialogDescription>{t("actionIrreversible") ?? "This action cannot be undone."}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={remove}>{t("delete")}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}

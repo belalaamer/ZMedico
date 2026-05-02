@@ -22,8 +22,8 @@ export default function Services() {
   const [openSv, setOS] = useState(false);
   const [editC, setEC] = useState<any>(null);
   const [editS, setES] = useState<any>(null);
-  const [cf, setCF] = useState<any>({ name_en: "", name_ar: "", icon: "", color: "#7c3aed", display_order: 0, is_active: true });
-  const [sf, setSF] = useState<any>({ category_id: "", name_en: "", name_ar: "", code: "", default_duration_minutes: 30, default_price: 0, cost_price: null, requires_appointment: true, available_online: true, display_order: 0, is_active: true });
+  const [cf, setCF] = useState<any>({ name: "", icon: "", color: "#7c3aed", display_order: 0, is_active: true });
+  const [sf, setSF] = useState<any>({ category_id: "", name: "", code: "", default_duration_minutes: 30, default_price: 0, cost_price: null, requires_appointment: true, available_online: true, display_order: 0, is_active: true });
 
   const load = async () => {
     const { data: c } = await supabase.from("service_categories").select("*").order("display_order");
@@ -33,15 +33,18 @@ export default function Services() {
   useEffect(() => { load(); }, []);
 
   const saveCat = async () => {
-    if (!cf.name_en || !cf.name_ar) return toast.error("required");
-    const payload = { name_en: cf.name_en, name_ar: cf.name_ar, icon: cf.icon || null, color: cf.color || null, display_order: cf.display_order, is_active: cf.is_active };
+    const name = (cf.name || "").trim();
+    if (!name) return toast.error("required");
+    const payload = { name_en: name, name_ar: name, icon: cf.icon || null, color: cf.color || null, display_order: cf.display_order, is_active: cf.is_active };
     const { error } = editC ? await supabase.from("service_categories").update(payload).eq("id", editC.id) : await supabase.from("service_categories").insert(payload);
     if (error) return toast.error(error.message);
     toast.success(t("saved")); setOC(false); load();
   };
   const saveSv = async () => {
-    if (!sf.name_en || !sf.name_ar) return toast.error("required");
-    const payload = { ...sf, category_id: sf.category_id || null, cost_price: sf.cost_price === "" ? null : sf.cost_price };
+    const name = (sf.name || "").trim();
+    if (!name) return toast.error("required");
+    const { name: _ignored, ...rest } = sf;
+    const payload = { ...rest, name_en: name, name_ar: name, category_id: sf.category_id || null, cost_price: sf.cost_price === "" ? null : sf.cost_price };
     const { error } = editS ? await supabase.from("services").update(payload).eq("id", editS.id) : await supabase.from("services").insert(payload);
     if (error) return toast.error(error.message);
     toast.success(t("saved")); setOS(false); load();
@@ -61,12 +64,11 @@ export default function Services() {
           <TabsContent value="categories" className="space-y-3">
             <div className="flex justify-end">
               <Dialog open={openCat} onOpenChange={setOC}>
-                <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground" onClick={() => { setEC(null); setCF({ name_en: "", name_ar: "", icon: "", color: "#7c3aed", display_order: cats.length, is_active: true }); setOC(true); }}><Plus className="me-2 size-4" />{t("addCategory")}</Button></DialogTrigger>
+                <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground" onClick={() => { setEC(null); setCF({ name: "", icon: "", color: "#7c3aed", display_order: cats.length, is_active: true }); setOC(true); }}><Plus className="me-2 size-4" />{t("addCategory")}</Button></DialogTrigger>
                 <DialogContent>
                   <DialogHeader><DialogTitle>{editC ? t("edit") : t("addCategory")}</DialogTitle></DialogHeader>
                   <div className="grid grid-cols-2 gap-3">
-                    <div><Label>{t("nameEn2")}</Label><Input value={cf.name_en} onChange={e => setCF({ ...cf, name_en: e.target.value })} /></div>
-                    <div><Label>{t("nameAr2")}</Label><Input dir="rtl" value={cf.name_ar} onChange={e => setCF({ ...cf, name_ar: e.target.value })} /></div>
+                    <div className="col-span-2"><Label>{t("name")} / الاسم</Label><Input value={cf.name} onChange={e => setCF({ ...cf, name: e.target.value })} /></div>
                     <div><Label>{t("icon")}</Label><Input value={cf.icon ?? ""} onChange={e => setCF({ ...cf, icon: e.target.value })} /></div>
                     <div><Label>{t("color")}</Label><Input type="color" value={cf.color ?? "#7c3aed"} onChange={e => setCF({ ...cf, color: e.target.value })} /></div>
                     <div><Label>{t("displayOrder")}</Label><Input type="number" value={cf.display_order} onChange={e => setCF({ ...cf, display_order: +e.target.value })} /></div>
@@ -80,7 +82,7 @@ export default function Services() {
                 <div className="size-8 rounded" style={{ background: c.color ?? "#7c3aed" }} />
                 <div className="flex-1"><div className="font-medium">{lang === "ar" ? c.name_ar : c.name_en}</div></div>
                 <Badge variant="outline">{services.filter(s => s.category_id === c.id).length}</Badge>
-                <Button variant="ghost" size="icon" onClick={() => { setEC(c); setCF({ ...c }); setOC(true); }}><Edit3 className="size-4" /></Button>
+                <Button variant="ghost" size="icon" onClick={() => { setEC(c); setCF({ ...c, name: c.name_en || c.name_ar || "" }); setOC(true); }}><Edit3 className="size-4" /></Button>
                 <Button variant="ghost" size="icon" onClick={() => toggleCat(c)}><Power className="size-4" /></Button>
               </div>
             ))}</div></Card>
@@ -88,7 +90,7 @@ export default function Services() {
           <TabsContent value="services" className="space-y-3">
             <div className="flex justify-end">
               <Dialog open={openSv} onOpenChange={setOS}>
-                <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground" onClick={() => { setES(null); setSF({ category_id: "", name_en: "", name_ar: "", code: "", default_duration_minutes: 30, default_price: 0, cost_price: null, requires_appointment: true, available_online: true, display_order: services.length, is_active: true }); setOS(true); }}><Plus className="me-2 size-4" />{t("addService")}</Button></DialogTrigger>
+                <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground" onClick={() => { setES(null); setSF({ category_id: "", name: "", code: "", default_duration_minutes: 30, default_price: 0, cost_price: null, requires_appointment: true, available_online: true, display_order: services.length, is_active: true }); setOS(true); }}><Plus className="me-2 size-4" />{t("addService")}</Button></DialogTrigger>
                 <DialogContent>
                   <DialogHeader><DialogTitle>{editS ? t("edit") : t("addService")}</DialogTitle></DialogHeader>
                   <div className="grid grid-cols-2 gap-3">
@@ -98,8 +100,7 @@ export default function Services() {
                         <SelectContent><SelectItem value="none">—</SelectItem>{cats.map(c => <SelectItem key={c.id} value={c.id}>{lang === "ar" ? c.name_ar : c.name_en}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
-                    <div><Label>{t("nameEn2")}</Label><Input value={sf.name_en} onChange={e => setSF({ ...sf, name_en: e.target.value })} /></div>
-                    <div><Label>{t("nameAr2")}</Label><Input dir="rtl" value={sf.name_ar} onChange={e => setSF({ ...sf, name_ar: e.target.value })} /></div>
+                    <div className="col-span-2"><Label>{t("name")} / الاسم</Label><Input value={sf.name} onChange={e => setSF({ ...sf, name: e.target.value })} /></div>
                     <div><Label>{t("code")}</Label><Input value={sf.code ?? ""} onChange={e => setSF({ ...sf, code: e.target.value })} /></div>
                     <div><Label>{t("durationMinutes")}</Label><Input type="number" value={sf.default_duration_minutes} onChange={e => setSF({ ...sf, default_duration_minutes: +e.target.value })} /></div>
                     <div><Label>{t("defaultPrice")}</Label><Input type="number" step="0.01" value={sf.default_price} onChange={e => setSF({ ...sf, default_price: +e.target.value })} /></div>
@@ -118,7 +119,7 @@ export default function Services() {
                   <div className="text-xs text-muted-foreground">{s.default_duration_minutes} min · {s.default_price}</div>
                 </div>
                 <Badge variant="outline" className={s.is_active ? "status-completed" : "status-departed"}>{s.is_active ? t("active") : t("inactive")}</Badge>
-                <Button variant="ghost" size="icon" onClick={() => { setES(s); setSF({ ...s }); setOS(true); }}><Edit3 className="size-4" /></Button>
+                <Button variant="ghost" size="icon" onClick={() => { setES(s); setSF({ ...s, name: s.name_en || s.name_ar || "" }); setOS(true); }}><Edit3 className="size-4" /></Button>
                 <Button variant="ghost" size="icon" onClick={() => toggleSv(s)}><Power className="size-4" /></Button>
               </div>
             ))}</div></Card>

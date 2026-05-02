@@ -22,7 +22,7 @@ type Product = any;
 
 function emptyForm() {
   return {
-    sku: "", barcode: "", name_en: "", name_ar: "", description_en: "", description_ar: "",
+    sku: "", barcode: "", name: "", description: "",
     category_id: "", supplier_id: "", unit: "piece",
     cost_price: 0, selling_price: 0, min_stock_level: 10, max_stock_level: "" as any,
     expiry_tracking: false, image_url: "",
@@ -83,8 +83,8 @@ export default function Products() {
     setEdit(p);
     setForm({
       sku: p.sku ?? "", barcode: p.barcode ?? "",
-      name_en: p.name_en, name_ar: p.name_ar,
-      description_en: p.description_en ?? "", description_ar: p.description_ar ?? "",
+      name: p.name_en || p.name_ar || "",
+      description: p.description_en || p.description_ar || "",
       category_id: p.category_id ?? "", supplier_id: p.supplier_id ?? "",
       unit: p.unit ?? "piece", cost_price: Number(p.cost_price), selling_price: Number(p.selling_price),
       min_stock_level: p.min_stock_level, max_stock_level: p.max_stock_level ?? "",
@@ -97,8 +97,8 @@ export default function Products() {
     setEdit(null);
     setForm({
       sku: "", barcode: "",
-      name_en: p.name_en + " (copy)", name_ar: p.name_ar,
-      description_en: p.description_en ?? "", description_ar: p.description_ar ?? "",
+      name: (p.name_en || p.name_ar || "") + " (copy)",
+      description: p.description_en || p.description_ar || "",
       category_id: p.category_id ?? "", supplier_id: p.supplier_id ?? "",
       unit: p.unit, cost_price: Number(p.cost_price), selling_price: Number(p.selling_price),
       min_stock_level: p.min_stock_level, max_stock_level: p.max_stock_level ?? "",
@@ -108,11 +108,13 @@ export default function Products() {
   };
 
   const save = async () => {
-    if (!form.name_en.trim() || !form.name_ar.trim()) { toast.error("Name required"); return; }
+    const name = form.name.trim();
+    const desc = form.description.trim();
+    if (!name) { toast.error("Name required"); return; }
     const payload: any = {
       barcode: form.barcode || null,
-      name_en: form.name_en.trim(), name_ar: form.name_ar.trim(),
-      description_en: form.description_en || null, description_ar: form.description_ar || null,
+      name_en: name, name_ar: name,
+      description_en: desc || null, description_ar: desc || null,
       category_id: form.category_id || null, supplier_id: form.supplier_id || null,
       unit: form.unit, cost_price: Number(form.cost_price) || 0, selling_price: Number(form.selling_price) || 0,
       min_stock_level: Number(form.min_stock_level) || 0,
@@ -190,8 +192,7 @@ export default function Products() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-2"><Label>{t("sku")}</Label><Input value={form.sku} placeholder="auto" disabled={!!edit} onChange={(e) => setForm({ ...form, sku: e.target.value })} maxLength={40} /></div>
                 <div className="space-y-2"><Label>{t("barcode")}</Label><Input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} maxLength={80} /></div>
-                <div className="space-y-2"><Label>{t("nameEn")}</Label><Input value={form.name_en} onChange={(e) => setForm({ ...form, name_en: e.target.value })} maxLength={150} /></div>
-                <div className="space-y-2"><Label>{t("nameAr")}</Label><Input dir="rtl" value={form.name_ar} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} maxLength={150} /></div>
+                <div className="space-y-2 sm:col-span-2"><Label>{t("name")} / الاسم</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={150} /></div>
                 <div className="space-y-2">
                   <Label>{t("category")}</Label>
                   <Select value={form.category_id || "none"} onValueChange={(v) => setForm({ ...form, category_id: v === "none" ? "" : v })}>
@@ -249,8 +250,7 @@ export default function Products() {
                 <div className="space-y-2"><Label>{t("sellingPrice")}</Label><Input type="number" min={0} step="0.01" value={form.selling_price} onChange={(e) => setForm({ ...form, selling_price: Number(e.target.value) })} /></div>
                 <div className="space-y-2"><Label>{t("minStock")}</Label><Input type="number" min={0} value={form.min_stock_level} onChange={(e) => setForm({ ...form, min_stock_level: Number(e.target.value) })} /></div>
                 <div className="space-y-2"><Label>{t("maxStock")}</Label><Input type="number" min={0} value={form.max_stock_level} onChange={(e) => setForm({ ...form, max_stock_level: e.target.value as any })} /></div>
-                <div className="space-y-2 sm:col-span-2"><Label>{t("description")} (EN)</Label><Textarea value={form.description_en} onChange={(e) => setForm({ ...form, description_en: e.target.value })} maxLength={500} rows={2} /></div>
-                <div className="space-y-2 sm:col-span-2"><Label>{t("description")} (AR)</Label><Textarea dir="rtl" value={form.description_ar} onChange={(e) => setForm({ ...form, description_ar: e.target.value })} maxLength={500} rows={2} /></div>
+                <div className="space-y-2 sm:col-span-2"><Label>{t("description")}</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} maxLength={500} rows={2} /></div>
                 <div className="flex items-center justify-between sm:col-span-2 border border-border rounded-lg px-3 py-2">
                   <Label>{t("expiryTracking")}</Label>
                   <Switch checked={form.expiry_tracking} onCheckedChange={(v) => setForm({ ...form, expiry_tracking: v })} />

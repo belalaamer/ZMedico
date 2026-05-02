@@ -92,6 +92,7 @@ export default function Dashboard() {
         branchEq(supabase.from("appointments").select("status")
           .gte("scheduled_at", start.toISOString()).lte("scheduled_at", end.toISOString())),
         branchEq(supabase.from("patients").select("id", { count: "exact", head: true })
+          .is("deleted_at", null)
           .gte("created_at", start.toISOString()).lte("created_at", end.toISOString())),
         branchEq(supabase.from("payments").select("amount").eq("payment_date", todayDate)),
         branchEq(supabase.from("invoices").select("total,paid_amount").in("status", ["pending", "partial"])),
@@ -99,8 +100,9 @@ export default function Dashboard() {
         branchEq(supabase.from("medical_records").select("id", { count: "exact", head: true }).eq("status", "draft")),
         branchEq(supabase.from("payments").select("payment_date,amount").gte("payment_date", last7Start.toISOString().slice(0, 10))),
         branchEq(supabase.from("appointments").select("status").gte("scheduled_at", last7Start.toISOString())),
-        branchEq(supabase.from("patients").select("dob")),
+        branchEq(supabase.from("patients").select("dob").is("deleted_at", null)),
         branchEq(supabase.from("patients").select("id,first_name_en,first_name_ar,last_name_en,last_name_ar,phone,created_at")
+          .is("deleted_at", null)
           .order("created_at", { ascending: false }).limit(5)),
         branchEq(supabase.from("appointments").select("id,scheduled_at,status,patient:patients(first_name_en,first_name_ar,last_name_en,last_name_ar),doctor:profiles!appointments_doctor_id_fkey(full_name)")
           .order("created_at", { ascending: false }).limit(5)),
@@ -159,7 +161,18 @@ export default function Dashboard() {
     };
 
     run();
-    return () => { cancelled = true; };
+
+    // Refetch when tab regains focus / becomes visible — keeps Dashboard fresh after deletes/edits elsewhere
+    const onFocus = () => { run(); };
+    const onVisible = () => { if (document.visibilityState === "visible") run(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [currentBranchId]);
 
   const isEmpty = useMemo(() =>

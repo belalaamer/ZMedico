@@ -19,7 +19,7 @@ export default function Specialties() {
   const [items, setItems] = useState<Spec[]>([]);
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<Spec | null>(null);
-  const [form, setForm] = useState({ name_en: "", name_ar: "", description: "", icon: "🩺", is_active: true });
+  const [form, setForm] = useState({ name: "", description: "", icon: "🩺", is_active: true });
 
   const load = async () => {
     const { data } = await supabase.from("medical_specialties").select("*").order("name_en");
@@ -27,12 +27,18 @@ export default function Specialties() {
   };
   useEffect(() => { load(); }, []);
 
-  const openNew = () => { setEdit(null); setForm({ name_en: "", name_ar: "", description: "", icon: "🩺", is_active: true }); setOpen(true); };
-  const openEdit = (s: Spec) => { setEdit(s); setForm({ name_en: s.name_en, name_ar: s.name_ar, description: s.description ?? "", icon: s.icon ?? "🩺", is_active: s.is_active }); setOpen(true); };
+  const openNew = () => { setEdit(null); setForm({ name: "", description: "", icon: "🩺", is_active: true }); setOpen(true); };
+  const openEdit = (s: Spec) => { setEdit(s); setForm({ name: s.name_en || s.name_ar || "", description: s.description ?? "", icon: s.icon ?? "🩺", is_active: s.is_active }); setOpen(true); };
 
   const save = async () => {
-    if (!form.name_en.trim() || !form.name_ar.trim()) { toast.error("Name required"); return; }
-    const payload = { ...form, name_en: form.name_en.trim(), name_ar: form.name_ar.trim(), description: form.description || null, icon: form.icon || null };
+    const name = form.name.trim();
+    if (!name) { toast.error("Name required"); return; }
+    const payload = {
+      name_en: name, name_ar: name,
+      description: form.description || null,
+      icon: form.icon || null,
+      is_active: form.is_active,
+    };
     const { error } = edit
       ? await supabase.from("medical_specialties").update(payload).eq("id", edit.id)
       : await supabase.from("medical_specialties").insert(payload);
@@ -56,9 +62,8 @@ export default function Specialties() {
             <div className="space-y-3">
               <div className="grid grid-cols-[80px_1fr] gap-3">
                 <div className="space-y-2"><Label>{t("icon")}</Label><Input value={form.icon} onChange={(e) => setForm({ ...form, icon: e.target.value })} maxLength={4} className="text-center text-2xl" /></div>
-                <div className="space-y-2"><Label>{t("nameEn")}</Label><Input value={form.name_en} onChange={(e) => setForm({ ...form, name_en: e.target.value })} maxLength={80} /></div>
+                <div className="space-y-2"><Label>{t("name")} / الاسم</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={80} /></div>
               </div>
-              <div className="space-y-2"><Label>{t("nameAr")}</Label><Input dir="rtl" value={form.name_ar} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} maxLength={80} /></div>
               <div className="space-y-2"><Label>{t("description")}</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} maxLength={300} rows={2} /></div>
               <div className="flex items-center justify-between border border-border rounded-lg px-3 py-2"><Label>{t("active")}</Label><Switch checked={form.is_active} onCheckedChange={(v) => setForm({ ...form, is_active: v })} /></div>
             </div>

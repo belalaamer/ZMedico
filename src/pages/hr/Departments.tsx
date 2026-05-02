@@ -22,7 +22,7 @@ export default function Departments() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [open, setOpen] = useState(false);
   const [edit, setE] = useState<Dept | null>(null);
-  const [form, setForm] = useState({ name_en: "", name_ar: "", description: "", branch_id: "", manager_id: "" });
+  const [form, setForm] = useState({ name: "", description: "", branch_id: "", manager_id: "" });
 
   const load = async () => {
     const { data } = await supabase.from("departments").select("*").order("name_en");
@@ -36,11 +36,12 @@ export default function Departments() {
   };
   useEffect(() => { load(); }, []);
 
-  const openNew = () => { setE(null); setForm({ name_en: "", name_ar: "", description: "", branch_id: "", manager_id: "" }); setOpen(true); };
-  const openEdit = (d: Dept) => { setE(d); setForm({ name_en: d.name_en, name_ar: d.name_ar, description: d.description ?? "", branch_id: d.branch_id ?? "", manager_id: d.manager_id ?? "" }); setOpen(true); };
+  const openNew = () => { setE(null); setForm({ name: "", description: "", branch_id: "", manager_id: "" }); setOpen(true); };
+  const openEdit = (d: Dept) => { setE(d); setForm({ name: d.name_en || d.name_ar || "", description: d.description ?? "", branch_id: d.branch_id ?? "", manager_id: d.manager_id ?? "" }); setOpen(true); };
   const save = async () => {
-    if (!form.name_en.trim() || !form.name_ar.trim()) { toast.error("Name required"); return; }
-    const payload: any = { name_en: form.name_en.trim(), name_ar: form.name_ar.trim(), description: form.description || null, branch_id: form.branch_id || null, manager_id: form.manager_id || null };
+    const name = form.name.trim();
+    if (!name) { toast.error("Name required"); return; }
+    const payload: any = { name_en: name, name_ar: name, description: form.description || null, branch_id: form.branch_id || null, manager_id: form.manager_id || null };
     const { error } = edit
       ? await supabase.from("departments").update(payload).eq("id", edit.id)
       : await supabase.from("departments").insert(payload);
@@ -66,8 +67,7 @@ export default function Departments() {
           <DialogContent>
             <DialogHeader><DialogTitle>{edit ? t("editDepartment") : t("newDepartment")}</DialogTitle></DialogHeader>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-2"><Label>{t("nameEn")}</Label><Input value={form.name_en} onChange={(e) => setForm({ ...form, name_en: e.target.value })} maxLength={120} /></div>
-              <div className="space-y-2"><Label>{t("nameAr")}</Label><Input dir="rtl" value={form.name_ar} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} maxLength={120} /></div>
+              <div className="space-y-2 sm:col-span-2"><Label>{t("name")} / الاسم</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={120} /></div>
               <div className="space-y-2 sm:col-span-2"><Label>{t("description")}</Label><Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} maxLength={300} /></div>
               <div className="space-y-2"><Label>{t("branch")}</Label>
                 <Select value={form.branch_id || "none"} onValueChange={(v) => setForm({ ...form, branch_id: v === "none" ? "" : v })}>

@@ -20,7 +20,7 @@ export default function PaymentMethods() {
   const [items, setItems] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
   const [edit, setE] = useState<any>(null);
-  const [f, setF] = useState<any>({ name_en: "", name_ar: "", code: "", type: "cash", requires_reference: false, processing_fee_percentage: 0, processing_fee_fixed: 0, display_order: 0, is_active: true });
+  const [f, setF] = useState<any>({ name: "", code: "", type: "cash", requires_reference: false, processing_fee_percentage: 0, processing_fee_fixed: 0, display_order: 0, is_active: true });
 
   const load = async () => {
     const { data } = await supabase.from("payment_methods").select("*").order("display_order");
@@ -28,11 +28,12 @@ export default function PaymentMethods() {
   };
   useEffect(() => { load(); }, []);
 
-  const openNew = () => { setE(null); setF({ name_en: "", name_ar: "", code: "", type: "cash", requires_reference: false, processing_fee_percentage: 0, processing_fee_fixed: 0, display_order: items.length, is_active: true }); setOpen(true); };
-  const openEdit = (m: any) => { setE(m); setF({ ...m }); setOpen(true); };
+  const openNew = () => { setE(null); setF({ name: "", code: "", type: "cash", requires_reference: false, processing_fee_percentage: 0, processing_fee_fixed: 0, display_order: items.length, is_active: true }); setOpen(true); };
+  const openEdit = (m: any) => { setE(m); setF({ ...m, name: m.name_en || m.name_ar || "" }); setOpen(true); };
   const save = async () => {
-    if (!f.name_en || !f.name_ar || !f.code) return toast.error("required");
-    const payload = { name_en: f.name_en, name_ar: f.name_ar, code: f.code, type: f.type, requires_reference: f.requires_reference, processing_fee_percentage: f.processing_fee_percentage, processing_fee_fixed: f.processing_fee_fixed, display_order: f.display_order, is_active: f.is_active };
+    const name = (f.name || "").trim();
+    if (!name || !f.code) return toast.error("required");
+    const payload = { name_en: name, name_ar: name, code: f.code, type: f.type, requires_reference: f.requires_reference, processing_fee_percentage: f.processing_fee_percentage, processing_fee_fixed: f.processing_fee_fixed, display_order: f.display_order, is_active: f.is_active };
     const { error } = edit ? await supabase.from("payment_methods").update(payload).eq("id", edit.id) : await supabase.from("payment_methods").insert(payload);
     if (error) return toast.error(error.message);
     toast.success(t("saved")); setOpen(false); load();
@@ -49,8 +50,7 @@ export default function PaymentMethods() {
             <DialogContent>
               <DialogHeader><DialogTitle>{edit ? t("edit") : t("addPaymentMethod")}</DialogTitle></DialogHeader>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div><Label>{t("nameEn2")}</Label><Input value={f.name_en} onChange={e => setF({ ...f, name_en: e.target.value })} /></div>
-                <div><Label>{t("nameAr2")}</Label><Input dir="rtl" value={f.name_ar} onChange={e => setF({ ...f, name_ar: e.target.value })} /></div>
+                <div className="sm:col-span-2"><Label>{t("name")} / الاسم</Label><Input value={f.name} onChange={e => setF({ ...f, name: e.target.value })} /></div>
                 <div><Label>{t("methodCode")}</Label><Input value={f.code} onChange={e => setF({ ...f, code: e.target.value })} /></div>
                 <div><Label>{t("methodType")}</Label>
                   <Select value={f.type} onValueChange={(v) => setF({ ...f, type: v })}>

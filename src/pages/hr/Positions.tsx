@@ -18,7 +18,7 @@ export default function Positions() {
   const [filterDept, setFilterDept] = useState<string>("all");
   const [open, setOpen] = useState(false);
   const [edit, setE] = useState<any>(null);
-  const [form, setForm] = useState({ title_en: "", title_ar: "", department_id: "", description_en: "", description_ar: "", salary_range_min: "", salary_range_max: "" });
+  const [form, setForm] = useState({ title: "", department_id: "", description: "", salary_range_min: "", salary_range_max: "" });
 
   const load = async () => {
     const { data } = await supabase.from("staff_positions").select("*").order("title_en");
@@ -28,14 +28,16 @@ export default function Positions() {
   };
   useEffect(() => { load(); }, []);
 
-  const openNew = () => { setE(null); setForm({ title_en: "", title_ar: "", department_id: "", description_en: "", description_ar: "", salary_range_min: "", salary_range_max: "" }); setOpen(true); };
-  const openEdit = (p: any) => { setE(p); setForm({ title_en: p.title_en, title_ar: p.title_ar, department_id: p.department_id ?? "", description_en: p.description_en ?? "", description_ar: p.description_ar ?? "", salary_range_min: p.salary_range_min?.toString() ?? "", salary_range_max: p.salary_range_max?.toString() ?? "" }); setOpen(true); };
+  const openNew = () => { setE(null); setForm({ title: "", department_id: "", description: "", salary_range_min: "", salary_range_max: "" }); setOpen(true); };
+  const openEdit = (p: any) => { setE(p); setForm({ title: p.title_en || p.title_ar || "", department_id: p.department_id ?? "", description: p.description_en || p.description_ar || "", salary_range_min: p.salary_range_min?.toString() ?? "", salary_range_max: p.salary_range_max?.toString() ?? "" }); setOpen(true); };
   const save = async () => {
-    if (!form.title_en.trim() || !form.title_ar.trim()) { toast.error("Title required"); return; }
+    const title = form.title.trim();
+    const desc = form.description.trim();
+    if (!title) { toast.error("Title required"); return; }
     const payload: any = {
-      title_en: form.title_en.trim(), title_ar: form.title_ar.trim(),
+      title_en: title, title_ar: title,
       department_id: form.department_id || null,
-      description_en: form.description_en || null, description_ar: form.description_ar || null,
+      description_en: desc || null, description_ar: desc || null,
       salary_range_min: form.salary_range_min ? Number(form.salary_range_min) : null,
       salary_range_max: form.salary_range_max ? Number(form.salary_range_max) : null,
     };
@@ -66,8 +68,7 @@ export default function Positions() {
             <DialogContent className="max-w-2xl">
               <DialogHeader><DialogTitle>{edit ? t("position") : t("newPosition")}</DialogTitle></DialogHeader>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-2"><Label>{t("titleEn")}</Label><Input value={form.title_en} onChange={(e) => setForm({ ...form, title_en: e.target.value })} maxLength={120} /></div>
-                <div className="space-y-2"><Label>{t("titleAr")}</Label><Input dir="rtl" value={form.title_ar} onChange={(e) => setForm({ ...form, title_ar: e.target.value })} maxLength={120} /></div>
+                <div className="space-y-2 sm:col-span-2"><Label>{t("title")} / المسمى</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} maxLength={120} /></div>
                 <div className="space-y-2 sm:col-span-2"><Label>{t("department")}</Label>
                   <Select value={form.department_id || "none"} onValueChange={(v) => setForm({ ...form, department_id: v === "none" ? "" : v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
@@ -76,7 +77,7 @@ export default function Positions() {
                 </div>
                 <div className="space-y-2"><Label>{t("salaryMin")}</Label><Input type="number" value={form.salary_range_min} onChange={(e) => setForm({ ...form, salary_range_min: e.target.value })} /></div>
                 <div className="space-y-2"><Label>{t("salaryMax")}</Label><Input type="number" value={form.salary_range_max} onChange={(e) => setForm({ ...form, salary_range_max: e.target.value })} /></div>
-                <div className="space-y-2 sm:col-span-2"><Label>{t("description")}</Label><Input value={form.description_en} onChange={(e) => setForm({ ...form, description_en: e.target.value })} maxLength={300} /></div>
+                <div className="space-y-2 sm:col-span-2"><Label>{t("description")}</Label><Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} maxLength={300} /></div>
               </div>
               <DialogFooter>
                 <Button variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button>

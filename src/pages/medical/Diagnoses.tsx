@@ -21,7 +21,7 @@ export default function Diagnoses() {
   const [cat, setCat] = useState<string>("all");
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<Dx | null>(null);
-  const [form, setForm] = useState({ code: "", name_en: "", name_ar: "", category: "", description_en: "", description_ar: "" });
+  const [form, setForm] = useState({ code: "", name: "", category: "", description: "" });
 
   const load = async () => {
     const { data } = await supabase.from("diagnoses").select("*").order("code").limit(2000);
@@ -36,16 +36,18 @@ export default function Diagnoses() {
     return true;
   }), [items, q, cat]);
 
-  const openNew = () => { setEdit(null); setForm({ code: "", name_en: "", name_ar: "", category: "", description_en: "", description_ar: "" }); setOpen(true); };
-  const openEdit = (d: Dx) => { setEdit(d); setForm({ code: d.code, name_en: d.name_en, name_ar: d.name_ar, category: d.category ?? "", description_en: d.description_en ?? "", description_ar: d.description_ar ?? "" }); setOpen(true); };
+  const openNew = () => { setEdit(null); setForm({ code: "", name: "", category: "", description: "" }); setOpen(true); };
+  const openEdit = (d: Dx) => { setEdit(d); setForm({ code: d.code, name: d.name_en || d.name_ar || "", category: d.category ?? "", description: d.description_en || d.description_ar || "" }); setOpen(true); };
 
   const save = async () => {
-    if (!form.code.trim() || !form.name_en.trim() || !form.name_ar.trim()) return toast.error("Code & name required");
+    const name = form.name.trim();
+    const desc = form.description.trim();
+    if (!form.code.trim() || !name) return toast.error("Code & name required");
     const payload = {
       code: form.code.trim().toUpperCase(),
-      name_en: form.name_en.trim(), name_ar: form.name_ar.trim(),
+      name_en: name, name_ar: name,
       category: form.category || null,
-      description_en: form.description_en || null, description_ar: form.description_ar || null,
+      description_en: desc || null, description_ar: desc || null,
     };
     const { error } = edit
       ? await supabase.from("diagnoses").update(payload).eq("id", edit.id)
@@ -77,10 +79,8 @@ export default function Diagnoses() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2"><Label>{t("code")}</Label><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} maxLength={20} /></div>
                 <div className="space-y-2"><Label>{t("category")}</Label><Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} maxLength={50} /></div>
-                <div className="space-y-2 col-span-2"><Label>{t("nameEn")}</Label><Input value={form.name_en} onChange={(e) => setForm({ ...form, name_en: e.target.value })} maxLength={200} /></div>
-                <div className="space-y-2 col-span-2"><Label>{t("nameAr")}</Label><Input dir="rtl" value={form.name_ar} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} maxLength={200} /></div>
-                <div className="space-y-2 col-span-2"><Label>{t("description")} (EN)</Label><Textarea value={form.description_en} onChange={(e) => setForm({ ...form, description_en: e.target.value })} maxLength={500} rows={2} /></div>
-                <div className="space-y-2 col-span-2"><Label>{t("description")} (AR)</Label><Textarea dir="rtl" value={form.description_ar} onChange={(e) => setForm({ ...form, description_ar: e.target.value })} maxLength={500} rows={2} /></div>
+                <div className="space-y-2 col-span-2"><Label>{t("name")} / الاسم</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={200} /></div>
+                <div className="space-y-2 col-span-2"><Label>{t("description")}</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} maxLength={500} rows={2} /></div>
               </div>
               <DialogFooter><Button variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button><Button className="gradient-primary text-primary-foreground" onClick={save}>{t("save")}</Button></DialogFooter>
             </DialogContent>

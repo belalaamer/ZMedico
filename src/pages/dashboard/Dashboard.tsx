@@ -363,7 +363,7 @@ export default function Dashboard() {
                     <li key={a.id} className="py-2 flex items-center justify-between gap-2">
                       <div className="min-w-0">
                         <div className="font-medium text-sm truncate">{fullName(a.patient)}</div>
-                        <div className="text-xs text-muted-foreground truncate">{a.doctor?.full_name || "—"}</div>
+                        <div className="text-xs text-muted-foreground truncate">{(a.doctor_id && doctorNames[a.doctor_id]) || "—"}</div>
                       </div>
                       <div className="text-right shrink-0">
                         <div className="text-xs text-muted-foreground">{formatDateTime(a.scheduled_at, lang)}</div>

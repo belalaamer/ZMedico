@@ -25,7 +25,7 @@ export default function Attendance() {
   const [gpsOpen, setGpsOpen] = useState<{ mode: "in" | "out"; staffId: string } | null>(null);
 
   const load = async () => {
-    let q = supabase.from("staff").select("id,employee_id,department_id" as any);
+    let q = supabase.from("staff_profiles").select("id,employee_id,department_id");
     if (currentBranchId) q = q.eq("branch_id", currentBranchId);
     const { data: s } = await q;
     setStaff(s ?? []);
@@ -100,7 +100,7 @@ export default function Attendance() {
   const visibleStaff = staff.filter((s) => {
     if (zoneFilter === "all") return true;
     const r = recOf(s.id);
-    if (!r || r.is_within_branch_radius == null) return zoneFilter === "all";
+    if (!r || r.is_within_branch_radius == null) return false;
     return zoneFilter === "within" ? r.is_within_branch_radius : !r.is_within_branch_radius;
   });
 

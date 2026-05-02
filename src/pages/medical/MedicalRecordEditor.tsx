@@ -613,8 +613,26 @@ function DocumentsTab({ record, patient, docs, reload, userId }: any) {
   const [uploading, setUploading] = useState(false);
 
   const upload = async (file: File) => {
+    const ALLOWED_MIME = new Set([
+      "image/jpeg", "image/png", "image/webp", "image/gif",
+      "application/pdf", "application/dicom",
+    ]);
+    const ALLOWED_EXT = /\.(jpe?g|png|webp|gif|pdf|dcm|dicom)$/i;
+    const MAX_SIZE = 20 * 1024 * 1024; // 20 MB
+    if (file.size > MAX_SIZE) {
+      return toast.error(`${file.name}: file exceeds 20 MB limit`);
+    }
+    const mimeOk = file.type && ALLOWED_MIME.has(file.type);
+    const extOk = ALLOWED_EXT.test(file.name);
+    if (!mimeOk && !extOk) {
+      return toast.error(`${file.name}: unsupported file type`);
+    }
+    const safeName = (file.name
+      .replace(/[^a-zA-Z0-9._-]/g, "_")
+      .replace(/_{2,}/g, "_")
+      .slice(0, 100)) || "file";
     setUploading(true);
-    const path = `${patient.id}/${Date.now()}-${file.name}`;
+    const path = `${patient.id}/${Date.now()}-${safeName}`;
     const { error: upErr } = await supabase.storage.from("patient-docs").upload(path, file);
     if (upErr) { setUploading(false); return toast.error(upErr.message); }
     const { error } = await supabase.from("patient_documents").insert({

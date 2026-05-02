@@ -22,7 +22,7 @@ export default function Procedures() {
   const [specFilter, setSpecFilter] = useState("all");
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<any>(null);
-  const [form, setForm] = useState({ specialty_id: "", code: "", name_en: "", name_ar: "", description_en: "", description_ar: "", default_duration: 30, default_price: 0, is_active: true });
+  const [form, setForm] = useState({ specialty_id: "", code: "", name: "", description: "", default_duration: 30, default_price: 0, is_active: true });
 
   const load = async () => {
     const [{ data }, { data: s }] = await Promise.all([
@@ -39,15 +39,17 @@ export default function Procedures() {
     return true;
   }), [items, q, specFilter]);
 
-  const openNew = () => { setEdit(null); setForm({ specialty_id: "", code: "", name_en: "", name_ar: "", description_en: "", description_ar: "", default_duration: 30, default_price: 0, is_active: true }); setOpen(true); };
-  const openEdit = (p: any) => { setEdit(p); setForm({ specialty_id: p.specialty_id ?? "", code: p.code ?? "", name_en: p.name_en, name_ar: p.name_ar, description_en: p.description_en ?? "", description_ar: p.description_ar ?? "", default_duration: p.default_duration ?? 30, default_price: Number(p.default_price ?? 0), is_active: p.is_active }); setOpen(true); };
+  const openNew = () => { setEdit(null); setForm({ specialty_id: "", code: "", name: "", description: "", default_duration: 30, default_price: 0, is_active: true }); setOpen(true); };
+  const openEdit = (p: any) => { setEdit(p); setForm({ specialty_id: p.specialty_id ?? "", code: p.code ?? "", name: p.name_en || p.name_ar || "", description: p.description_en || p.description_ar || "", default_duration: p.default_duration ?? 30, default_price: Number(p.default_price ?? 0), is_active: p.is_active }); setOpen(true); };
 
   const save = async () => {
-    if (!form.name_en.trim() || !form.name_ar.trim()) return toast.error("Name required");
+    const name = form.name.trim();
+    const desc = form.description.trim();
+    if (!name) return toast.error("Name required");
     const payload = {
       specialty_id: form.specialty_id || null, code: form.code || null,
-      name_en: form.name_en.trim(), name_ar: form.name_ar.trim(),
-      description_en: form.description_en || null, description_ar: form.description_ar || null,
+      name_en: name, name_ar: name,
+      description_en: desc || null, description_ar: desc || null,
       default_duration: Number(form.default_duration) || null,
       default_price: Number(form.default_price) || null,
       is_active: form.is_active,
@@ -90,12 +92,10 @@ export default function Procedures() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2 col-span-2"><Label>{t("nameEn")}</Label><Input value={form.name_en} onChange={(e) => setForm({ ...form, name_en: e.target.value })} maxLength={200} /></div>
-                <div className="space-y-2 col-span-2"><Label>{t("nameAr")}</Label><Input dir="rtl" value={form.name_ar} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} maxLength={200} /></div>
+                <div className="space-y-2 col-span-2"><Label>{t("name")} / الاسم</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={200} /></div>
                 <div className="space-y-2"><Label>{t("defaultDuration")}</Label><Input type="number" min={0} value={form.default_duration} onChange={(e) => setForm({ ...form, default_duration: Number(e.target.value) })} /></div>
                 <div className="space-y-2"><Label>{t("defaultPrice")}</Label><Input type="number" min={0} step="0.01" value={form.default_price} onChange={(e) => setForm({ ...form, default_price: Number(e.target.value) })} /></div>
-                <div className="space-y-2 col-span-2"><Label>{t("description")} (EN)</Label><Textarea value={form.description_en} onChange={(e) => setForm({ ...form, description_en: e.target.value })} maxLength={500} rows={2} /></div>
-                <div className="space-y-2 col-span-2"><Label>{t("description")} (AR)</Label><Textarea dir="rtl" value={form.description_ar} onChange={(e) => setForm({ ...form, description_ar: e.target.value })} maxLength={500} rows={2} /></div>
+                <div className="space-y-2 col-span-2"><Label>{t("description")}</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} maxLength={500} rows={2} /></div>
                 <div className="flex items-center justify-between border border-border rounded-lg px-3 py-2 col-span-2"><Label>{t("active")}</Label><Switch checked={form.is_active} onCheckedChange={(v) => setForm({ ...form, is_active: v })} /></div>
               </div>
               <DialogFooter><Button variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button><Button className="gradient-primary text-primary-foreground" onClick={save}>{t("save")}</Button></DialogFooter>

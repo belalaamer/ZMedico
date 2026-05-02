@@ -1517,8 +1517,12 @@ export type Database = {
           send_follow_up_reminder: boolean
           send_invoice_notification: boolean
           send_payment_receipt: boolean
+          sms_api_key: string | null
+          sms_api_url: string | null
           sms_sender_id: string | null
           updated_at: string
+          whatsapp_api_key: string | null
+          whatsapp_api_url: string | null
           whatsapp_business_number: string | null
         }
         Insert: {
@@ -1537,8 +1541,12 @@ export type Database = {
           send_follow_up_reminder?: boolean
           send_invoice_notification?: boolean
           send_payment_receipt?: boolean
+          sms_api_key?: string | null
+          sms_api_url?: string | null
           sms_sender_id?: string | null
           updated_at?: string
+          whatsapp_api_key?: string | null
+          whatsapp_api_url?: string | null
           whatsapp_business_number?: string | null
         }
         Update: {
@@ -1557,8 +1565,12 @@ export type Database = {
           send_follow_up_reminder?: boolean
           send_invoice_notification?: boolean
           send_payment_receipt?: boolean
+          sms_api_key?: string | null
+          sms_api_url?: string | null
           sms_sender_id?: string | null
           updated_at?: string
+          whatsapp_api_key?: string | null
+          whatsapp_api_url?: string | null
           whatsapp_business_number?: string | null
         }
         Relationships: [

@@ -19,7 +19,7 @@ export default function Categories() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<Cat | null>(null);
-  const [form, setForm] = useState({ name_en: "", name_ar: "", parent_id: "" as string, description: "" });
+  const [form, setForm] = useState({ name: "", parent_id: "" as string, description: "" });
 
   const load = async () => {
     const { data } = await supabase.from("product_categories").select("*").order("name_en");
@@ -31,14 +31,15 @@ export default function Categories() {
   };
   useEffect(() => { load(); }, []);
 
-  const openNew = () => { setEdit(null); setForm({ name_en: "", name_ar: "", parent_id: "", description: "" }); setOpen(true); };
-  const openEdit = (c: Cat) => { setEdit(c); setForm({ name_en: c.name_en, name_ar: c.name_ar, parent_id: c.parent_id ?? "", description: c.description ?? "" }); setOpen(true); };
+  const openNew = () => { setEdit(null); setForm({ name: "", parent_id: "", description: "" }); setOpen(true); };
+  const openEdit = (c: Cat) => { setEdit(c); setForm({ name: c.name_en || c.name_ar || "", parent_id: c.parent_id ?? "", description: c.description ?? "" }); setOpen(true); };
 
   const save = async () => {
-    if (!form.name_en.trim() || !form.name_ar.trim()) { toast.error("Name required"); return; }
+    const name = form.name.trim();
+    if (!name) { toast.error("Name required"); return; }
     const payload = {
-      name_en: form.name_en.trim(),
-      name_ar: form.name_ar.trim(),
+      name_en: name,
+      name_ar: name,
       parent_id: form.parent_id || null,
       description: form.description || null,
     };
@@ -90,10 +91,7 @@ export default function Categories() {
           <DialogContent>
             <DialogHeader><DialogTitle>{edit ? t("editProduct") : t("newCategory")}</DialogTitle></DialogHeader>
             <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2"><Label>{t("nameEn")}</Label><Input value={form.name_en} onChange={(e) => setForm({ ...form, name_en: e.target.value })} maxLength={120} /></div>
-                <div className="space-y-2"><Label>{t("nameAr")}</Label><Input dir="rtl" value={form.name_ar} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} maxLength={120} /></div>
-              </div>
+              <div className="space-y-2"><Label>{t("name")} / الاسم</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={120} /></div>
               <div className="space-y-2">
                 <Label>{t("parentCategory")}</Label>
                 <Select value={form.parent_id || "none"} onValueChange={(v) => setForm({ ...form, parent_id: v === "none" ? "" : v })}>

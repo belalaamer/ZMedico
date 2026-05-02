@@ -26,6 +26,7 @@ export function RecordPaymentDialog({
 
   const [patients, setPatients] = useState<{ id: string; label: string }[]>([]);
   const [pid, setPid] = useState<string>(patientId ?? "");
+  const [pidSelectOpen, setPidSelectOpen] = useState(false);
   const [iid, setIid] = useState<string>(invoiceId ?? "");
   const [amount, setAmount] = useState<number>(defaultAmount ?? 0);
   const [method, setMethod] = useState<Method>("cash");
@@ -45,11 +46,22 @@ export function RecordPaymentDialog({
   }, [open, patientId, invoiceId, defaultAmount]);
 
   const loadPatients = () => {
-    supabase.from("patients").select("id,first_name_en,last_name_en,patient_code").is("deleted_at", null).order("created_at", { ascending: false }).limit(500)
-      .then(({ data }) => setPatients((data ?? []).map((p: any) => ({ id: p.id, label: `#${p.patient_code} · ${p.first_name_en} ${p.last_name_en ?? ""}`.trim() }))));
+    supabase
+      .from("patients")
+      .select("id,first_name_en,last_name_en,patient_code,deleted_at")
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(500)
+      .then(({ data }) => {
+        const rows = (data ?? []).filter((p: any) => p.deleted_at == null);
+        setPatients(rows.map((p: any) => ({
+          id: p.id,
+          label: `#${p.patient_code} · ${p.first_name_en} ${p.last_name_en ?? ""}`.trim(),
+        })));
+      });
   };
 
-  useDataSync(["patients"], () => { if (open && !patientId) loadPatients(); });
+  useDataSync(["patients"], () => { if (!patientId) loadPatients(); });
 
   const save = async () => {
     if (!pid) { toast.error(t("selectPatient")); return; }
@@ -80,7 +92,15 @@ export function RecordPaymentDialog({
           {!patientId && (
             <div className="space-y-2">
               <Label>{t("patientName")}</Label>
-              <Select value={pid} onValueChange={setPid}>
+              <Select
+                value={pid}
+                onValueChange={setPid}
+                open={pidSelectOpen}
+                onOpenChange={(o) => {
+                  setPidSelectOpen(o);
+                  if (o) loadPatients();
+                }}
+              >
                 <SelectTrigger><SelectValue placeholder={t("selectPatient")} /></SelectTrigger>
                 <SelectContent>
                   {patients.map((p) => <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>)}

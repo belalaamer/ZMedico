@@ -159,7 +159,7 @@ function BranchTab({ start, end, setStart, setEnd, lang, t }: any) {
       const out: any[] = [];
       for (const b of branches ?? []) {
         const [{ count: patients }, { data: revs }, { data: exps }] = await Promise.all([
-          supabase.from("patients").select("id", { count: "exact", head: true }).eq("branch_id", b.id),
+          supabase.from("patients").select("id", { count: "exact", head: true }).is("deleted_at", null).eq("branch_id", b.id),
           supabase.from("payments").select("amount").eq("branch_id", b.id).gte("payment_date", start).lte("payment_date", end),
           supabase.from("expenses").select("amount").eq("branch_id", b.id).gte("expense_date", start).lte("expense_date", end),
         ]);

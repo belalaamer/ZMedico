@@ -32,7 +32,7 @@ export default function DocumentsCenter() {
   };
   useEffect(() => {
     load();
-    supabase.from("patients").select("id,first_name_en,last_name_en,patient_code").order("created_at", { ascending: false }).limit(500)
+    supabase.from("patients").select("id,first_name_en,last_name_en,patient_code").is("deleted_at", null).order("created_at", { ascending: false }).limit(500)
       .then(({ data }) => setPatients(data ?? []));
   }, []);
 

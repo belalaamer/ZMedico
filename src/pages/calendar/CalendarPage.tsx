@@ -84,10 +84,12 @@ export default function CalendarPage() {
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [date, currentBranchId]);
   useDataSync(["appointments", "calendar"], () => { load(); });
 
-  useEffect(() => {
-    supabase.from("patients").select("id,first_name_en,last_name_en").order("created_at", { ascending: false }).limit(200)
+  const loadPatientOptions = () => {
+    supabase.from("patients").select("id,first_name_en,last_name_en").is("deleted_at", null).order("created_at", { ascending: false }).limit(200)
       .then(({ data }) => setPatients((data ?? []).map((p: any) => ({ id: p.id, label: `${p.first_name_en} ${p.last_name_en ?? ""}`.trim() }))));
-  }, []);
+  };
+  useEffect(() => { loadPatientOptions(); }, []);
+  useDataSync(["patients"], () => loadPatientOptions());
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();

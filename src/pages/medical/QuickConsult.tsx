@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { useBranch } from "@/contexts/BranchContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useDataSync, notifyDataChange } from "@/lib/dataSync";
 
 export default function QuickConsult() {
   const { t, lang } = useI18n();
@@ -22,10 +23,20 @@ export default function QuickConsult() {
   const [form, setForm] = useState({ patient_id: "", specialty_id: "", visit_type: "consultation", chief_complaint_ar: "", chief_complaint_en: "", notes_ar: "", notes_en: "" });
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    supabase.from("patients").select("id,first_name_en,last_name_en,patient_code").order("created_at", { ascending: false }).limit(500).then(({ data }) => setPatients(data ?? []));
-    supabase.from("medical_specialties").select("*").eq("is_active", true).order("name_en").then(({ data }) => setSpecs(data ?? []));
+  const loadPatients = useCallback(() => {
+    supabase.from("patients")
+      .select("id,first_name_en,last_name_en,patient_code")
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false }).limit(500)
+      .then(({ data }) => setPatients(data ?? []));
   }, []);
+
+  useEffect(() => {
+    loadPatients();
+    supabase.from("medical_specialties").select("*").eq("is_active", true).order("name_en").then(({ data }) => setSpecs(data ?? []));
+  }, [loadPatients]);
+
+  useDataSync(["patients"], () => loadPatients());
 
   const save = async (status: "draft" | "completed") => {
     if (!form.patient_id) return toast.error(t("selectPatient"));
@@ -39,6 +50,7 @@ export default function QuickConsult() {
     setSaving(false);
     if (error) return toast.error(error.message);
     toast.success(t("save"));
+    notifyDataChange("medical_records");
     nav(`/medical/records`);
   };
 

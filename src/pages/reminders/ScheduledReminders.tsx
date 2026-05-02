@@ -109,6 +109,22 @@ export default function ScheduledReminders() {
     await supabase.from("reminders").update({ status: "sent", sent_at: new Date().toISOString() }).eq("id", id);
     load();
   };
+  const sendNow = async (id: string) => {
+    const { data, error } = await supabase.functions.invoke("send-reminder", { body: { reminder_id: id } });
+    if (error) { toast({ title: error.message, variant: "destructive" }); return; }
+    const r = (data?.results ?? [])[0];
+    if (r && !r.ok) toast({ title: r.error ?? "Failed", variant: "destructive" });
+    else toast({ title: t("sent") });
+    load();
+  };
+  const sendAllPending = async () => {
+    const { data, error } = await supabase.functions.invoke("send-reminder", {
+      body: { branch_id: currentBranchId ?? undefined, due_only: false },
+    });
+    if (error) { toast({ title: error.message, variant: "destructive" }); return; }
+    toast({ title: `Sent: ${data?.sent ?? 0}, Failed: ${data?.failed ?? 0}` });
+    load();
+  };
   const reschedule = async (id: string) => {
     const next = prompt("New time (YYYY-MM-DD HH:MM)");
     if (!next) return;
@@ -155,6 +171,9 @@ export default function ScheduledReminders() {
           </SelectContent>
         </Select>
         <div className="ms-auto">
+          <Button variant="outline" className="me-2" onClick={sendAllPending}>
+            <Send className="size-4 me-1" />{t("sendAllPending")}
+          </Button>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button><Plus className="size-4 me-1" />{t("sendReminder")}</Button>
@@ -232,7 +251,7 @@ export default function ScheduledReminders() {
                   <TableCell>
                     <div className="flex gap-1">
                       {r.status === "pending" && (
-                        <Button size="icon" variant="ghost" title={t("sent")} onClick={() => markSent(r.id)}>
+                        <Button size="icon" variant="ghost" title={t("sendNow")} onClick={() => sendNow(r.id)}>
                           <Send className="size-4" />
                         </Button>
                       )}

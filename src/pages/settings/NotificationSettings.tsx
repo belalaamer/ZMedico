@@ -26,13 +26,26 @@ export default function NotificationSettings() {
   });
   useEffect(() => {
     if (!branchId) return;
-    supabase.from("notification_settings").select("*").eq("branch_id", branchId).maybeSingle()
-      .then(({ data }) => { if (data) setF({ ...f, ...data }); });
+    // Never fetch sensitive credentials (whatsapp_api_key, sms_api_key) into the browser.
+    // We only fetch non-sensitive columns and surface a "configured" indicator for keys.
+    supabase
+      .from("notification_settings")
+      .select("id,branch_id,send_appointment_reminders,reminder_channel,send_appointment_confirmation,send_appointment_cancellation,send_invoice_notification,send_payment_receipt,send_birthday_greeting,birthday_discount_percentage,send_follow_up_reminder,follow_up_days_after,email_sender_name,email_sender_address,sms_sender_id,whatsapp_business_number,whatsapp_api_url,sms_api_url")
+      .eq("branch_id", branchId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!data) return;
+        setF((prev: any) => ({ ...prev, ...data, whatsapp_api_key: "", sms_api_key: "" }));
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [branchId]);
   const save = async () => {
     if (!branchId) return toast.error(t("branch"));
-    const { error } = await supabase.from("notification_settings").upsert({ ...f, branch_id: branchId }, { onConflict: "branch_id" });
+    // Only write API key fields if the admin entered a new value; otherwise leave the stored secret intact.
+    const payload: any = { ...f, branch_id: branchId };
+    if (!payload.whatsapp_api_key) delete payload.whatsapp_api_key;
+    if (!payload.sms_api_key) delete payload.sms_api_key;
+    const { error } = await supabase.from("notification_settings").upsert(payload, { onConflict: "branch_id" });
     if (error) return toast.error(error.message);
     toast.success(t("saved"));
   };
@@ -68,9 +81,9 @@ export default function NotificationSettings() {
           <div><Label>{t("smsSenderId")}</Label><Input value={f.sms_sender_id ?? ""} onChange={e => setF({ ...f, sms_sender_id: e.target.value })} /></div>
           <div><Label>{t("whatsappBusinessNumber")}</Label><Input value={f.whatsapp_business_number ?? ""} onChange={e => setF({ ...f, whatsapp_business_number: e.target.value })} /></div>
           <div><Label>{t("whatsappApiUrl")}</Label><Input value={f.whatsapp_api_url ?? ""} onChange={e => setF({ ...f, whatsapp_api_url: e.target.value })} placeholder="https://..." /></div>
-          <div><Label>{t("whatsappApiKey")}</Label><Input type="password" value={f.whatsapp_api_key ?? ""} onChange={e => setF({ ...f, whatsapp_api_key: e.target.value })} /></div>
+          <div><Label>{t("whatsappApiKey")}</Label><Input type="password" autoComplete="new-password" placeholder="••••••••  (leave blank to keep current)" value={f.whatsapp_api_key ?? ""} onChange={e => setF({ ...f, whatsapp_api_key: e.target.value })} /></div>
           <div><Label>{t("smsApiUrl")}</Label><Input value={f.sms_api_url ?? ""} onChange={e => setF({ ...f, sms_api_url: e.target.value })} placeholder="https://..." /></div>
-          <div><Label>{t("smsApiKey")}</Label><Input type="password" value={f.sms_api_key ?? ""} onChange={e => setF({ ...f, sms_api_key: e.target.value })} /></div>
+          <div><Label>{t("smsApiKey")}</Label><Input type="password" autoComplete="new-password" placeholder="••••••••  (leave blank to keep current)" value={f.sms_api_key ?? ""} onChange={e => setF({ ...f, sms_api_key: e.target.value })} /></div>
           <div className="sm:col-span-2 flex justify-end"><Button className="gradient-primary text-primary-foreground" onClick={save}>{t("save")}</Button></div>
         </Card>
       </div>

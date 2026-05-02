@@ -203,18 +203,12 @@ function HistoryDialog({ open, onOpenChange, patientId, userId, initial, onSaved
             ))}
           </div>
           {f.has_allergies && (
-            <div className="grid sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>{t("allergies")} (EN)</Label><Textarea rows={2} value={f.allergies_en ?? ""} onChange={(e) => setF({ ...f, allergies_en: e.target.value })}/></div>
-              <div className="space-y-1.5"><Label>{t("allergies")} (AR)</Label><Textarea dir="rtl" rows={2} value={f.allergies_ar ?? ""} onChange={(e) => setF({ ...f, allergies_ar: e.target.value })}/></div>
-            </div>
+            <div className="space-y-1.5"><Label>{t("allergies")}</Label><Textarea rows={2} value={f.allergies_en ?? ""} onChange={(e) => setF({ ...f, allergies_en: e.target.value, allergies_ar: e.target.value })}/></div>
           )}
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div className="space-y-1.5"><Label>{t("currentMedications")} (EN)</Label><Textarea rows={2} value={f.current_medications_en ?? ""} onChange={(e) => setF({ ...f, current_medications_en: e.target.value })}/></div>
-            <div className="space-y-1.5"><Label>{t("currentMedications")} (AR)</Label><Textarea dir="rtl" rows={2} value={f.current_medications_ar ?? ""} onChange={(e) => setF({ ...f, current_medications_ar: e.target.value })}/></div>
-            <div className="space-y-1.5"><Label>{t("previousSurgeries")} (EN)</Label><Textarea rows={2} value={f.previous_surgeries_en ?? ""} onChange={(e) => setF({ ...f, previous_surgeries_en: e.target.value })}/></div>
-            <div className="space-y-1.5"><Label>{t("previousSurgeries")} (AR)</Label><Textarea dir="rtl" rows={2} value={f.previous_surgeries_ar ?? ""} onChange={(e) => setF({ ...f, previous_surgeries_ar: e.target.value })}/></div>
-            <div className="space-y-1.5"><Label>{t("familyHistory")} (EN)</Label><Textarea rows={2} value={f.family_history_en ?? ""} onChange={(e) => setF({ ...f, family_history_en: e.target.value })}/></div>
-            <div className="space-y-1.5"><Label>{t("familyHistory")} (AR)</Label><Textarea dir="rtl" rows={2} value={f.family_history_ar ?? ""} onChange={(e) => setF({ ...f, family_history_ar: e.target.value })}/></div>
+          <div className="grid gap-3">
+            <div className="space-y-1.5"><Label>{t("currentMedications")}</Label><Textarea rows={2} value={f.current_medications_en ?? ""} onChange={(e) => setF({ ...f, current_medications_en: e.target.value, current_medications_ar: e.target.value })}/></div>
+            <div className="space-y-1.5"><Label>{t("previousSurgeries")}</Label><Textarea rows={2} value={f.previous_surgeries_en ?? ""} onChange={(e) => setF({ ...f, previous_surgeries_en: e.target.value, previous_surgeries_ar: e.target.value })}/></div>
+            <div className="space-y-1.5"><Label>{t("familyHistory")}</Label><Textarea rows={2} value={f.family_history_en ?? ""} onChange={(e) => setF({ ...f, family_history_en: e.target.value, family_history_ar: e.target.value })}/></div>
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>{t("cancel")}</Button>

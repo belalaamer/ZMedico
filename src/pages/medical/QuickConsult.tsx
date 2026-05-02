@@ -88,10 +88,8 @@ export default function QuickConsult() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2 sm:col-span-2"><Label>{t("chiefComplaint")} (EN)</Label><Textarea value={form.chief_complaint_en} onChange={(e) => setForm({ ...form, chief_complaint_en: e.target.value })} maxLength={1000} rows={2} /></div>
-          <div className="space-y-2 sm:col-span-2"><Label>{t("chiefComplaint")} (AR)</Label><Textarea dir="rtl" value={form.chief_complaint_ar} onChange={(e) => setForm({ ...form, chief_complaint_ar: e.target.value })} maxLength={1000} rows={2} /></div>
-          <div className="space-y-2 sm:col-span-2"><Label>{t("notes")} (EN)</Label><Textarea value={form.notes_en} onChange={(e) => setForm({ ...form, notes_en: e.target.value })} maxLength={2000} rows={3} /></div>
-          <div className="space-y-2 sm:col-span-2"><Label>{t("notes")} (AR)</Label><Textarea dir="rtl" value={form.notes_ar} onChange={(e) => setForm({ ...form, notes_ar: e.target.value })} maxLength={2000} rows={3} /></div>
+          <div className="space-y-2 sm:col-span-2"><Label>{t("chiefComplaint")}</Label><Textarea value={form.chief_complaint_en} onChange={(e) => setForm({ ...form, chief_complaint_en: e.target.value, chief_complaint_ar: e.target.value })} maxLength={1000} rows={2} /></div>
+          <div className="space-y-2 sm:col-span-2"><Label>{t("notes")}</Label><Textarea value={form.notes_en} onChange={(e) => setForm({ ...form, notes_en: e.target.value, notes_ar: e.target.value })} maxLength={2000} rows={3} /></div>
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="outline" onClick={() => save("draft")} disabled={saving}>{t("saveAsDraft")}</Button>

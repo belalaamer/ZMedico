@@ -207,10 +207,7 @@ export function CreateInvoiceDialog({
                     </SelectContent>
                   </Select>
                 ) : (
-                  <>
-                    <Input value={it.description_en} placeholder="Description (EN)" onChange={(e) => updateItem(idx, { description_en: e.target.value })} />
-                    <Input dir="rtl" value={it.description_ar} placeholder="الوصف (AR)" onChange={(e) => updateItem(idx, { description_ar: e.target.value })} />
-                  </>
+                  <Input value={it.description_en} placeholder="Description" onChange={(e) => updateItem(idx, { description_en: e.target.value, description_ar: e.target.value })} />
                 )}
               </div>
               <Input className="col-span-2 text-end" type="number" min={0} step="0.01" value={it.quantity} onChange={(e) => updateItem(idx, { quantity: Number(e.target.value) })} />

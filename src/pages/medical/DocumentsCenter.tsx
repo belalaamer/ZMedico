@@ -50,9 +50,33 @@ export default function DocumentsCenter() {
   const upload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     if (!uploadPatient) return toast.error(t("selectPatient"));
+    const ALLOWED_MIME = new Set([
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/gif",
+      "application/pdf",
+      "application/dicom",
+    ]);
+    const ALLOWED_EXT = /\.(jpe?g|png|webp|gif|pdf|dcm|dicom)$/i;
+    const MAX_SIZE = 20 * 1024 * 1024; // 20 MB
     setUploading(true);
     for (const file of Array.from(files)) {
-      const path = `${uploadPatient}/${Date.now()}-${file.name}`;
+      if (file.size > MAX_SIZE) {
+        toast.error(`${file.name}: file exceeds 20 MB limit`);
+        continue;
+      }
+      const mimeOk = file.type && ALLOWED_MIME.has(file.type);
+      const extOk = ALLOWED_EXT.test(file.name);
+      if (!mimeOk && !extOk) {
+        toast.error(`${file.name}: unsupported file type`);
+        continue;
+      }
+      const safeName = file.name
+        .replace(/[^a-zA-Z0-9._-]/g, "_")
+        .replace(/_{2,}/g, "_")
+        .slice(0, 100) || "file";
+      const path = `${uploadPatient}/${Date.now()}-${safeName}`;
       const { error: upErr } = await supabase.storage.from("patient-docs").upload(path, file);
       if (upErr) { toast.error(upErr.message); continue; }
       await supabase.from("patient_documents").insert({

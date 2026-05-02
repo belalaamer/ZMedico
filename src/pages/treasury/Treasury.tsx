@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useDataSync } from "@/lib/dataSync";
 import { Banknote, ArrowDownToLine, ArrowUpFromLine, TrendingUp, ArrowLeftRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,7 @@ export default function Treasury() {
     }
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId]);
+  useDataSync(["treasury_transactions", "payments", "expenses"], () => { load(); });
 
   const totalBalance = treasuries.reduce((s, tr) => s + Number(tr.current_balance), 0);
 

@@ -136,10 +136,17 @@ export type Database = {
       attendance: {
         Row: {
           branch_id: string | null
+          check_in_accuracy: number | null
+          check_in_latitude: number | null
+          check_in_longitude: number | null
           check_in_method:
             | Database["public"]["Enums"]["attendance_method"]
             | null
+          check_in_reason: string | null
           check_in_time: string | null
+          check_out_accuracy: number | null
+          check_out_latitude: number | null
+          check_out_longitude: number | null
           check_out_method:
             | Database["public"]["Enums"]["attendance_method"]
             | null
@@ -148,6 +155,7 @@ export type Database = {
           created_by: string | null
           date: string
           id: string
+          is_within_branch_radius: boolean | null
           notes: string | null
           overtime_hours: number
           staff_id: string
@@ -156,10 +164,17 @@ export type Database = {
         }
         Insert: {
           branch_id?: string | null
+          check_in_accuracy?: number | null
+          check_in_latitude?: number | null
+          check_in_longitude?: number | null
           check_in_method?:
             | Database["public"]["Enums"]["attendance_method"]
             | null
+          check_in_reason?: string | null
           check_in_time?: string | null
+          check_out_accuracy?: number | null
+          check_out_latitude?: number | null
+          check_out_longitude?: number | null
           check_out_method?:
             | Database["public"]["Enums"]["attendance_method"]
             | null
@@ -168,6 +183,7 @@ export type Database = {
           created_by?: string | null
           date?: string
           id?: string
+          is_within_branch_radius?: boolean | null
           notes?: string | null
           overtime_hours?: number
           staff_id: string
@@ -176,10 +192,17 @@ export type Database = {
         }
         Update: {
           branch_id?: string | null
+          check_in_accuracy?: number | null
+          check_in_latitude?: number | null
+          check_in_longitude?: number | null
           check_in_method?:
             | Database["public"]["Enums"]["attendance_method"]
             | null
+          check_in_reason?: string | null
           check_in_time?: string | null
+          check_out_accuracy?: number | null
+          check_out_latitude?: number | null
+          check_out_longitude?: number | null
           check_out_method?:
             | Database["public"]["Enums"]["attendance_method"]
             | null
@@ -188,6 +211,7 @@ export type Database = {
           created_by?: string | null
           date?: string
           id?: string
+          is_within_branch_radius?: boolean | null
           notes?: string | null
           overtime_hours?: number
           staff_id?: string
@@ -271,6 +295,9 @@ export type Database = {
       branches: {
         Row: {
           address: string | null
+          allowed_latitude: number | null
+          allowed_longitude: number | null
+          allowed_radius: number
           city: string | null
           code: string | null
           created_at: string
@@ -288,6 +315,9 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          allowed_latitude?: number | null
+          allowed_longitude?: number | null
+          allowed_radius?: number
           city?: string | null
           code?: string | null
           created_at?: string
@@ -305,6 +335,9 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          allowed_latitude?: number | null
+          allowed_longitude?: number | null
+          allowed_radius?: number
           city?: string | null
           code?: string | null
           created_at?: string

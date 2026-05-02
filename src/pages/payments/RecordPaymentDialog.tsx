@@ -10,6 +10,7 @@ import { useBranch } from "@/contexts/BranchContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useDataSync } from "@/lib/dataSync";
 
 type Method = "cash" | "card" | "bank_transfer" | "insurance" | "wallet";
 
@@ -40,11 +41,15 @@ export function RecordPaymentDialog({
     setAmount(defaultAmount ?? 0);
     setMethod("cash"); setRef(""); setNotes("");
     setDate(new Date().toISOString().slice(0,10));
-    if (!patientId) {
-      supabase.from("patients").select("id,first_name_en,last_name_en,patient_code").is("deleted_at", null).order("created_at", { ascending: false }).limit(500)
-        .then(({ data }) => setPatients((data ?? []).map((p: any) => ({ id: p.id, label: `#${p.patient_code} · ${p.first_name_en} ${p.last_name_en ?? ""}`.trim() }))));
-    }
+    if (!patientId) loadPatients();
   }, [open, patientId, invoiceId, defaultAmount]);
+
+  const loadPatients = () => {
+    supabase.from("patients").select("id,first_name_en,last_name_en,patient_code").is("deleted_at", null).order("created_at", { ascending: false }).limit(500)
+      .then(({ data }) => setPatients((data ?? []).map((p: any) => ({ id: p.id, label: `#${p.patient_code} · ${p.first_name_en} ${p.last_name_en ?? ""}`.trim() }))));
+  };
+
+  useDataSync(["patients"], () => { if (open && !patientId) loadPatients(); });
 
   const save = async () => {
     if (!pid) { toast.error(t("selectPatient")); return; }

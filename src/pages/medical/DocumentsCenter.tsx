@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/format";
 import { Link } from "react-router-dom";
+import { useDataSync } from "@/lib/dataSync";
 
 export default function DocumentsCenter() {
   const { t, lang } = useI18n();
@@ -30,11 +31,16 @@ export default function DocumentsCenter() {
       .order("created_at", { ascending: false }).limit(300);
     setDocs(data ?? []);
   };
-  useEffect(() => {
-    load();
+  const loadPatients = () => {
     supabase.from("patients").select("id,first_name_en,last_name_en,patient_code").is("deleted_at", null).order("created_at", { ascending: false }).limit(500)
       .then(({ data }) => setPatients(data ?? []));
+  };
+  useEffect(() => {
+    load();
+    loadPatients();
   }, []);
+  useDataSync(["patients"], () => loadPatients());
+  useDataSync(["patient_documents"], () => load());
 
   const filtered = docs.filter((d) => {
     if (filterType !== "all" && d.document_type !== filterType) return false;

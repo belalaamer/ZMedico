@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
+import { useDataSync } from "@/lib/dataSync";
 
 type Item = {
   item_type: "service" | "product" | "procedure";
@@ -41,13 +42,19 @@ export function CreateInvoiceDialog({
 
   useEffect(() => { setPatientId(presetPatientId ?? ""); }, [presetPatientId, open]);
 
-  useEffect(() => {
-    if (!open) return;
+  const loadPatients = () => {
     supabase.from("patients").select("id,first_name_en,last_name_en,patient_code").is("deleted_at", null).order("created_at", { ascending: false }).limit(500)
       .then(({ data }) => setPatients((data ?? []).map((p: any) => ({ id: p.id, label: `#${p.patient_code} · ${p.first_name_en} ${p.last_name_en ?? ""}`.trim() }))));
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    loadPatients();
     supabase.from("products").select("id,sku,name_en,name_ar,selling_price,min_stock_level").eq("is_active", true).order("name_en").limit(1000)
       .then(({ data }) => setProducts(data ?? []));
   }, [open]);
+
+  useDataSync(["patients"], () => { if (open) loadPatients(); });
 
   useEffect(() => {
     if (!open) return;

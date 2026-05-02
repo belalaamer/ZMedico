@@ -34,9 +34,13 @@ export default function BackupExport() {
 
   const exportTable = async (table: string, filename: string) => {
     if (!guard()) return;
-    const { data, error } = await (supabase as any).from(table).select("*").limit(10000);
+    const { data: result, error } = await supabase.functions.invoke("admin-export", {
+      body: { mode: "table", table },
+    });
     if (error) return toast.error(error.message);
-    const ws = XLSX.utils.json_to_sheet(data ?? []);
+    if ((result as any)?.error) return toast.error((result as any).error);
+    const rows = (result as any)?.data?.[table] ?? [];
+    const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, table);
     XLSX.writeFile(wb, filename);
@@ -45,12 +49,12 @@ export default function BackupExport() {
 
   const exportAllJson = async () => {
     if (!guard()) return;
-    const tables = ["patients","appointments","invoices","payments","products","medical_records"];
-    const out: any = {};
-    for (const tbl of tables) {
-      const { data } = await (supabase as any).from(tbl).select("*").limit(10000);
-      out[tbl] = data ?? [];
-    }
+    const { data: result, error } = await supabase.functions.invoke("admin-export", {
+      body: { mode: "all" },
+    });
+    if (error) return toast.error(error.message);
+    if ((result as any)?.error) return toast.error((result as any).error);
+    const out = (result as any)?.data ?? {};
     const blob = new Blob([JSON.stringify(out, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = `zmedico-backup-${new Date().toISOString().slice(0,10)}.json`; a.click();

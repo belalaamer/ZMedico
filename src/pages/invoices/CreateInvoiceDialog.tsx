@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,7 +30,6 @@ export function CreateInvoiceDialog({
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
   const { user } = useAuth();
-  const [patients, setPatients] = useState<{ id: string; label: string }[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [stocks, setStocks] = useState<Record<string, number>>({});
   const [patientId, setPatientId] = useState<string>(presetPatientId ?? "");
@@ -43,33 +43,62 @@ export function CreateInvoiceDialog({
 
   useEffect(() => { setPatientId(presetPatientId ?? ""); }, [presetPatientId, open]);
 
-  const loadPatients = () => {
-    supabase
-      .from("patients")
-      .select("id,first_name_en,last_name_en,patient_code,deleted_at")
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(500)
-      .then(({ data }) => {
-        // Defensive client-side filter in case the column was just updated
-        const rows = (data ?? []).filter((p: any) => p.deleted_at == null);
-        setPatients(rows.map((p: any) => ({
+  const { data: patientRows = [], refetch: refetchPatients } = useQuery({
+    queryKey: ["patients-for-invoice"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("patients")
+        .select("id,first_name_en,last_name_en,patient_code,phone,deleted_at")
+        .is("deleted_at", null)
+        .order("first_name_en", { ascending: true })
+        .order("last_name_en", { ascending: true })
+        .limit(500);
+
+      if (error) {
+        console.error("[CreateInvoiceDialog] patient query failed", error);
+        throw error;
+      }
+
+      const rows = (data ?? []).filter((p: any) => p.deleted_at == null);
+      console.log("[CreateInvoiceDialog] patients fetched", {
+        count: rows.length,
+        patients: rows.map((p: any) => ({
           id: p.id,
-          label: `#${p.patient_code} · ${p.first_name_en} ${p.last_name_en ?? ""}`.trim(),
-        })));
+          name: `${p.first_name_en ?? ""} ${p.last_name_en ?? ""}`.trim(),
+          deleted_at: p.deleted_at,
+        })),
       });
-  };
+      return rows;
+    },
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+  });
+
+  const patients = useMemo(
+    () => patientRows.map((p: any) => ({
+      id: p.id,
+      label: `#${p.patient_code} · ${p.first_name_en ?? ""} ${p.last_name_en ?? ""}`.trim(),
+    })),
+    [patientRows],
+  );
 
   useEffect(() => {
     if (!open) return;
-    loadPatients();
+    console.log("Dialog opened, refetching patients...");
+    void refetchPatients();
     supabase.from("products").select("id,sku,name_en,name_ar,selling_price,min_stock_level").eq("is_active", true).order("name_en").limit(1000)
       .then(({ data }) => setProducts(data ?? []));
-  }, [open]);
+  }, [open, refetchPatients]);
 
-  // Always refetch on patient changes — keeps the cached list fresh even
-  // if the dialog is opened later in the session.
-  useDataSync(["patients"], () => { loadPatients(); });
+  useDataSync(["patients"], () => {
+    console.log("Patient data changed, refetching...");
+    void refetchPatients();
+  });
+
+  useEffect(() => {
+    console.log("[CreateInvoiceDialog] patient options count", patients.length);
+  }, [patients]);
 
   useEffect(() => {
     if (!open) return;
@@ -179,7 +208,10 @@ export function CreateInvoiceDialog({
               open={patientSelectOpen}
               onOpenChange={(o) => {
                 setPatientSelectOpen(o);
-                if (o) loadPatients();
+                if (o) {
+                  console.log("[CreateInvoiceDialog] patient selector opened, refetching patients...");
+                  void refetchPatients();
+                }
               }}
             >
               <SelectTrigger><SelectValue placeholder={t("selectPatient")} /></SelectTrigger>

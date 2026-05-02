@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useDataSync } from "@/lib/dataSync";
 import { Plus, Search, Package, Edit3, Power, Copy, Upload, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
@@ -77,6 +78,7 @@ export default function Products() {
     }
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId]);
+  useDataSync(["products", "inventory", "inventory_transactions"], () => { load(); });
 
   const openNew = () => { setEdit(null); setForm(emptyForm()); setOpen(true); };
   const openEdit = (p: Product) => {

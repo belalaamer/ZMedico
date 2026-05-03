@@ -1593,6 +1593,7 @@ export type Database = {
           email_sender_name: string | null
           follow_up_days_after: number
           id: string
+          meta_phone_number_id: string | null
           reminder_channel: Database["public"]["Enums"]["notification_channel"]
           send_appointment_cancellation: boolean
           send_appointment_confirmation: boolean
@@ -1603,11 +1604,19 @@ export type Database = {
           send_payment_receipt: boolean
           sms_api_key: string | null
           sms_api_url: string | null
+          sms_enabled: boolean
+          sms_provider: Database["public"]["Enums"]["sms_provider"]
           sms_sender_id: string | null
+          twilio_account_sid: string | null
+          twilio_auth_token: string | null
+          twilio_from_sms: string | null
+          twilio_from_whatsapp: string | null
           updated_at: string
           whatsapp_api_key: string | null
           whatsapp_api_url: string | null
           whatsapp_business_number: string | null
+          whatsapp_enabled: boolean
+          whatsapp_provider: Database["public"]["Enums"]["whatsapp_provider"]
         }
         Insert: {
           birthday_discount_percentage?: number
@@ -1617,6 +1626,7 @@ export type Database = {
           email_sender_name?: string | null
           follow_up_days_after?: number
           id?: string
+          meta_phone_number_id?: string | null
           reminder_channel?: Database["public"]["Enums"]["notification_channel"]
           send_appointment_cancellation?: boolean
           send_appointment_confirmation?: boolean
@@ -1627,11 +1637,19 @@ export type Database = {
           send_payment_receipt?: boolean
           sms_api_key?: string | null
           sms_api_url?: string | null
+          sms_enabled?: boolean
+          sms_provider?: Database["public"]["Enums"]["sms_provider"]
           sms_sender_id?: string | null
+          twilio_account_sid?: string | null
+          twilio_auth_token?: string | null
+          twilio_from_sms?: string | null
+          twilio_from_whatsapp?: string | null
           updated_at?: string
           whatsapp_api_key?: string | null
           whatsapp_api_url?: string | null
           whatsapp_business_number?: string | null
+          whatsapp_enabled?: boolean
+          whatsapp_provider?: Database["public"]["Enums"]["whatsapp_provider"]
         }
         Update: {
           birthday_discount_percentage?: number
@@ -1641,6 +1659,7 @@ export type Database = {
           email_sender_name?: string | null
           follow_up_days_after?: number
           id?: string
+          meta_phone_number_id?: string | null
           reminder_channel?: Database["public"]["Enums"]["notification_channel"]
           send_appointment_cancellation?: boolean
           send_appointment_confirmation?: boolean
@@ -1651,11 +1670,19 @@ export type Database = {
           send_payment_receipt?: boolean
           sms_api_key?: string | null
           sms_api_url?: string | null
+          sms_enabled?: boolean
+          sms_provider?: Database["public"]["Enums"]["sms_provider"]
           sms_sender_id?: string | null
+          twilio_account_sid?: string | null
+          twilio_auth_token?: string | null
+          twilio_from_sms?: string | null
+          twilio_from_whatsapp?: string | null
           updated_at?: string
           whatsapp_api_key?: string | null
           whatsapp_api_url?: string | null
           whatsapp_business_number?: string | null
+          whatsapp_enabled?: boolean
+          whatsapp_provider?: Database["public"]["Enums"]["whatsapp_provider"]
         }
         Relationships: [
           {
@@ -4382,6 +4409,7 @@ export type Database = {
       saas_payment_status: "pending" | "completed" | "failed" | "refunded"
       salary_adjustment_type: "bonus" | "deduction" | "allowance" | "penalty"
       setting_value_type: "string" | "number" | "boolean" | "json"
+      sms_provider: "twilio" | "messagebird" | "custom"
       staff_status: "active" | "on_leave" | "terminated" | "suspended"
       subscription_status:
         | "trial"
@@ -4400,6 +4428,7 @@ export type Database = {
         | "bridge"
       treasury_tx_type: "income" | "expense" | "transfer"
       visit_type: "consultation" | "follow_up" | "procedure" | "emergency"
+      whatsapp_provider: "twilio" | "meta" | "custom"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -4625,6 +4654,7 @@ export const Constants = {
       saas_payment_status: ["pending", "completed", "failed", "refunded"],
       salary_adjustment_type: ["bonus", "deduction", "allowance", "penalty"],
       setting_value_type: ["string", "number", "boolean", "json"],
+      sms_provider: ["twilio", "messagebird", "custom"],
       staff_status: ["active", "on_leave", "terminated", "suspended"],
       subscription_status: [
         "trial",
@@ -4645,6 +4675,7 @@ export const Constants = {
       ],
       treasury_tx_type: ["income", "expense", "transfer"],
       visit_type: ["consultation", "follow_up", "procedure", "emergency"],
+      whatsapp_provider: ["twilio", "meta", "custom"],
     },
   },
 } as const

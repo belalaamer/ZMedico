@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { RowActions } from "@/components/RowActions";
 
 type Supplier = any;
 
@@ -25,7 +26,7 @@ export default function Suppliers() {
   });
 
   const load = async () => {
-    const { data } = await supabase.from("suppliers").select("*").order("name_en");
+    const { data } = await supabase.from("suppliers").select("*").is("deleted_at", null).order("name_en");
     setItems(data ?? []);
     const { data: prods } = await supabase.from("products").select("supplier_id").not("supplier_id", "is", null);
     const c: Record<string, number> = {};
@@ -64,6 +65,13 @@ export default function Suppliers() {
   const toggleActive = async (s: Supplier) => {
     const { error } = await supabase.from("suppliers").update({ is_active: !s.is_active }).eq("id", s.id);
     if (error) { toast.error(error.message); return; }
+    load();
+  };
+
+  const softDelete = async (s: Supplier) => {
+    const { error } = await supabase.from("suppliers").update({ deleted_at: new Date().toISOString() } as any).eq("id", s.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("delete"));
     load();
   };
 
@@ -131,6 +139,7 @@ export default function Suppliers() {
                 <Badge variant="outline" className="text-[10px]">{counts[s.id] ?? 0} {t("productsCount")}</Badge>
                 <Button variant="ghost" size="icon" onClick={() => openEdit(s)}><Edit3 className="size-4" /></Button>
                 <Button variant="ghost" size="icon" onClick={() => toggleActive(s)}><Power className="size-4" /></Button>
+                <RowActions onEdit={() => openEdit(s)} onDelete={() => softDelete(s)} />
               </div>
             ))}
           </div>

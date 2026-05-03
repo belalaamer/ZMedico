@@ -13,6 +13,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney, formatDate } from "@/lib/format";
 import { CreateInvoiceDialog } from "./CreateInvoiceDialog";
+import { RowActions } from "@/components/RowActions";
+import { useNavigate } from "react-router-dom";
 
 type Inv = {
   id: string;
@@ -36,6 +38,7 @@ const statusClass: Record<Inv["status"], string> = {
 export default function Invoices() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
+  const navigate = useNavigate();
   const [items, setItems] = useState<Inv[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
@@ -46,6 +49,7 @@ export default function Invoices() {
     setLoading(true);
     let query = supabase.from("invoices")
       .select("id, invoice_number, invoice_date, total, paid_amount, status, patient_id, patients!inner(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)")
+      .is("deleted_at", null)
       .order("created_at", { ascending: false }).limit(200);
     if (currentBranchId) query = query.eq("branch_id", currentBranchId);
     if (statusFilter !== "all") query = query.eq("status", statusFilter as Inv["status"]);
@@ -67,6 +71,13 @@ export default function Invoices() {
 
   const statusLabel = (s: Inv["status"]) =>
     ({ draft: t("statusDraft"), pending: t("statusPending"), paid: t("statusPaid"), partial: t("statusPartial"), cancelled: t("statusCancelled") }[s]);
+
+  const softDelete = async (i: Inv): Promise<void> => {
+    if (i.status !== "draft") { toast.error(lang === "ar" ? "يمكن حذف المسودات فقط" : "Only draft invoices can be deleted"); return; }
+    const { error } = await supabase.from("invoices").update({ deleted_at: new Date().toISOString() } as any).eq("id", i.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("delete")); load();
+  };
 
   return (
     <div className="space-y-6">
@@ -110,8 +121,8 @@ export default function Invoices() {
                 ? `${p.first_name_ar ?? p.first_name_en} ${p.last_name_ar ?? p.last_name_en ?? ""}`.trim()
                 : `${p.first_name_en} ${p.last_name_en ?? ""}`.trim();
               return (
-                <Link key={i.id} to={`/invoices/${i.id}`}
-                  className="flex items-center gap-4 p-4 hover:bg-muted/40 transition-colors">
+                <div key={i.id} className="flex items-center gap-4 p-4 hover:bg-muted/40 transition-colors">
+                  <Link to={`/invoices/${i.id}`} className="flex items-center gap-4 flex-1 min-w-0">
                   <div className="size-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
                     <FileText className="size-5" />
                   </div>
@@ -127,7 +138,13 @@ export default function Invoices() {
                     <div className="text-[11px] text-muted-foreground tabular-nums">{t("paid")}: {formatMoney(i.paid_amount, lang)}</div>
                   </div>
                   <Badge variant="outline" className={statusClass[i.status]}>{statusLabel(i.status)}</Badge>
-                </Link>
+                  </Link>
+                  <RowActions
+                    onEdit={() => navigate(`/invoices/${i.id}`)}
+                    onDelete={() => softDelete(i)}
+                    canDelete={i.status === "draft"}
+                  />
+                </div>
               );
             })}
           </div>

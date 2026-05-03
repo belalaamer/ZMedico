@@ -13,6 +13,7 @@ import { Plus, Edit3, Power } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { RowActions } from "@/components/RowActions";
 
 export default function Services() {
   const { t, lang } = useI18n();
@@ -26,8 +27,8 @@ export default function Services() {
   const [sf, setSF] = useState<any>({ category_id: "", name: "", code: "", default_duration_minutes: 30, default_price: 0, cost_price: null, requires_appointment: true, available_online: true, display_order: 0, is_active: true });
 
   const load = async () => {
-    const { data: c } = await supabase.from("service_categories").select("*").order("display_order");
-    const { data: s } = await supabase.from("services").select("*").order("display_order");
+    const { data: c } = await supabase.from("service_categories").select("*").is("deleted_at", null).order("display_order");
+    const { data: s } = await supabase.from("services").select("*").is("deleted_at", null).order("display_order");
     setCats(c ?? []); setServices(s ?? []);
   };
   useEffect(() => { load(); }, []);
@@ -51,6 +52,18 @@ export default function Services() {
   };
   const toggleSv = async (s: any) => { await supabase.from("services").update({ is_active: !s.is_active }).eq("id", s.id); load(); };
   const toggleCat = async (c: any) => { await supabase.from("service_categories").update({ is_active: !c.is_active }).eq("id", c.id); load(); };
+
+  const delCat = async (c: any): Promise<void> => {
+    if (services.some(s => s.category_id === c.id)) { toast.error(lang === "ar" ? "لا يمكن الحذف: تحتوي على خدمات" : "Cannot delete: has services"); return; }
+    const { error } = await supabase.from("service_categories").update({ deleted_at: new Date().toISOString() } as any).eq("id", c.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("delete")); load();
+  };
+  const delSv = async (s: any): Promise<void> => {
+    const { error } = await supabase.from("services").update({ deleted_at: new Date().toISOString() } as any).eq("id", s.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("delete")); load();
+  };
 
   return (
     <SettingsLayout>
@@ -84,6 +97,7 @@ export default function Services() {
                 <Badge variant="outline">{services.filter(s => s.category_id === c.id).length}</Badge>
                 <Button variant="ghost" size="icon" onClick={() => { setEC(c); setCF({ ...c, name: c.name_en || c.name_ar || "" }); setOC(true); }}><Edit3 className="size-4" /></Button>
                 <Button variant="ghost" size="icon" onClick={() => toggleCat(c)}><Power className="size-4" /></Button>
+                <RowActions onEdit={() => { setEC(c); setCF({ ...c, name: c.name_en || c.name_ar || "" }); setOC(true); }} onDelete={() => delCat(c)} />
               </div>
             ))}</div></Card>
           </TabsContent>
@@ -121,6 +135,7 @@ export default function Services() {
                 <Badge variant="outline" className={s.is_active ? "status-completed" : "status-departed"}>{s.is_active ? t("active") : t("inactive")}</Badge>
                 <Button variant="ghost" size="icon" onClick={() => { setES(s); setSF({ ...s, name: s.name_en || s.name_ar || "" }); setOS(true); }}><Edit3 className="size-4" /></Button>
                 <Button variant="ghost" size="icon" onClick={() => toggleSv(s)}><Power className="size-4" /></Button>
+                <RowActions onEdit={() => { setES(s); setSF({ ...s, name: s.name_en || s.name_ar || "" }); setOS(true); }} onDelete={() => delSv(s)} />
               </div>
             ))}</div></Card>
           </TabsContent>

@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { RowActions } from "@/components/RowActions";
 
 export default function Positions() {
   const { t, lang } = useI18n();
@@ -21,7 +22,7 @@ export default function Positions() {
   const [form, setForm] = useState({ title: "", department_id: "", description: "", salary_range_min: "", salary_range_max: "" });
 
   const load = async () => {
-    const { data } = await supabase.from("staff_positions").select("*").order("title_en");
+    const { data } = await supabase.from("staff_positions").select("*").is("deleted_at", null).order("title_en");
     setItems(data ?? []);
     const { data: d } = await supabase.from("departments").select("id,name_en,name_ar");
     setDepts(d ?? []);
@@ -49,6 +50,14 @@ export default function Positions() {
   };
 
   const deptName = (id: string | null) => { const d = depts.find((x) => x.id === id); return d ? (lang === "ar" ? d.name_ar : d.name_en) : "—"; };
+
+  const softDelete = async (p: any) => {
+    const { count } = await supabase.from("staff_profiles").select("id", { count: "exact", head: true }).eq("position_id", p.id);
+    if ((count ?? 0) > 0) { toast.error(lang === "ar" ? "لا يمكن الحذف: مرتبط بموظفين" : "Cannot delete: in use by staff"); return; }
+    const { error } = await supabase.from("staff_positions").update({ deleted_at: new Date().toISOString() } as any).eq("id", p.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("delete")); load();
+  };
   const filtered = filterDept === "all" ? items : items.filter((p) => p.department_id === filterDept);
 
   return (
@@ -99,6 +108,7 @@ export default function Positions() {
                 </div>
                 {(p.salary_range_min || p.salary_range_max) && <Badge variant="outline">{p.salary_range_min ?? "—"} – {p.salary_range_max ?? "—"}</Badge>}
                 <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Edit3 className="size-4" /></Button>
+                <RowActions onEdit={() => openEdit(p)} onDelete={() => softDelete(p)} />
               </div>
             ))}
           </div>

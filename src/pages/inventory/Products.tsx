@@ -16,6 +16,7 @@ import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
+import { RowActions } from "@/components/RowActions";
 
 const UNITS = ["piece", "box", "bottle", "session", "ml", "g"];
 
@@ -76,9 +77,9 @@ export default function Products() {
 
   const load = async () => {
     const [{ data: ps }, { data: cs }, { data: ss }] = await Promise.all([
-      supabase.from("products").select("*").order("created_at", { ascending: false }),
+      supabase.from("products").select("*").is("deleted_at", null).order("created_at", { ascending: false }),
       supabase.from("product_categories").select("*").eq("is_active", true).order("name_en"),
-      supabase.from("suppliers").select("*").eq("is_active", true).order("name_en"),
+      supabase.from("suppliers").select("*").eq("is_active", true).is("deleted_at", null).order("name_en"),
     ]);
     setItems(ps ?? []); setCats(cs ?? []); setSups(ss ?? []);
     if (currentBranchId) {
@@ -154,6 +155,12 @@ export default function Products() {
     const { error } = await supabase.from("products").update({ is_active: !p.is_active }).eq("id", p.id);
     if (error) { toast.error(error.message); return; }
     load();
+  };
+
+  const softDelete = async (p: Product): Promise<void> => {
+    const { error } = await supabase.from("products").update({ deleted_at: new Date().toISOString() } as any).eq("id", p.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("delete")); load();
   };
 
   const filtered = useMemo(() => items.filter((p) => {
@@ -319,6 +326,7 @@ export default function Products() {
                   <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Edit3 className="size-4" /></Button>
                   <Button variant="ghost" size="icon" onClick={() => duplicate(p)}><Copy className="size-4" /></Button>
                   <Button variant="ghost" size="icon" onClick={() => toggleActive(p)}><Power className="size-4" /></Button>
+                  <RowActions onEdit={() => openEdit(p)} onDelete={() => softDelete(p)} />
                 </div>
               );
             })}

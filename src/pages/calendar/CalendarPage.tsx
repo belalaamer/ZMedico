@@ -13,6 +13,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { RowActions } from "@/components/RowActions";
 
 function statusLabel(s: Appt["status"], t: (k: any) => string) {
   const map: Record<Appt["status"], string> = {
@@ -59,6 +60,7 @@ export default function CalendarPage() {
   const [items, setItems] = useState<Appt[]>([]);
   const [patients, setPatients] = useState<{ id: string; label: string }[]>([]);
   const [open, setOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({
     patient_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "",
   });
@@ -74,6 +76,7 @@ export default function CalendarPage() {
     let q = supabase.from("appointments")
       .select("*, patients!inner(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)")
       .gte("scheduled_at", start).lt("scheduled_at", end)
+      .is("deleted_at", null)
       .order("scheduled_at", { ascending: true });
     if (currentBranchId) q = q.eq("branch_id", currentBranchId);
     const { data, error } = await q;
@@ -91,22 +94,51 @@ export default function CalendarPage() {
   useEffect(() => { loadPatientOptions(); }, []);
   useDataSync(["patients"], () => loadPatientOptions());
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const openNew = () => {
+    setEditId(null);
+    setForm({ patient_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "" });
+    setOpen(true);
+  };
+  const openEdit = (a: Appt) => {
+    setEditId(a.id);
+    const dt = new Date(a.scheduled_at);
+    const tz = dt.getTimezoneOffset();
+    const local = new Date(dt.getTime() - tz * 60000).toISOString().slice(0,16);
+    setForm({
+      patient_id: a.patient_id,
+      scheduled_at: local,
+      duration_minutes: a.duration_minutes,
+      procedure: a.procedure ?? "",
+      room: a.room ?? "",
+      notes: a.notes ?? "",
+    });
+    setOpen(true);
+  };
+
+  const softDelete = async (a: Appt): Promise<void> => {
+    const { error } = await supabase.from("appointments").update({ deleted_at: new Date().toISOString() } as any).eq("id", a.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("delete"));
+    load();
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.patient_id || !form.scheduled_at) { toast.error("Pick a patient and time"); return; }
-    const { error } = await supabase.from("appointments").insert({
+    const payload: any = {
       patient_id: form.patient_id,
       scheduled_at: new Date(form.scheduled_at).toISOString(),
       duration_minutes: Number(form.duration_minutes) || 30,
       procedure: form.procedure || null,
       room: form.room || null,
       notes: form.notes || null,
-      branch_id: currentBranchId,
-      status: "scheduled",
-    });
+    };
+    const { error } = editId
+      ? await supabase.from("appointments").update(payload).eq("id", editId)
+      : await supabase.from("appointments").insert({ ...payload, branch_id: currentBranchId, status: "scheduled" });
     if (error) { toast.error(error.message); return; }
     toast.success(lang === "ar" ? "تم حفظ الموعد" : "Appointment saved");
-    setOpen(false);
+    setOpen(false); setEditId(null);
     setForm({ patient_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "" });
     load();
   };
@@ -124,11 +156,11 @@ export default function CalendarPage() {
           <Button variant="outline" size="icon" onClick={() => setDate(addDays(date, 1))}><ChevronRight className="size-4" /></Button>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button className="gradient-primary text-primary-foreground"><Plus className="me-2 size-4" />{t("newAppointment")}</Button>
+              <Button className="gradient-primary text-primary-foreground" onClick={openNew}><Plus className="me-2 size-4" />{t("newAppointment")}</Button>
             </DialogTrigger>
             <DialogContent>
-              <DialogHeader><DialogTitle>{t("newAppointment")}</DialogTitle></DialogHeader>
-              <form onSubmit={handleCreate} className="space-y-4">
+              <DialogHeader><DialogTitle>{editId ? t("edit") : t("newAppointment")}</DialogTitle></DialogHeader>
+              <form onSubmit={handleSave} className="space-y-4">
                 <div className="space-y-2">
                   <Label>{t("patientName")}</Label>
                   <Select value={form.patient_id} onValueChange={(v) => setForm({ ...form, patient_id: v })}>
@@ -197,6 +229,7 @@ export default function CalendarPage() {
                       </div>
                     </div>
                     <Badge variant="outline" className={statusClass[a.status]}>{statusLabel(a.status, t)}</Badge>
+                  <RowActions onEdit={() => openEdit(a)} onDelete={() => softDelete(a)} />
                   </div>
                 );
               })}

@@ -15,6 +15,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney, formatDate } from "@/lib/format";
+import { RowActions } from "@/components/RowActions";
 
 export default function Expenses() {
   const { t, lang } = useI18n();
@@ -29,7 +30,7 @@ export default function Expenses() {
   });
 
   const load = async () => {
-    let q = supabase.from("expenses").select("*, expense_categories(name_en,name_ar)").order("expense_date", { ascending: false }).limit(200);
+    let q = supabase.from("expenses").select("*, expense_categories(name_en,name_ar)").is("deleted_at", null).order("expense_date", { ascending: false }).limit(200);
     if (currentBranchId) q = q.eq("branch_id", currentBranchId);
     const { data } = await q;
     setItems(data ?? []);
@@ -40,6 +41,12 @@ export default function Expenses() {
     /* eslint-disable-next-line */
   }, [currentBranchId]);
   useDataSync(["expenses"], () => { load(); });
+
+  const softDelete = async (x: any): Promise<void> => {
+    const { error } = await supabase.from("expenses").update({ deleted_at: new Date().toISOString() } as any).eq("id", x.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("delete")); load();
+  };
 
   const save = async () => {
     if (!currentBranchId) { toast.error("Select a branch"); return; }
@@ -141,6 +148,7 @@ export default function Expenses() {
                   </Badge>
                 )}
                 <div className="font-semibold tabular-nums text-destructive">- {formatMoney(x.amount, lang)}</div>
+                <RowActions canEdit={false} onDelete={() => softDelete(x)} />
               </div>
             ))}
           </div>

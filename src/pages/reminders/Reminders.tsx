@@ -53,7 +53,17 @@ export default function Reminders() {
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(200);
-    setItems((data ?? []) as Notif[]);
+    // De-duplicate notifications by related entity (keeps most recent)
+    const seen = new Set<string>();
+    const unique = ((data ?? []) as Notif[]).filter((n) => {
+      const key = n.related_entity_type && n.related_entity_id
+        ? `${n.related_entity_type}:${n.related_entity_id}`
+        : `id:${n.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    setItems(unique);
   };
 
   useEffect(() => {

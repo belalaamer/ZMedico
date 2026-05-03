@@ -53,15 +53,15 @@ export default function Services() {
   const toggleSv = async (s: any) => { await supabase.from("services").update({ is_active: !s.is_active }).eq("id", s.id); load(); };
   const toggleCat = async (c: any) => { await supabase.from("service_categories").update({ is_active: !c.is_active }).eq("id", c.id); load(); };
 
-  const delCat = async (c: any) => {
+  const delCat = async (c: any): Promise<void> => {
     if (services.some(s => s.category_id === c.id)) { toast.error(lang === "ar" ? "لا يمكن الحذف: تحتوي على خدمات" : "Cannot delete: has services"); return; }
     const { error } = await supabase.from("service_categories").update({ deleted_at: new Date().toISOString() } as any).eq("id", c.id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success(t("delete")); load();
   };
-  const delSv = async (s: any) => {
+  const delSv = async (s: any): Promise<void> => {
     const { error } = await supabase.from("services").update({ deleted_at: new Date().toISOString() } as any).eq("id", s.id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success(t("delete")); load();
   };
 

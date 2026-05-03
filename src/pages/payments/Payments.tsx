@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney, formatDateTime } from "@/lib/format";
 import { RecordPaymentDialog } from "./RecordPaymentDialog";
+import { RowActions } from "@/components/RowActions";
 
 export default function Payments() {
   const { t, lang } = useI18n();
@@ -20,6 +21,7 @@ export default function Payments() {
   const load = async () => {
     let q = supabase.from("payments")
       .select("*, patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code), invoices(invoice_number)")
+      .is("deleted_at", null)
       .order("created_at", { ascending: false }).limit(200);
     if (currentBranchId) q = q.eq("branch_id", currentBranchId);
     const { data, error } = await q;
@@ -28,6 +30,13 @@ export default function Payments() {
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId]);
   useDataSync(["payments", "invoices"], () => { load(); });
+
+  const softDelete = async (p: any): Promise<void> => {
+    const { error } = await supabase.from("payments").update({ deleted_at: new Date().toISOString() } as any).eq("id", p.id);
+    if (error) { toast.error(error.message); return; }
+    if (p.invoice_id) { await (supabase as any).rpc("recalc_invoice_payments", { _invoice_id: p.invoice_id }); }
+    toast.success(t("delete")); load();
+  };
 
   return (
     <div className="space-y-6">
@@ -67,6 +76,7 @@ export default function Payments() {
                     <div className="font-semibold tabular-nums text-success">{formatMoney(p.amount, lang)}</div>
                     {p.reference_number && <Badge variant="outline" className="text-[10px] mt-1">{p.reference_number}</Badge>}
                   </div>
+                  <RowActions canEdit={false} onDelete={() => softDelete(p)} />
                 </div>
               );
             })}

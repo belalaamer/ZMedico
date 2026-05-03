@@ -7,18 +7,30 @@ import { Input } from "@/components/ui/input";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate } from "@/lib/format";
+import { RowActions } from "@/components/RowActions";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 export default function Prescriptions() {
   const { t, lang } = useI18n();
+  const navigate = useNavigate();
   const [items, setItems] = useState<any[]>([]);
   const [search, setSearch] = useState("");
 
-  useEffect(() => {
+  const load = () => {
     supabase.from("prescriptions")
       .select("*, patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)")
+      .is("deleted_at", null)
       .order("created_at", { ascending: false }).limit(200)
       .then(({ data }) => setItems(data ?? []));
-  }, []);
+  };
+  useEffect(() => { load(); }, []);
+
+  const softDelete = async (rx: any): Promise<void> => {
+    const { error } = await supabase.from("prescriptions").update({ deleted_at: new Date().toISOString() } as any).eq("id", rx.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("delete")); load();
+  };
 
   const filtered = items.filter((r) => {
     if (!search) return true;
@@ -41,14 +53,17 @@ export default function Prescriptions() {
               const p = rx.patients;
               const name = lang === "ar" ? `${p?.first_name_ar ?? p?.first_name_en ?? ""} ${p?.last_name_ar ?? p?.last_name_en ?? ""}`.trim() : `${p?.first_name_en ?? ""} ${p?.last_name_en ?? ""}`.trim();
               return (
-                <Link key={rx.id} to={`/medical/prescriptions/${rx.id}`} className="flex items-center gap-3 p-4 hover:bg-muted/40">
+                <div key={rx.id} className="flex items-center gap-3 p-4 hover:bg-muted/40">
+                  <Link to={`/medical/prescriptions/${rx.id}`} className="flex items-center gap-3 flex-1 min-w-0">
                   <Pill className="size-5 text-primary"/>
                   <div className="flex-1 min-w-0">
                     <div className="font-medium">{name} <span className="text-xs text-muted-foreground">#{p?.patient_code}</span></div>
                     <div className="text-xs text-muted-foreground">{formatDate(rx.prescription_date, lang)}</div>
                   </div>
                   <Badge variant="outline" className={rx.status === "active" ? "status-progress" : rx.status === "completed" ? "status-completed" : "status-cancelled"}>{rx.status === "active" ? t("activeRx") : rx.status === "completed" ? t("completed") : t("discontinued")}</Badge>
-                </Link>
+                  </Link>
+                  <RowActions onEdit={() => navigate(`/medical/prescriptions/${rx.id}`)} onDelete={() => softDelete(rx)} />
+                </div>
               );
             })}
           </div>

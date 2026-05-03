@@ -15,6 +15,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney, formatDate } from "@/lib/format";
+import { RowActions } from "@/components/RowActions";
+import { useNavigate } from "react-router-dom";
 
 const statusClass: Record<string, string> = {
   draft: "status-cancelled", pending: "status-review", partial: "status-progress", received: "status-completed", cancelled: "status-departed",
@@ -26,6 +28,7 @@ export default function PurchaseOrders() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [pos, setPos] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -44,16 +47,23 @@ export default function PurchaseOrders() {
   const [saving, setSaving] = useState(false);
 
   const load = async () => {
-    let q1 = supabase.from("purchase_orders").select("*, suppliers(name_en,name_ar)").order("created_at", { ascending: false }).limit(200);
+    let q1 = supabase.from("purchase_orders").select("*, suppliers(name_en,name_ar)").is("deleted_at", null).order("created_at", { ascending: false }).limit(200);
     if (currentBranchId) q1 = q1.eq("branch_id", currentBranchId);
     const [{ data: posData }, { data: sups }, { data: prods }] = await Promise.all([
       q1,
-      supabase.from("suppliers").select("*").eq("is_active", true).order("name_en"),
-      supabase.from("products").select("*").eq("is_active", true).order("name_en"),
+      supabase.from("suppliers").select("*").eq("is_active", true).is("deleted_at", null).order("name_en"),
+      supabase.from("products").select("*").eq("is_active", true).is("deleted_at", null).order("name_en"),
     ]);
     setPos(posData ?? []); setSuppliers(sups ?? []); setProducts(prods ?? []);
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId]);
+
+  const softDelete = async (po: any): Promise<void> => {
+    if (po.status !== "draft") { toast.error(lang === "ar" ? "يمكن حذف المسودات فقط" : "Only draft POs can be deleted"); return; }
+    const { error } = await supabase.from("purchase_orders").update({ deleted_at: new Date().toISOString() } as any).eq("id", po.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("delete")); load();
+  };
 
   const subtotal = useMemo(() => lines.reduce((s, l) => s + (Number(l.quantity_ordered) || 0) * (Number(l.unit_cost) || 0), 0), [lines]);
   const tax = useMemo(() => +(subtotal * (Number(taxPct) || 0) / 100).toFixed(2), [subtotal, taxPct]);
@@ -203,7 +213,8 @@ export default function PurchaseOrders() {
             {filtered.map((po) => {
               const statusLabel = ({ draft: t("statusDraft"), pending: t("statusPending"), partial: t("statusPartial"), received: t("statusReceived"), cancelled: t("statusCancelled") } as any)[po.status];
               return (
-                <Link key={po.id} to={`/inventory/purchase-orders/${po.id}`} className="flex items-center gap-4 p-4 hover:bg-muted/40">
+                <div key={po.id} className="flex items-center gap-4 p-4 hover:bg-muted/40">
+                  <Link to={`/inventory/purchase-orders/${po.id}`} className="flex items-center gap-4 flex-1 min-w-0">
                   <div className="size-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center"><ClipboardList className="size-5" /></div>
                   <div className="flex-1 min-w-0">
                     <div className="font-medium">{po.po_number}</div>
@@ -212,7 +223,13 @@ export default function PurchaseOrders() {
                   {po.expected_date && <div className="text-xs text-muted-foreground"><div>{t("expectedDate")}</div><div>{formatDate(po.expected_date, lang)}</div></div>}
                   <Badge variant="outline" className={statusClass[po.status]}>{statusLabel}</Badge>
                   <div className="text-end font-semibold tabular-nums">{formatMoney(po.total, lang)}</div>
-                </Link>
+                  </Link>
+                  <RowActions
+                    onEdit={() => navigate(`/inventory/purchase-orders/${po.id}`)}
+                    onDelete={() => softDelete(po)}
+                    canDelete={po.status === "draft"}
+                  />
+                </div>
               );
             })}
           </div>

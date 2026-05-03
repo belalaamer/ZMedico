@@ -14,6 +14,8 @@ import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
+import { RowActions } from "@/components/RowActions";
+import { useNavigate } from "react-router-dom";
 
 export function statusLabel(s: string, t: (k: any) => string) {
   const map: Record<string, string> = { active: "statusActive", on_leave: "statusOnLeave", terminated: "statusTerminated", suspended: "statusSuspended" };
@@ -23,6 +25,7 @@ export function statusLabel(s: string, t: (k: any) => string) {
 export default function Staff() {
   const { t, lang } = useI18n();
   const { branches, currentBranchId } = useBranch();
+  const navigate = useNavigate();
   const [items, setItems] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
   const [depts, setDepts] = useState<any[]>([]);
@@ -43,13 +46,13 @@ export default function Staff() {
   const load = async () => {
     let q1 = supabase.from("staff_profiles").select("*, profile:profiles!staff_profiles_id_fkey(full_name,email,avatar_url)");
     if (currentBranchId) q1 = q1.eq("branch_id", currentBranchId);
-    const { data } = await q1.order("created_at", { ascending: false });
+    const { data } = await q1.is("deleted_at", null).order("created_at", { ascending: false });
     setItems(data ?? []);
     const { data: profs } = await supabase.from("profiles").select("id,full_name,email,avatar_url");
     setProfiles(profs ?? []);
-    const { data: d } = await supabase.from("departments").select("id,name_en,name_ar");
+    const { data: d } = await supabase.from("departments").select("id,name_en,name_ar").is("deleted_at", null);
     setDepts(d ?? []);
-    const { data: pos } = await supabase.from("staff_positions").select("id,title_en,title_ar,department_id");
+    const { data: pos } = await supabase.from("staff_positions").select("id,title_en,title_ar,department_id").is("deleted_at", null);
     setPositions(pos ?? []);
   };
   useEffect(() => { load(); }, [currentBranchId]);
@@ -87,6 +90,12 @@ export default function Staff() {
 
   const usedIds = new Set(items.map((s) => s.id));
   const availableProfiles = profiles.filter((p) => !usedIds.has(p.id));
+
+  const softDelete = async (s: any): Promise<void> => {
+    const { error } = await supabase.from("staff_profiles").update({ deleted_at: new Date().toISOString() } as any).eq("id", s.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("delete")); load();
+  };
 
   const filtered = items.filter((s) => {
     if (filterDept !== "all" && s.department_id !== filterDept) return false;
@@ -178,8 +187,8 @@ export default function Staff() {
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {filtered.map((s) => (
-          <Link key={s.id} to={`/hr/staff/${s.id}`}>
-            <Card className="p-4 shadow-card hover:shadow-elegant transition-shadow flex items-center gap-3">
+          <Card key={s.id} className="p-4 shadow-card hover:shadow-elegant transition-shadow flex items-center gap-3">
+            <Link to={`/hr/staff/${s.id}`} className="flex items-center gap-3 flex-1 min-w-0">
               <div className="size-12 rounded-full bg-primary/10 text-primary flex items-center justify-center overflow-hidden">
                 {s.profile_image_url ? <img src={s.profile_image_url} alt="" className="w-full h-full object-cover" /> : <User className="size-6" />}
               </div>
@@ -189,8 +198,9 @@ export default function Staff() {
                 <div className="text-[11px] text-muted-foreground truncate">{deptName(s.department_id)} · {formatMoney(s.salary, lang, s.salary_currency)}</div>
               </div>
               <Badge variant="outline" className={s.status === "active" ? "status-completed" : "status-departed"}>{statusLabel(s.status, t)}</Badge>
-            </Card>
-          </Link>
+            </Link>
+            <RowActions onEdit={() => navigate(`/hr/staff/${s.id}`)} onDelete={() => softDelete(s)} />
+          </Card>
         ))}
         {filtered.length === 0 && <Card className="p-10 col-span-full text-center text-muted-foreground">{t("noPatients")}</Card>}
       </div>

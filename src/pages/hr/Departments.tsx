@@ -11,6 +11,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { RowActions } from "@/components/RowActions";
 
 type Dept = any;
 
@@ -25,7 +26,7 @@ export default function Departments() {
   const [form, setForm] = useState({ name: "", description: "", branch_id: "", manager_id: "" });
 
   const load = async () => {
-    const { data } = await supabase.from("departments").select("*").order("name_en");
+    const { data } = await supabase.from("departments").select("*").is("deleted_at", null).order("name_en");
     setItems(data ?? []);
     const { data: profs } = await supabase.from("profiles").select("id,full_name,email");
     setProfiles(profs ?? []);
@@ -49,6 +50,13 @@ export default function Departments() {
     toast.success(t("save")); setOpen(false); load();
   };
   const toggle = async (d: Dept) => { await supabase.from("departments").update({ is_active: !d.is_active }).eq("id", d.id); load(); };
+
+  const softDelete = async (d: Dept) => {
+    if ((counts[d.id] ?? 0) > 0) { toast.error(lang === "ar" ? "لا يمكن الحذف: يوجد موظفين" : "Cannot delete: has staff"); return; }
+    const { error } = await supabase.from("departments").update({ deleted_at: new Date().toISOString() } as any).eq("id", d.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("delete")); load();
+  };
 
   const branchName = (id: string | null) => branches.find((b) => b.id === id) ? (lang === "ar" ? branches.find((b) => b.id === id)!.name_ar : branches.find((b) => b.id === id)!.name_en) : "—";
   const profileName = (id: string | null) => profiles.find((p) => p.id === id)?.full_name ?? "—";
@@ -108,6 +116,7 @@ export default function Departments() {
                 <Badge variant="outline">{counts[d.id] ?? 0} {t("staffCount")}</Badge>
                 <Button variant="ghost" size="icon" onClick={() => openEdit(d)}><Edit3 className="size-4" /></Button>
                 <Button variant="ghost" size="icon" onClick={() => toggle(d)}><Power className="size-4" /></Button>
+                <RowActions onEdit={() => openEdit(d)} onDelete={() => softDelete(d)} />
               </div>
             ))}
           </div>

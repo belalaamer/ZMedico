@@ -38,6 +38,15 @@ type NotifySettings = {
   sms_sender_id: string | null;
   email_sender_address: string | null;
   email_sender_name: string | null;
+  whatsapp_enabled?: boolean;
+  sms_enabled?: boolean;
+  whatsapp_provider?: "twilio" | "meta" | "custom" | null;
+  sms_provider?: "twilio" | "messagebird" | "custom" | null;
+  meta_phone_number_id?: string | null;
+  twilio_account_sid?: string | null;
+  twilio_auth_token?: string | null;
+  twilio_from_whatsapp?: string | null;
+  twilio_from_sms?: string | null;
 };
 
 // SSRF guard: only allow https URLs to public hostnames.
@@ -90,6 +99,69 @@ async function sendOne(
   if (reminder.reminder_type === "whatsapp" || reminder.reminder_type === "sms") {
     if (!patientPhone) return { ok: false, error: "Patient has no phone" };
     const isWa = reminder.reminder_type === "whatsapp";
+    if (isWa && cfg?.whatsapp_enabled === false) return { ok: false, error: "WhatsApp disabled" };
+    if (!isWa && cfg?.sms_enabled === false) return { ok: false, error: "SMS disabled" };
+    const provider = isWa ? cfg?.whatsapp_provider : cfg?.sms_provider;
+
+    // Twilio (REST API) — works for both SMS and WhatsApp
+    if (provider === "twilio") {
+      const sid = cfg?.twilio_account_sid;
+      const token = cfg?.twilio_auth_token;
+      const from = isWa ? cfg?.twilio_from_whatsapp : cfg?.twilio_from_sms;
+      if (!sid || !token || !from) return { ok: false, error: "Twilio not configured" };
+      const to = isWa ? `whatsapp:${patientPhone}` : patientPhone;
+      const fromAddr = isWa
+        ? (from.startsWith("whatsapp:") ? from : `whatsapp:${from}`)
+        : from;
+      try {
+        const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(sid)}/Messages.json`, {
+          method: "POST",
+          headers: {
+            "Authorization": "Basic " + btoa(`${sid}:${token}`),
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams({ To: to, From: fromAddr, Body: message }).toString(),
+        });
+        if (!res.ok) {
+          const body = await res.text().catch(() => "");
+          return { ok: false, error: `Twilio ${res.status}: ${sanitizeProviderError(body)}` };
+        }
+        return { ok: true };
+      } catch {
+        return { ok: false, error: "Twilio request failed" };
+      }
+    }
+
+    // Meta WhatsApp Cloud API
+    if (isWa && provider === "meta") {
+      const phoneId = cfg?.meta_phone_number_id;
+      const token = cfg?.whatsapp_api_key;
+      if (!phoneId || !token) return { ok: false, error: "Meta WhatsApp not configured" };
+      try {
+        const res = await fetch(`https://graph.facebook.com/v20.0/${encodeURIComponent(phoneId)}/messages`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            messaging_product: "whatsapp",
+            to: patientPhone.replace(/^\+/, ""),
+            type: "text",
+            text: { body: message },
+          }),
+        });
+        if (!res.ok) {
+          const body = await res.text().catch(() => "");
+          return { ok: false, error: `Meta ${res.status}: ${sanitizeProviderError(body)}` };
+        }
+        return { ok: true };
+      } catch {
+        return { ok: false, error: "Meta request failed" };
+      }
+    }
+
+    // Fallback: custom HTTP gateway (existing behavior)
     const url = isWa ? cfg?.whatsapp_api_url : cfg?.sms_api_url;
     const key = isWa ? cfg?.whatsapp_api_key : cfg?.sms_api_key;
     if (!url || !key) return { ok: false, error: `${isWa ? "WhatsApp" : "SMS"} provider not configured` };
@@ -229,7 +301,7 @@ Deno.serve(async (req) => {
       if (!cfgCache.has(r.branch_id)) {
         const { data } = await supabase
           .from("notification_settings")
-          .select("whatsapp_api_key,whatsapp_api_url,whatsapp_business_number,sms_api_key,sms_api_url,sms_sender_id,email_sender_address,email_sender_name")
+          .select("whatsapp_api_key,whatsapp_api_url,whatsapp_business_number,sms_api_key,sms_api_url,sms_sender_id,email_sender_address,email_sender_name,whatsapp_enabled,sms_enabled,whatsapp_provider,sms_provider,meta_phone_number_id,twilio_account_sid,twilio_auth_token,twilio_from_whatsapp,twilio_from_sms")
           .eq("branch_id", r.branch_id)
           .maybeSingle();
         cfgCache.set(r.branch_id, (data as NotifySettings) ?? null);

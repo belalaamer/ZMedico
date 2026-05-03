@@ -63,6 +63,7 @@ import InvoiceSettings from "@/pages/settings/InvoiceSettings";
 import PaymentMethodsPage from "@/pages/settings/PaymentMethods";
 import ServicesPage from "@/pages/settings/Services";
 import NotificationSettings from "@/pages/settings/NotificationSettings";
+import RemindersSettings from "@/pages/settings/RemindersSettings";
 import Templates from "@/pages/settings/Templates";
 import LanguagesPage from "@/pages/settings/Languages";
 import RolePermissions from "@/pages/settings/RolePermissions";
@@ -152,6 +153,7 @@ const App = () => (
                   <Route path="/settings/payments" element={<PaymentMethodsPage />} />
                   <Route path="/settings/services" element={<ServicesPage />} />
                   <Route path="/settings/notifications" element={<NotificationSettings />} />
+                  <Route path="/settings/reminders" element={<RemindersSettings />} />
                   <Route path="/settings/templates/email" element={<Templates kind="email" />} />
                   <Route path="/settings/templates/sms" element={<Templates kind="sms" />} />
                   <Route path="/settings/templates/whatsapp" element={<Templates kind="whatsapp" />} />

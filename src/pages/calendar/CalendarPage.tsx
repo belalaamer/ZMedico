@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Send } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -122,6 +122,37 @@ export default function CalendarPage() {
     load();
   };
 
+  const sendReminderNow = async (a: Appt) => {
+    // Find a pending reminder for this appointment (or create an immediate one) then trigger send.
+    const { data: existing } = await supabase
+      .from("reminders")
+      .select("id")
+      .eq("appointment_id", a.id)
+      .eq("status", "pending")
+      .limit(1)
+      .maybeSingle();
+    let reminderId = existing?.id as string | undefined;
+    if (!reminderId) {
+      const p = a.patients!;
+      const nameEn = `${p.first_name_en} ${p.last_name_en ?? ""}`.trim();
+      const nameAr = `${p.first_name_ar ?? p.first_name_en} ${p.last_name_ar ?? p.last_name_en ?? ""}`.trim();
+      const when = new Date(a.scheduled_at).toLocaleString();
+      const { data: ins, error: insErr } = await supabase.from("reminders").insert({
+        appointment_id: a.id, patient_id: a.patient_id, branch_id: currentBranchId,
+        reminder_type: "whatsapp", scheduled_time: new Date().toISOString(),
+        message_en: `Hi ${nameEn}, reminder for your appointment on ${when}.`,
+        message_ar: `مرحبا ${nameAr}، تذكير بموعدك في ${when}.`,
+        status: "pending",
+      } as any).select("id").single();
+      if (insErr) { toast.error(insErr.message); return; }
+      reminderId = ins!.id as string;
+    }
+    const { data, error } = await supabase.functions.invoke("send-reminder", { body: { reminder_id: reminderId } });
+    if (error) { toast.error(error.message); return; }
+    if (data?.sent > 0) toast.success(lang === "ar" ? "تم إرسال التذكير" : "Reminder sent");
+    else toast.error(data?.results?.[0]?.error ?? (lang === "ar" ? "فشل الإرسال" : "Send failed"));
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.patient_id || !form.scheduled_at) { toast.error("Pick a patient and time"); return; }
@@ -229,6 +260,9 @@ export default function CalendarPage() {
                       </div>
                     </div>
                     <Badge variant="outline" className={statusClass[a.status]}>{statusLabel(a.status, t)}</Badge>
+                    <Button variant="ghost" size="icon" title={t("sendReminder")} onClick={() => sendReminderNow(a)}>
+                      <Send className="size-4" />
+                    </Button>
                   <RowActions onEdit={() => openEdit(a)} onDelete={() => softDelete(a)} />
                   </div>
                 );

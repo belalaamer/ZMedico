@@ -1,0 +1,31 @@
+
+ALTER TABLE public.appointments ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+ALTER TABLE public.treasury ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+ALTER TABLE public.expenses ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+ALTER TABLE public.medical_records ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+ALTER TABLE public.purchase_orders ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+ALTER TABLE public.prescriptions ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+ALTER TABLE public.staff_profiles ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+ALTER TABLE public.suppliers ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+ALTER TABLE public.departments ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+ALTER TABLE public.staff_positions ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+ALTER TABLE public.services ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+ALTER TABLE public.service_categories ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+ALTER TABLE public.medications ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+ALTER TABLE public.diagnoses ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+ALTER TABLE public.procedures ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+ALTER TABLE public.medical_specialties ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+
+CREATE INDEX IF NOT EXISTS idx_appointments_active ON public.appointments(scheduled_at) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_invoices_active ON public.invoices(invoice_date) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_payments_active ON public.payments(payment_date) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_expenses_active ON public.expenses(expense_date) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_products_active ON public.products(name_en) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_medical_records_active ON public.medical_records(visit_date) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_prescriptions_active ON public.prescriptions(prescription_date) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_staff_profiles_active ON public.staff_profiles(id) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_suppliers_active ON public.suppliers(name_en) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_active ON public.purchase_orders(order_date) WHERE deleted_at IS NULL;

@@ -104,6 +104,7 @@ export type Database = {
         Row: {
           branch_id: string | null
           created_at: string
+          deleted_at: string | null
           doctor_id: string | null
           duration_minutes: number
           id: string
@@ -118,6 +119,7 @@ export type Database = {
         Insert: {
           branch_id?: string | null
           created_at?: string
+          deleted_at?: string | null
           doctor_id?: string | null
           duration_minutes?: number
           id?: string
@@ -132,6 +134,7 @@ export type Database = {
         Update: {
           branch_id?: string | null
           created_at?: string
+          deleted_at?: string | null
           doctor_id?: string | null
           duration_minutes?: number
           id?: string
@@ -600,6 +603,7 @@ export type Database = {
         Row: {
           branch_id: string | null
           created_at: string
+          deleted_at: string | null
           description: string | null
           id: string
           is_active: boolean
@@ -611,6 +615,7 @@ export type Database = {
         Insert: {
           branch_id?: string | null
           created_at?: string
+          deleted_at?: string | null
           description?: string | null
           id?: string
           is_active?: boolean
@@ -622,6 +627,7 @@ export type Database = {
         Update: {
           branch_id?: string | null
           created_at?: string
+          deleted_at?: string | null
           description?: string | null
           id?: string
           is_active?: boolean
@@ -645,6 +651,7 @@ export type Database = {
           category: string | null
           code: string
           created_at: string
+          deleted_at: string | null
           description_ar: string | null
           description_en: string | null
           id: string
@@ -655,6 +662,7 @@ export type Database = {
           category?: string | null
           code: string
           created_at?: string
+          deleted_at?: string | null
           description_ar?: string | null
           description_en?: string | null
           id?: string
@@ -665,6 +673,7 @@ export type Database = {
           category?: string | null
           code?: string
           created_at?: string
+          deleted_at?: string | null
           description_ar?: string | null
           description_en?: string | null
           id?: string
@@ -772,6 +781,7 @@ export type Database = {
           category_id: string | null
           created_at: string
           created_by: string | null
+          deleted_at: string | null
           description_ar: string | null
           description_en: string
           expense_date: string
@@ -786,6 +796,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           description_ar?: string | null
           description_en: string
           expense_date?: string
@@ -800,6 +811,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           description_ar?: string | null
           description_en?: string
           expense_date?: string
@@ -1110,6 +1122,7 @@ export type Database = {
           branch_id: string | null
           created_at: string
           created_by: string | null
+          deleted_at: string | null
           discount: number
           due_date: string | null
           id: string
@@ -1128,6 +1141,7 @@ export type Database = {
           branch_id?: string | null
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           discount?: number
           due_date?: string | null
           id?: string
@@ -1146,6 +1160,7 @@ export type Database = {
           branch_id?: string | null
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           discount?: number
           due_date?: string | null
           id?: string
@@ -1385,6 +1400,7 @@ export type Database = {
           chief_complaint_ar: string | null
           chief_complaint_en: string | null
           created_at: string
+          deleted_at: string | null
           doctor_id: string | null
           follow_up_date: string | null
           id: string
@@ -1405,6 +1421,7 @@ export type Database = {
           chief_complaint_ar?: string | null
           chief_complaint_en?: string | null
           created_at?: string
+          deleted_at?: string | null
           doctor_id?: string | null
           follow_up_date?: string | null
           id?: string
@@ -1425,6 +1442,7 @@ export type Database = {
           chief_complaint_ar?: string | null
           chief_complaint_en?: string | null
           created_at?: string
+          deleted_at?: string | null
           doctor_id?: string | null
           follow_up_date?: string | null
           id?: string
@@ -1480,6 +1498,7 @@ export type Database = {
       medical_specialties: {
         Row: {
           created_at: string
+          deleted_at: string | null
           description: string | null
           icon: string | null
           id: string
@@ -1489,6 +1508,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          deleted_at?: string | null
           description?: string | null
           icon?: string | null
           id?: string
@@ -1498,6 +1518,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          deleted_at?: string | null
           description?: string | null
           icon?: string | null
           id?: string
@@ -1510,6 +1531,7 @@ export type Database = {
       medications: {
         Row: {
           created_at: string
+          deleted_at: string | null
           dosage_form: string
           generic_name: string | null
           id: string
@@ -1524,6 +1546,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          deleted_at?: string | null
           dosage_form: string
           generic_name?: string | null
           id?: string
@@ -1538,6 +1561,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          deleted_at?: string | null
           dosage_form?: string
           generic_name?: string | null
           id?: string
@@ -1905,6 +1929,7 @@ export type Database = {
           amount: number
           branch_id: string | null
           created_at: string
+          deleted_at: string | null
           id: string
           invoice_id: string | null
           notes: string | null
@@ -1919,6 +1944,7 @@ export type Database = {
           amount: number
           branch_id?: string | null
           created_at?: string
+          deleted_at?: string | null
           id?: string
           invoice_id?: string | null
           notes?: string | null
@@ -1933,6 +1959,7 @@ export type Database = {
           amount?: number
           branch_id?: string | null
           created_at?: string
+          deleted_at?: string | null
           id?: string
           invoice_id?: string | null
           notes?: string | null
@@ -2198,6 +2225,7 @@ export type Database = {
       prescriptions: {
         Row: {
           created_at: string
+          deleted_at: string | null
           doctor_id: string | null
           id: string
           medical_record_id: string | null
@@ -2210,6 +2238,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          deleted_at?: string | null
           doctor_id?: string | null
           id?: string
           medical_record_id?: string | null
@@ -2222,6 +2251,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          deleted_at?: string | null
           doctor_id?: string | null
           id?: string
           medical_record_id?: string | null
@@ -2262,6 +2292,7 @@ export type Database = {
           created_at: string
           default_duration: number | null
           default_price: number | null
+          deleted_at: string | null
           description_ar: string | null
           description_en: string | null
           id: string
@@ -2275,6 +2306,7 @@ export type Database = {
           created_at?: string
           default_duration?: number | null
           default_price?: number | null
+          deleted_at?: string | null
           description_ar?: string | null
           description_en?: string | null
           id?: string
@@ -2288,6 +2320,7 @@ export type Database = {
           created_at?: string
           default_duration?: number | null
           default_price?: number | null
+          deleted_at?: string | null
           description_ar?: string | null
           description_en?: string | null
           id?: string
@@ -2368,6 +2401,7 @@ export type Database = {
           category_id: string | null
           cost_price: number
           created_at: string
+          deleted_at: string | null
           description_ar: string | null
           description_en: string | null
           expiry_tracking: boolean
@@ -2389,6 +2423,7 @@ export type Database = {
           category_id?: string | null
           cost_price?: number
           created_at?: string
+          deleted_at?: string | null
           description_ar?: string | null
           description_en?: string | null
           expiry_tracking?: boolean
@@ -2410,6 +2445,7 @@ export type Database = {
           category_id?: string | null
           cost_price?: number
           created_at?: string
+          deleted_at?: string | null
           description_ar?: string | null
           description_en?: string | null
           expiry_tracking?: boolean
@@ -2534,6 +2570,7 @@ export type Database = {
           branch_id: string
           created_at: string
           created_by: string | null
+          deleted_at: string | null
           expected_date: string | null
           id: string
           notes: string | null
@@ -2550,6 +2587,7 @@ export type Database = {
           branch_id: string
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           expected_date?: string | null
           id?: string
           notes?: string | null
@@ -2566,6 +2604,7 @@ export type Database = {
           branch_id?: string
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           expected_date?: string | null
           id?: string
           notes?: string | null
@@ -3075,6 +3114,7 @@ export type Database = {
         Row: {
           color: string | null
           created_at: string
+          deleted_at: string | null
           description_ar: string | null
           description_en: string | null
           display_order: number
@@ -3087,6 +3127,7 @@ export type Database = {
         Insert: {
           color?: string | null
           created_at?: string
+          deleted_at?: string | null
           description_ar?: string | null
           description_en?: string | null
           display_order?: number
@@ -3099,6 +3140,7 @@ export type Database = {
         Update: {
           color?: string | null
           created_at?: string
+          deleted_at?: string | null
           description_ar?: string | null
           description_en?: string | null
           display_order?: number
@@ -3119,6 +3161,7 @@ export type Database = {
           created_at: string
           default_duration_minutes: number
           default_price: number
+          deleted_at: string | null
           description_ar: string | null
           description_en: string | null
           display_order: number
@@ -3136,6 +3179,7 @@ export type Database = {
           created_at?: string
           default_duration_minutes?: number
           default_price?: number
+          deleted_at?: string | null
           description_ar?: string | null
           description_en?: string | null
           display_order?: number
@@ -3153,6 +3197,7 @@ export type Database = {
           created_at?: string
           default_duration_minutes?: number
           default_price?: number
+          deleted_at?: string | null
           description_ar?: string | null
           description_en?: string | null
           display_order?: number
@@ -3211,6 +3256,7 @@ export type Database = {
       staff_positions: {
         Row: {
           created_at: string
+          deleted_at: string | null
           department_id: string | null
           description_ar: string | null
           description_en: string | null
@@ -3223,6 +3269,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          deleted_at?: string | null
           department_id?: string | null
           description_ar?: string | null
           description_en?: string | null
@@ -3235,6 +3282,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          deleted_at?: string | null
           department_id?: string | null
           description_ar?: string | null
           description_en?: string | null
@@ -3266,6 +3314,7 @@ export type Database = {
           contract_type: Database["public"]["Enums"]["contract_type"]
           created_at: string
           date_of_birth: string | null
+          deleted_at: string | null
           department_id: string | null
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
@@ -3294,6 +3343,7 @@ export type Database = {
           contract_type?: Database["public"]["Enums"]["contract_type"]
           created_at?: string
           date_of_birth?: string | null
+          deleted_at?: string | null
           department_id?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
@@ -3322,6 +3372,7 @@ export type Database = {
           contract_type?: Database["public"]["Enums"]["contract_type"]
           created_at?: string
           date_of_birth?: string | null
+          deleted_at?: string | null
           department_id?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
@@ -3599,6 +3650,7 @@ export type Database = {
           address: string | null
           contact_person: string | null
           created_at: string
+          deleted_at: string | null
           email: string | null
           id: string
           is_active: boolean
@@ -3613,6 +3665,7 @@ export type Database = {
           address?: string | null
           contact_person?: string | null
           created_at?: string
+          deleted_at?: string | null
           email?: string | null
           id?: string
           is_active?: boolean
@@ -3627,6 +3680,7 @@ export type Database = {
           address?: string | null
           contact_person?: string | null
           created_at?: string
+          deleted_at?: string | null
           email?: string | null
           id?: string
           is_active?: boolean
@@ -3839,6 +3893,7 @@ export type Database = {
           created_at: string
           currency: string
           current_balance: number
+          deleted_at: string | null
           id: string
           is_active: boolean
           name_ar: string
@@ -3850,6 +3905,7 @@ export type Database = {
           created_at?: string
           currency?: string
           current_balance?: number
+          deleted_at?: string | null
           id?: string
           is_active?: boolean
           name_ar: string
@@ -3861,6 +3917,7 @@ export type Database = {
           created_at?: string
           currency?: string
           current_balance?: number
+          deleted_at?: string | null
           id?: string
           is_active?: boolean
           name_ar?: string

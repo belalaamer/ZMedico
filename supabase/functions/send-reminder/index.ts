@@ -301,7 +301,7 @@ Deno.serve(async (req) => {
       if (!cfgCache.has(r.branch_id)) {
         const { data } = await supabase
           .from("notification_settings")
-          .select("whatsapp_api_key,whatsapp_api_url,whatsapp_business_number,sms_api_key,sms_api_url,sms_sender_id,email_sender_address,email_sender_name")
+          .select("whatsapp_api_key,whatsapp_api_url,whatsapp_business_number,sms_api_key,sms_api_url,sms_sender_id,email_sender_address,email_sender_name,whatsapp_enabled,sms_enabled,whatsapp_provider,sms_provider,meta_phone_number_id,twilio_account_sid,twilio_auth_token,twilio_from_whatsapp,twilio_from_sms")
           .eq("branch_id", r.branch_id)
           .maybeSingle();
         cfgCache.set(r.branch_id, (data as NotifySettings) ?? null);

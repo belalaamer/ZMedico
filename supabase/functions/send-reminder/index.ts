@@ -217,7 +217,10 @@ Deno.serve(async (req) => {
   // or a shared cron secret (for scheduled invocations).
   const authHeader = req.headers.get("Authorization") ?? "";
   const cronSecret = Deno.env.get("SEND_REMINDER_CRON_SECRET");
-  const isCron = !!cronSecret && authHeader === `Bearer ${cronSecret}`;
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const isCron =
+    (!!cronSecret && authHeader === `Bearer ${cronSecret}`) ||
+    (!!serviceKey && authHeader === `Bearer ${serviceKey}`);
 
   let callerIsAdmin = false;
   if (!isCron) {

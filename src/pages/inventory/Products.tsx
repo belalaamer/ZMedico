@@ -326,6 +326,7 @@ export default function Products() {
                   <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Edit3 className="size-4" /></Button>
                   <Button variant="ghost" size="icon" onClick={() => duplicate(p)}><Copy className="size-4" /></Button>
                   <Button variant="ghost" size="icon" onClick={() => toggleActive(p)}><Power className="size-4" /></Button>
+                  <RowActions onEdit={() => openEdit(p)} onDelete={() => softDelete(p)} />
                 </div>
               );
             })}

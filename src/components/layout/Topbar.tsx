@@ -36,7 +36,17 @@ export function Topbar() {
       .eq("is_read", false)
       .order("created_at", { ascending: false })
       .limit(10);
-    setNotifs(data ?? []);
+    // De-duplicate: collapse multiple notifications for the same related entity
+    const seen = new Set<string>();
+    const unique = (data ?? []).filter((n: any) => {
+      const key = n.related_entity_type && n.related_entity_id
+        ? `${n.related_entity_type}:${n.related_entity_id}`
+        : `id:${n.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    setNotifs(unique);
   };
 
   useEffect(() => {

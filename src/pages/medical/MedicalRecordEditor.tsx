@@ -708,6 +708,20 @@ function InvoicePreviewTab({ record, patient, procs, nav, userId }: any) {
   const { t, lang } = useI18n();
   const items = procs.filter((rp: any) => rp.procedures?.default_price != null);
   const total = items.reduce((s: number, rp: any) => s + (Number(rp.procedures.default_price) * Number(rp.quantity)), 0);
+  const [existing, setExisting] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!patient?.id) return;
+    (async () => {
+      const { data } = await supabase
+        .from("invoices")
+        .select("id, invoice_number, invoice_date, status, total, paid_amount")
+        .eq("patient_id", patient.id)
+        .is("deleted_at", null)
+        .order("invoice_date", { ascending: false });
+      setExisting(data ?? []);
+    })();
+  }, [patient?.id]);
 
   const create = async () => {
     if (items.length === 0) return toast.error(t("noResults"));
@@ -728,6 +742,39 @@ function InvoicePreviewTab({ record, patient, procs, nav, userId }: any) {
 
   return (
     <Card className="p-6 shadow-card space-y-4">
+      {/* Existing invoices for this patient */}
+      <div className="space-y-2">
+        <h3 className="font-semibold">{lang === "ar" ? "فواتير المريض" : "Patient Invoices"}</h3>
+        {existing.length === 0 ? (
+          <div className="text-muted-foreground text-sm py-4">{t("noResults")}</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40 text-xs uppercase">
+                <tr>
+                  <th className="p-2 text-start">{lang === "ar" ? "رقم" : "Number"}</th>
+                  <th className="p-2 text-start">{lang === "ar" ? "التاريخ" : "Date"}</th>
+                  <th className="p-2 text-start">{lang === "ar" ? "الحالة" : "Status"}</th>
+                  <th className="p-2 text-end">{lang === "ar" ? "الإجمالي" : "Total"}</th>
+                  <th className="p-2 text-end">{lang === "ar" ? "المدفوع" : "Paid"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {existing.map((inv) => (
+                  <tr key={inv.id} className="border-t border-border hover:bg-muted/30 cursor-pointer" onClick={() => nav(`/invoices/${inv.id}`)}>
+                    <td className="p-2 font-medium">{inv.invoice_number}</td>
+                    <td className="p-2">{formatDate(inv.invoice_date, lang)}</td>
+                    <td className="p-2"><Badge variant="outline">{inv.status}</Badge></td>
+                    <td className="p-2 text-end tabular-nums">{formatMoney(inv.total, lang)}</td>
+                    <td className="p-2 text-end tabular-nums">{formatMoney(inv.paid_amount, lang)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h3 className="font-semibold">{t("invoiceFromProcedures")}</h3>
         <Button onClick={create} className="gradient-primary text-primary-foreground" disabled={items.length === 0}><FileText className="me-2 size-4"/>{t("createInvoice")}</Button>

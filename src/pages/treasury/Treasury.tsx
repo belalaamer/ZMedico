@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney, formatDateTime } from "@/lib/format";
 import { TransferDialog } from "./TransferDialog";
+import { RowActions } from "@/components/RowActions";
 
 export default function Treasury() {
   const { t, lang } = useI18n();
@@ -27,7 +28,7 @@ export default function Treasury() {
   const [transferOpen, setTransferOpen] = useState(false);
 
   const load = async () => {
-    let tq = supabase.from("treasury").select("*").order("created_at");
+    let tq = supabase.from("treasury").select("*").is("deleted_at", null).order("created_at");
     if (currentBranchId) tq = tq.eq("branch_id", currentBranchId);
     const { data: trs } = await tq;
     setTreasuries(trs ?? []);
@@ -48,6 +49,14 @@ export default function Treasury() {
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId]);
   useDataSync(["treasury_transactions", "payments", "expenses"], () => { load(); });
+
+  const softDeleteTreasury = async (tr: any): Promise<void> => {
+    const { count } = await supabase.from("treasury_transactions").select("id", { count: "exact", head: true }).eq("treasury_id", tr.id);
+    if ((count ?? 0) > 0) { toast.error(lang === "ar" ? "لا يمكن الحذف: توجد معاملات" : "Cannot delete: has transactions"); return; }
+    const { error } = await supabase.from("treasury").update({ deleted_at: new Date().toISOString() } as any).eq("id", tr.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("delete")); load();
+  };
 
   const totalBalance = treasuries.reduce((s, tr) => s + Number(tr.current_balance), 0);
 
@@ -149,7 +158,10 @@ export default function Treasury() {
             <div className="text-sm text-muted-foreground">—</div>
           ) : treasuries.map((tr) => (
             <div key={tr.id} className="border border-border rounded-lg p-3">
-              <div className="font-medium">{lang === "ar" ? tr.name_ar : tr.name_en}</div>
+              <div className="flex items-center justify-between">
+                <div className="font-medium">{lang === "ar" ? tr.name_ar : tr.name_en}</div>
+                <RowActions canEdit={false} onDelete={() => softDeleteTreasury(tr)} />
+              </div>
               <div className="mt-1 text-2xl font-bold tabular-nums text-primary">{formatMoney(tr.current_balance, lang, tr.currency)}</div>
             </div>
           ))}

@@ -421,6 +421,55 @@ export default function Dashboard() {
             )}
           </Card>
 
+          <div className="grid lg:grid-cols-2 gap-4">
+            <Card className="p-5 shadow-card border-border/60">
+              <div className="text-sm font-medium mb-3 flex items-center gap-2">
+                <Stethoscope className="size-4" /> {t("doctorPerformance")}
+              </div>
+              {loading ? <Skeleton className="h-64 w-full" /> : doctorPerf.length === 0 ? (
+                <div className="h-64 flex items-center justify-center text-sm text-muted-foreground">{t("noDataYet")}</div>
+              ) : (
+                <div className="h-64">
+                  <ResponsiveContainer>
+                    <BarChart data={doctorPerf} layout="vertical" margin={{ left: 8, right: 16 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12} allowDecimals={false} />
+                      <YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} width={120} />
+                      <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} formatter={(v: any) => [`${v}`, t("appointmentsCount")]} />
+                      <Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 6, 6, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </Card>
+
+            <Card className="p-5 shadow-card border-border/60">
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-sm font-medium flex items-center gap-2">
+                  <Receipt className="size-4" /> {t("topRequestedServices")}
+                </div>
+                <Button asChild variant="ghost" size="sm"><Link to="/reports/financial">→</Link></Button>
+              </div>
+              {loading ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full mb-2" />) :
+                topServices.length === 0 ? (
+                  <div className="text-sm text-muted-foreground py-6 text-center">{t("noDataYet")}</div>
+                ) : (
+                  <ul className="divide-y divide-border">
+                    {topServices.map((s, i) => (
+                      <li key={i} className="py-2 flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="font-medium text-sm truncate">{s.name}</div>
+                          <div className="text-xs text-muted-foreground">{s.count} ×</div>
+                        </div>
+                        <div className="font-semibold text-sm tabular-nums whitespace-nowrap">{formatMoney(s.revenue, lang)}</div>
+                      </li>
+                    ))}
+                  </ul>
+                )
+              }
+            </Card>
+          </div>
+
           <div className="grid lg:grid-cols-3 gap-4">
             <Card className="p-5 shadow-card border-border/60">
               <div className="flex items-center justify-between mb-3">

@@ -8,6 +8,8 @@ import { Link } from "react-router-dom";
 import {
   Wallet, Receipt, CalendarCheck, FileText, Clock, Users, UserPlus, Stethoscope, Inbox,
 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
   PieChart, Pie, Cell, BarChart, Bar, Legend,
@@ -59,6 +61,27 @@ export default function Dashboard() {
   const [revenue7d, setRevenue7d] = useState<{ date: string; revenue: number }[]>([]);
   const [apptStatusAll, setApptStatusAll] = useState<{ name: string; value: number }[]>([]);
   const [ageGroups, setAgeGroups] = useState<{ name: string; value: number }[]>([]);
+  const [doctorPerf, setDoctorPerf] = useState<{ name: string; value: number }[]>([]);
+  const [topServices, setTopServices] = useState<{ name: string; count: number; revenue: number }[]>([]);
+
+  // Date range for charts
+  const [rangePreset, setRangePreset] = useState<"7d" | "30d" | "month" | "custom">("7d");
+  const [rangeStart, setRangeStart] = useState<string>(() => {
+    const d = new Date(); d.setDate(d.getDate() - 6); return d.toISOString().slice(0, 10);
+  });
+  const [rangeEnd, setRangeEnd] = useState<string>(() => new Date().toISOString().slice(0, 10));
+
+  const applyPreset = (p: "7d" | "30d" | "month" | "custom") => {
+    setRangePreset(p);
+    if (p === "custom") return;
+    const end = new Date();
+    const start = new Date();
+    if (p === "7d") start.setDate(end.getDate() - 6);
+    else if (p === "30d") start.setDate(end.getDate() - 29);
+    else if (p === "month") start.setDate(1);
+    setRangeStart(start.toISOString().slice(0, 10));
+    setRangeEnd(end.toISOString().slice(0, 10));
+  };
 
   const [recentPatients, setRecentPatients] = useState<any[]>([]);
   const [recentAppts, setRecentAppts] = useState<any[]>([]);
@@ -71,7 +94,8 @@ export default function Dashboard() {
     const start = new Date(); start.setHours(0, 0, 0, 0);
     const end = new Date(); end.setHours(23, 59, 59, 999);
     const todayDate = new Date().toISOString().slice(0, 10);
-    const last7Start = new Date(); last7Start.setDate(last7Start.getDate() - 6); last7Start.setHours(0, 0, 0, 0);
+    const rs = new Date(rangeStart + "T00:00:00");
+    const re = new Date(rangeEnd + "T23:59:59");
 
     const branchEq = (q: any) => (currentBranchId ? q.eq("branch_id", currentBranchId) : q);
 
@@ -88,6 +112,8 @@ export default function Dashboard() {
         recentPtRes,
         recentApptRes,
         recentPayRes,
+        doctorApptRes,
+        topItemsRes,
       ] = await Promise.all([
         branchEq(supabase.from("appointments").select("status")
           .gte("scheduled_at", start.toISOString()).lte("scheduled_at", end.toISOString())),
@@ -98,8 +124,9 @@ export default function Dashboard() {
         branchEq(supabase.from("invoices").select("total,paid_amount").in("status", ["pending", "partial"])),
         branchEq(supabase.from("medical_records").select("id", { count: "exact", head: true }).eq("visit_date", todayDate)),
         branchEq(supabase.from("medical_records").select("id", { count: "exact", head: true }).eq("status", "draft")),
-        branchEq(supabase.from("payments").select("payment_date,amount").gte("payment_date", last7Start.toISOString().slice(0, 10))),
-        branchEq(supabase.from("appointments").select("status").gte("scheduled_at", last7Start.toISOString())),
+        branchEq(supabase.from("payments").select("payment_date,amount")
+          .gte("payment_date", rangeStart).lte("payment_date", rangeEnd)),
+        branchEq(supabase.from("appointments").select("status").gte("scheduled_at", rs.toISOString()).lte("scheduled_at", re.toISOString())),
         branchEq(supabase.from("patients").select("dob").is("deleted_at", null)),
         branchEq(supabase.from("patients").select("id,first_name_en,first_name_ar,last_name_en,last_name_ar,phone,created_at")
           .is("deleted_at", null)
@@ -108,6 +135,11 @@ export default function Dashboard() {
           .order("created_at", { ascending: false }).limit(5)),
         branchEq(supabase.from("payments").select("id,amount,payment_method,payment_date,patient:patients(first_name_en,first_name_ar,last_name_en,last_name_ar)")
           .order("created_at", { ascending: false }).limit(5)),
+        branchEq(supabase.from("appointments").select("doctor_id,status")
+          .gte("scheduled_at", rs.toISOString()).lte("scheduled_at", re.toISOString())
+          .not("doctor_id", "is", null)),
+        supabase.from("invoice_items").select("description_en,description_ar,quantity,total,invoice:invoices!inner(branch_id,issue_date)")
+          .gte("invoice.issue_date", rangeStart).lte("invoice.issue_date", rangeEnd),
       ]);
 
       const apptRows = (apptsTodayRes.data ?? []) as { status: string }[];
@@ -127,10 +159,14 @@ export default function Dashboard() {
       setTodayConsults(consultsRes.count ?? 0);
       setDraftRecords(draftsRes.count ?? 0);
 
-      // Last 7 days revenue
+      // Revenue over selected range
       const buckets = new Map<string, number>();
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date(); d.setDate(d.getDate() - i);
+      const dayMs = 86400000;
+      const startMs = new Date(rangeStart + "T00:00:00").getTime();
+      const endMs = new Date(rangeEnd + "T00:00:00").getTime();
+      const days = Math.max(1, Math.round((endMs - startMs) / dayMs) + 1);
+      for (let i = 0; i < days; i++) {
+        const d = new Date(startMs + i * dayMs);
         buckets.set(d.toISOString().slice(0, 10), 0);
       }
       for (const r of (rev7Res.data ?? []) as any[]) {
@@ -156,19 +192,48 @@ export default function Dashboard() {
       setRecentAppts(recentApptRes.data ?? []);
       setRecentPayments(recentPayRes.data ?? []);
 
-      // Fetch doctor names from profiles for the recent appointments
-      const doctorIds = Array.from(new Set(((recentApptRes.data ?? []) as any[]).map((a) => a.doctor_id).filter(Boolean)));
+      // Doctor performance over range
+      const docCounts: Record<string, number> = {};
+      for (const r of (doctorApptRes.data ?? []) as any[]) {
+        if (!r.doctor_id) continue;
+        docCounts[r.doctor_id] = (docCounts[r.doctor_id] ?? 0) + 1;
+      }
+
+      // Fetch doctor names for both recent appointments AND performance chart
+      const doctorIds = Array.from(new Set([
+        ...((recentApptRes.data ?? []) as any[]).map((a) => a.doctor_id),
+        ...Object.keys(docCounts),
+      ].filter(Boolean)));
+      let nameMap: Record<string, string> = {};
       if (doctorIds.length) {
         const { data: docs } = await supabase.from("profiles").select("id,full_name").in("id", doctorIds);
-        const map: Record<string, string> = {};
-        for (const d of (docs ?? []) as any[]) map[d.id] = d.full_name ?? "";
-        setDoctorNames(map);
+        for (const d of (docs ?? []) as any[]) nameMap[d.id] = d.full_name ?? "";
+        setDoctorNames(nameMap);
       } else {
         setDoctorNames({});
       }
+      const perf = Object.entries(docCounts)
+        .map(([id, value]) => ({ name: nameMap[id] || "—", value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 8);
+      setDoctorPerf(perf);
+
+      // Top requested services from invoice items
+      const svcMap = new Map<string, { count: number; revenue: number; ar?: string }>();
+      for (const r of (topItemsRes.data ?? []) as any[]) {
+        const inv = r.invoice;
+        if (currentBranchId && inv?.branch_id && inv.branch_id !== currentBranchId) continue;
+        const key = (lang === "ar" ? (r.description_ar || r.description_en) : (r.description_en || r.description_ar)) || "—";
+        const cur = svcMap.get(key) ?? { count: 0, revenue: 0 };
+        cur.count += Number(r.quantity || 0);
+        cur.revenue += Number(r.total || 0);
+        svcMap.set(key, cur);
+      }
+      setTopServices(Array.from(svcMap, ([name, v]) => ({ name, count: v.count, revenue: v.revenue }))
+        .sort((a, b) => b.count - a.count).slice(0, 8));
 
       setLoading(false);
-  }, [currentBranchId]);
+  }, [currentBranchId, rangeStart, rangeEnd, lang]);
 
   // Initial load + refetch on branch change
   useEffect(() => { run(); }, [run]);

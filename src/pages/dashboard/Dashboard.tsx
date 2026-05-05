@@ -290,8 +290,35 @@ export default function Dashboard() {
           <Button asChild><Link to="/patients">{t("addPatient")}</Link></Button>
           <Button asChild variant="outline"><Link to="/calendar">{t("newAppointment")}</Link></Button>
           <Button asChild variant="outline"><Link to="/invoices">{t("createInvoice")}</Link></Button>
+          <Button asChild variant="outline"><Link to="/reports">{t("viewAllReports")}</Link></Button>
         </div>
       </div>
+
+      {/* Date range filter */}
+      <Card className="p-3 shadow-card border-border/60 flex flex-wrap items-end gap-3">
+        <div className="min-w-[160px]">
+          <div className="text-[11px] text-muted-foreground mb-1">{t("dateRange") as any}</div>
+          <Select value={rangePreset} onValueChange={(v) => applyPreset(v as any)}>
+            <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7d">{t("last7Days")}</SelectItem>
+              <SelectItem value="30d">{t("last30Days")}</SelectItem>
+              <SelectItem value="month">{t("thisMonthRange")}</SelectItem>
+              <SelectItem value="custom">{t("customRange")}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <div className="text-[11px] text-muted-foreground mb-1">{t("fromDate")}</div>
+          <Input type="date" className="h-9 w-40" value={rangeStart}
+            onChange={(e) => { setRangeStart(e.target.value); setRangePreset("custom"); }} />
+        </div>
+        <div>
+          <div className="text-[11px] text-muted-foreground mb-1">{t("toDate")}</div>
+          <Input type="date" className="h-9 w-40" value={rangeEnd}
+            onChange={(e) => { setRangeEnd(e.target.value); setRangePreset("custom"); }} />
+        </div>
+      </Card>
 
       {isEmpty ? (
         <Card className="p-10 text-center shadow-card border-border/60">

@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { formatMoney, formatDate } from "@/lib/format";
 import { RowActions } from "@/components/RowActions";
 import { useNavigate } from "react-router-dom";
+import { useUserRole } from "@/hooks/useUserRole";
 
 const statusClass: Record<string, string> = {
   draft: "status-cancelled", pending: "status-review", partial: "status-progress", received: "status-completed", cancelled: "status-departed",
@@ -29,6 +30,7 @@ export default function PurchaseOrders() {
   const { currentBranchId } = useBranch();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { isAdmin } = useUserRole();
   const [pos, setPos] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -59,7 +61,10 @@ export default function PurchaseOrders() {
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId]);
 
   const softDelete = async (po: any): Promise<void> => {
-    if (po.status !== "draft") { toast.error(lang === "ar" ? "يمكن حذف المسودات فقط" : "Only draft POs can be deleted"); return; }
+    if (po.status !== "draft" && !isAdmin) {
+      toast.error(lang === "ar" ? "يمكن حذف المسودات فقط" : "Only draft POs can be deleted");
+      return;
+    }
     const { error } = await supabase.from("purchase_orders").update({ deleted_at: new Date().toISOString() } as any).eq("id", po.id);
     if (error) { toast.error(error.message); return; }
     toast.success(t("delete")); load();
@@ -227,7 +232,7 @@ export default function PurchaseOrders() {
                   <RowActions
                     onEdit={() => navigate(`/inventory/purchase-orders/${po.id}`)}
                     onDelete={() => softDelete(po)}
-                    canDelete={po.status === "draft"}
+                    canDelete={isAdmin || po.status === "draft"}
                   />
                 </div>
               );

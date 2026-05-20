@@ -4318,6 +4318,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      renumber_active_patient_codes: { Args: never; Returns: undefined }
     }
     Enums: {
       addon_status: "active" | "cancelled"

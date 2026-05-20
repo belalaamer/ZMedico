@@ -16,6 +16,9 @@ import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
 import { RowActions } from "@/components/RowActions";
 import { useNavigate } from "react-router-dom";
+import { Copy } from "lucide-react";
+
+const ROLES = ["admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr", "staff"] as const;
 
 export function statusLabel(s: string, t: (k: any) => string) {
   const map: Record<string, string> = { active: "statusActive", on_leave: "statusOnLeave", terminated: "statusTerminated", suspended: "statusSuspended" };
@@ -34,6 +37,10 @@ export default function Staff() {
   const [filterDept, setFilterDept] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"existing" | "new">("new");
+  const [newUser, setNewUser] = useState({ email: "", full_name: "", role: "staff" as string, password: "" });
+  const [creatingUser, setCreatingUser] = useState(false);
+  const [createdInfo, setCreatedInfo] = useState<{ email: string; password: string } | null>(null);
   const [form, setForm] = useState<any>({
     profile_id: "", position_id: "", department_id: "", branch_id: "",
     hire_date: new Date().toISOString().slice(0, 10), contract_type: "full_time",
@@ -59,9 +66,33 @@ export default function Staff() {
   useDataSync(["staff", "departments", "positions"], () => { load(); });
 
   const save = async () => {
-    if (!form.profile_id) { toast.error("Profile required"); return; }
+    let profileId = form.profile_id;
+
+    if (mode === "new") {
+      if (!newUser.email || !newUser.full_name) { toast.error(t("fullName") + " / Email"); return; }
+      setCreatingUser(true);
+      const { data, error } = await supabase.functions.invoke("admin-create-user", {
+        body: {
+          email: newUser.email.trim().toLowerCase(),
+          full_name: newUser.full_name.trim(),
+          role: newUser.role,
+          branch_id: form.branch_id || currentBranchId || null,
+          password: newUser.password || undefined,
+        },
+      });
+      setCreatingUser(false);
+      if (error || (data as any)?.error) {
+        toast.error((data as any)?.error ?? error?.message ?? "Failed to create user");
+        return;
+      }
+      profileId = (data as any).user_id;
+      setCreatedInfo({ email: (data as any).email, password: (data as any).password });
+    }
+
+    if (!profileId) { toast.error("Profile required"); return; }
+
     const payload: any = {
-      id: form.profile_id,
+      id: profileId,
       position_id: form.position_id || null,
       department_id: form.department_id || null,
       branch_id: form.branch_id || currentBranchId || null,
@@ -79,9 +110,11 @@ export default function Staff() {
       date_of_birth: form.date_of_birth || null,
       address: form.address || null,
     };
-    const { error } = await supabase.from("staff_profiles").insert(payload);
+    const { error } = await supabase.from("staff_profiles").upsert(payload, { onConflict: "id" });
     if (error) return toast.error(error.message);
-    toast.success(t("save")); setOpen(false); load();
+    toast.success(t("save"));
+    if (mode !== "new") setOpen(false);
+    load();
   };
 
   const profName = (id: string) => { const p = profiles.find((x) => x.id === id); return p?.full_name ?? p?.email ?? "—"; };
@@ -130,13 +163,47 @@ export default function Staff() {
             <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground"><Plus className="me-2 size-4" />{t("addStaff")}</Button></DialogTrigger>
             <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
               <DialogHeader><DialogTitle>{t("newStaff")}</DialogTitle></DialogHeader>
+              <div className="flex gap-2 mb-2">
+                <Button type="button" size="sm" variant={mode === "new" ? "default" : "outline"} onClick={() => setMode("new")}>+ New user</Button>
+                <Button type="button" size="sm" variant={mode === "existing" ? "default" : "outline"} onClick={() => setMode("existing")}>Existing user</Button>
+              </div>
+              {createdInfo && (
+                <Card className="p-3 mb-2 border-success/40 bg-success/5 text-sm">
+                  <div className="font-medium">User created ✓</div>
+                  <div className="mt-1 flex items-center gap-2 flex-wrap">
+                    <span className="text-muted-foreground">Email:</span><span className="font-mono">{createdInfo.email}</span>
+                    <span className="text-muted-foreground ms-3">Password:</span><span className="font-mono">{createdInfo.password}</span>
+                    <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(createdInfo.password); toast.success("Copied"); }}><Copy className="size-3" /></Button>
+                  </div>
+                </Card>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-2 sm:col-span-2"><Label>{t("fullName")}</Label>
-                  <Select value={form.profile_id} onValueChange={(v) => setForm({ ...form, profile_id: v })}>
-                    <SelectTrigger><SelectValue placeholder={t("selectStaff")} /></SelectTrigger>
-                    <SelectContent>{availableProfiles.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name ?? p.email}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
+                {mode === "existing" ? (
+                  <div className="space-y-2 sm:col-span-2"><Label>{t("fullName")}</Label>
+                    <Select value={form.profile_id} onValueChange={(v) => setForm({ ...form, profile_id: v })}>
+                      <SelectTrigger><SelectValue placeholder={t("selectStaff")} /></SelectTrigger>
+                      <SelectContent>{availableProfiles.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name ?? p.email}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-2"><Label>{t("fullName")}</Label>
+                      <Input value={newUser.full_name} onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })} placeholder="Ahmed Ali" />
+                    </div>
+                    <div className="space-y-2"><Label>Email</Label>
+                      <Input type="email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} placeholder="user@example.com" />
+                    </div>
+                    <div className="space-y-2"><Label>Role</Label>
+                      <Select value={newUser.role} onValueChange={(v) => setNewUser({ ...newUser, role: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2"><Label>Password (optional)</Label>
+                      <Input value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} placeholder="Auto-generated if empty" />
+                    </div>
+                  </>
+                )}
                 <div className="space-y-2"><Label>{t("position")}</Label>
                   <Select value={form.position_id || "none"} onValueChange={(v) => setForm({ ...form, position_id: v === "none" ? "" : v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
@@ -178,8 +245,8 @@ export default function Staff() {
                 <div className="space-y-2 sm:col-span-2"><Label>{t("address")}</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
               </div>
               <DialogFooter>
-                <Button variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button>
-                <Button className="gradient-primary text-primary-foreground" onClick={save}>{t("save")}</Button>
+                <Button variant="ghost" onClick={() => { setOpen(false); setCreatedInfo(null); }}>{t("cancel")}</Button>
+                <Button className="gradient-primary text-primary-foreground" onClick={save} disabled={creatingUser}>{creatingUser ? "..." : t("save")}</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

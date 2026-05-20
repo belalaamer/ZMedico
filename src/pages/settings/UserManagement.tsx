@@ -10,6 +10,10 @@ import { Search, UserPlus, Trash2, Copy, KeyRound, AlertTriangle } from "lucide-
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -43,6 +47,13 @@ export default function UserManagement() {
   const [cBranch, setCBranch] = useState<string>("");
   const [creating, setCreating] = useState(false);
   const [createdInfo, setCreatedInfo] = useState<{ email: string; password: string } | null>(null);
+
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? null));
+  }, []);
 
   const load = async () => {
     const { data: ps } = await supabase.from("profiles").select("*");
@@ -151,6 +162,22 @@ export default function UserManagement() {
     }
   };
 
+  const deleteUser = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    const { data, error } = await supabase.functions.invoke("admin-delete-user", {
+      body: { user_id: deleteTarget.id },
+    });
+    setDeleting(false);
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.error ?? error?.message ?? "Failed");
+      return;
+    }
+    toast.success(lang === "ar" ? "تم حذف المستخدم" : "User deleted");
+    setDeleteTarget(null);
+    load();
+  };
+
   const filtered = users.filter(u => !q || (u.full_name ?? "").toLowerCase().includes(q.toLowerCase()) || (u.email ?? "").toLowerCase().includes(q.toLowerCase()));
 
   return (
@@ -191,6 +218,16 @@ export default function UserManagement() {
                 )}
               </div>
               <Button size="sm" variant="outline">{t("edit")}</Button>
+              {currentUserId !== u.id && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => setDeleteTarget(u)}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              )}
             </div>
           ))}
           {filtered.length === 0 && <div className="p-8 text-center text-muted-foreground">{t("noData")}</div>}

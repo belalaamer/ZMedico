@@ -92,6 +92,8 @@ export default function RolePermissions() {
     setMatrix(JSON.parse(JSON.stringify(DEFAULT)));
   };
 
+  if (!roleLoading && !isAdmin) return <Navigate to="/settings/general" replace />;
+
   return (
     <SettingsLayout>
       <div className="space-y-4">

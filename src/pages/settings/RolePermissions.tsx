@@ -33,7 +33,7 @@ function emptyMatrix(): Matrix {
 
 export default function RolePermissions() {
   const { t, lang } = useI18n();
-  const { isAdmin } = useUserRole();
+  const { isAdmin, loading: roleLoading } = useUserRole();
   const [matrix, setMatrix] = useState<Matrix>(() => JSON.parse(JSON.stringify(DEFAULT)));
   const [original, setOriginal] = useState<Matrix>(() => JSON.parse(JSON.stringify(DEFAULT)));
   const [loading, setLoading] = useState(true);

@@ -444,6 +444,31 @@ export default function UserManagement() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && !deleting && setDeleteTarget(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {lang === "ar" ? "حذف المستخدم؟" : "Delete user?"}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {lang === "ar"
+                  ? `سيتم حذف ${deleteTarget?.full_name ?? deleteTarget?.email} نهائياً مع كل الأدوار والصلاحيات. لا يمكن التراجع.`
+                  : `${deleteTarget?.full_name ?? deleteTarget?.email} will be permanently deleted with all roles. This cannot be undone.`}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>{t("cancel")}</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={deleteUser}
+                disabled={deleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleting ? (lang === "ar" ? "جارٍ الحذف..." : "Deleting...") : t("delete")}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </SettingsLayout>
   );

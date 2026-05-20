@@ -181,7 +181,7 @@ export function Topbar() {
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="relative" aria-label={t("notifications")}>
+          <Button variant="ghost" size="icon" type="button" className="relative" aria-label={t("notifications")}>
             <Bell className="size-5" />
             {unreadCount > 0 && (
               <Badge className="absolute -top-1 -end-1 h-5 min-w-5 px-1 text-[10px] bg-destructive text-destructive-foreground border-0">
@@ -220,7 +220,7 @@ export function Topbar() {
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="flex items-center gap-2 rounded-full hover:bg-muted px-1 py-1">
+          <button type="button" className="flex items-center gap-2 rounded-full hover:bg-muted px-1 py-1">
             <Avatar className="size-9">
               <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">{initials}</AvatarFallback>
             </Avatar>

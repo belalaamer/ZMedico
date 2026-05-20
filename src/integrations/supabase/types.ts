@@ -1858,7 +1858,7 @@ export type Database = {
           last_name_en?: string | null
           nationality?: string | null
           notes?: string | null
-          patient_code?: number
+          patient_code: number
           phone?: string | null
           phone2?: string | null
           referral_source?: string | null

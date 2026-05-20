@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Navigate } from "react-router-dom";
 import SettingsLayout from "./SettingsLayout";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,7 +33,7 @@ function emptyMatrix(): Matrix {
 
 export default function RolePermissions() {
   const { t, lang } = useI18n();
-  const { isAdmin } = useUserRole();
+  const { isAdmin, loading: roleLoading } = useUserRole();
   const [matrix, setMatrix] = useState<Matrix>(() => JSON.parse(JSON.stringify(DEFAULT)));
   const [original, setOriginal] = useState<Matrix>(() => JSON.parse(JSON.stringify(DEFAULT)));
   const [loading, setLoading] = useState(true);
@@ -90,6 +91,8 @@ export default function RolePermissions() {
   const resetDefaults = () => {
     setMatrix(JSON.parse(JSON.stringify(DEFAULT)));
   };
+
+  if (!roleLoading && !isAdmin) return <Navigate to="/settings/general" replace />;
 
   return (
     <SettingsLayout>

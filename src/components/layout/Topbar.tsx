@@ -13,7 +13,8 @@ import {
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { SidebarContent } from "./Sidebar";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -104,7 +105,14 @@ export function Topbar() {
             <Menu className="size-5" />
           </Button>
         </SheetTrigger>
-        <SheetContent side={lang === "ar" ? "right" : "left"} className="p-0 w-72 bg-sidebar text-sidebar-foreground border-sidebar-border">
+        <SheetContent
+          side={lang === "ar" ? "right" : "left"}
+          className="p-0 w-[280px] sm:max-w-[280px] bg-sidebar text-sidebar-foreground border-sidebar-border [&>button]:text-white [&>button]:opacity-80 [&>button]:hover:opacity-100"
+        >
+          <VisuallyHidden>
+            <SheetTitle>{t("appName")}</SheetTitle>
+            <SheetDescription>{t("tagline")}</SheetDescription>
+          </VisuallyHidden>
           <SidebarContent onNavigate={() => setMobileOpen(false)} />
         </SheetContent>
       </Sheet>

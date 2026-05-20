@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useBranch } from "@/contexts/BranchContext";
 import { cn } from "@/lib/utils";
 
-export function Sidebar() {
+export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {}) {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
   const { pathname } = useLocation();
@@ -71,7 +71,7 @@ export function Sidebar() {
   ];
 
   return (
-    <aside className="hidden md:flex w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground border-e border-sidebar-border h-screen sticky top-0">
+    <div className="flex w-full h-full flex-col bg-sidebar text-sidebar-foreground">
       <div className="h-16 flex items-center gap-3 px-5 border-b border-sidebar-border">
         <div className="size-9 rounded-xl bg-white/10 backdrop-blur flex items-center justify-center">
           <Stethoscope className="size-5 text-white" />
@@ -87,6 +87,7 @@ export function Sidebar() {
             key={it.to}
             to={it.to}
             end={it.end}
+            onClick={onNavigate}
             className={({ isActive }) =>
               cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
@@ -115,7 +116,7 @@ export function Sidebar() {
           </div>
           <div className="ms-3 ps-3 border-s border-sidebar-border/40 mt-1 space-y-1">
             {inventoryItems.map((it) => (
-              <NavLink key={it.to} to={it.to}
+              <NavLink key={it.to} to={it.to} onClick={onNavigate}
                 className={({ isActive }) => cn(
                   "flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors",
                   isActive ? "bg-white text-sidebar-primary-foreground shadow-card" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-white"
@@ -141,7 +142,7 @@ export function Sidebar() {
           </div>
           <div className="ms-3 ps-3 border-s border-sidebar-border/40 mt-1 space-y-1">
             {medicalItems.map((it) => (
-              <NavLink key={it.to} to={it.to}
+              <NavLink key={it.to} to={it.to} onClick={onNavigate}
                 className={({ isActive }) => cn(
                   "flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors",
                   isActive ? "bg-white text-sidebar-primary-foreground shadow-card" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-white"
@@ -164,7 +165,7 @@ export function Sidebar() {
           </div>
           <div className="ms-3 ps-3 border-s border-sidebar-border/40 mt-1 space-y-1">
             {hrItems.map((it) => (
-              <NavLink key={it.to} to={it.to}
+              <NavLink key={it.to} to={it.to} onClick={onNavigate}
                 className={({ isActive }) => cn(
                   "flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors",
                   isActive ? "bg-white text-sidebar-primary-foreground shadow-card" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-white"
@@ -181,6 +182,7 @@ export function Sidebar() {
             key={it.to}
             to={it.to}
             end={it.end}
+            onClick={onNavigate}
             className={({ isActive }) =>
               cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mt-1",
@@ -198,6 +200,14 @@ export function Sidebar() {
       <div className="p-4 text-[11px] text-sidebar-foreground/60 border-t border-sidebar-border">
         v1.0 · {lang.toUpperCase()}
       </div>
+    </div>
+  );
+}
+
+export function Sidebar() {
+  return (
+    <aside className="hidden md:flex w-64 shrink-0 flex-col border-e border-sidebar-border h-screen sticky top-0">
+      <SidebarContent />
     </aside>
   );
 }

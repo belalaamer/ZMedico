@@ -1,8 +1,13 @@
+import { useEffect, useState } from "react";
 import SettingsLayout from "./SettingsLayout";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useI18n } from "@/contexts/I18nContext";
-import { ShieldCheck, Info } from "lucide-react";
+import { ShieldCheck, Info, Save, RotateCcw, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useUserRole } from "@/hooks/useUserRole";
+import { toast } from "sonner";
 
 const ROLES = ["admin", "manager", "doctor", "nurse", "receptionist", "accountant"];
 const MODULES = ["patients", "appointments", "medical_records", "invoices", "treasury", "inventory", "reports", "settings"];
@@ -17,9 +22,74 @@ const DEFAULT: Record<string, Record<string, string[]>> = {
   accountant: { patients: ["view"], appointments: ["view"], medical_records: [], invoices: ["view","create","edit","export"], treasury: ["view","create","edit"], inventory: ["view"], reports: ["view","export"], settings: [] },
 };
 
+type Matrix = Record<string, Record<string, string[]>>;
+
+function emptyMatrix(): Matrix {
+  const m: Matrix = {};
+  ROLES.forEach(r => { m[r] = {}; MODULES.forEach(mod => { m[r][mod] = []; }); });
+  return m;
+}
+
 export default function RolePermissions() {
-  const { t } = useI18n();
-  const matrix = DEFAULT;
+  const { t, lang } = useI18n();
+  const { isAdmin } = useUserRole();
+  const [matrix, setMatrix] = useState<Matrix>(() => JSON.parse(JSON.stringify(DEFAULT)));
+  const [original, setOriginal] = useState<Matrix>(() => JSON.parse(JSON.stringify(DEFAULT)));
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    const { data } = await (supabase as any)
+      .from("role_permissions")
+      .select("role,module,actions");
+    const base = emptyMatrix();
+    // start with defaults
+    ROLES.forEach(r => MODULES.forEach(m => {
+      base[r][m] = DEFAULT[r]?.[m] ? [...DEFAULT[r][m]] : [];
+    }));
+    (data ?? []).forEach((row: any) => {
+      if (!base[row.role]) base[row.role] = {};
+      base[row.role][row.module] = Array.isArray(row.actions) ? row.actions : [];
+    });
+    setMatrix(JSON.parse(JSON.stringify(base)));
+    setOriginal(JSON.parse(JSON.stringify(base)));
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, []);
+
+  const dirty = JSON.stringify(matrix) !== JSON.stringify(original);
+
+  const toggle = (role: string, module: string, action: string) => {
+    if (!isAdmin) return;
+    setMatrix(prev => {
+      const next = JSON.parse(JSON.stringify(prev)) as Matrix;
+      const list = new Set(next[role]?.[module] ?? []);
+      if (list.has(action)) list.delete(action); else list.add(action);
+      if (!next[role]) next[role] = {};
+      next[role][module] = Array.from(list);
+      return next;
+    });
+  };
+
+  const save = async () => {
+    setSaving(true);
+    const rows: any[] = [];
+    ROLES.forEach(r => MODULES.forEach(m => {
+      rows.push({ role: r, module: m, actions: matrix[r]?.[m] ?? [] });
+    }));
+    const { error } = await (supabase as any)
+      .from("role_permissions")
+      .upsert(rows, { onConflict: "role,module" });
+    setSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(lang === "ar" ? "تم الحفظ" : "Saved");
+    setOriginal(JSON.parse(JSON.stringify(matrix)));
+  };
+
+  const resetDefaults = () => {
+    setMatrix(JSON.parse(JSON.stringify(DEFAULT)));
+  };
 
   return (
     <SettingsLayout>
@@ -29,12 +99,33 @@ export default function RolePermissions() {
             <ShieldCheck className="size-6 text-primary" />
             {t("rolePermissions")}
           </h1>
-          <Badge variant="outline">Read-only reference</Badge>
+          <div className="flex items-center gap-2 flex-wrap">
+            {!isAdmin && <Badge variant="outline">Read-only</Badge>}
+            {isAdmin && (
+              <>
+                <Button variant="outline" size="sm" onClick={resetDefaults} disabled={saving}>
+                  <RotateCcw className="me-2 size-4" />
+                  {lang === "ar" ? "استعادة الافتراضي" : "Reset defaults"}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={save}
+                  disabled={!dirty || saving}
+                  className="gradient-primary text-primary-foreground"
+                >
+                  {saving ? <Loader2 className="me-2 size-4 animate-spin" /> : <Save className="me-2 size-4" />}
+                  {lang === "ar" ? "حفظ" : "Save"}
+                </Button>
+              </>
+            )}
+          </div>
         </div>
         <div className="rounded-md border border-border bg-muted/30 p-3 text-sm flex gap-2">
           <Info className="size-4 mt-0.5 text-muted-foreground shrink-0" />
           <p className="text-muted-foreground">
-            This matrix documents the intended access for each role. Effective access is enforced server-side via database row-level security policies and the <code className="text-foreground">user_roles</code> table — it cannot be changed from this page. To change a user&apos;s role, use User Management.
+            {lang === "ar"
+              ? "هذه المصفوفة توثّق صلاحيات كل دور. التطبيق الفعلي للصلاحيات يتم على مستوى قاعدة البيانات عبر سياسات RLS وجدول user_roles. لتغيير دور مستخدم استخدم إدارة المستخدمين."
+              : "This matrix documents the intended access for each role. Effective access is enforced server-side via RLS policies and the user_roles table. To change a user's role, use User Management."}
           </p>
         </div>
         <Card className="overflow-x-auto">
@@ -48,18 +139,29 @@ export default function RolePermissions() {
                 <tr key={m} className="border-t">
                   <td className="p-3 font-medium capitalize">{m.replace("_"," ")}</td>
                   {ROLES.map(r => (
-                    <td key={r} className="p-3">
+                    <td key={r} className="p-3 align-top">
                       <div className="flex flex-wrap gap-1 justify-center">
                         {ACTIONS.map(a => {
                           const allowed = matrix[r]?.[m]?.includes(a);
                           return (
-                            <Badge
+                            <button
+                              type="button"
                               key={a}
-                              variant={allowed ? "default" : "outline"}
-                              className={allowed ? "" : "opacity-40"}
+                              onClick={() => toggle(r, m, a)}
+                              disabled={!isAdmin || loading}
+                              className={
+                                "transition " +
+                                (isAdmin ? "cursor-pointer hover:scale-105" : "cursor-default")
+                              }
+                              aria-pressed={allowed}
                             >
-                              {a}
-                            </Badge>
+                              <Badge
+                                variant={allowed ? "default" : "outline"}
+                                className={allowed ? "" : "opacity-40"}
+                              >
+                                {a}
+                              </Badge>
+                            </button>
                           );
                         })}
                       </div>

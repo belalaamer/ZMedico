@@ -2914,6 +2914,33 @@ export type Database = {
         }
         Relationships: []
       }
+      role_permissions: {
+        Row: {
+          actions: string[]
+          created_at: string
+          id: string
+          module: string
+          role: string
+          updated_at: string
+        }
+        Insert: {
+          actions?: string[]
+          created_at?: string
+          id?: string
+          module: string
+          role: string
+          updated_at?: string
+        }
+        Update: {
+          actions?: string[]
+          created_at?: string
+          id?: string
+          module?: string
+          role?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       saas_invoice_counters: {
         Row: {
           last_value: number

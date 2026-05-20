@@ -15,6 +15,7 @@ import { formatMoney, formatDate } from "@/lib/format";
 import { CreateInvoiceDialog } from "./CreateInvoiceDialog";
 import { RowActions } from "@/components/RowActions";
 import { useNavigate } from "react-router-dom";
+import { useUserRole } from "@/hooks/useUserRole";
 
 type Inv = {
   id: string;
@@ -39,6 +40,7 @@ export default function Invoices() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
   const navigate = useNavigate();
+  const { isAdmin } = useUserRole();
   const [items, setItems] = useState<Inv[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
@@ -73,8 +75,16 @@ export default function Invoices() {
     ({ draft: t("statusDraft"), pending: t("statusPending"), paid: t("statusPaid"), partial: t("statusPartial"), cancelled: t("statusCancelled") }[s]);
 
   const softDelete = async (i: Inv): Promise<void> => {
-    if (i.status !== "draft") { toast.error(lang === "ar" ? "يمكن حذف المسودات فقط" : "Only draft invoices can be deleted"); return; }
-    const { error } = await supabase.from("invoices").update({ deleted_at: new Date().toISOString() } as any).eq("id", i.id);
+    if (i.status !== "draft" && !isAdmin) {
+      toast.error(lang === "ar" ? "يمكن حذف المسودات فقط" : "Only draft invoices can be deleted");
+      return;
+    }
+    const now = new Date().toISOString();
+    // Admin: also soft-delete linked payments so totals stay consistent
+    if (isAdmin) {
+      await supabase.from("payments").update({ deleted_at: now } as any).eq("invoice_id", i.id).is("deleted_at", null);
+    }
+    const { error } = await supabase.from("invoices").update({ deleted_at: now } as any).eq("id", i.id);
     if (error) { toast.error(error.message); return; }
     toast.success(t("delete")); load();
   };
@@ -142,7 +152,7 @@ export default function Invoices() {
                   <RowActions
                     onEdit={() => navigate(`/invoices/${i.id}`)}
                     onDelete={() => softDelete(i)}
-                    canDelete={i.status === "draft"}
+                    canDelete={isAdmin || i.status === "draft"}
                   />
                 </div>
               );

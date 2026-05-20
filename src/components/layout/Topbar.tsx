@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Bell, Search, LogOut, Globe, Calendar, Wallet, Clock, AlertTriangle } from "lucide-react";
+import { Bell, Search, LogOut, Globe, Calendar, Wallet, Clock, AlertTriangle, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,8 @@ import {
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { SidebarContent } from "./Sidebar";
 import { supabase } from "@/integrations/supabase/client";
 
 export function Topbar() {
@@ -21,6 +23,7 @@ export function Topbar() {
   const { branches, currentBranchId, setCurrentBranchId } = useBranch();
   const [now, setNow] = useState(new Date());
   const [notifs, setNotifs] = useState<any[]>([]);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -95,10 +98,22 @@ export function Topbar() {
 
   return (
     <header className="h-16 shrink-0 flex items-center gap-3 px-4 md:px-6 border-b border-border bg-card">
-      <div className="relative flex-1 max-w-xl">
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetTrigger asChild>
+          <Button variant="ghost" size="icon" className="md:hidden" aria-label="Menu">
+            <Menu className="size-5" />
+          </Button>
+        </SheetTrigger>
+        <SheetContent side={lang === "ar" ? "right" : "left"} className="p-0 w-72 bg-sidebar text-sidebar-foreground border-sidebar-border">
+          <SidebarContent onNavigate={() => setMobileOpen(false)} />
+        </SheetContent>
+      </Sheet>
+
+      <div className="relative flex-1 max-w-xl hidden sm:block">
         <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
         <Input placeholder={t("search")} className="ps-9 bg-muted/50 border-transparent focus-visible:bg-background" />
       </div>
+      <div className="flex-1 sm:hidden" />
 
       <div className="hidden sm:block text-sm font-mono tabular-nums text-muted-foreground">
         {time}

@@ -3,9 +3,11 @@ import { NavLink } from "react-router-dom";
 import { Settings, Building2, Calendar, FileText, CreditCard, Briefcase, Bell, Mail, MessageSquare, Phone, Languages, ShieldCheck, Users, HardDrive, ScrollText, Info, GitBranch, Send } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { cn } from "@/lib/utils";
+import { useUserRole } from "@/hooks/useUserRole";
 
 export default function SettingsLayout({ children }: { children: ReactNode }) {
   const { t } = useI18n();
+  const { isAdmin } = useUserRole();
   const items = [
     { to: "/settings/general", icon: Building2, label: t("clinicProfile") },
     { to: "/settings/branches", icon: GitBranch, label: t("branches") },
@@ -19,7 +21,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
     { to: "/settings/templates/sms", icon: MessageSquare, label: t("smsTemplates") },
     { to: "/settings/templates/whatsapp", icon: Phone, label: t("whatsappTemplates") },
     { to: "/settings/languages", icon: Languages, label: t("languageSettings") },
-    { to: "/settings/roles", icon: ShieldCheck, label: t("rolePermissions") },
+    ...(isAdmin ? [{ to: "/settings/roles", icon: ShieldCheck, label: t("rolePermissions") }] : []),
     { to: "/settings/users", icon: Users, label: t("userManagement") },
     { to: "/settings/backup", icon: HardDrive, label: t("backupExport") },
     { to: "/settings/audit", icon: ScrollText, label: t("auditLogs") },

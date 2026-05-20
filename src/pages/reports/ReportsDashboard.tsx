@@ -18,7 +18,7 @@ export default function ReportsDashboard() {
     const today = new Date();
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
     (async () => {
-      let pq = supabase.from("payments").select("amount").gte("payment_date", monthStart);
+      let pq = supabase.from("payments").select("amount").is("deleted_at", null).gte("payment_date", monthStart);
       if (currentBranchId) pq = pq.eq("branch_id", currentBranchId);
       const { data: pays } = await pq;
       const revenue = (pays ?? []).reduce((s, r: any) => s + Number(r.amount || 0), 0);
@@ -31,7 +31,7 @@ export default function ReportsDashboard() {
       if (currentBranchId) aq = aq.eq("branch_id", currentBranchId);
       const { count: appts } = await aq;
 
-      let iq = supabase.from("invoices").select("id", { count: "exact", head: true }).in("status", ["pending", "partial"]);
+      let iq = supabase.from("invoices").select("id", { count: "exact", head: true }).is("deleted_at", null).in("status", ["pending", "partial"]);
       if (currentBranchId) iq = iq.eq("branch_id", currentBranchId);
       const { count: pending } = await iq;
 

@@ -43,6 +43,7 @@ function RevenueTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
   useEffect(() => {
     let q = supabase.from("invoices")
       .select("id, invoice_number, invoice_date, total, paid_amount, status, patients(first_name_en, last_name_en, first_name_ar, last_name_ar)")
+      .is("deleted_at", null)
       .gte("invoice_date", start).lte("invoice_date", end).order("invoice_date", { ascending: false });
     if (branchId) q = q.eq("branch_id", branchId);
     q.then(({ data }) => setRows(data ?? []));
@@ -119,7 +120,7 @@ function RevenueTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
 function CollectionTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
   const [rows, setRows] = useState<any[]>([]);
   useEffect(() => {
-    let q = supabase.from("payments").select("amount, payment_method").gte("payment_date", start).lte("payment_date", end);
+    let q = supabase.from("payments").select("amount, payment_method").is("deleted_at", null).gte("payment_date", start).lte("payment_date", end);
     if (branchId) q = q.eq("branch_id", branchId);
     q.then(({ data }) => setRows(data ?? []));
   }, [start, end, branchId]);
@@ -171,6 +172,7 @@ function OutstandingTab({ branchId, lang, t }: any) {
   useEffect(() => {
     let q = supabase.from("invoices")
       .select("id, invoice_number, invoice_date, total, paid_amount, status, patients(first_name_en, last_name_en, first_name_ar, last_name_ar)")
+      .is("deleted_at", null)
       .in("status", ["pending", "partial"]);
     if (branchId) q = q.eq("branch_id", branchId);
     q.then(({ data }) => setRows(data ?? []));
@@ -229,7 +231,7 @@ function OutstandingTab({ branchId, lang, t }: any) {
 function ExpenseTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
   const [rows, setRows] = useState<any[]>([]);
   useEffect(() => {
-    let q = supabase.from("expenses").select("id, expense_date, amount, description_en, description_ar, expense_categories(name_en, name_ar)").gte("expense_date", start).lte("expense_date", end);
+    let q = supabase.from("expenses").select("id, expense_date, amount, description_en, description_ar, expense_categories(name_en, name_ar)").is("deleted_at", null).gte("expense_date", start).lte("expense_date", end);
     if (branchId) q = q.eq("branch_id", branchId);
     q.then(({ data }) => setRows(data ?? []));
   }, [start, end, branchId]);
@@ -288,12 +290,12 @@ function PLTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
 
   useEffect(() => {
     (async () => {
-      let pq = supabase.from("payments").select("amount").gte("payment_date", start).lte("payment_date", end);
+      let pq = supabase.from("payments").select("amount").is("deleted_at", null).gte("payment_date", start).lte("payment_date", end);
       if (branchId) pq = pq.eq("branch_id", branchId);
       const { data: pays } = await pq;
       setRevenue((pays ?? []).reduce((s, r: any) => s + Number(r.amount || 0), 0));
 
-      let eq = supabase.from("expenses").select("amount").gte("expense_date", start).lte("expense_date", end);
+      let eq = supabase.from("expenses").select("amount").is("deleted_at", null).gte("expense_date", start).lte("expense_date", end);
       if (branchId) eq = eq.eq("branch_id", branchId);
       const { data: exps } = await eq;
       setExpenses((exps ?? []).reduce((s, r: any) => s + Number(r.amount || 0), 0));

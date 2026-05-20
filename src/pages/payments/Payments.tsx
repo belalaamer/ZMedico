@@ -34,7 +34,7 @@ export default function Payments() {
   const softDelete = async (p: any): Promise<void> => {
     const { error } = await supabase.from("payments").update({ deleted_at: new Date().toISOString() } as any).eq("id", p.id);
     if (error) { toast.error(error.message); return; }
-    if (p.invoice_id) { await (supabase as any).rpc("recalc_invoice_payments", { _invoice_id: p.invoice_id }); }
+    // Treasury reversal & invoice recalc happen automatically via DB trigger.
     toast.success(t("delete")); load();
   };
 

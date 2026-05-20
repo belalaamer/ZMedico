@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Navigate } from "react-router-dom";
 import SettingsLayout from "./SettingsLayout";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";

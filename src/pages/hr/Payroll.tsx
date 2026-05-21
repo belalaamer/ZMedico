@@ -14,6 +14,7 @@ import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
+import { RowActions } from "@/components/RowActions";
 
 const now = new Date();
 
@@ -79,6 +80,14 @@ export default function Payroll() {
     load();
   };
 
+  const remove = async (p: any) => {
+    await supabase.from("salary_adjustments").delete().eq("payroll_id", p.id);
+    const { error } = await supabase.from("payroll").delete().eq("id", p.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("delete"));
+    load();
+  };
+
   const addAdjustment = async () => {
     if (!openAdj || !adj.amount) return;
     const amount = Number(adj.amount);
@@ -134,6 +143,7 @@ export default function Payroll() {
                   {p.status === "draft" && <Button size="sm" onClick={() => setStatus(p.id, "approved")}>{t("approve")}</Button>}
                   {p.status === "approved" && <Button size="sm" className="gradient-primary text-primary-foreground" onClick={() => setStatus(p.id, "paid")}>{t("markAsPaid")}</Button>}
                   <Button size="sm" variant="ghost" onClick={() => window.print()}><FileText className="size-4" /></Button>
+                  <RowActions canEdit={false} onDelete={() => remove(p)} />
                 </div>
               </div>
             ))}

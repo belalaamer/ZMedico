@@ -20,3 +20,17 @@ export function formatDateTime(d: string | Date | null | undefined, lang: "en" |
     year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit",
   });
 }
+
+// Convert Arabic-Indic (٠-٩) and Persian (۰-۹) digits to Latin (0-9)
+export function toLatinDigits(input: string): string {
+  if (!input) return input;
+  return input
+    .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 0x06F0))
+    .replace(/،/g, ".");
+}
+
+export function parseLocaleNumber(input: string): number {
+  const n = Number(toLatinDigits(String(input ?? "")).replace(",", "."));
+  return Number.isFinite(n) ? n : 0;
+}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Edit3, Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { RowActions } from "@/components/RowActions";
 
 type Dx = { id: string; code: string; name_en: string; name_ar: string; category: string | null; description_en: string | null; description_ar: string | null };
 
@@ -24,9 +25,19 @@ export default function Diagnoses() {
   const [form, setForm] = useState({ code: "", name: "", category: "", description: "" });
 
   const load = async () => {
-    const { data } = await supabase.from("diagnoses").select("*").order("code").limit(2000);
+    const { data } = await supabase.from("diagnoses").select("*").is("deleted_at", null).order("code").limit(2000);
     setItems((data ?? []) as any);
   };
+  const remove = async (d: Dx) => {
+    const { count } = await supabase.from("record_diagnoses").select("id", { count: "exact", head: true }).eq("diagnosis_id", d.id);
+    if ((count ?? 0) > 0) {
+      return toast.error(lang === "ar" ? "لا يمكن الحذف: التشخيص مستخدم في سجلات طبية" : "Cannot delete: diagnosis is used in medical records");
+    }
+    const { error } = await supabase.from("diagnoses").update({ deleted_at: new Date().toISOString() } as any).eq("id", d.id);
+    if (error) return toast.error(error.message);
+    toast.success(t("delete")); load();
+  };
+
   useEffect(() => { load(); }, []);
 
   const cats = useMemo(() => Array.from(new Set(items.map((i) => i.category).filter(Boolean) as string[])).sort(), [items]);
@@ -100,7 +111,7 @@ export default function Diagnoses() {
                   <div className="text-xs text-muted-foreground truncate" dir={lang === "ar" ? "ltr" : "rtl"}>{lang === "ar" ? d.name_en : d.name_ar}</div>
                 </div>
                 {d.category && <Badge variant="outline">{d.category}</Badge>}
-                <Button variant="ghost" size="icon" onClick={() => openEdit(d)}><Edit3 className="size-4" /></Button>
+                <RowActions onEdit={() => openEdit(d)} onDelete={() => remove(d)} />
               </div>
             ))}
           </div>

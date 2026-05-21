@@ -24,7 +24,7 @@ export default function Categories() {
   const load = async () => {
     const { data } = await supabase.from("product_categories").select("*").order("name_en");
     setCats((data ?? []) as Cat[]);
-    const { data: prods } = await supabase.from("products").select("category_id").not("category_id", "is", null);
+    const { data: prods } = await supabase.from("products").select("category_id").is("deleted_at", null).not("category_id", "is", null);
     const c: Record<string, number> = {};
     (prods ?? []).forEach((p: any) => { c[p.category_id] = (c[p.category_id] ?? 0) + 1; });
     setCounts(c);

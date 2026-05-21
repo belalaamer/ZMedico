@@ -28,13 +28,14 @@ export default function Diagnoses() {
     const { data } = await supabase.from("diagnoses").select("*").is("deleted_at", null).order("code").limit(2000);
     setItems((data ?? []) as any);
   };
-  const remove = async (d: Dx) => {
+  const remove = async (d: Dx): Promise<void> => {
     const { count } = await supabase.from("record_diagnoses").select("id", { count: "exact", head: true }).eq("diagnosis_id", d.id);
     if ((count ?? 0) > 0) {
-      return toast.error(lang === "ar" ? "لا يمكن الحذف: التشخيص مستخدم في سجلات طبية" : "Cannot delete: diagnosis is used in medical records");
+      toast.error(lang === "ar" ? "لا يمكن الحذف: التشخيص مستخدم في سجلات طبية" : "Cannot delete: diagnosis is used in medical records");
+      return;
     }
     const { error } = await supabase.from("diagnoses").update({ deleted_at: new Date().toISOString() } as any).eq("id", d.id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success(t("delete")); load();
   };
 

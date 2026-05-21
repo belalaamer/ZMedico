@@ -5,6 +5,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useBranch } from "@/contexts/BranchContext";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {}) {
   const { t, lang } = useI18n();
@@ -205,6 +206,12 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
 }
 
 export function Sidebar() {
+  const isMobile = useIsMobile();
+
+  if (isMobile) {
+    return null;
+  }
+
   return (
     <aside className="hidden md:flex w-64 shrink-0 flex-col border-e border-sidebar-border h-screen sticky top-0">
       <SidebarContent />

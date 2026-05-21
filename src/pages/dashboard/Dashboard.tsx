@@ -116,6 +116,7 @@ export default function Dashboard() {
         topItemsRes,
       ] = await Promise.all([
         branchEq(supabase.from("appointments").select("status")
+          .is("deleted_at", null)
           .gte("scheduled_at", start.toISOString()).lte("scheduled_at", end.toISOString())),
         branchEq(supabase.from("patients").select("id", { count: "exact", head: true })
           .is("deleted_at", null)
@@ -126,17 +127,19 @@ export default function Dashboard() {
         branchEq(supabase.from("medical_records").select("id", { count: "exact", head: true }).eq("status", "draft")),
         branchEq(supabase.from("payments").select("payment_date,amount").is("deleted_at", null)
           .gte("payment_date", rangeStart).lte("payment_date", rangeEnd)),
-        branchEq(supabase.from("appointments").select("status").gte("scheduled_at", rs.toISOString()).lte("scheduled_at", re.toISOString())),
+        branchEq(supabase.from("appointments").select("status").is("deleted_at", null).gte("scheduled_at", rs.toISOString()).lte("scheduled_at", re.toISOString())),
         branchEq(supabase.from("patients").select("dob").is("deleted_at", null)),
         branchEq(supabase.from("patients").select("id,first_name_en,first_name_ar,last_name_en,last_name_ar,phone,created_at")
           .is("deleted_at", null)
           .order("created_at", { ascending: false }).limit(5)),
         branchEq(supabase.from("appointments").select("id,scheduled_at,status,doctor_id,patient:patients(first_name_en,first_name_ar,last_name_en,last_name_ar)")
+          .is("deleted_at", null)
           .order("created_at", { ascending: false }).limit(5)),
         branchEq(supabase.from("payments").select("id,amount,payment_method,payment_date,patient:patients(first_name_en,first_name_ar,last_name_en,last_name_ar)")
           .is("deleted_at", null)
           .order("created_at", { ascending: false }).limit(5)),
         branchEq(supabase.from("appointments").select("doctor_id,status")
+          .is("deleted_at", null)
           .gte("scheduled_at", rs.toISOString()).lte("scheduled_at", re.toISOString())
           .not("doctor_id", "is", null)),
         supabase.from("invoice_items").select("description_en,description_ar,quantity,total,invoice:invoices!inner(branch_id,issue_date,deleted_at)")

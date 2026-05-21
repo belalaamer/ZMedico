@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft, ChevronRight, Plus, Send } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Send, CalendarDays, LayoutGrid, Clock } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -42,6 +42,9 @@ type Appt = {
 
 function startOfDay(d: Date) { const x = new Date(d); x.setHours(0,0,0,0); return x; }
 function addDays(d: Date, n: number) { const x = new Date(d); x.setDate(x.getDate()+n); return x; }
+function startOfWeek(d: Date) { const x = startOfDay(d); const dow = x.getDay(); return addDays(x, -dow); }
+function startOfMonth(d: Date) { const x = new Date(d.getFullYear(), d.getMonth(), 1); x.setHours(0,0,0,0); return x; }
+function sameDay(a: Date, b: Date) { return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
 
 const statusClass: Record<Appt["status"], string> = {
   scheduled: "status-progress",
@@ -53,11 +56,29 @@ const statusClass: Record<Appt["status"], string> = {
   departed: "status-departed",
 };
 
+// HSL tokens for time-grid blocks (uses semantic tokens)
+const statusBlock: Record<Appt["status"], string> = {
+  scheduled:   "bg-primary/15 border-primary/40 text-foreground",
+  confirmed:   "bg-emerald-500/15 border-emerald-500/40 text-foreground",
+  in_progress: "bg-amber-500/15 border-amber-500/40 text-foreground",
+  completed:   "bg-emerald-500/20 border-emerald-500/50 text-foreground",
+  cancelled:   "bg-destructive/15 border-destructive/40 text-foreground line-through opacity-70",
+  no_show:     "bg-destructive/10 border-destructive/30 text-foreground opacity-70",
+  departed:    "bg-muted border-border text-muted-foreground",
+};
+
+const DAY_START_HOUR = 8;
+const DAY_END_HOUR = 21; // exclusive
+const HOUR_HEIGHT = 56; // px
+
 export default function CalendarPage() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
   const [date, setDate] = useState<Date>(startOfDay(new Date()));
+  const [view, setView] = useState<"day" | "week">("day");
+  const [monthCursor, setMonthCursor] = useState<Date>(startOfMonth(new Date()));
   const [items, setItems] = useState<Appt[]>([]);
+  const [monthDots, setMonthDots] = useState<Record<string, number>>({});
   const [patients, setPatients] = useState<{ id: string; label: string }[]>([]);
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -70,9 +91,14 @@ export default function CalendarPage() {
     [date, lang]
   );
 
+  const rangeStart = useMemo(() => view === "day" ? startOfDay(date) : startOfWeek(date), [date, view]);
+  const rangeEnd = useMemo(() => view === "day" ? addDays(rangeStart, 1) : addDays(rangeStart, 7), [rangeStart, view]);
+  const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(rangeStart, i)), [rangeStart]);
+  const hours = useMemo(() => Array.from({ length: DAY_END_HOUR - DAY_START_HOUR }, (_, i) => DAY_START_HOUR + i), []);
+
   const load = async () => {
-    const start = startOfDay(date).toISOString();
-    const end = addDays(startOfDay(date), 1).toISOString();
+    const start = rangeStart.toISOString();
+    const end = rangeEnd.toISOString();
     let q = supabase.from("appointments")
       .select("*, patients!inner(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)")
       .gte("scheduled_at", start).lt("scheduled_at", end)
@@ -84,8 +110,29 @@ export default function CalendarPage() {
     setItems((data ?? []) as any);
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [date, currentBranchId]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [rangeStart.getTime(), rangeEnd.getTime(), currentBranchId]);
   useDataSync(["appointments", "calendar"], () => { load(); });
+
+  // Month dots
+  const loadMonthDots = async () => {
+    const start = startOfMonth(monthCursor).toISOString();
+    const endDate = new Date(monthCursor.getFullYear(), monthCursor.getMonth() + 1, 1);
+    const end = endDate.toISOString();
+    let q = supabase.from("appointments")
+      .select("scheduled_at")
+      .gte("scheduled_at", start).lt("scheduled_at", end)
+      .is("deleted_at", null);
+    if (currentBranchId) q = q.eq("branch_id", currentBranchId);
+    const { data } = await q;
+    const dots: Record<string, number> = {};
+    for (const r of (data ?? []) as { scheduled_at: string }[]) {
+      const k = new Date(r.scheduled_at).toDateString();
+      dots[k] = (dots[k] ?? 0) + 1;
+    }
+    setMonthDots(dots);
+  };
+  useEffect(() => { loadMonthDots(); /* eslint-disable-next-line */ }, [monthCursor.getTime(), currentBranchId]);
+  useDataSync(["appointments"], () => loadMonthDots());
 
   const loadPatientOptions = () => {
     supabase.from("patients").select("id,first_name_en,last_name_en").is("deleted_at", null).order("created_at", { ascending: false }).limit(200)
@@ -97,6 +144,13 @@ export default function CalendarPage() {
   const openNew = () => {
     setEditId(null);
     setForm({ patient_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "" });
+    setOpen(true);
+  };
+  const openNewAt = (slot: Date) => {
+    setEditId(null);
+    const tz = slot.getTimezoneOffset();
+    const local = new Date(slot.getTime() - tz * 60000).toISOString().slice(0, 16);
+    setForm({ patient_id: "", scheduled_at: local, duration_minutes: 30, procedure: "", room: "", notes: "" });
     setOpen(true);
   };
   const openEdit = (a: Appt) => {
@@ -174,17 +228,100 @@ export default function CalendarPage() {
     load();
   };
 
+  // Group items by day for week view
+  const itemsByDay = useMemo(() => {
+    const map: Record<string, Appt[]> = {};
+    for (const a of items) {
+      const k = new Date(a.scheduled_at).toDateString();
+      (map[k] ??= []).push(a);
+    }
+    return map;
+  }, [items]);
+
+  // Stats for current visible range
+  const stats = useMemo(() => {
+    const s = { total: items.length, scheduled: 0, completed: 0, cancelled: 0 };
+    for (const a of items) {
+      if (a.status === "scheduled" || a.status === "confirmed") s.scheduled++;
+      else if (a.status === "completed") s.completed++;
+      else if (a.status === "cancelled" || a.status === "no_show") s.cancelled++;
+    }
+    return s;
+  }, [items]);
+
+  // Block position for time grid
+  const blockStyle = (a: Appt) => {
+    const dt = new Date(a.scheduled_at);
+    const minutesFromStart = (dt.getHours() - DAY_START_HOUR) * 60 + dt.getMinutes();
+    const top = (minutesFromStart / 60) * HOUR_HEIGHT;
+    const height = Math.max(28, (a.duration_minutes / 60) * HOUR_HEIGHT - 2);
+    return { top: `${top}px`, height: `${height}px` };
+  };
+
+  const timeStr = (d: Date) => d.toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US",
+    { hour: "2-digit", minute: "2-digit", hour12: true });
+  const fullName = (p: NonNullable<Appt["patients"]>) => lang === "ar"
+    ? `${p.first_name_ar ?? p.first_name_en} ${p.last_name_ar ?? p.last_name_en ?? ""}`.trim()
+    : `${p.first_name_en} ${p.last_name_en ?? ""}`.trim();
+
+  const renderApptBlock = (a: Appt) => (
+    <button
+      key={a.id}
+      onClick={() => openEdit(a)}
+      className={`absolute inset-x-1 rounded-md border text-start px-2 py-1 overflow-hidden hover:shadow-md transition-all ${statusBlock[a.status]}`}
+      style={blockStyle(a)}
+      title={`${fullName(a.patients!)} · ${timeStr(new Date(a.scheduled_at))}`}
+    >
+      <div className="text-[11px] font-medium truncate">{timeStr(new Date(a.scheduled_at))} · {fullName(a.patients!)}</div>
+      <div className="text-[10px] opacity-80 truncate">{a.procedure || "—"}{a.room ? ` · ${a.room}` : ""}</div>
+    </button>
+  );
+
+  // Month grid (sidebar mini calendar)
+  const monthGrid = useMemo(() => {
+    const first = startOfMonth(monthCursor);
+    const leading = first.getDay();
+    const cells: (Date | null)[] = [];
+    for (let i = 0; i < leading; i++) cells.push(null);
+    const daysIn = new Date(monthCursor.getFullYear(), monthCursor.getMonth() + 1, 0).getDate();
+    for (let d = 1; d <= daysIn; d++) cells.push(new Date(monthCursor.getFullYear(), monthCursor.getMonth(), d));
+    while (cells.length % 7 !== 0) cells.push(null);
+    return cells;
+  }, [monthCursor]);
+
+  const weekHeader = (d: Date) => d.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", { weekday: "short" });
+
+  // Now-line position (only on current day cells)
+  const now = new Date();
+  const nowTop = ((now.getHours() - DAY_START_HOUR) * 60 + now.getMinutes()) / 60 * HOUR_HEIGHT;
+  const showNowLine = now.getHours() >= DAY_START_HOUR && now.getHours() < DAY_END_HOUR;
+
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("calendar")}</h1>
           <p className="text-sm text-muted-foreground mt-1 capitalize">{dayLabel}</p>
         </div>
         <div className="flex gap-2 items-center">
-          <Button variant="outline" size="icon" onClick={() => setDate(addDays(date, -1))}><ChevronLeft className="size-4" /></Button>
+          <div className="inline-flex rounded-md border border-border overflow-hidden">
+            <button
+              onClick={() => setView("day")}
+              className={`px-3 h-9 text-sm inline-flex items-center gap-1 ${view === "day" ? "bg-muted" : "hover:bg-muted/50"}`}
+            >
+              <CalendarDays className="size-4" /> {t("today")}
+            </button>
+            <button
+              onClick={() => setView("week")}
+              className={`px-3 h-9 text-sm inline-flex items-center gap-1 border-s border-border ${view === "week" ? "bg-muted" : "hover:bg-muted/50"}`}
+            >
+              <LayoutGrid className="size-4" /> {lang === "ar" ? "أسبوع" : "Week"}
+            </button>
+          </div>
+          <Button variant="outline" size="icon" onClick={() => setDate(addDays(date, view === "week" ? -7 : -1))}><ChevronLeft className="size-4" /></Button>
           <Button variant="outline" size="sm" onClick={() => setDate(startOfDay(new Date()))}>{t("today")}</Button>
-          <Button variant="outline" size="icon" onClick={() => setDate(addDays(date, 1))}><ChevronRight className="size-4" /></Button>
+          <Button variant="outline" size="icon" onClick={() => setDate(addDays(date, view === "week" ? 7 : 1))}><ChevronRight className="size-4" /></Button>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button className="gradient-primary text-primary-foreground" onClick={openNew}><Plus className="me-2 size-4" />{t("newAppointment")}</Button>
@@ -236,57 +373,162 @@ export default function CalendarPage() {
         </div>
       </div>
 
+      {/* Stats strip */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          { label: lang === "ar" ? "إجمالي" : "Total", value: stats.total, cls: "text-foreground" },
+          { label: lang === "ar" ? "قادمة" : "Upcoming", value: stats.scheduled, cls: "text-primary" },
+          { label: lang === "ar" ? "مكتمل" : "Completed", value: stats.completed, cls: "text-emerald-500" },
+          { label: lang === "ar" ? "ملغية" : "Cancelled", value: stats.cancelled, cls: "text-destructive" },
+        ].map((s) => (
+          <Card key={s.label} className="p-4 shadow-card">
+            <div className="text-xs text-muted-foreground">{s.label}</div>
+            <div className={`text-2xl font-bold mt-1 ${s.cls}`}>{s.value}</div>
+          </Card>
+        ))}
+      </div>
+
       <div className="grid lg:grid-cols-[1fr,300px] gap-4">
+        {/* Time grid */}
         <Card className="shadow-card overflow-hidden">
-          {items.length === 0 ? (
-            <div className="p-10 text-center text-muted-foreground">{t("noAppointments")}</div>
-          ) : (
-            <div className="divide-y divide-border">
-              {items.map((a) => {
-                const time = new Date(a.scheduled_at).toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US",
-                  { hour: "2-digit", minute: "2-digit", hour12: true });
-                const p = a.patients!;
-                const name = lang === "ar"
-                  ? `${p.first_name_ar ?? p.first_name_en} ${p.last_name_ar ?? p.last_name_en ?? ""}`.trim()
-                  : `${p.first_name_en} ${p.last_name_en ?? ""}`.trim();
+          {view === "week" && (
+            <div className="grid border-b border-border" style={{ gridTemplateColumns: "56px repeat(7, minmax(0, 1fr))" }}>
+              <div />
+              {weekDays.map((d) => {
+                const today = sameDay(d, new Date());
                 return (
-                  <div key={a.id} className="flex items-center gap-4 p-4 hover:bg-muted/40 transition-colors">
-                    <div className="w-20 text-sm font-mono tabular-nums text-muted-foreground">{time}</div>
-                    <div className="w-1 self-stretch rounded-full gradient-primary" />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium truncate">{name} <span className="text-xs text-muted-foreground">#{p.patient_code}</span></div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        {a.procedure || "—"} {a.room ? `· ${a.room}` : ""} · {a.duration_minutes} min
-                      </div>
-                    </div>
-                    <Badge variant="outline" className={statusClass[a.status]}>{statusLabel(a.status, t)}</Badge>
-                    <Button variant="ghost" size="icon" title={t("sendReminder")} onClick={() => sendReminderNow(a)}>
-                      <Send className="size-4" />
-                    </Button>
-                  <RowActions onEdit={() => openEdit(a)} onDelete={() => softDelete(a)} />
-                  </div>
+                  <button key={d.toISOString()} onClick={() => { setDate(d); setView("day"); }}
+                    className={`p-2 text-center hover:bg-muted/40 transition-colors ${today ? "bg-primary/5" : ""}`}>
+                    <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{weekHeader(d)}</div>
+                    <div className={`text-lg font-semibold ${today ? "text-primary" : ""}`}>{d.getDate()}</div>
+                  </button>
                 );
               })}
             </div>
           )}
+
+          <div className="overflow-auto" style={{ maxHeight: "70vh" }}>
+            <div className="grid relative" style={{ gridTemplateColumns: view === "week" ? "56px repeat(7, minmax(0, 1fr))" : "56px 1fr" }}>
+              {/* Hour labels column */}
+              <div className="border-e border-border bg-muted/20">
+                {hours.map((h) => (
+                  <div key={h} className="text-[10px] text-muted-foreground text-end pe-2 pt-1" style={{ height: HOUR_HEIGHT }}>
+                    {new Date(2000, 0, 1, h).toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US", { hour: "numeric", hour12: true })}
+                  </div>
+                ))}
+              </div>
+
+              {/* Day columns */}
+              {(view === "week" ? weekDays : [date]).map((d) => {
+                const dayKey = d.toDateString();
+                const dayItems = itemsByDay[dayKey] ?? [];
+                const isToday = sameDay(d, new Date());
+                return (
+                  <div key={dayKey} className="relative border-e border-border last:border-e-0">
+                    {/* Hour rows (clickable to create) */}
+                    {hours.map((h) => (
+                      <button
+                        key={h}
+                        onClick={() => {
+                          const slot = new Date(d); slot.setHours(h, 0, 0, 0);
+                          openNewAt(slot);
+                        }}
+                        className="block w-full border-b border-border/60 hover:bg-primary/5 transition-colors"
+                        style={{ height: HOUR_HEIGHT }}
+                        aria-label={`Create at ${h}:00`}
+                      />
+                    ))}
+                    {/* Now line */}
+                    {isToday && showNowLine && (
+                      <div className="absolute inset-x-0 z-10 pointer-events-none" style={{ top: nowTop }}>
+                        <div className="h-px bg-destructive" />
+                        <div className="size-2 -mt-1 ms-0 rounded-full bg-destructive" />
+                      </div>
+                    )}
+                    {/* Appointment blocks */}
+                    {dayItems.map(renderApptBlock)}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {items.length === 0 && (
+            <div className="p-6 text-center text-sm text-muted-foreground border-t border-border">
+              {t("noAppointments")} — {lang === "ar" ? "اضغط على أي خانة لإنشاء موعد" : "click any slot to create one"}
+            </div>
+          )}
         </Card>
 
-        <Card className="p-4 shadow-card h-fit">
-          <div className="text-sm font-semibold mb-3">{t("today")}</div>
-          <div className="grid grid-cols-7 gap-1 text-center text-xs">
-            {Array.from({ length: 14 }).map((_, i) => {
-              const d = addDays(startOfDay(new Date()), i - 2);
-              const active = d.getTime() === date.getTime();
-              return (
-                <button key={i} onClick={() => setDate(d)}
-                  className={`p-2 rounded-lg ${active ? "gradient-primary text-primary-foreground" : "hover:bg-muted"}`}>
-                  <div className="text-[10px] opacity-70">{d.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", { weekday: "short" })}</div>
-                  <div className="font-semibold">{d.getDate()}</div>
-                </button>
-              );
-            })}
-          </div>
-        </Card>
+        {/* Sidebar: mini month + agenda */}
+        <div className="space-y-4">
+          <Card className="p-4 shadow-card">
+            <div className="flex items-center justify-between mb-3">
+              <button onClick={() => setMonthCursor(new Date(monthCursor.getFullYear(), monthCursor.getMonth() - 1, 1))}
+                className="size-7 inline-flex items-center justify-center rounded hover:bg-muted">
+                <ChevronLeft className="size-4" />
+              </button>
+              <div className="text-sm font-semibold">
+                {monthCursor.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", { month: "long", year: "numeric" })}
+              </div>
+              <button onClick={() => setMonthCursor(new Date(monthCursor.getFullYear(), monthCursor.getMonth() + 1, 1))}
+                className="size-7 inline-flex items-center justify-center rounded hover:bg-muted">
+                <ChevronRight className="size-4" />
+              </button>
+            </div>
+            <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-muted-foreground mb-1">
+              {["S","M","T","W","T","F","S"].map((d, i) => <div key={i}>{d}</div>)}
+            </div>
+            <div className="grid grid-cols-7 gap-1 text-center text-xs">
+              {monthGrid.map((d, i) => {
+                if (!d) return <div key={i} />;
+                const active = sameDay(d, date);
+                const today = sameDay(d, new Date());
+                const count = monthDots[d.toDateString()] ?? 0;
+                return (
+                  <button key={i} onClick={() => setDate(d)}
+                    className={`aspect-square rounded-lg relative flex flex-col items-center justify-center
+                      ${active ? "gradient-primary text-primary-foreground" : today ? "ring-1 ring-primary text-primary" : "hover:bg-muted"}`}>
+                    <span className="font-medium">{d.getDate()}</span>
+                    {count > 0 && (
+                      <span className={`absolute bottom-1 size-1 rounded-full ${active ? "bg-primary-foreground" : "bg-primary"}`} />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </Card>
+
+          <Card className="p-4 shadow-card">
+            <div className="text-sm font-semibold mb-3 inline-flex items-center gap-2">
+              <Clock className="size-4" /> {lang === "ar" ? "أجندة اليوم" : "Today's agenda"}
+            </div>
+            {items.filter((a) => sameDay(new Date(a.scheduled_at), date)).length === 0 ? (
+              <div className="text-xs text-muted-foreground py-4 text-center">{t("noAppointments")}</div>
+            ) : (
+              <div className="space-y-2 max-h-[40vh] overflow-auto">
+                {items.filter((a) => sameDay(new Date(a.scheduled_at), date)).map((a) => {
+                  const p = a.patients!;
+                  return (
+                    <div key={a.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/40 transition-colors">
+                      <div className="w-14 text-xs font-mono tabular-nums text-muted-foreground">{timeStr(new Date(a.scheduled_at))}</div>
+                      <div className="w-1 self-stretch rounded-full gradient-primary" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{fullName(p)}</div>
+                        <div className="text-[11px] text-muted-foreground truncate">{a.procedure || "—"}</div>
+                      </div>
+                      <Badge variant="outline" className={`text-[10px] ${statusClass[a.status]}`}>{statusLabel(a.status, t)}</Badge>
+                      <Button variant="ghost" size="icon" className="size-7" title={t("sendReminder")} onClick={() => sendReminderNow(a)}>
+                        <Send className="size-3.5" />
+                      </Button>
+                      <RowActions onEdit={() => openEdit(a)} onDelete={() => softDelete(a)} />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+        </div>
       </div>
     </div>
   );

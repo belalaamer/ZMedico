@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Edit3, Search, Activity } from "lucide-react";
+import { Plus, Search, Activity } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
+import { RowActions } from "@/components/RowActions";
 
 export default function Procedures() {
   const { t, lang } = useI18n();
@@ -26,12 +27,20 @@ export default function Procedures() {
 
   const load = async () => {
     const [{ data }, { data: s }] = await Promise.all([
-      supabase.from("procedures").select("*").order("name_en").limit(2000),
+      supabase.from("procedures").select("*").is("deleted_at", null).order("name_en").limit(2000),
       supabase.from("medical_specialties").select("*").eq("is_active", true).order("name_en"),
     ]);
     setItems(data ?? []); setSpecs(s ?? []);
   };
   useEffect(() => { load(); }, []);
+
+  const remove = async (p: any): Promise<void> => {
+    const { count } = await supabase.from("record_procedures").select("id", { count: "exact", head: true }).eq("procedure_id", p.id);
+    if ((count ?? 0) > 0) { toast.error(lang === "ar" ? "لا يمكن الحذف: الإجراء مستخدم في سجلات طبية" : "Cannot delete: procedure is used in medical records"); return; }
+    const { error } = await supabase.from("procedures").update({ deleted_at: new Date().toISOString() } as any).eq("id", p.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("delete")); load();
+  };
 
   const filtered = useMemo(() => items.filter((i) => {
     if (q && !`${i.code ?? ""} ${i.name_en} ${i.name_ar}`.toLowerCase().includes(q.toLowerCase())) return false;
@@ -116,7 +125,7 @@ export default function Procedures() {
                 </div>
                 <div className="text-end font-semibold tabular-nums text-primary">{formatMoney(p.default_price ?? 0, lang)}</div>
                 {!p.is_active && <Badge variant="outline" className="status-departed">{t("inactive")}</Badge>}
-                <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Edit3 className="size-4" /></Button>
+                <RowActions onEdit={() => openEdit(p)} onDelete={() => remove(p)} />
               </div>
             );
           })}

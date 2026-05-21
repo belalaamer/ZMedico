@@ -87,7 +87,7 @@ export function CreateInvoiceDialog({
     if (!open) return;
     console.log("Dialog opened, refetching patients...");
     void refetchPatients();
-    supabase.from("products").select("id,sku,name_en,name_ar,selling_price,min_stock_level").eq("is_active", true).order("name_en").limit(1000)
+    supabase.from("products").select("id,sku,name_en,name_ar,selling_price,min_stock_level").eq("is_active", true).is("deleted_at", null).order("name_en").limit(1000)
       .then(({ data }) => setProducts(data ?? []));
   }, [open, refetchPatients]);
 

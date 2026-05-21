@@ -34,7 +34,7 @@ export default function StockOverview() {
 
   const load = async () => {
     const [{ data: ps }, { data: bs }] = await Promise.all([
-      supabase.from("products").select("*").eq("is_active", true),
+      supabase.from("products").select("*").eq("is_active", true).is("deleted_at", null),
       supabase.from("branches").select("*").order("name_en"),
     ]);
     setProducts(ps ?? []); setBranches(bs ?? []);

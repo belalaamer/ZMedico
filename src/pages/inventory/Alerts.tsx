@@ -33,7 +33,7 @@ export default function Alerts() {
     if (currentBranchId) q = q.eq("branch_id", currentBranchId);
     const [{ data: al }, { data: ps }, { data: bs }] = await Promise.all([
       q,
-      supabase.from("products").select("*"),
+      supabase.from("products").select("*").is("deleted_at", null),
       supabase.from("branches").select("*"),
     ]);
     setAlerts(al ?? []);

@@ -1,0 +1,1 @@
+CREATE POLICY "hr_payroll_delete" ON public.payroll FOR DELETE TO authenticated USING (has_role(auth.uid(), 'hr'::app_role));

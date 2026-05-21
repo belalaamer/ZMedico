@@ -28,7 +28,7 @@ export default function Suppliers() {
   const load = async () => {
     const { data } = await supabase.from("suppliers").select("*").is("deleted_at", null).order("name_en");
     setItems(data ?? []);
-    const { data: prods } = await supabase.from("products").select("supplier_id").not("supplier_id", "is", null);
+    const { data: prods } = await supabase.from("products").select("supplier_id").is("deleted_at", null).not("supplier_id", "is", null);
     const c: Record<string, number> = {};
     (prods ?? []).forEach((p: any) => { c[p.supplier_id] = (c[p.supplier_id] ?? 0) + 1; });
     setCounts(c);

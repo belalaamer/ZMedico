@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NumberInput } from "@/components/ui/number-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -272,8 +273,8 @@ export function CreateInvoiceDialog({
                   <Input value={it.description_en} placeholder="Description" onChange={(e) => updateItem(idx, { description_en: e.target.value, description_ar: e.target.value })} />
                 )}
               </div>
-              <Input className="col-span-2 text-end" type="number" min={0} step="0.01" value={it.quantity} onChange={(e) => updateItem(idx, { quantity: Number(e.target.value) })} />
-              <Input className="col-span-2 text-end" type="number" min={0} step="0.01" value={it.unit_price} onChange={(e) => updateItem(idx, { unit_price: Number(e.target.value) })} />
+              <NumberInput className="col-span-2 text-end" value={it.quantity} onChange={(v) => updateItem(idx, { quantity: v })} />
+              <NumberInput className="col-span-2 text-end" value={it.unit_price} onChange={(v) => updateItem(idx, { unit_price: v })} />
               <div className="col-span-2 text-end self-center font-medium tabular-nums">
                 {formatMoney((Number(it.quantity)||0) * (Number(it.unit_price)||0), lang)}
               </div>
@@ -303,12 +304,12 @@ export function CreateInvoiceDialog({
             </div>
             <div className="flex items-center justify-between gap-2 text-sm">
               <span className="text-muted-foreground">{t("discount")} %</span>
-              <Input className="w-24 text-end" type="number" min={0} max={100} step="0.1" value={discountPct} onChange={(e) => setDiscountPct(Number(e.target.value))} />
+              <NumberInput className="w-24 text-end" value={discountPct} onChange={setDiscountPct} />
               <span className="font-medium tabular-nums w-28 text-end">- {formatMoney(discount, lang)}</span>
             </div>
             <div className="flex items-center justify-between gap-2 text-sm">
               <span className="text-muted-foreground">{t("tax")} %</span>
-              <Input className="w-24 text-end" type="number" min={0} max={100} step="0.1" value={taxPct} onChange={(e) => setTaxPct(Number(e.target.value))} />
+              <NumberInput className="w-24 text-end" value={taxPct} onChange={setTaxPct} />
               <span className="font-medium tabular-nums w-28 text-end">+ {formatMoney(tax, lang)}</span>
             </div>
             <div className="flex items-center justify-between text-base font-bold border-t border-border pt-2">

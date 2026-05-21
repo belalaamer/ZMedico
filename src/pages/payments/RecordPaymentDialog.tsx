@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NumberInput } from "@/components/ui/number-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -157,7 +158,7 @@ export function RecordPaymentDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>{t("amount")}</Label>
-              <Input type="number" min={0.01} step="0.01" value={amount} onChange={(e) => setAmount(Number(e.target.value))} />
+              <NumberInput value={amount} onChange={setAmount} />
             </div>
             <div className="space-y-2">
               <Label>{t("invoiceDate")}</Label>

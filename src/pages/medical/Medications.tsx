@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Edit3, Search, Pill } from "lucide-react";
+import { Plus, Search, Pill } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { RowActions } from "@/components/RowActions";
 
 const FORMS = ["tablet", "capsule", "syrup", "drops", "cream", "ointment", "inhaler", "injection", "solution", "spray"];
 
@@ -26,12 +27,20 @@ export default function Medications() {
 
   const load = async () => {
     const [{ data }, { data: p }] = await Promise.all([
-      supabase.from("medications").select("*").order("name_en").limit(2000),
+      supabase.from("medications").select("*").is("deleted_at", null).order("name_en").limit(2000),
       supabase.from("products").select("id,sku,name_en,name_ar").eq("is_active", true).is("deleted_at", null).order("name_en").limit(1000),
     ]);
     setItems(data ?? []); setProducts(p ?? []);
   };
   useEffect(() => { load(); }, []);
+
+  const remove = async (m: any): Promise<void> => {
+    const { count } = await supabase.from("prescription_items").select("id", { count: "exact", head: true }).eq("medication_id", m.id);
+    if ((count ?? 0) > 0) { toast.error(lang === "ar" ? "لا يمكن الحذف: الدواء مستخدم في وصفات" : "Cannot delete: medication is used in prescriptions"); return; }
+    const { error } = await supabase.from("medications").update({ deleted_at: new Date().toISOString() } as any).eq("id", m.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("delete")); load();
+  };
 
   const filtered = useMemo(() => items.filter((i) =>
     !q || `${i.name_en} ${i.name_ar} ${i.generic_name ?? ""}`.toLowerCase().includes(q.toLowerCase())
@@ -118,7 +127,7 @@ export default function Medications() {
                 <div className="text-xs text-muted-foreground truncate">{m.generic_name} · {m.dosage_form}</div>
               </div>
               {!m.is_active && <Badge variant="outline" className="status-departed">{t("inactive")}</Badge>}
-              <Button variant="ghost" size="icon" onClick={() => openEdit(m)}><Edit3 className="size-4" /></Button>
+              <RowActions onEdit={() => openEdit(m)} onDelete={() => remove(m)} />
             </div>
           ))}
         </div>

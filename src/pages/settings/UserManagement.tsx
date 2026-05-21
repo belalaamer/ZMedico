@@ -50,6 +50,41 @@ export default function UserManagement() {
 
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // Edit-user dialog state
+  const [editTarget, setEditTarget] = useState<any | null>(null);
+  const [eRole, setERole] = useState<Role>("staff");
+  const [eBranch, setEBranch] = useState<string>("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const openEdit = (u: any) => {
+    const current = (roles[u.id] ?? [])[0] as Role | undefined;
+    setERole((current as Role) ?? "staff");
+    setEBranch(staffBranches[u.id] ?? "");
+    setEditTarget(u);
+  };
+
+  const saveEdit = async () => {
+    if (!editTarget) return;
+    if (eRole === "manager" && !eBranch) {
+      toast.error(lang === "ar" ? "يجب اختيار فرع لدور المدير" : "Branch is required for the manager role");
+      return;
+    }
+    setSavingEdit(true);
+    // Replace roles: delete all then insert the chosen one
+    const del = await (supabase as any).from("user_roles").delete().eq("user_id", editTarget.id);
+    if (del.error) { setSavingEdit(false); toast.error(del.error.message); return; }
+    const ins = await (supabase as any).from("user_roles").insert({ user_id: editTarget.id, role: eRole });
+    if (ins.error) { setSavingEdit(false); toast.error(ins.error.message); return; }
+    // Update staff_profiles branch if row exists
+    if (eBranch) {
+      await (supabase as any).from("staff_profiles").update({ branch_id: eBranch }).eq("id", editTarget.id);
+    }
+    setSavingEdit(false);
+    toast.success(lang === "ar" ? "تم تحديث الصلاحيات" : "Permissions updated");
+    setEditTarget(null);
+    load();
+  };
+
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? null));
@@ -217,7 +252,7 @@ export default function UserManagement() {
                   </Badge>
                 )}
               </div>
-              <Button size="sm" variant="outline">{t("edit")}</Button>
+              <Button size="sm" variant="outline" onClick={() => openEdit(u)}>{t("edit")}</Button>
               {currentUserId !== u.id && (
                 <Button
                   size="sm"
@@ -469,6 +504,57 @@ export default function UserManagement() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Edit user dialog */}
+        <Dialog open={!!editTarget} onOpenChange={(o) => !o && !savingEdit && setEditTarget(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {lang === "ar" ? "تعديل صلاحيات المستخدم" : "Edit user permissions"}
+              </DialogTitle>
+              <DialogDescription>
+                {editTarget?.full_name ?? editTarget?.email}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>{lang === "ar" ? "الدور" : "Role"}</Label>
+                <Select value={eRole} onValueChange={(v) => setERole(v as Role)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {ROLES.map((r) => (
+                      <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>
+                  {lang === "ar" ? "الفرع" : "Branch"}
+                  {eRole === "manager" && (lang === "ar" ? " (مطلوب للمدير)" : " (required for manager)")}
+                </Label>
+                <Select value={eBranch} onValueChange={setEBranch}>
+                  <SelectTrigger><SelectValue placeholder={lang === "ar" ? "اختر فرعاً" : "Select a branch"} /></SelectTrigger>
+                  <SelectContent>
+                    {branches.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {lang === "ar" ? b.name_ar : b.name_en}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditTarget(null)} disabled={savingEdit}>
+                {t("cancel")}
+              </Button>
+              <Button type="button" onClick={saveEdit} disabled={savingEdit} className="gradient-primary text-primary-foreground">
+                {savingEdit ? (lang === "ar" ? "جارٍ الحفظ..." : "Saving...") : (lang === "ar" ? "حفظ" : "Save")}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </SettingsLayout>
   );

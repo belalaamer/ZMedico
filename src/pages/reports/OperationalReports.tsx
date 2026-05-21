@@ -39,6 +39,7 @@ function ApptsTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
   useEffect(() => {
     let q = supabase.from("appointments")
       .select("id, scheduled_at, status, doctor_id, patients(first_name_en, last_name_en, first_name_ar, last_name_ar), profiles!appointments_doctor_id_fkey(full_name)")
+      .is("deleted_at", null)
       .gte("scheduled_at", start).lte("scheduled_at", end + "T23:59:59");
     if (branchId) q = q.eq("branch_id", branchId);
     q.then(({ data }) => setRows(data ?? []));

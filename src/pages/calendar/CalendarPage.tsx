@@ -510,18 +510,22 @@ export default function CalendarPage() {
                 {items.filter((a) => sameDay(new Date(a.scheduled_at), date)).map((a) => {
                   const p = a.patients!;
                   return (
-                    <div key={a.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/40 transition-colors">
-                      <div className="w-14 text-xs font-mono tabular-nums text-muted-foreground">{timeStr(new Date(a.scheduled_at))}</div>
-                      <div className="w-1 self-stretch rounded-full gradient-primary" />
+                    <div key={a.id} className="flex items-start gap-2 p-2 rounded-lg hover:bg-muted/40 transition-colors">
+                      <div className="w-1 self-stretch rounded-full gradient-primary shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">{fullName(p)}</div>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-xs font-mono tabular-nums text-muted-foreground">{timeStr(new Date(a.scheduled_at))}</div>
+                          <Badge variant="outline" className={`text-[10px] shrink-0 ${statusClass[a.status]}`}>{statusLabel(a.status, t)}</Badge>
+                        </div>
+                        <div className="text-sm font-medium break-words leading-snug mt-0.5">{fullName(p)}</div>
                         <div className="text-[11px] text-muted-foreground truncate">{a.procedure || "—"}</div>
+                        <div className="flex items-center gap-1 mt-1 -ms-1">
+                          <Button variant="ghost" size="icon" className="size-7" title={t("sendReminder")} onClick={() => sendReminderNow(a)}>
+                            <Send className="size-3.5" />
+                          </Button>
+                          <RowActions onEdit={() => openEdit(a)} onDelete={() => softDelete(a)} />
+                        </div>
                       </div>
-                      <Badge variant="outline" className={`text-[10px] ${statusClass[a.status]}`}>{statusLabel(a.status, t)}</Badge>
-                      <Button variant="ghost" size="icon" className="size-7" title={t("sendReminder")} onClick={() => sendReminderNow(a)}>
-                        <Send className="size-3.5" />
-                      </Button>
-                      <RowActions onEdit={() => openEdit(a)} onDelete={() => softDelete(a)} />
                     </div>
                   );
                 })}

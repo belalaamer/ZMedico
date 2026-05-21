@@ -28,6 +28,7 @@ export function RecordPaymentDialog({
   const [pid, setPid] = useState<string>(patientId ?? "");
   const [pidSelectOpen, setPidSelectOpen] = useState(false);
   const [iid, setIid] = useState<string>(invoiceId ?? "");
+  const [invoices, setInvoices] = useState<{ id: string; label: string; remaining: number }[]>([]);
   const [amount, setAmount] = useState<number>(defaultAmount ?? 0);
   const [method, setMethod] = useState<Method>("cash");
   const [date, setDate] = useState<string>(new Date().toISOString().slice(0,10));
@@ -44,6 +45,36 @@ export function RecordPaymentDialog({
     setDate(new Date().toISOString().slice(0,10));
     if (!patientId) loadPatients();
   }, [open, patientId, invoiceId, defaultAmount]);
+
+  // Load open invoices for the selected patient (when not fixed by parent)
+  useEffect(() => {
+    if (!open || invoiceId) return;
+    if (!pid) { setInvoices([]); return; }
+    supabase
+      .from("invoices")
+      .select("id,invoice_number,total,paid_amount,status,invoice_date")
+      .eq("patient_id", pid)
+      .in("status", ["pending", "partial", "draft"])
+      .order("invoice_date", { ascending: false })
+      .limit(50)
+      .then(({ data }) => {
+        const rows = (data ?? [])
+          .map((i: any) => ({
+            id: i.id,
+            remaining: +(Number(i.total) - Number(i.paid_amount)).toFixed(2),
+            label: `${i.invoice_number} · ${(+(Number(i.total) - Number(i.paid_amount))).toFixed(2)}`,
+          }))
+          .filter((i) => i.remaining > 0);
+        setInvoices(rows);
+      });
+  }, [open, pid, invoiceId]);
+
+  const onInvoiceChange = (v: string) => {
+    setIid(v);
+    const found = invoices.find((i) => i.id === v);
+    if (found && (!amount || amount <= 0)) setAmount(found.remaining);
+    else if (found) setAmount(found.remaining);
+  };
 
   const loadPatients = () => {
     supabase
@@ -104,6 +135,21 @@ export function RecordPaymentDialog({
                 <SelectTrigger><SelectValue placeholder={t("selectPatient")} /></SelectTrigger>
                 <SelectContent>
                   {patients.map((p) => <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {!invoiceId && pid && (
+            <div className="space-y-2">
+              <Label>{t("invoice")}</Label>
+              <Select value={iid} onValueChange={onInvoiceChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder={invoices.length ? "—" : t("noInvoices") ?? "—"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {invoices.map((i) => (
+                    <SelectItem key={i.id} value={i.id}>{i.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

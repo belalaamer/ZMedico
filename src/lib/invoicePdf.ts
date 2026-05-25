@@ -29,9 +29,10 @@ export async function generateInvoicePdf(opts: {
   patient: any;
   branch?: { name_en?: string; name_ar?: string; address?: string; phone?: string } | null;
   lang: Lang;
+  mode?: "download" | "print";
   t: (k: string) => string;
 }) {
-  const { invoice, items, payments, patient, branch, lang, t } = opts;
+  const { invoice, items, payments, patient, branch, lang, mode = "download", t } = opts;
 
   const isAr = lang === "ar";
   const dir = isAr ? "rtl" : "ltr";
@@ -221,6 +222,22 @@ export async function generateInvoicePdf(opts: {
         doc.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
         heightLeft -= pageHeight;
       }
+    }
+
+    if (mode === "print") {
+      doc.autoPrint();
+      const pdfBlob = doc.output("blob");
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      const printWindow = window.open(pdfUrl, "_blank", "noopener,noreferrer");
+
+      if (!printWindow) {
+        URL.revokeObjectURL(pdfUrl);
+        doc.save(`${invoice.invoice_number}.pdf`);
+        return;
+      }
+
+      window.setTimeout(() => URL.revokeObjectURL(pdfUrl), 60_000);
+      return;
     }
 
     doc.save(`${invoice.invoice_number}.pdf`);

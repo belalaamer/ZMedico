@@ -92,6 +92,15 @@ export default function InvoiceDetail() {
     generateInvoicePdf({ invoice: inv, items, payments: pays, patient: inv.patients, branch, lang, t: t as any });
   };
 
+  const printInvoice = async () => {
+    let branch = null;
+    if (inv.branch_id) {
+      const { data } = await supabase.from("branches").select("name_en,name_ar,address,phone").eq("id", inv.branch_id).maybeSingle();
+      branch = data;
+    }
+    generateInvoicePdf({ invoice: inv, items, payments: pays, patient: inv.patients, branch, lang, mode: "print", t: t as any });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap print:hidden">
@@ -102,7 +111,7 @@ export default function InvoiceDetail() {
               <CreditCard className="me-2 size-4" />{t("recordPayment")}
             </Button>
           )}
-          <Button variant="outline" onClick={() => window.print()}><Printer className="me-2 size-4" />{t("print")}</Button>
+          <Button variant="outline" onClick={printInvoice}><Printer className="me-2 size-4" />{t("print")}</Button>
           <Button variant="outline" onClick={downloadPdf}><Download className="me-2 size-4" />{t("downloadPdf")}</Button>
           {inv.status !== "cancelled" && (
             <AlertDialog>

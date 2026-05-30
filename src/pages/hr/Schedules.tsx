@@ -13,7 +13,8 @@ const DAYS = ["sun","mon","tue","wed","thu","fri","sat"] as const;
 
 type Slot = { day_of_week: number; start_time: string; end_time: string; is_working_day: boolean };
 
-const blank = (): Slot[] => Array.from({ length: 7 }, (_, i) => ({ day_of_week: i, start_time: "09:00", end_time: "17:00", is_working_day: i !== 5 && i !== 6 }));
+const blank = (start = "09:00", end = "17:00"): Slot[] =>
+  Array.from({ length: 7 }, (_, i) => ({ day_of_week: i, start_time: start, end_time: end, is_working_day: i !== 5 && i !== 6 }));
 
 export default function Schedules() {
   const { t, lang } = useI18n();
@@ -21,7 +22,18 @@ export default function Schedules() {
   const [staff, setStaff] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
   const [staffId, setStaffId] = useState("");
+  const [branchHours, setBranchHours] = useState<{ start: string; end: string }>({ start: "09:00", end: "17:00" });
   const [slots, setSlots] = useState<Slot[]>(blank());
+
+  useEffect(() => {
+    if (!currentBranchId) return;
+    supabase.from("branches").select("working_hours_start,working_hours_end").eq("id", currentBranchId).maybeSingle()
+      .then(({ data }) => {
+        const start = (data?.working_hours_start as string | null)?.slice(0,5) ?? "09:00";
+        const end = (data?.working_hours_end as string | null)?.slice(0,5) ?? "17:00";
+        setBranchHours({ start, end });
+      });
+  }, [currentBranchId]);
 
   useEffect(() => {
     (async () => {
@@ -35,20 +47,27 @@ export default function Schedules() {
   }, [currentBranchId]);
 
   useEffect(() => {
-    if (!staffId) { setSlots(blank()); return; }
+    if (!staffId) { setSlots(blank(branchHours.start, branchHours.end)); return; }
     (async () => {
       const { data } = await supabase.from("work_schedules").select("*").eq("staff_id", staffId);
-      const next = blank();
+      const hasData = (data ?? []).length > 0;
+      const next = blank(branchHours.start, branchHours.end);
       (data ?? []).forEach((row: any) => {
         const i = next.findIndex((s) => s.day_of_week === row.day_of_week);
         if (i >= 0) next[i] = { day_of_week: row.day_of_week, start_time: row.start_time?.slice(0,5) ?? "09:00", end_time: row.end_time?.slice(0,5) ?? "17:00", is_working_day: row.is_working_day };
       });
       setSlots(next);
+      void hasData;
     })();
-  }, [staffId]);
+  }, [staffId, branchHours.start, branchHours.end]);
 
   const profName = (id: string) => profiles.find((p) => p.id === id)?.full_name ?? profiles.find((p) => p.id === id)?.email ?? id;
   const update = (i: number, patch: Partial<Slot>) => setSlots((arr) => arr.map((s, idx) => idx === i ? { ...s, ...patch } : s));
+
+  const applyBranchHours = () => {
+    setSlots((arr) => arr.map((s) => s.is_working_day ? { ...s, start_time: branchHours.start, end_time: branchHours.end } : s));
+    toast.success(t("save"));
+  };
 
   const save = async () => {
     if (!staffId) { toast.error("Select staff"); return; }
@@ -74,6 +93,9 @@ export default function Schedules() {
             <SelectTrigger className="w-64"><SelectValue placeholder={t("selectStaff")} /></SelectTrigger>
             <SelectContent>{staff.map((s) => <SelectItem key={s.id} value={s.id}>{profName(s.id)} · {s.employee_id}</SelectItem>)}</SelectContent>
           </Select>
+          <Button variant="outline" onClick={applyBranchHours} disabled={!staffId} title={`${branchHours.start} - ${branchHours.end}`}>
+            {lang === "ar" ? `تطبيق ساعات الفرع (${branchHours.start} - ${branchHours.end})` : `Apply branch hours (${branchHours.start} - ${branchHours.end})`}
+          </Button>
           <Button className="gradient-primary text-primary-foreground" onClick={save} disabled={!staffId}>{t("save")}</Button>
         </div>
       </div>

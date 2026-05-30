@@ -590,6 +590,98 @@ export default function UserManagement() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Reset password dialog */}
+        <Dialog open={!!resetTarget} onOpenChange={(o) => !o && !resetting && setResetTarget(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {lang === "ar" ? "إعادة تعيين كلمة المرور" : "Reset password"}
+              </DialogTitle>
+              <DialogDescription>
+                {resetTarget?.full_name ?? resetTarget?.email}
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={resetPassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="rPassword">
+                  {lang === "ar" ? "كلمة مرور جديدة (اختياري)" : "New password (optional)"}
+                </Label>
+                <Input
+                  id="rPassword"
+                  type="text"
+                  placeholder={lang === "ar" ? "اتركه فارغاً لتوليد كلمة مرور" : "Leave empty to auto-generate"}
+                  value={rPassword}
+                  onChange={(e) => setRPassword(e.target.value)}
+                  minLength={6}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {lang === "ar" ? "الحد الأدنى 6 أحرف" : "Minimum 6 characters"}
+                </p>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setResetTarget(null)} disabled={resetting}>
+                  {t("cancel")}
+                </Button>
+                <Button type="submit" disabled={resetting} className="gradient-primary text-primary-foreground">
+                  {resetting
+                    ? (lang === "ar" ? "جارٍ التعيين..." : "Resetting...")
+                    : (lang === "ar" ? "إعادة تعيين" : "Reset")}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Reset result dialog */}
+        <Dialog open={!!resetInfo} onOpenChange={(o) => !o && setResetInfo(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{lang === "ar" ? "تم تحديث كلمة المرور" : "Password updated"}</DialogTitle>
+              <DialogDescription>
+                {lang === "ar"
+                  ? "احفظ كلمة المرور الجديدة الآن. لن تظهر مجدداً."
+                  : "Save the new password now. It will not be shown again."}
+              </DialogDescription>
+            </DialogHeader>
+            {resetInfo && (
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label>{lang === "ar" ? "البريد" : "Email"}</Label>
+                  <div className="flex gap-2">
+                    <Input readOnly value={resetInfo.email} />
+                    <Button type="button" variant="outline" size="icon" onClick={() => copy(resetInfo.email)}>
+                      <Copy className="size-4" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label>{lang === "ar" ? "كلمة المرور" : "Password"}</Label>
+                  <div className="flex gap-2">
+                    <Input readOnly value={resetInfo.password} className="font-mono" />
+                    <Button type="button" variant="outline" size="icon" onClick={() => copy(resetInfo.password)}>
+                      <Copy className="size-4" />
+                    </Button>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => copy(`${lang === "ar" ? "البريد" : "Email"}: ${resetInfo.email}\n${lang === "ar" ? "كلمة المرور" : "Password"}: ${resetInfo.password}`)}
+                >
+                  <Copy className="me-2 size-4" />
+                  {lang === "ar" ? "نسخ بيانات الدخول" : "Copy credentials"}
+                </Button>
+              </div>
+            )}
+            <DialogFooter>
+              <Button onClick={() => setResetInfo(null)} className="gradient-primary text-primary-foreground">
+                {lang === "ar" ? "تم" : "Done"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </SettingsLayout>
   );

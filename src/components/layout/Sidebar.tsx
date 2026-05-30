@@ -31,7 +31,6 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
     return () => { supabase.removeChannel(ch); };
   }, [currentBranchId]);
 
-  const items = [
   const allItems = [
     { to: "/", icon: LayoutDashboard, label: t("dashboard"), end: true, show: true },
     { to: "/calendar", icon: Calendar, label: t("calendar"), show: can("appointments") },

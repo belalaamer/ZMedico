@@ -839,7 +839,7 @@ export const dict = {
     locationStatus: "Location",
   },
   ar: {
-    appName: "زي ميديكو",
+    appName: "ZMedico",
     tagline: "نظام إدارة العيادات الشامل",
     dashboard: "الرئيسية",
     calendar: "التقويم",

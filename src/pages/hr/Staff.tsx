@@ -127,6 +127,8 @@ export default function Staff() {
   const softDelete = async (s: any): Promise<void> => {
     const { error } = await supabase.from("staff_profiles").update({ deleted_at: new Date().toISOString() } as any).eq("id", s.id);
     if (error) { toast.error(error.message); return; }
+    const { error: delErr } = await supabase.functions.invoke("admin-delete-user", { body: { user_id: s.id } });
+    if (delErr) { toast.error(delErr.message); return; }
     toast.success(t("delete")); load();
   };
 

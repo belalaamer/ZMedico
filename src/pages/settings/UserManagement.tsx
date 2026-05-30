@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, UserPlus, Trash2, Copy, KeyRound, AlertTriangle } from "lucide-react";
+import { Search, UserPlus, Trash2, Copy, KeyRound, AlertTriangle, Lock } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
@@ -50,6 +50,11 @@ export default function UserManagement() {
 
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // Reset-password dialog state
+  const [resetTarget, setResetTarget] = useState<any | null>(null);
+  const [rPassword, setRPassword] = useState("");
+  const [resetting, setResetting] = useState(false);
+  const [resetInfo, setResetInfo] = useState<{ email: string; password: string } | null>(null);
   // Edit-user dialog state
   const [editTarget, setEditTarget] = useState<any | null>(null);
   const [eRole, setERole] = useState<Role>("staff");
@@ -213,6 +218,28 @@ export default function UserManagement() {
     load();
   };
 
+  const resetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetTarget) return;
+    if (rPassword && rPassword.length < 6) {
+      toast.error(lang === "ar" ? "كلمة المرور يجب أن تكون 6 أحرف على الأقل" : "Password must be at least 6 characters");
+      return;
+    }
+    setResetting(true);
+    const { data, error } = await supabase.functions.invoke("admin-reset-password", {
+      body: { user_id: resetTarget.id, password: rPassword || undefined },
+    });
+    setResetting(false);
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.error ?? error?.message ?? "Failed");
+      return;
+    }
+    const info = data as { email: string; password: string };
+    setResetInfo({ email: info.email ?? resetTarget.email, password: info.password });
+    setRPassword("");
+    setResetTarget(null);
+  };
+
   const filtered = users.filter(u => !q || (u.full_name ?? "").toLowerCase().includes(q.toLowerCase()) || (u.email ?? "").toLowerCase().includes(q.toLowerCase()));
 
   return (
@@ -253,6 +280,14 @@ export default function UserManagement() {
                 )}
               </div>
               <Button size="sm" variant="outline" onClick={() => openEdit(u)}>{t("edit")}</Button>
+              <Button
+                size="sm"
+                variant="outline"
+                title={lang === "ar" ? "إعادة تعيين كلمة المرور" : "Reset password"}
+                onClick={() => { setRPassword(""); setResetTarget(u); }}
+              >
+                <Lock className="size-4" />
+              </Button>
               {currentUserId !== u.id && (
                 <Button
                   size="sm"
@@ -555,7 +590,100 @@ export default function UserManagement() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Reset password dialog */}
+        <Dialog open={!!resetTarget} onOpenChange={(o) => !o && !resetting && setResetTarget(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {lang === "ar" ? "إعادة تعيين كلمة المرور" : "Reset password"}
+              </DialogTitle>
+              <DialogDescription>
+                {resetTarget?.full_name ?? resetTarget?.email}
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={resetPassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="rPassword">
+                  {lang === "ar" ? "كلمة مرور جديدة (اختياري)" : "New password (optional)"}
+                </Label>
+                <Input
+                  id="rPassword"
+                  type="text"
+                  placeholder={lang === "ar" ? "اتركه فارغاً لتوليد كلمة مرور" : "Leave empty to auto-generate"}
+                  value={rPassword}
+                  onChange={(e) => setRPassword(e.target.value)}
+                  minLength={6}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {lang === "ar" ? "الحد الأدنى 6 أحرف" : "Minimum 6 characters"}
+                </p>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setResetTarget(null)} disabled={resetting}>
+                  {t("cancel")}
+                </Button>
+                <Button type="submit" disabled={resetting} className="gradient-primary text-primary-foreground">
+                  {resetting
+                    ? (lang === "ar" ? "جارٍ التعيين..." : "Resetting...")
+                    : (lang === "ar" ? "إعادة تعيين" : "Reset")}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Reset result dialog */}
+        <Dialog open={!!resetInfo} onOpenChange={(o) => !o && setResetInfo(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{lang === "ar" ? "تم تحديث كلمة المرور" : "Password updated"}</DialogTitle>
+              <DialogDescription>
+                {lang === "ar"
+                  ? "احفظ كلمة المرور الجديدة الآن. لن تظهر مجدداً."
+                  : "Save the new password now. It will not be shown again."}
+              </DialogDescription>
+            </DialogHeader>
+            {resetInfo && (
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label>{lang === "ar" ? "البريد" : "Email"}</Label>
+                  <div className="flex gap-2">
+                    <Input readOnly value={resetInfo.email} />
+                    <Button type="button" variant="outline" size="icon" onClick={() => copy(resetInfo.email)}>
+                      <Copy className="size-4" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label>{lang === "ar" ? "كلمة المرور" : "Password"}</Label>
+                  <div className="flex gap-2">
+                    <Input readOnly value={resetInfo.password} className="font-mono" />
+                    <Button type="button" variant="outline" size="icon" onClick={() => copy(resetInfo.password)}>
+                      <Copy className="size-4" />
+                    </Button>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => copy(`${lang === "ar" ? "البريد" : "Email"}: ${resetInfo.email}\n${lang === "ar" ? "كلمة المرور" : "Password"}: ${resetInfo.password}`)}
+                >
+                  <Copy className="me-2 size-4" />
+                  {lang === "ar" ? "نسخ بيانات الدخول" : "Copy credentials"}
+                </Button>
+              </div>
+            )}
+            <DialogFooter>
+              <Button onClick={() => setResetInfo(null)} className="gradient-primary text-primary-foreground">
+                {lang === "ar" ? "تم" : "Done"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </SettingsLayout>
   );
 }
+

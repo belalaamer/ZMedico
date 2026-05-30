@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, UserPlus, Trash2, Copy, KeyRound, AlertTriangle } from "lucide-react";
+import { Search, UserPlus, Trash2, Copy, KeyRound, AlertTriangle, Lock } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
@@ -50,6 +50,11 @@ export default function UserManagement() {
 
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // Reset-password dialog state
+  const [resetTarget, setResetTarget] = useState<any | null>(null);
+  const [rPassword, setRPassword] = useState("");
+  const [resetting, setResetting] = useState(false);
+  const [resetInfo, setResetInfo] = useState<{ email: string; password: string } | null>(null);
   // Edit-user dialog state
   const [editTarget, setEditTarget] = useState<any | null>(null);
   const [eRole, setERole] = useState<Role>("staff");
@@ -213,6 +218,28 @@ export default function UserManagement() {
     load();
   };
 
+  const resetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetTarget) return;
+    if (rPassword && rPassword.length < 6) {
+      toast.error(lang === "ar" ? "كلمة المرور يجب أن تكون 6 أحرف على الأقل" : "Password must be at least 6 characters");
+      return;
+    }
+    setResetting(true);
+    const { data, error } = await supabase.functions.invoke("admin-reset-password", {
+      body: { user_id: resetTarget.id, password: rPassword || undefined },
+    });
+    setResetting(false);
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.error ?? error?.message ?? "Failed");
+      return;
+    }
+    const info = data as { email: string; password: string };
+    setResetInfo({ email: info.email ?? resetTarget.email, password: info.password });
+    setRPassword("");
+    setResetTarget(null);
+  };
+
   const filtered = users.filter(u => !q || (u.full_name ?? "").toLowerCase().includes(q.toLowerCase()) || (u.email ?? "").toLowerCase().includes(q.toLowerCase()));
 
   return (
@@ -253,6 +280,14 @@ export default function UserManagement() {
                 )}
               </div>
               <Button size="sm" variant="outline" onClick={() => openEdit(u)}>{t("edit")}</Button>
+              <Button
+                size="sm"
+                variant="outline"
+                title={lang === "ar" ? "إعادة تعيين كلمة المرور" : "Reset password"}
+                onClick={() => { setRPassword(""); setResetTarget(u); }}
+              >
+                <Lock className="size-4" />
+              </Button>
               {currentUserId !== u.id && (
                 <Button
                   size="sm"

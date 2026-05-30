@@ -6,12 +6,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useBranch } from "@/contexts/BranchContext";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { usePermissions } from "@/hooks/usePermissions";
 
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {}) {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
   const { pathname } = useLocation();
   const [alertCount, setAlertCount] = useState(0);
+  const { can, isAdmin } = usePermissions();
   const inventoryOpen = pathname.startsWith("/inventory");
   const medicalOpen = pathname.startsWith("/medical");
   const hrOpen = pathname.startsWith("/hr");
@@ -30,19 +32,23 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
   }, [currentBranchId]);
 
   const items = [
-    { to: "/", icon: LayoutDashboard, label: t("dashboard"), end: true },
-    { to: "/calendar", icon: Calendar, label: t("calendar"), badge: null },
-    { to: "/patients", icon: Users, label: t("patients"), badge: null },
-    { to: "/invoices", icon: FileText, label: t("invoices") },
-    { to: "/payments", icon: CreditCard, label: t("payments") },
-    { to: "/treasury", icon: Banknote, label: t("treasury") },
-    { to: "/expenses", icon: Receipt, label: t("expenses") },
-    { to: "/reports", icon: PieChart, label: t("reports") },
-    { to: "/reminders", icon: Bell, label: t("reminders") },
-    { to: "/branches", icon: Building2, label: t("branches") },
-    { to: "/settings", icon: Settings, label: t("settings") },
+  const allItems = [
+    { to: "/", icon: LayoutDashboard, label: t("dashboard"), end: true, show: true },
+    { to: "/calendar", icon: Calendar, label: t("calendar"), show: can("appointments") },
+    { to: "/patients", icon: Users, label: t("patients"), show: can("patients") },
+    { to: "/invoices", icon: FileText, label: t("invoices"), show: can("invoices") },
+    { to: "/payments", icon: CreditCard, label: t("payments"), show: can("invoices") },
+    { to: "/treasury", icon: Banknote, label: t("treasury"), show: can("treasury") },
+    { to: "/expenses", icon: Receipt, label: t("expenses"), show: can("treasury") },
+    { to: "/reports", icon: PieChart, label: t("reports"), show: can("reports") },
+    { to: "/reminders", icon: Bell, label: t("reminders"), show: can("appointments") },
+    { to: "/branches", icon: Building2, label: t("branches"), show: isAdmin },
+    { to: "/settings", icon: Settings, label: t("settings"), show: true },
   ];
-  const inventoryItems = [
+  const items = allItems.filter(i => i.show);
+  const topItems = items.filter(i => i.to !== "/branches" && i.to !== "/settings");
+  const tailItems = items.filter(i => i.to === "/branches" || i.to === "/settings");
+  const inventoryItems = !can("inventory") ? [] : [
     { to: "/inventory/stock", icon: BarChart3, label: t("stockOverview") },
     { to: "/inventory/products", icon: Package, label: t("products") },
     { to: "/inventory/categories", icon: FolderTree, label: t("categories") },
@@ -50,7 +56,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
     { to: "/inventory/purchase-orders", icon: ClipboardList, label: t("purchaseOrders") },
     { to: "/inventory/alerts", icon: AlertTriangle, label: t("alerts"), badge: alertCount },
   ];
-  const medicalItems = [
+  const medicalItems = !can("medical_records") ? [] : [
     { to: "/medical/records", icon: FileText, label: t("medicalRecords") },
     { to: "/medical/quick-consult", icon: Zap, label: t("quickConsult") },
     { to: "/medical/prescriptions", icon: Pill, label: t("prescriptions") },
@@ -60,7 +66,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
     { to: "/medical/medications", icon: Pill, label: t("medications") },
     { to: "/medical/procedures", icon: Activity, label: t("proceduresCatalog") },
   ];
-  const hrItems = [
+  const hrItems = !isAdmin ? [] : [
     { to: "/hr/staff", icon: UserCog, label: t("staffDirectory") },
     { to: "/hr/departments", icon: Building2, label: t("departments") },
     { to: "/hr/positions", icon: Briefcase, label: t("positions") },
@@ -83,7 +89,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
         </div>
       </div>
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-        {items.slice(0, 8).map((it) => (
+        {topItems.map((it) => (
           <NavLink
             key={it.to}
             to={it.to}
@@ -104,7 +110,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
         ))}
 
         {/* Inventory section */}
-        <div className="pt-2">
+        {inventoryItems.length > 0 && <div className="pt-2">
           <div className={cn(
             "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold",
             inventoryOpen ? "text-white" : "text-sidebar-foreground/80"
@@ -130,10 +136,10 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
               </NavLink>
             ))}
           </div>
-        </div>
+        </div>}
 
         {/* Medical section */}
-        <div className="pt-2">
+        {medicalItems.length > 0 && <div className="pt-2">
           <div className={cn(
             "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold",
             medicalOpen ? "text-white" : "text-sidebar-foreground/80"
@@ -153,10 +159,10 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
               </NavLink>
             ))}
           </div>
-        </div>
+        </div>}
 
         {/* HR section */}
-        <div className="pt-2">
+        {hrItems.length > 0 && <div className="pt-2">
           <div className={cn(
             "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold",
             hrOpen ? "text-white" : "text-sidebar-foreground/80"
@@ -176,9 +182,9 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
               </NavLink>
             ))}
           </div>
-        </div>
+        </div>}
 
-        {items.slice(8).map((it) => (
+        {tailItems.map((it) => (
           <NavLink
             key={it.to}
             to={it.to}

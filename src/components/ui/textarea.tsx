@@ -2,9 +2,23 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+const toLatinDigits = (s: string) =>
+  s
+    .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 0x06F0));
+
 export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {}
 
-const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({ className, ...props }, ref) => {
+const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({ className, onChange, ...props }, ref) => {
+  const handleChange = onChange
+    ? (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const converted = toLatinDigits(e.target.value);
+        if (converted !== e.target.value) {
+          e.target.value = converted;
+        }
+        onChange(e);
+      }
+    : undefined;
   return (
     <textarea
       className={cn(
@@ -12,6 +26,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({ classNa
         className,
       )}
       ref={ref}
+      onChange={handleChange}
       {...props}
     />
   );

@@ -231,7 +231,15 @@ export default function UserManagement() {
     });
     setResetting(false);
     if (error || (data as any)?.error) {
-      toast.error((data as any)?.error ?? error?.message ?? "Failed");
+      let msg = (data as any)?.error ?? error?.message ?? "Failed";
+      try {
+        const ctx: any = (error as any)?.context;
+        if (ctx && typeof ctx.json === "function") {
+          const body = await ctx.json();
+          if (body?.error) msg = body.error;
+        }
+      } catch {}
+      toast.error(msg);
       return;
     }
     const info = data as { email: string; password: string };

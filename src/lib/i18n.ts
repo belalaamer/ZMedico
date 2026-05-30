@@ -839,7 +839,7 @@ export const dict = {
     locationStatus: "Location",
   },
   ar: {
-    appName: "زي ميديكو",
+    appName: "ZMedico",
     tagline: "نظام إدارة العيادات الشامل",
     dashboard: "الرئيسية",
     calendar: "التقويم",
@@ -1019,7 +1019,7 @@ export const dict = {
     sameTreasuryError: "يجب اختلاف الخزينة المصدر عن الوجهة",
     transferSuccess: "تم التحويل بنجاح",
     downloadPdf: "تنزيل PDF",
-    clinicName: "عيادة زي ميديكو",
+    clinicName: "عيادة ZMedico",
     billTo: "فاتورة إلى",
     invoiceFor: "فاتورة لـ",
     thanksMsg: "شكراً لزيارتكم",

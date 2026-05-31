@@ -16,6 +16,8 @@ import { CreateInvoiceDialog } from "./CreateInvoiceDialog";
 import { RowActions } from "@/components/RowActions";
 import { useNavigate } from "react-router-dom";
 import { useUserRole } from "@/hooks/useUserRole";
+import { usePermissions } from "@/hooks/usePermissions";
+import { Can } from "@/components/Can";
 
 type Inv = {
   id: string;
@@ -41,6 +43,7 @@ export default function Invoices() {
   const { currentBranchId } = useBranch();
   const navigate = useNavigate();
   const { isAdmin } = useUserRole();
+  const { can } = usePermissions();
   const [items, setItems] = useState<Inv[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
@@ -112,9 +115,11 @@ export default function Invoices() {
               <SelectItem value="cancelled">{t("statusCancelled")}</SelectItem>
             </SelectContent>
           </Select>
-          <Button className="gradient-primary text-primary-foreground" onClick={() => setOpen(true)}>
-            <Plus className="me-2 size-4" />{t("newInvoice")}
-          </Button>
+          <Can module="invoices" action="create">
+            <Button className="gradient-primary text-primary-foreground" onClick={() => setOpen(true)}>
+              <Plus className="me-2 size-4" />{t("newInvoice")}
+            </Button>
+          </Can>
         </div>
       </div>
 
@@ -152,7 +157,8 @@ export default function Invoices() {
                   <RowActions
                     onEdit={() => navigate(`/invoices/${i.id}`)}
                     onDelete={() => softDelete(i)}
-                    canDelete={isAdmin || i.status === "draft"}
+                    canEdit={can("invoices", "edit")}
+                    canDelete={can("invoices", "delete") && (isAdmin || i.status === "draft")}
                   />
                 </div>
               );

@@ -11,11 +11,14 @@ import { formatDate } from "@/lib/format";
 import { RowActions } from "@/components/RowActions";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { Can } from "@/components/Can";
+import { usePermissions } from "@/hooks/usePermissions";
 
 export default function MedicalRecords() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
   const navigate = useNavigate();
+  const { can } = usePermissions();
   const [items, setItems] = useState<any[]>([]);
   const load = () => {
     let q = supabase.from("medical_records").select("*, patients(*), medical_specialties(name_en,name_ar)").is("deleted_at", null).order("visit_date", { ascending: false }).limit(200);
@@ -37,7 +40,9 @@ export default function MedicalRecords() {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("medicalRecords")}</h1>
           <p className="text-sm text-muted-foreground mt-1">{items.length}</p>
         </div>
-        <Button asChild className="gradient-primary text-primary-foreground"><Link to="/medical/quick-consult"><Plus className="me-2 size-4" />{t("addRecord")}</Link></Button>
+        <Can module="medical_records" action="create">
+          <Button asChild className="gradient-primary text-primary-foreground"><Link to="/medical/quick-consult"><Plus className="me-2 size-4" />{t("addRecord")}</Link></Button>
+        </Can>
       </div>
       <Card className="shadow-card overflow-hidden">
         {items.length === 0 ? (
@@ -58,7 +63,12 @@ export default function MedicalRecords() {
                   <Badge variant="outline">{t(("visit_" + r.visit_type) as any) ?? r.visit_type}</Badge>
                   <Badge variant="outline" className={r.status === "completed" ? "status-completed" : r.status === "reviewed" ? "status-progress" : "status-cancelled"}>{r.status}</Badge>
                   </Link>
-                  <RowActions onEdit={() => navigate(`/medical/records/${r.id}`)} onDelete={() => softDelete(r)} />
+                  <RowActions
+                    onEdit={() => navigate(`/medical/records/${r.id}`)}
+                    onDelete={() => softDelete(r)}
+                    canEdit={can("medical_records", "edit")}
+                    canDelete={can("medical_records", "delete")}
+                  />
                 </div>
               );
             })}

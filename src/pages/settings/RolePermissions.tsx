@@ -9,19 +9,12 @@ import { ShieldCheck, Info, Save, RotateCcw, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
 import { toast } from "sonner";
+import { ROLES as ALL_ROLES, MODULES as ALL_MODULES, ACTIONS as ALL_ACTIONS, DEFAULT_PERMISSIONS } from "@/lib/rolePermissions";
 
-const ROLES = ["admin", "manager", "doctor", "nurse", "receptionist", "accountant"];
-const MODULES = ["patients", "appointments", "medical_records", "invoices", "treasury", "inventory", "reports", "settings"];
-const ACTIONS = ["view", "create", "edit", "delete", "export"];
-
-const DEFAULT: Record<string, Record<string, string[]>> = {
-  admin: Object.fromEntries(MODULES.map(m => [m, [...ACTIONS]])),
-  manager: Object.fromEntries(MODULES.map(m => [m, ["view","create","edit","export"]])),
-  doctor: { patients: ["view","edit"], appointments: ["view","create","edit"], medical_records: ["view","create","edit"], invoices: ["view"], treasury: [], inventory: ["view"], reports: ["view"], settings: [] },
-  nurse: { patients: ["view"], appointments: ["view"], medical_records: ["view"], invoices: [], treasury: [], inventory: ["view"], reports: [], settings: [] },
-  receptionist: { patients: ["view","create","edit"], appointments: ["view","create","edit"], medical_records: [], invoices: ["view","create"], treasury: [], inventory: [], reports: [], settings: [] },
-  accountant: { patients: ["view"], appointments: ["view"], medical_records: [], invoices: ["view","create","edit","export"], treasury: ["view","create","edit"], inventory: ["view"], reports: ["view","export"], settings: [] },
-};
+const ROLES = [...ALL_ROLES];
+const MODULES = [...ALL_MODULES];
+const ACTIONS = [...ALL_ACTIONS];
+const DEFAULT = DEFAULT_PERMISSIONS;
 
 type Matrix = Record<string, Record<string, string[]>>;
 

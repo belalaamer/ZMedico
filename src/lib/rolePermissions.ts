@@ -14,26 +14,48 @@ export const DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
     patients: ["view","edit"],
     appointments: ["view","create","edit"],
     medical_records: ["view","create","edit"],
-    invoices: [],
+    invoices: ["view"], // read-only billing
+    treasury: [],
+    inventory: [],
+    reports: ["view"],
+    hr: [],
+    settings: [],
+  },
+  nurse: {
+    // Vitals, patient lists, specific medical logs. No delete on billing/records.
+    patients: ["view"],
+    appointments: ["view","create","edit"],
+    medical_records: ["view","create","edit"],
+    invoices: ["view"],
+    treasury: [],
+    inventory: ["view"],
+    reports: [],
+    hr: [],
+    settings: [],
+  },
+  receptionist: {
+    // Calendar, patient registration, invoices. No clinical notes/medical history.
+    patients: ["view","create","edit"],
+    appointments: ["view","create","edit","delete"],
+    medical_records: [],
+    invoices: ["view","create","edit"],
     treasury: [],
     inventory: [],
     reports: [],
     hr: [],
     settings: [],
   },
-  nurse: {
-    patients: ["view"], appointments: ["view"], medical_records: ["view"],
-    invoices: [], treasury: [], inventory: ["view"], reports: [], hr: [], settings: [],
-  },
-  receptionist: {
-    patients: ["view","create","edit"], appointments: ["view","create","edit"],
-    medical_records: [], invoices: ["view","create"], treasury: [], inventory: [],
-    reports: [], hr: [], settings: [],
-  },
   accountant: {
-    patients: ["view"], appointments: ["view"], medical_records: [],
-    invoices: ["view","create","edit","export"], treasury: ["view","create","edit"],
-    inventory: ["view"], reports: ["view","export"], hr: [], settings: [],
+    // Invoices, payments, expenses. No medical records.
+    patients: ["view"],
+    appointments: ["view"],
+    medical_records: [],
+    invoices: ["view","create","edit","delete","export"],
+    treasury: ["view","create","edit","export"],
+    inventory: ["view"],
+    reports: ["view","export"],
+    hr: [],
+    settings: [],
   },
   hr: {
     patients: [], appointments: [], medical_records: [], invoices: [], treasury: [],
@@ -47,4 +69,18 @@ export const DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
 
 export function defaultActionsFor(role: string, module: string): string[] {
   return DEFAULT_PERMISSIONS[role]?.[module] ?? [];
+}
+
+// Map route path prefixes to permission modules. Used by PermissionRoute.
+export function moduleForPath(path: string): string | null {
+  if (path.startsWith("/calendar") || path.startsWith("/reminders")) return "appointments";
+  if (path.startsWith("/patients")) return "patients";
+  if (path.startsWith("/invoices") || path.startsWith("/payments")) return "invoices";
+  if (path.startsWith("/treasury") || path.startsWith("/expenses")) return "treasury";
+  if (path.startsWith("/inventory")) return "inventory";
+  if (path.startsWith("/medical")) return "medical_records";
+  if (path.startsWith("/hr")) return "hr";
+  if (path.startsWith("/reports")) return "reports";
+  if (path.startsWith("/settings") || path.startsWith("/branches")) return "settings";
+  return null;
 }

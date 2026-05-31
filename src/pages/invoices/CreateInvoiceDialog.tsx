@@ -39,6 +39,9 @@ export function CreateInvoiceDialog({
   const [discountPct, setDiscountPct] = useState<number>(0);
   const [taxPct, setTaxPct] = useState<number>(0);
   const [notes, setNotes] = useState("");
+  const [insuranceCompanies, setInsuranceCompanies] = useState<any[]>([]);
+  const [insuranceCompanyId, setInsuranceCompanyId] = useState<string>("");
+  const [coverageRatio, setCoverageRatio] = useState<number>(0);
   const [items, setItems] = useState<Item[]>([{ item_type: "service", description_en: "", description_ar: "", quantity: 1, unit_price: 0 }]);
   const [saving, setSaving] = useState(false);
 
@@ -90,6 +93,8 @@ export function CreateInvoiceDialog({
     void refetchPatients();
     supabase.from("products").select("id,sku,name_en,name_ar,selling_price,min_stock_level").eq("is_active", true).is("deleted_at", null).order("name_en").limit(1000)
       .then(({ data }) => setProducts(data ?? []));
+    supabase.from("insurance_companies").select("id,name_en,name_ar,default_coverage_ratio,is_active").eq("is_active", true).order("name_en")
+      .then(({ data }) => setInsuranceCompanies(data ?? []));
   }, [open, refetchPatients]);
 
   useDataSync(["patients"], () => {
@@ -111,11 +116,28 @@ export function CreateInvoiceDialog({
     });
   }, [open, currentBranchId]);
 
+  // Auto-fill insurance from patient
+  useEffect(() => {
+    if (!patientId) { setInsuranceCompanyId(""); setCoverageRatio(0); return; }
+    supabase.from("patients").select("insurance_company_id,insurance_coverage_ratio").eq("id", patientId).maybeSingle()
+      .then(({ data }) => {
+        if (!data) return;
+        if (data.insurance_company_id) {
+          setInsuranceCompanyId(data.insurance_company_id);
+          setCoverageRatio(Number(data.insurance_coverage_ratio) || 0);
+        } else {
+          setInsuranceCompanyId(""); setCoverageRatio(0);
+        }
+      });
+  }, [patientId]);
+
   const subtotal = useMemo(() => items.reduce((s, it) => s + (Number(it.quantity)||0) * (Number(it.unit_price)||0), 0), [items]);
   const discount = useMemo(() => +(subtotal * (Number(discountPct)||0) / 100).toFixed(2), [subtotal, discountPct]);
   const taxBase = subtotal - discount;
   const tax = useMemo(() => +(taxBase * (Number(taxPct)||0) / 100).toFixed(2), [taxBase, taxPct]);
   const total = +(subtotal - discount + tax).toFixed(2);
+  const claimAmount = +(total * (Number(coverageRatio)||0) / 100).toFixed(2);
+  const patientShare = +(total - claimAmount).toFixed(2);
 
   const updateItem = (idx: number, patch: Partial<Item>) =>
     setItems((arr) => arr.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
@@ -143,6 +165,9 @@ export function CreateInvoiceDialog({
       subtotal, discount, tax,
       status, notes: notes || null,
       created_by: user?.id ?? null,
+      insurance_company_id: insuranceCompanyId || null,
+      claim_amount: insuranceCompanyId ? claimAmount : null,
+      claim_status: insuranceCompanyId ? 'pending' : null,
     } as any).select("id, invoice_number").single();
     if (error || !inv) { setSaving(false); toast.error(error?.message ?? "Failed"); return; }
 
@@ -192,6 +217,7 @@ export function CreateInvoiceDialog({
     toast.success(`${t("invoice")} ${inv.invoice_number}`);
     setItems([{ item_type: "service", description_en: "", description_ar: "", quantity: 1, unit_price: 0 }]);
     setDiscountPct(0); setTaxPct(0); setNotes(""); setPatientId("");
+    setInsuranceCompanyId(""); setCoverageRatio(0);
     onSaved(inv.id);
   };
 
@@ -224,6 +250,33 @@ export function CreateInvoiceDialog({
           <div className="space-y-2">
             <Label>{t("invoiceDate")}</Label>
             <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>{t("insuranceCompany")}</Label>
+            <Select
+              value={insuranceCompanyId || "__none__"}
+              onValueChange={(v) => {
+                if (v === "__none__") { setInsuranceCompanyId(""); setCoverageRatio(0); return; }
+                setInsuranceCompanyId(v);
+                const c = insuranceCompanies.find((x) => x.id === v);
+                if (c) setCoverageRatio(Number(c.default_coverage_ratio) || 0);
+              }}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">{t("noInsurance")}</SelectItem>
+                {insuranceCompanies.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{lang === "ar" ? (c.name_ar || c.name_en) : c.name_en}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>{t("coverageRatio")}</Label>
+            <NumberInput value={coverageRatio} onChange={setCoverageRatio} disabled={!insuranceCompanyId} />
           </div>
         </div>
 
@@ -316,6 +369,18 @@ export function CreateInvoiceDialog({
               <span>{t("total")}</span>
               <span className="tabular-nums text-primary">{formatMoney(total, lang)}</span>
             </div>
+            {insuranceCompanyId && coverageRatio > 0 && (
+              <>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">{t("coveredAmount")}</span>
+                  <span className="font-medium tabular-nums text-success">{formatMoney(claimAmount, lang)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">{t("patientShare")}</span>
+                  <span className="font-medium tabular-nums">{formatMoney(patientShare, lang)}</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
 

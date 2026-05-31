@@ -42,7 +42,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
     { to: "/reports", icon: PieChart, label: t("reports"), show: can("reports") },
     { to: "/reminders", icon: Bell, label: t("reminders"), show: can("appointments") },
     { to: "/branches", icon: Building2, label: t("branches"), show: isAdmin },
-    { to: "/settings", icon: Settings, label: t("settings"), show: true },
+    { to: "/settings", icon: Settings, label: t("settings"), show: can("settings") },
   ];
   const items = allItems.filter(i => i.show);
   const topItems = items.filter(i => i.to !== "/branches" && i.to !== "/settings");

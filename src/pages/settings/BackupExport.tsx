@@ -59,6 +59,16 @@ export default function BackupExport() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = `zmedico-backup-${new Date().toISOString().slice(0,10)}.json`; a.click();
     URL.revokeObjectURL(url);
+    try {
+      const tablesCount = Object.keys(out).length;
+      const rowsCount = Object.values(out).reduce((acc: number, v: any) => acc + (Array.isArray(v) ? v.length : 0), 0);
+      await (supabase as any).from("system_backups").insert({
+        backup_type: "manual", status: "completed",
+        size_bytes: blob.size, tables_count: tablesCount, rows_count: rowsCount,
+        created_by: user?.id ?? null,
+      });
+    } catch {}
+    toast.success(t("saved"));
   };
 
   return (

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Printer, Copy, Check } from "lucide-react";
+import { ArrowLeft, Printer, Copy, Check, MessageCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/format";
 import { generatePrescriptionPdf } from "@/lib/prescriptionPdf";
+import { openWhatsApp, prescriptionWhatsAppMessage } from "@/lib/whatsapp";
 
 export default function PrescriptionDetail() {
   const { id } = useParams();
@@ -40,6 +41,22 @@ export default function PrescriptionDetail() {
 
   const print = () => generatePrescriptionPdf({ prescription: rx, items, patient, lang });
 
+  const sendWhatsApp = () => {
+    if (!patient?.phone) {
+      toast.error(lang === "ar" ? "لا يوجد رقم هاتف للمريض" : "Patient has no phone number");
+      return;
+    }
+    const message = prescriptionWhatsAppMessage({
+      patientName: name,
+      date: formatDate(rx.prescription_date, lang),
+      lang,
+      link: window.location.href,
+    });
+    if (!openWhatsApp(patient.phone, message)) {
+      toast.error(lang === "ar" ? "رقم هاتف غير صالح" : "Invalid phone number");
+    }
+  };
+
   const markCompleted = async () => {
     const { error } = await supabase.from("prescriptions").update({ status: "completed" }).eq("id", rx.id);
     if (error) return toast.error(error.message);
@@ -69,6 +86,9 @@ export default function PrescriptionDetail() {
           <Badge variant="outline" className={rx.status === "active" ? "status-progress" : rx.status === "completed" ? "status-completed" : "status-cancelled"}>{rx.status === "active" ? t("activeRx") : rx.status === "completed" ? t("completed") : t("discontinued")}</Badge>
           <Button size="sm" variant="outline" onClick={clone}><Copy className="me-2 size-4"/>{t("cloneRefill")}</Button>
           {rx.status === "active" && <Button size="sm" variant="outline" onClick={markCompleted}><Check className="me-2 size-4"/>{t("markCompletedRx")}</Button>}
+          <Button size="sm" variant="outline" onClick={sendWhatsApp} className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200 dark:bg-green-950/30 dark:hover:bg-green-900/40 dark:text-green-300 dark:border-green-900">
+            <MessageCircle className="me-2 size-4"/>WhatsApp
+          </Button>
           <Button size="sm" className="gradient-primary text-primary-foreground" onClick={print}><Printer className="me-2 size-4"/>{t("print")}</Button>
         </div>
       </div>

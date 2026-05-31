@@ -65,7 +65,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
     { to: "/medical/medications", icon: Pill, label: t("medications") },
     { to: "/medical/procedures", icon: Activity, label: t("proceduresCatalog") },
   ];
-  const hrItems = !isAdmin ? [] : [
+  const hrItems = !can("hr") ? [] : [
     { to: "/hr/staff", icon: UserCog, label: t("staffDirectory") },
     { to: "/hr/departments", icon: Building2, label: t("departments") },
     { to: "/hr/positions", icon: Briefcase, label: t("positions") },

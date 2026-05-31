@@ -16,6 +16,8 @@ import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { z } from "zod";
+import { Can } from "@/components/Can";
+import { usePermissions } from "@/hooks/usePermissions";
 
 type Patient = {
   id: string;
@@ -52,6 +54,7 @@ const schema = z.object({
 export default function PatientsPage() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
+  const { can } = usePermissions();
   const [items, setItems] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
@@ -129,10 +132,11 @@ export default function PatientsPage() {
             <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("search")} className="ps-9" />
           </div>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button className="gradient-primary text-primary-foreground"><Plus className="me-2 size-4" />{t("addPatient")}</Button>
-            </DialogTrigger>
+          <Can module="patients" action="create">
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button className="gradient-primary text-primary-foreground"><Plus className="me-2 size-4" />{t("addPatient")}</Button>
+              </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>{t("newPatient")}</DialogTitle></DialogHeader>
               <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -189,7 +193,8 @@ export default function PatientsPage() {
                 </DialogFooter>
               </form>
             </DialogContent>
-          </Dialog>
+            </Dialog>
+          </Can>
         </div>
       </div>
 
@@ -222,11 +227,13 @@ export default function PatientsPage() {
                       </div>
                     </div>
                   </Link>
-                  <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConfirmDel(p); }}
-                    aria-label="Delete">
-                    <Trash2 className="size-4" />
-                  </Button>
+                  {can("patients", "delete") && (
+                    <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConfirmDel(p); }}
+                      aria-label="Delete">
+                      <Trash2 className="size-4" />
+                    </Button>
+                  )}
                 </div>
               );
             })}

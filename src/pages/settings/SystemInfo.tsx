@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 export default function SystemInfo() {
   const { t } = useI18n();
   const [stats, setStats] = useState<Record<string, number>>({});
+  const [lastBackup, setLastBackup] = useState<string | null>(null);
   useEffect(() => {
     (async () => {
       const tables = ["patients","appointments","invoices","payments","products","medical_records","profiles"];
@@ -17,6 +18,8 @@ export default function SystemInfo() {
         out[tbl] = count ?? 0;
       }
       setStats(out);
+      const { data } = await (supabase as any).from("system_backups").select("created_at").order("created_at", { ascending: false }).limit(1).maybeSingle();
+      setLastBackup(data?.created_at ?? null);
     })();
   }, []);
   return (
@@ -26,7 +29,7 @@ export default function SystemInfo() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Card className="p-5"><div className="text-sm text-muted-foreground">{t("version")}</div><div className="text-2xl font-bold mt-1">1.0.0</div></Card>
           <Card className="p-5"><div className="text-sm text-muted-foreground">{t("systemHealth")}</div><Badge className="status-completed mt-2">{t("healthy2")}</Badge></Card>
-          <Card className="p-5"><div className="text-sm text-muted-foreground">{t("lastBackupDate")}</div><div className="text-sm mt-1">—</div></Card>
+          <Card className="p-5"><div className="text-sm text-muted-foreground">{t("lastBackupDate")}</div><div className="text-sm mt-1">{lastBackup ? new Date(lastBackup).toLocaleString() : "—"}</div></Card>
         </div>
         <Card className="p-5">
           <h3 className="font-semibold mb-3">{t("dbStats")}</h3>

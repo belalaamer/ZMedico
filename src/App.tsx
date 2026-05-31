@@ -8,6 +8,7 @@ import { I18nProvider } from "@/contexts/I18nContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { BranchProvider } from "@/contexts/BranchContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { PermissionRoute } from "@/components/PermissionRoute";
 import AppShell from "@/components/layout/AppShell";
 import AuthPage from "@/pages/auth/Auth";
 import ResetPassword from "@/pages/auth/ResetPassword";
@@ -96,73 +97,73 @@ const App = () => (
                 <Route path="/pricing" element={<Pricing />} />
                 <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
                   <Route path="/" element={<Dashboard />} />
-                  <Route path="/patients" element={<PatientsPage />} />
-                  <Route path="/patients/:id" element={<PatientProfile />} />
-                  <Route path="/calendar" element={<CalendarPage />} />
-                  <Route path="/invoices" element={<Invoices />} />
-                  <Route path="/invoices/:id" element={<InvoiceDetail />} />
-                  <Route path="/payments" element={<Payments />} />
-                  <Route path="/treasury" element={<Treasury />} />
-                  <Route path="/expenses" element={<Expenses />} />
-                  <Route path="/reminders" element={<Reminders />} />
-                  <Route path="/reminders/scheduled" element={<Reminders />}>
+                  <Route path="/patients" element={<PermissionRoute><PatientsPage /></PermissionRoute>} />
+                  <Route path="/patients/:id" element={<PermissionRoute><PatientProfile /></PermissionRoute>} />
+                  <Route path="/calendar" element={<PermissionRoute><CalendarPage /></PermissionRoute>} />
+                  <Route path="/invoices" element={<PermissionRoute><Invoices /></PermissionRoute>} />
+                  <Route path="/invoices/:id" element={<PermissionRoute><InvoiceDetail /></PermissionRoute>} />
+                  <Route path="/payments" element={<PermissionRoute><Payments /></PermissionRoute>} />
+                  <Route path="/treasury" element={<PermissionRoute><Treasury /></PermissionRoute>} />
+                  <Route path="/expenses" element={<PermissionRoute><Expenses /></PermissionRoute>} />
+                  <Route path="/reminders" element={<PermissionRoute><Reminders /></PermissionRoute>} />
+                  <Route path="/reminders/scheduled" element={<PermissionRoute><Reminders /></PermissionRoute>}>
                     <Route index element={<ScheduledReminders />} />
                   </Route>
-                  <Route path="/inventory" element={<StockOverview />} />
-                  <Route path="/inventory/stock" element={<StockOverview />} />
-                  <Route path="/inventory/products" element={<Products />} />
-                  <Route path="/inventory/products/:id" element={<ProductDetail />} />
-                  <Route path="/inventory/categories" element={<Categories />} />
-                  <Route path="/inventory/suppliers" element={<Suppliers />} />
-                  <Route path="/inventory/purchase-orders" element={<PurchaseOrders />} />
-                  <Route path="/inventory/purchase-orders/:id" element={<PurchaseOrderDetail />} />
-                  <Route path="/inventory/alerts" element={<Alerts />} />
-                  <Route path="/medical/records" element={<MedicalRecords />} />
-                  <Route path="/medical/records/:id" element={<MedicalRecordEditor />} />
-                  <Route path="/medical/quick-consult" element={<QuickConsult />} />
-                  <Route path="/medical/prescriptions" element={<Prescriptions />} />
-                  <Route path="/medical/prescriptions/:id" element={<PrescriptionDetail />} />
-                  <Route path="/medical/documents" element={<DocumentsCenter />} />
-                  <Route path="/patients/:id/dental" element={<PatientDental />} />
-                  <Route path="/medical/specialties" element={<Specialties />} />
-                  <Route path="/medical/diagnoses" element={<Diagnoses />} />
-                  <Route path="/medical/medications" element={<Medications />} />
-                  <Route path="/medical/procedures" element={<ProceduresPage />} />
-                  <Route path="/hr/departments" element={<Departments />} />
-                  <Route path="/hr/positions" element={<Positions />} />
-                  <Route path="/hr/staff" element={<Staff />} />
-                  <Route path="/hr/staff/:id" element={<StaffDetail />} />
-                  <Route path="/hr/schedules" element={<Schedules />} />
-                  <Route path="/hr/attendance" element={<Attendance />} />
-                  <Route path="/hr/leaves" element={<Leaves />} />
-                  <Route path="/hr/payroll" element={<Payroll />} />
-                  <Route path="/hr/performance" element={<Performance />} />
-                  <Route path="/reports" element={<ReportsDashboard />} />
-                  <Route path="/reports/financial" element={<FinancialReports />} />
-                  <Route path="/reports/operational" element={<OperationalReports />} />
-                  <Route path="/reports/medical" element={<MedicalReports />} />
-                  <Route path="/reports/hr" element={<HRReports />} />
-                  <Route path="/reports/inventory" element={<InventoryReports />} />
-                  <Route path="/reports/scheduled" element={<ScheduledReports />} />
-                  <Route path="/branches" element={<Branches />} />
-                  <Route path="/settings/branches" element={<Branches />} />
-                  <Route path="/settings" element={<GeneralSettings />} />
-                  <Route path="/settings/general" element={<GeneralSettings />} />
-                  <Route path="/settings/appointments" element={<AppointmentSettings />} />
-                  <Route path="/settings/invoices" element={<InvoiceSettings />} />
-                  <Route path="/settings/payments" element={<PaymentMethodsPage />} />
-                  <Route path="/settings/services" element={<ServicesPage />} />
-                  <Route path="/settings/notifications" element={<NotificationSettings />} />
-                  <Route path="/settings/reminders" element={<RemindersSettings />} />
-                  <Route path="/settings/templates/email" element={<Templates kind="email" />} />
-                  <Route path="/settings/templates/sms" element={<Templates kind="sms" />} />
-                  <Route path="/settings/templates/whatsapp" element={<Templates kind="whatsapp" />} />
-                  <Route path="/settings/languages" element={<LanguagesPage />} />
-                  <Route path="/settings/roles" element={<RolePermissions />} />
-                  <Route path="/settings/users" element={<UserManagement />} />
-                  <Route path="/settings/backup" element={<BackupExport />} />
-                  <Route path="/settings/audit" element={<AuditLogs />} />
-                  <Route path="/settings/system" element={<SystemInfo />} />
+                  <Route path="/inventory" element={<PermissionRoute><StockOverview /></PermissionRoute>} />
+                  <Route path="/inventory/stock" element={<PermissionRoute><StockOverview /></PermissionRoute>} />
+                  <Route path="/inventory/products" element={<PermissionRoute><Products /></PermissionRoute>} />
+                  <Route path="/inventory/products/:id" element={<PermissionRoute><ProductDetail /></PermissionRoute>} />
+                  <Route path="/inventory/categories" element={<PermissionRoute><Categories /></PermissionRoute>} />
+                  <Route path="/inventory/suppliers" element={<PermissionRoute><Suppliers /></PermissionRoute>} />
+                  <Route path="/inventory/purchase-orders" element={<PermissionRoute><PurchaseOrders /></PermissionRoute>} />
+                  <Route path="/inventory/purchase-orders/:id" element={<PermissionRoute><PurchaseOrderDetail /></PermissionRoute>} />
+                  <Route path="/inventory/alerts" element={<PermissionRoute><Alerts /></PermissionRoute>} />
+                  <Route path="/medical/records" element={<PermissionRoute><MedicalRecords /></PermissionRoute>} />
+                  <Route path="/medical/records/:id" element={<PermissionRoute><MedicalRecordEditor /></PermissionRoute>} />
+                  <Route path="/medical/quick-consult" element={<PermissionRoute><QuickConsult /></PermissionRoute>} />
+                  <Route path="/medical/prescriptions" element={<PermissionRoute><Prescriptions /></PermissionRoute>} />
+                  <Route path="/medical/prescriptions/:id" element={<PermissionRoute><PrescriptionDetail /></PermissionRoute>} />
+                  <Route path="/medical/documents" element={<PermissionRoute><DocumentsCenter /></PermissionRoute>} />
+                  <Route path="/patients/:id/dental" element={<PermissionRoute><PatientDental /></PermissionRoute>} />
+                  <Route path="/medical/specialties" element={<PermissionRoute><Specialties /></PermissionRoute>} />
+                  <Route path="/medical/diagnoses" element={<PermissionRoute><Diagnoses /></PermissionRoute>} />
+                  <Route path="/medical/medications" element={<PermissionRoute><Medications /></PermissionRoute>} />
+                  <Route path="/medical/procedures" element={<PermissionRoute><ProceduresPage /></PermissionRoute>} />
+                  <Route path="/hr/departments" element={<PermissionRoute><Departments /></PermissionRoute>} />
+                  <Route path="/hr/positions" element={<PermissionRoute><Positions /></PermissionRoute>} />
+                  <Route path="/hr/staff" element={<PermissionRoute><Staff /></PermissionRoute>} />
+                  <Route path="/hr/staff/:id" element={<PermissionRoute><StaffDetail /></PermissionRoute>} />
+                  <Route path="/hr/schedules" element={<PermissionRoute><Schedules /></PermissionRoute>} />
+                  <Route path="/hr/attendance" element={<PermissionRoute><Attendance /></PermissionRoute>} />
+                  <Route path="/hr/leaves" element={<PermissionRoute><Leaves /></PermissionRoute>} />
+                  <Route path="/hr/payroll" element={<PermissionRoute><Payroll /></PermissionRoute>} />
+                  <Route path="/hr/performance" element={<PermissionRoute><Performance /></PermissionRoute>} />
+                  <Route path="/reports" element={<PermissionRoute><ReportsDashboard /></PermissionRoute>} />
+                  <Route path="/reports/financial" element={<PermissionRoute><FinancialReports /></PermissionRoute>} />
+                  <Route path="/reports/operational" element={<PermissionRoute><OperationalReports /></PermissionRoute>} />
+                  <Route path="/reports/medical" element={<PermissionRoute><MedicalReports /></PermissionRoute>} />
+                  <Route path="/reports/hr" element={<PermissionRoute><HRReports /></PermissionRoute>} />
+                  <Route path="/reports/inventory" element={<PermissionRoute><InventoryReports /></PermissionRoute>} />
+                  <Route path="/reports/scheduled" element={<PermissionRoute><ScheduledReports /></PermissionRoute>} />
+                  <Route path="/branches" element={<PermissionRoute><Branches /></PermissionRoute>} />
+                  <Route path="/settings/branches" element={<PermissionRoute><Branches /></PermissionRoute>} />
+                  <Route path="/settings" element={<PermissionRoute><GeneralSettings /></PermissionRoute>} />
+                  <Route path="/settings/general" element={<PermissionRoute><GeneralSettings /></PermissionRoute>} />
+                  <Route path="/settings/appointments" element={<PermissionRoute><AppointmentSettings /></PermissionRoute>} />
+                  <Route path="/settings/invoices" element={<PermissionRoute><InvoiceSettings /></PermissionRoute>} />
+                  <Route path="/settings/payments" element={<PermissionRoute><PaymentMethodsPage /></PermissionRoute>} />
+                  <Route path="/settings/services" element={<PermissionRoute><ServicesPage /></PermissionRoute>} />
+                  <Route path="/settings/notifications" element={<PermissionRoute><NotificationSettings /></PermissionRoute>} />
+                  <Route path="/settings/reminders" element={<PermissionRoute><RemindersSettings /></PermissionRoute>} />
+                  <Route path="/settings/templates/email" element={<PermissionRoute><Templates kind="email" /></PermissionRoute>} />
+                  <Route path="/settings/templates/sms" element={<PermissionRoute><Templates kind="sms" /></PermissionRoute>} />
+                  <Route path="/settings/templates/whatsapp" element={<PermissionRoute><Templates kind="whatsapp" /></PermissionRoute>} />
+                  <Route path="/settings/languages" element={<PermissionRoute><LanguagesPage /></PermissionRoute>} />
+                  <Route path="/settings/roles" element={<PermissionRoute><RolePermissions /></PermissionRoute>} />
+                  <Route path="/settings/users" element={<PermissionRoute><UserManagement /></PermissionRoute>} />
+                  <Route path="/settings/backup" element={<PermissionRoute><BackupExport /></PermissionRoute>} />
+                  <Route path="/settings/audit" element={<PermissionRoute><AuditLogs /></PermissionRoute>} />
+                  <Route path="/settings/system" element={<PermissionRoute><SystemInfo /></PermissionRoute>} />
                 </Route>
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />

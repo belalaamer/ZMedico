@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, FileText, CreditCard, Phone, Mail, MapPin, Calendar, Stethoscope, Trash2 } from "lucide-react";
+import { ArrowLeft, FileText, CreditCard, Phone, Mail, MapPin, Calendar, Stethoscope, Trash2, Shield } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +22,7 @@ export default function PatientProfile() {
   const navigate = useNavigate();
   const { t, lang } = useI18n();
   const [patient, setPatient] = useState<any>(null);
+  const [insurer, setInsurer] = useState<any>(null);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
@@ -36,6 +37,10 @@ export default function PatientProfile() {
     ]);
     if (pe) toast.error(pe.message);
     setPatient(p); setInvoices(invs ?? []); setPayments(pays ?? []);
+    if (p?.insurance_company_id) {
+      const { data: ins } = await (supabase as any).from("insurance_companies").select("*").eq("id", p.insurance_company_id).maybeSingle();
+      setInsurer(ins);
+    } else { setInsurer(null); }
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
 
@@ -140,6 +145,20 @@ export default function PatientProfile() {
               {patient.notes && <div className="sm:col-span-2"><div className="text-muted-foreground text-xs">{t("notes")}</div><div className="whitespace-pre-wrap">{patient.notes}</div></div>}
             </div>
           </Card>
+          {(insurer || patient.insurance_policy_number) && (
+            <Card className="p-6 shadow-card mt-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Shield className="size-4 text-primary" />
+                <h3 className="font-semibold">{lang === "ar" ? "التأمين" : "Insurance"}</h3>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-4 text-sm">
+                {insurer && <div><div className="text-muted-foreground text-xs">{lang === "ar" ? "شركة التأمين" : "Insurance Company"}</div><div className="font-medium">{lang === "ar" ? (insurer.name_ar || insurer.name_en) : insurer.name_en}</div></div>}
+                {patient.insurance_policy_number && <div><div className="text-muted-foreground text-xs">{lang === "ar" ? "رقم البوليصة" : "Policy #"}</div><div>{patient.insurance_policy_number}</div></div>}
+                {patient.insurance_coverage_ratio != null && <div><div className="text-muted-foreground text-xs">{lang === "ar" ? "نسبة التغطية" : "Coverage"}</div><div>{patient.insurance_coverage_ratio}%</div></div>}
+                {patient.insurance_policy_expiry && <div><div className="text-muted-foreground text-xs">{lang === "ar" ? "تاريخ انتهاء البوليصة" : "Policy Expiry"}</div><div>{formatDate(patient.insurance_policy_expiry, lang)}</div></div>}
+              </div>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="medical" className="mt-4">

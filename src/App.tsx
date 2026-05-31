@@ -63,6 +63,7 @@ import AppointmentSettings from "@/pages/settings/AppointmentSettings";
 import InvoiceSettings from "@/pages/settings/InvoiceSettings";
 import PaymentMethodsPage from "@/pages/settings/PaymentMethods";
 import ServicesPage from "@/pages/settings/Services";
+import InsuranceCompanies from "@/pages/settings/InsuranceCompanies";
 import NotificationSettings from "@/pages/settings/NotificationSettings";
 import RemindersSettings from "@/pages/settings/RemindersSettings";
 import Templates from "@/pages/settings/Templates";
@@ -153,6 +154,7 @@ const App = () => (
                   <Route path="/settings/invoices" element={<PermissionRoute><InvoiceSettings /></PermissionRoute>} />
                   <Route path="/settings/payments" element={<PermissionRoute><PaymentMethodsPage /></PermissionRoute>} />
                   <Route path="/settings/services" element={<PermissionRoute><ServicesPage /></PermissionRoute>} />
+                  <Route path="/settings/insurance" element={<PermissionRoute><InsuranceCompanies /></PermissionRoute>} />
                   <Route path="/settings/notifications" element={<PermissionRoute><NotificationSettings /></PermissionRoute>} />
                   <Route path="/settings/reminders" element={<PermissionRoute><RemindersSettings /></PermissionRoute>} />
                   <Route path="/settings/templates/email" element={<PermissionRoute><Templates kind="email" /></PermissionRoute>} />

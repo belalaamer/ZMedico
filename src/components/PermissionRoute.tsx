@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { useLocation, Navigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { usePermissions } from "@/hooks/usePermissions";
 import { moduleForPath } from "@/lib/rolePermissions";
 import { useI18n } from "@/contexts/I18nContext";
@@ -39,7 +39,6 @@ export function PermissionRoute({ children, module }: { children: ReactNode; mod
             ? "ليس لديك إذن لعرض هذه الصفحة. تواصل مع المسؤول إذا كنت تعتقد أن هذا خطأ."
             : "You don't have permission to view this page. Contact your administrator if you think this is a mistake."}
         </p>
-        <Navigate to="/" replace />
       </div>
     </div>
   );

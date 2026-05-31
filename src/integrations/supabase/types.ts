@@ -844,6 +844,48 @@ export type Database = {
           },
         ]
       }
+      insurance_companies: {
+        Row: {
+          address: string | null
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          default_coverage_ratio: number
+          id: string
+          is_active: boolean
+          name_ar: string | null
+          name_en: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          default_coverage_ratio?: number
+          id?: string
+          is_active?: boolean
+          name_ar?: string | null
+          name_en: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          default_coverage_ratio?: number
+          id?: string
+          is_active?: boolean
+          name_ar?: string | null
+          name_en?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       inventory: {
         Row: {
           available_quantity: number | null
@@ -1120,12 +1162,18 @@ export type Database = {
       invoices: {
         Row: {
           branch_id: string | null
+          claim_amount: number
+          claim_number: string | null
+          claim_resolved_at: string | null
+          claim_status: Database["public"]["Enums"]["claim_status"]
+          claim_submitted_at: string | null
           created_at: string
           created_by: string | null
           deleted_at: string | null
           discount: number
           due_date: string | null
           id: string
+          insurance_company_id: string | null
           invoice_date: string
           invoice_number: string
           notes: string | null
@@ -1139,12 +1187,18 @@ export type Database = {
         }
         Insert: {
           branch_id?: string | null
+          claim_amount?: number
+          claim_number?: string | null
+          claim_resolved_at?: string | null
+          claim_status?: Database["public"]["Enums"]["claim_status"]
+          claim_submitted_at?: string | null
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
           discount?: number
           due_date?: string | null
           id?: string
+          insurance_company_id?: string | null
           invoice_date?: string
           invoice_number: string
           notes?: string | null
@@ -1158,12 +1212,18 @@ export type Database = {
         }
         Update: {
           branch_id?: string | null
+          claim_amount?: number
+          claim_number?: string | null
+          claim_resolved_at?: string | null
+          claim_status?: Database["public"]["Enums"]["claim_status"]
+          claim_submitted_at?: string | null
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
           discount?: number
           due_date?: string | null
           id?: string
+          insurance_company_id?: string | null
           invoice_date?: string
           invoice_number?: string
           notes?: string | null
@@ -1181,6 +1241,13 @@ export type Database = {
             columns: ["branch_id"]
             isOneToOne: false
             referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_insurance_company_id_fkey"
+            columns: ["insurance_company_id"]
+            isOneToOne: false
+            referencedRelation: "insurance_companies"
             referencedColumns: ["id"]
           },
           {
@@ -1830,6 +1897,10 @@ export type Database = {
           first_name_en: string | null
           gender: Database["public"]["Enums"]["gender"] | null
           id: string
+          insurance_company_id: string | null
+          insurance_coverage_ratio: number | null
+          insurance_policy_expiry: string | null
+          insurance_policy_number: string | null
           last_name_ar: string | null
           last_name_en: string | null
           nationality: string | null
@@ -1854,6 +1925,10 @@ export type Database = {
           first_name_en?: string | null
           gender?: Database["public"]["Enums"]["gender"] | null
           id?: string
+          insurance_company_id?: string | null
+          insurance_coverage_ratio?: number | null
+          insurance_policy_expiry?: string | null
+          insurance_policy_number?: string | null
           last_name_ar?: string | null
           last_name_en?: string | null
           nationality?: string | null
@@ -1878,6 +1953,10 @@ export type Database = {
           first_name_en?: string | null
           gender?: Database["public"]["Enums"]["gender"] | null
           id?: string
+          insurance_company_id?: string | null
+          insurance_coverage_ratio?: number | null
+          insurance_policy_expiry?: string | null
+          insurance_policy_number?: string | null
           last_name_ar?: string | null
           last_name_en?: string | null
           nationality?: string | null
@@ -1894,6 +1973,13 @@ export type Database = {
             columns: ["branch_id"]
             isOneToOne: false
             referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patients_insurance_company_id_fkey"
+            columns: ["insurance_company_id"]
+            isOneToOne: false
+            referencedRelation: "insurance_companies"
             referencedColumns: ["id"]
           },
         ]
@@ -3747,6 +3833,42 @@ export type Database = {
         }
         Relationships: []
       }
+      system_backups: {
+        Row: {
+          backup_type: string
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          rows_count: number | null
+          size_bytes: number | null
+          status: string
+          tables_count: number | null
+        }
+        Insert: {
+          backup_type?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          rows_count?: number | null
+          size_bytes?: number | null
+          status?: string
+          tables_count?: number | null
+        }
+        Update: {
+          backup_type?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          rows_count?: number | null
+          size_bytes?: number | null
+          status?: string
+          tables_count?: number | null
+        }
+        Relationships: []
+      }
       system_languages: {
         Row: {
           code: string
@@ -4380,6 +4502,13 @@ export type Database = {
         | "half_day"
         | "on_leave"
       billing_cycle: "monthly" | "yearly"
+      claim_status:
+        | "none"
+        | "pending"
+        | "submitted"
+        | "approved"
+        | "rejected"
+        | "paid"
       contract_type: "full_time" | "part_time" | "contract" | "freelance"
       document_type:
         | "lab_result"
@@ -4620,6 +4749,14 @@ export const Constants = {
         "on_leave",
       ],
       billing_cycle: ["monthly", "yearly"],
+      claim_status: [
+        "none",
+        "pending",
+        "submitted",
+        "approved",
+        "rejected",
+        "paid",
+      ],
       contract_type: ["full_time", "part_time", "contract", "freelance"],
       document_type: [
         "lab_result",

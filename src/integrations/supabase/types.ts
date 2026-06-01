@@ -4074,6 +4074,7 @@ export type Database = {
           is_active: boolean
           name_ar: string
           name_en: string
+          non_cash_balance: number
           updated_at: string
         }
         Insert: {
@@ -4086,6 +4087,7 @@ export type Database = {
           is_active?: boolean
           name_ar: string
           name_en: string
+          non_cash_balance?: number
           updated_at?: string
         }
         Update: {
@@ -4098,6 +4100,7 @@ export type Database = {
           is_active?: boolean
           name_ar?: string
           name_en?: string
+          non_cash_balance?: number
           updated_at?: string
         }
         Relationships: [
@@ -4119,6 +4122,7 @@ export type Database = {
           description_ar: string | null
           description_en: string
           id: string
+          is_cash: boolean
           reference_id: string | null
           reference_type: string | null
           transaction_type: Database["public"]["Enums"]["treasury_tx_type"]
@@ -4132,6 +4136,7 @@ export type Database = {
           description_ar?: string | null
           description_en: string
           id?: string
+          is_cash?: boolean
           reference_id?: string | null
           reference_type?: string | null
           transaction_type: Database["public"]["Enums"]["treasury_tx_type"]
@@ -4145,6 +4150,7 @@ export type Database = {
           description_ar?: string | null
           description_en?: string
           id?: string
+          is_cash?: boolean
           reference_id?: string | null
           reference_type?: string | null
           transaction_type?: Database["public"]["Enums"]["treasury_tx_type"]
@@ -4399,19 +4405,34 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      add_treasury_tx: {
-        Args: {
-          _amount: number
-          _by: string
-          _desc_ar: string
-          _desc_en: string
-          _ref_id: string
-          _ref_type: string
-          _treasury_id: string
-          _type: Database["public"]["Enums"]["treasury_tx_type"]
-        }
-        Returns: string
-      }
+      add_treasury_tx:
+        | {
+            Args: {
+              _amount: number
+              _by: string
+              _desc_ar: string
+              _desc_en: string
+              _ref_id: string
+              _ref_type: string
+              _treasury_id: string
+              _type: Database["public"]["Enums"]["treasury_tx_type"]
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              _amount: number
+              _by: string
+              _desc_ar: string
+              _desc_en: string
+              _is_cash?: boolean
+              _ref_id: string
+              _ref_type: string
+              _treasury_id: string
+              _type: Database["public"]["Enums"]["treasury_tx_type"]
+            }
+            Returns: string
+          }
       apply_inventory_tx: {
         Args: {
           _batch: string

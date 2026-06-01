@@ -158,7 +158,7 @@ export function CreateInvoiceDialog({
     if (!patientId) { toast.error(t("selectPatient")); return; }
     if (items.length === 0 || items.every((it) => !it.description_en)) { toast.error("Add at least one item"); return; }
     setSaving(true);
-    const { data: inv, error } = await supabase.from("invoices").insert({
+    const invoicePayload: Record<string, unknown> = {
       patient_id: patientId,
       branch_id: currentBranchId,
       invoice_date: date,
@@ -167,8 +167,17 @@ export function CreateInvoiceDialog({
       created_by: user?.id ?? null,
       insurance_company_id: insuranceCompanyId || null,
       claim_amount: insuranceCompanyId ? claimAmount : null,
-      claim_status: insuranceCompanyId ? 'pending' : 'none',
-    } as any).select("id, invoice_number").single();
+    };
+
+    if (insuranceCompanyId) {
+      invoicePayload.claim_status = "pending";
+    }
+
+    const { data: inv, error } = await supabase
+      .from("invoices")
+      .insert(invoicePayload as any, { defaultToNull: false })
+      .select("id, invoice_number")
+      .single();
     if (error || !inv) { setSaving(false); toast.error(error?.message ?? "Failed"); return; }
 
     const rows = items

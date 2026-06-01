@@ -167,7 +167,7 @@ export function CreateInvoiceDialog({
       created_by: user?.id ?? null,
       insurance_company_id: insuranceCompanyId || null,
       claim_amount: insuranceCompanyId ? claimAmount : null,
-      claim_status: insuranceCompanyId ? 'pending' : null,
+      claim_status: insuranceCompanyId ? 'pending' : 'none',
     } as any).select("id, invoice_number").single();
     if (error || !inv) { setSaving(false); toast.error(error?.message ?? "Failed"); return; }
 

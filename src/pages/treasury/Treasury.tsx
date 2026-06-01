@@ -177,6 +177,16 @@ export default function Treasury() {
                 <RowActions canEdit={false} onDelete={() => softDeleteTreasury(tr)} />
               </div>
               <div className="mt-1 text-2xl font-bold tabular-nums text-primary">{formatMoney(tr.current_balance, lang, tr.currency)}</div>
+              <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                <div className="rounded-md bg-muted/40 p-2">
+                  <div className="text-muted-foreground">{t("cashBalance")}</div>
+                  <div className="font-semibold tabular-nums">{formatMoney(tr.current_balance, lang, tr.currency)}</div>
+                </div>
+                <div className="rounded-md bg-muted/40 p-2">
+                  <div className="text-muted-foreground">{t("nonCashBalance")}</div>
+                  <div className="font-semibold tabular-nums">{formatMoney(tr.non_cash_balance ?? 0, lang, tr.currency)}</div>
+                </div>
+              </div>
             </div>
           ))}
         </Card>

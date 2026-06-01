@@ -166,7 +166,7 @@ export function CreateInvoiceDialog({
       status, notes: notes || null,
       created_by: user?.id ?? null,
       insurance_company_id: insuranceCompanyId || null,
-      claim_amount: insuranceCompanyId ? claimAmount : null,
+      claim_amount: insuranceCompanyId ? claimAmount : 0,
     };
 
     if (insuranceCompanyId) {

@@ -176,7 +176,8 @@ export default function Treasury() {
                 <div className="font-medium">{lang === "ar" ? tr.name_ar : tr.name_en}</div>
                 <RowActions canEdit={false} onDelete={() => softDeleteTreasury(tr)} />
               </div>
-              <div className="mt-1 text-2xl font-bold tabular-nums text-primary">{formatMoney(tr.current_balance, lang, tr.currency)}</div>
+              <div className="mt-1 text-2xl font-bold tabular-nums text-primary">{formatMoney(Number(tr.current_balance) + Number(tr.non_cash_balance ?? 0), lang, tr.currency)}</div>
+              <div className="text-[10px] text-muted-foreground">{t("totalBalance")}</div>
               <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                 <div className="rounded-md bg-muted/40 p-2">
                   <div className="text-muted-foreground">{t("cashBalance")}</div>

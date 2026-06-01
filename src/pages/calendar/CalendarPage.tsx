@@ -374,18 +374,57 @@ export default function CalendarPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>{t("durationMin")}</Label>
-                    <Input type="number" min={5} max={480} value={form.duration_minutes}
-                      onChange={(e) => setForm({ ...form, duration_minutes: Number(e.target.value) })} />
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      dir="ltr"
+                      value={String(form.duration_minutes ?? "")}
+                      onChange={(e) => {
+                        // Accept Arabic-Indic & Persian digits
+                        const ascii = e.target.value
+                          .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+                          .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 0x06F0))
+                          .replace(/[^\d]/g, "");
+                        setForm({ ...form, duration_minutes: ascii === "" ? 0 : Number(ascii) });
+                      }}
+                    />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label>{t("procedure")}</Label>
-                    <Input value={form.procedure} onChange={(e) => setForm({ ...form, procedure: e.target.value })} maxLength={120} />
+                    <Select
+                      value={procedures.find((p) => p.name === form.procedure) ? form.procedure : (form.procedure ? "__custom__" : "__none__")}
+                      onValueChange={(v) => {
+                        if (v === "__none__") { setForm({ ...form, procedure: "" }); return; }
+                        if (v === "__custom__") return;
+                        const sel = procedures.find((p) => p.name === v);
+                        setForm({
+                          ...form,
+                          procedure: v,
+                          duration_minutes: sel?.duration ? sel.duration : form.duration_minutes,
+                        });
+                      }}
+                    >
+                      <SelectTrigger><SelectValue placeholder={t("selectProcedure")} /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">— {t("none")} —</SelectItem>
+                        {procedures.map((p) => <SelectItem key={p.id} value={p.name}>{p.name}{p.duration ? ` · ${p.duration}m` : ""}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
                     <Label>{t("room")}</Label>
-                    <Input value={form.room} onChange={(e) => setForm({ ...form, room: e.target.value })} maxLength={40} />
+                    <Input
+                      list="calendar-rooms-list"
+                      value={form.room}
+                      onChange={(e) => setForm({ ...form, room: e.target.value })}
+                      maxLength={40}
+                      placeholder={t("selectRoom")}
+                    />
+                    <datalist id="calendar-rooms-list">
+                      {rooms.map((r) => <option key={r} value={r} />)}
+                    </datalist>
                   </div>
                 </div>
                 <div className="space-y-2">

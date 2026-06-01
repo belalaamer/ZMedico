@@ -24,6 +24,7 @@ export default function Treasury() {
   const [treasuries, setTreasuries] = useState<any[]>([]);
   const [txs, setTxs] = useState<any[]>([]);
   const [adj, setAdj] = useState({ open: false, type: "income", amount: 0, desc_en: "", desc_ar: "", treasury_id: "" });
+  const [adjIsCash, setAdjIsCash] = useState<"cash" | "non_cash">("cash");
   const [today, setToday] = useState({ income: 0, expense: 0 });
   const [transferOpen, setTransferOpen] = useState(false);
 
@@ -58,7 +59,9 @@ export default function Treasury() {
     toast.success(t("delete")); load();
   };
 
-  const totalBalance = treasuries.reduce((s, tr) => s + Number(tr.current_balance), 0);
+  const totalCashBalance = treasuries.reduce((s, tr) => s + Number(tr.current_balance), 0);
+  const totalNonCashBalance = treasuries.reduce((s, tr) => s + Number(tr.non_cash_balance ?? 0), 0);
+  const totalBalance = totalCashBalance + totalNonCashBalance;
 
   const submitAdj = async () => {
     if (!adj.treasury_id || !adj.amount || !adj.desc_en) { toast.error("Fill all fields"); return; }
@@ -71,6 +74,7 @@ export default function Treasury() {
       _desc_en: adj.desc_en,
       _desc_ar: adj.desc_ar || adj.desc_en,
       _by: user?.id ?? null,
+      _is_cash: adjIsCash === "cash",
     } as any);
     if (error) { toast.error(error.message); return; }
     toast.success(t("save"));
@@ -135,9 +139,9 @@ export default function Treasury() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: t("cashBalance"), value: totalBalance, icon: Banknote, tone: "from-primary to-primary-glow" },
+      { label: t("nonCashBalance"), value: totalNonCashBalance, icon: Banknote, tone: "from-info to-info" },
           { label: t("todayIncome"), value: today.income, icon: ArrowDownToLine, tone: "from-success to-success" },
           { label: t("todayExpenses"), value: today.expense, icon: ArrowUpFromLine, tone: "from-destructive to-destructive" },
-          { label: t("netToday"), value: today.income - today.expense, icon: TrendingUp, tone: "from-info to-info" },
         ].map((m) => (
           <Card key={m.label} className="p-4 shadow-card">
             <div className="flex items-start justify-between">

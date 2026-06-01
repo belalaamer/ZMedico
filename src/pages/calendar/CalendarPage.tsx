@@ -80,6 +80,8 @@ export default function CalendarPage() {
   const [items, setItems] = useState<Appt[]>([]);
   const [monthDots, setMonthDots] = useState<Record<string, number>>({});
   const [patients, setPatients] = useState<{ id: string; label: string }[]>([]);
+  const [procedures, setProcedures] = useState<{ id: string; name: string; duration: number | null }[]>([]);
+  const [rooms, setRooms] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -140,6 +142,33 @@ export default function CalendarPage() {
   };
   useEffect(() => { loadPatientOptions(); }, []);
   useDataSync(["patients"], () => loadPatientOptions());
+
+  // Load procedures + distinct rooms
+  const loadProcedures = () => {
+    supabase.from("procedures")
+      .select("id,name_en,name_ar,default_duration")
+      .eq("is_active", true).is("deleted_at", null)
+      .order("name_en")
+      .then(({ data }) => {
+        setProcedures((data ?? []).map((p: any) => ({
+          id: p.id,
+          name: lang === "ar" ? (p.name_ar || p.name_en) : (p.name_en || p.name_ar),
+          duration: p.default_duration,
+        })));
+      });
+  };
+  const loadRooms = () => {
+    let q = supabase.from("appointments").select("room").not("room", "is", null).is("deleted_at", null).limit(1000);
+    if (currentBranchId) q = q.eq("branch_id", currentBranchId);
+    q.then(({ data }) => {
+      const set = new Set<string>();
+      (data ?? []).forEach((r: any) => { if (r.room) set.add(String(r.room).trim()); });
+      setRooms(Array.from(set).sort());
+    });
+  };
+  useEffect(() => { loadProcedures(); }, [lang]);
+  useEffect(() => { loadRooms(); }, [currentBranchId]);
+  useDataSync(["appointments"], () => loadRooms());
 
   const openNew = () => {
     setEditId(null);

@@ -141,27 +141,27 @@ export default function PatientsPage() {
               <DialogHeader><DialogTitle>{t("newPatient")}</DialogTitle></DialogHeader>
               <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2 sm:col-span-2">
-                  <Label>Name / الاسم *</Label>
-                  <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required maxLength={160} placeholder="Full name / الاسم الكامل" />
+                  <Label>{t("fullName")} *</Label>
+                  <Input dir="auto" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required maxLength={160} placeholder={t("fullName")} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Phone / رقم الهاتف *</Label>
-                  <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required placeholder="+20..." maxLength={30} />
+                  <Label>{t("phone")} *</Label>
+                  <Input dir="ltr" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required placeholder="+20..." maxLength={30} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Phone 2 / رقم إضافي</Label>
-                  <Input value={form.phone2} onChange={(e) => setForm({ ...form, phone2: e.target.value })} maxLength={30} />
+                  <Label>{t("phone2")}</Label>
+                  <Input dir="ltr" value={form.phone2} onChange={(e) => setForm({ ...form, phone2: e.target.value })} maxLength={30} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Email / البريد الإلكتروني</Label>
-                  <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} maxLength={255} />
+                  <Label>{t("email")}</Label>
+                  <Input dir="ltr" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} maxLength={255} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Date of Birth / تاريخ الميلاد</Label>
+                  <Label>{t("dob")}</Label>
                   <Input type="date" value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Gender / النوع</Label>
+                  <Label>{t("gender")}</Label>
                   <Select value={form.gender} onValueChange={(v) => setForm({ ...form, gender: v as any })}>
                     <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                     <SelectContent>
@@ -171,7 +171,7 @@ export default function PatientsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Blood Type / فصيلة الدم</Label>
+                  <Label>{t("bloodType")}</Label>
                   <Select value={form.blood_type} onValueChange={(v) => setForm({ ...form, blood_type: v })}>
                     <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                     <SelectContent>
@@ -180,12 +180,12 @@ export default function PatientsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2 sm:col-span-2">
-                  <Label>Address / العنوان</Label>
-                  <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} maxLength={255} />
+                  <Label>{t("address")}</Label>
+                  <Input dir="auto" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} maxLength={255} />
                 </div>
                 <div className="space-y-2 sm:col-span-2">
-                  <Label>Notes / ملاحظات</Label>
-                  <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} maxLength={1000} />
+                  <Label>{t("notes")}</Label>
+                  <Textarea dir="auto" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} maxLength={1000} />
                 </div>
                 <DialogFooter className="sm:col-span-2">
                   <Button type="button" variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button>

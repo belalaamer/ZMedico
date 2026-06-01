@@ -726,7 +726,11 @@ function InvoicePreviewTab({ record, patient, procs, nav, userId }: any) {
   const create = async () => {
     if (items.length === 0) return toast.error(t("noResults"));
     const { data: inv, error } = await supabase.from("invoices").insert({
-      patient_id: patient.id, branch_id: record.branch_id, status: "draft", created_by: userId,
+      patient_id: patient.id,
+      branch_id: record.branch_id,
+      status: "draft",
+      created_by: userId,
+      claim_status: "none",
     } as any).select("id").single();
     if (error || !inv) return toast.error(error?.message ?? "error");
     const rows = items.map((rp: any) => ({

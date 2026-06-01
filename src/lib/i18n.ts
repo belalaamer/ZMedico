@@ -148,7 +148,6 @@ export const dict = {
     nonCashBalance: "Non-Cash Balance",
     totalBalance: "Total Balance",
     cashOrNonCash: "Cash / Non-cash",
-    cash: "Cash",
     nonCash: "Non-cash",
     todayIncome: "Today's Income",
     todayExpenses: "Today's Expenses",

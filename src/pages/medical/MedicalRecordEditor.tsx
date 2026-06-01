@@ -730,7 +730,6 @@ function InvoicePreviewTab({ record, patient, procs, nav, userId }: any) {
       branch_id: record.branch_id,
       status: "draft",
       created_by: userId,
-      claim_status: "none",
     } as any).select("id").single();
     if (error || !inv) return toast.error(error?.message ?? "error");
     const rows = items.map((rp: any) => ({

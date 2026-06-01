@@ -138,7 +138,7 @@ export default function Treasury() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: t("cashBalance"), value: totalBalance, icon: Banknote, tone: "from-primary to-primary-glow" },
+      { label: t("cashBalance"), value: totalCashBalance, icon: Banknote, tone: "from-primary to-primary-glow" },
       { label: t("nonCashBalance"), value: totalNonCashBalance, icon: Banknote, tone: "from-info to-info" },
           { label: t("todayIncome"), value: today.income, icon: ArrowDownToLine, tone: "from-success to-success" },
           { label: t("todayExpenses"), value: today.expense, icon: ArrowUpFromLine, tone: "from-destructive to-destructive" },

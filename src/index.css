@@ -136,6 +136,45 @@ html { font-family: "Inter", system-ui, sans-serif; }
 /* RTL-aware logical spacing helpers already supported by Tailwind via [dir] */
 [dir="rtl"] .lucide { transform: scaleX(1); }
 
+/* ============================================================
+   RTL Polish — mirror common physical classes inside [dir=rtl]
+   Targets shadcn/ui primitives that still use left/right based
+   utilities so the Arabic layout stays consistent.
+   ============================================================ */
+[dir="rtl"] .text-left { text-align: right; }
+[dir="rtl"] .text-right { text-align: left; }
+[dir="rtl"] .sm\:text-left { text-align: right; }
+
+[dir="rtl"] .ml-auto { margin-left: 0; margin-right: auto; }
+[dir="rtl"] .mr-auto { margin-right: 0; margin-left: auto; }
+[dir="rtl"] .ml-2 { margin-left: 0; margin-right: 0.5rem; }
+[dir="rtl"] .mr-2 { margin-right: 0; margin-left: 0.5rem; }
+
+/* Menu / Select item indicator spacing (left chevron/check slot) */
+[dir="rtl"] .pl-8 { padding-left: 0.5rem; padding-right: 2rem; }
+[dir="rtl"] .pr-2 { padding-right: 0; padding-left: 0.5rem; }
+[dir="rtl"] .pl-2\.5 { padding-left: 0; padding-right: 0.625rem; }
+[dir="rtl"] .pr-2\.5 { padding-right: 0; padding-left: 0.625rem; }
+
+/* Indicator icons absolutely positioned at left-2 inside items */
+[dir="rtl"] [role="menuitem"] > .absolute.left-2,
+[dir="rtl"] [role="menuitemcheckbox"] > .absolute.left-2,
+[dir="rtl"] [role="menuitemradio"] > .absolute.left-2,
+[dir="rtl"] [role="option"] > .absolute.left-2 {
+  left: auto;
+  right: 0.5rem;
+}
+
+/* Table cells default to text-start in RTL */
+[dir="rtl"] table th,
+[dir="rtl"] table td { text-align: right; }
+
+/* Mirror lucide chevron icons that imply direction */
+[dir="rtl"] .lucide-chevron-right { transform: scaleX(-1); }
+[dir="rtl"] .lucide-chevron-left { transform: scaleX(-1); }
+[dir="rtl"] .lucide-arrow-right { transform: scaleX(-1); }
+[dir="rtl"] .lucide-arrow-left { transform: scaleX(-1); }
+
 /* Status badge utility classes */
 @layer components {
   .status-completed { @apply bg-success/15 text-success border-success/30; }

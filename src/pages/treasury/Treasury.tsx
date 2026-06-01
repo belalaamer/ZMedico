@@ -123,6 +123,16 @@ export default function Treasury() {
                 </div>
               </div>
               <div className="space-y-2">
+                <Label>{t("cashOrNonCash")}</Label>
+                <Select value={adjIsCash} onValueChange={(v) => setAdjIsCash(v as "cash" | "non_cash")}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">{t("cash")}</SelectItem>
+                    <SelectItem value="non_cash">{t("nonCash")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
                 <Label>{t("description")}</Label>
                 <Input value={adj.desc_en} onChange={(e) => setAdj({ ...adj, desc_en: e.target.value, desc_ar: e.target.value })} maxLength={200} />
               </div>

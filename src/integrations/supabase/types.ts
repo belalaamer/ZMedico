@@ -1165,7 +1165,7 @@ export type Database = {
           claim_amount: number
           claim_number: string | null
           claim_resolved_at: string | null
-          claim_status: Database["public"]["Enums"]["claim_status"]
+          claim_status: Database["public"]["Enums"]["claim_status"] | null
           claim_submitted_at: string | null
           created_at: string
           created_by: string | null
@@ -1190,7 +1190,7 @@ export type Database = {
           claim_amount?: number
           claim_number?: string | null
           claim_resolved_at?: string | null
-          claim_status?: Database["public"]["Enums"]["claim_status"]
+          claim_status?: Database["public"]["Enums"]["claim_status"] | null
           claim_submitted_at?: string | null
           created_at?: string
           created_by?: string | null
@@ -1215,7 +1215,7 @@ export type Database = {
           claim_amount?: number
           claim_number?: string | null
           claim_resolved_at?: string | null
-          claim_status?: Database["public"]["Enums"]["claim_status"]
+          claim_status?: Database["public"]["Enums"]["claim_status"] | null
           claim_submitted_at?: string | null
           created_at?: string
           created_by?: string | null

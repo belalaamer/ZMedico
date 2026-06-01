@@ -1,0 +1,1 @@
+ALTER TABLE public.invoices ALTER COLUMN claim_status DROP NOT NULL;

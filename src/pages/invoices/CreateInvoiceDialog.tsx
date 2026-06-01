@@ -173,7 +173,11 @@ export function CreateInvoiceDialog({
       invoicePayload.claim_status = "pending";
     }
 
-    const { data: inv, error } = await supabase.from("invoices").insert(invoicePayload as any).select("id, invoice_number").single();
+    const { data: inv, error } = await supabase
+      .from("invoices")
+      .insert(invoicePayload as any, { defaultToNull: false })
+      .select("id, invoice_number")
+      .single();
     if (error || !inv) { setSaving(false); toast.error(error?.message ?? "Failed"); return; }
 
     const rows = items

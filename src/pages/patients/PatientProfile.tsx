@@ -13,6 +13,7 @@ import { formatMoney, formatDate, formatDateTime } from "@/lib/format";
 import { CreateInvoiceDialog } from "../invoices/CreateInvoiceDialog";
 import PatientMedicalTab from "./PatientMedicalTab";
 import { EditPatientDialog } from "./EditPatientDialog";
+import PatientTreatmentPlans from "./PatientTreatmentPlans";
 import { Can } from "@/components/Can";
 
 const statusClass: Record<string, string> = {
@@ -25,6 +26,7 @@ export default function PatientProfile() {
   const { t, lang } = useI18n();
   const [patient, setPatient] = useState<any>(null);
   const [insurer, setInsurer] = useState<any>(null);
+  const [assignedDoctorName, setAssignedDoctorName] = useState<string>("");
   const [invoices, setInvoices] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
@@ -44,6 +46,10 @@ export default function PatientProfile() {
       const { data: ins } = await (supabase as any).from("insurance_companies").select("*").eq("id", p.insurance_company_id).maybeSingle();
       setInsurer(ins);
     } else { setInsurer(null); }
+    if (p?.assigned_doctor_id) {
+      const { data: prof } = await supabase.from("profiles").select("full_name").eq("id", p.assigned_doctor_id).maybeSingle();
+      setAssignedDoctorName(prof?.full_name ?? "");
+    } else { setAssignedDoctorName(""); }
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
 
@@ -139,6 +145,7 @@ export default function PatientProfile() {
         <TabsList>
           <TabsTrigger value="overview">{t("overview")}</TabsTrigger>
           <TabsTrigger value="medical">{t("medicalTab")}</TabsTrigger>
+          <TabsTrigger value="plans">{lang === "ar" ? "خطط العلاج" : "Treatment Plans"}</TabsTrigger>
           <TabsTrigger value="invoices">{t("invoices")}</TabsTrigger>
           <TabsTrigger value="payments">{t("paymentHistory")}</TabsTrigger>
         </TabsList>
@@ -150,6 +157,7 @@ export default function PatientProfile() {
               <div><div className="text-muted-foreground text-xs">{t("nationality")}</div><div>{patient.nationality ?? "—"}</div></div>
               <div><div className="text-muted-foreground text-xs">{t("address")}</div><div>{patient.address ?? "—"}</div></div>
               <div><div className="text-muted-foreground text-xs">{t("referralSource")}</div><div>{patient.referral_source ?? "—"}</div></div>
+              <div><div className="text-muted-foreground text-xs">{lang === "ar" ? "الطبيب المسؤول" : "Assigned Doctor"}</div><div>{assignedDoctorName || "—"}</div></div>
               {patient.notes && <div className="sm:col-span-2"><div className="text-muted-foreground text-xs">{t("notes")}</div><div className="whitespace-pre-wrap">{patient.notes}</div></div>}
             </div>
           </Card>
@@ -171,6 +179,10 @@ export default function PatientProfile() {
 
         <TabsContent value="medical" className="mt-4">
           <PatientMedicalTab patientId={patient.id} />
+        </TabsContent>
+
+        <TabsContent value="plans" className="mt-4">
+          <PatientTreatmentPlans patientId={patient.id} />
         </TabsContent>
 
         <TabsContent value="invoices" className="mt-4">

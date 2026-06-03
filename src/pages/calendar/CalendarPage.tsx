@@ -249,13 +249,14 @@ export default function CalendarPage() {
       room: form.room || null,
       notes: form.notes || null,
     };
+    if (editId) payload.status = form.status;
     const { error } = editId
       ? await supabase.from("appointments").update(payload).eq("id", editId)
       : await supabase.from("appointments").insert({ ...payload, branch_id: currentBranchId, status: "scheduled" });
     if (error) { toast.error(error.message); return; }
     toast.success(lang === "ar" ? "تم حفظ الموعد" : "Appointment saved");
     setOpen(false); setEditId(null);
-    setForm({ patient_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "" });
+    setForm({ patient_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "", status: "scheduled" });
     load();
   };
 

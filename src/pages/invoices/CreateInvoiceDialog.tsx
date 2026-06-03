@@ -44,6 +44,8 @@ export function CreateInvoiceDialog({
   const [coverageRatio, setCoverageRatio] = useState<number>(0);
   const [items, setItems] = useState<Item[]>([{ item_type: "service", description_en: "", description_ar: "", quantity: 1, unit_price: 0 }]);
   const [saving, setSaving] = useState(false);
+  const [patientProcedures, setPatientProcedures] = useState<any[]>([]);
+  const [selectedProcIds, setSelectedProcIds] = useState<Record<string, boolean>>({});
 
   useEffect(() => { setPatientId(presetPatientId ?? ""); }, [presetPatientId, open]);
 
@@ -130,6 +132,48 @@ export function CreateInvoiceDialog({
         }
       });
   }, [patientId]);
+
+  // Load patient's recorded procedures (from medical records) for quick add
+  useEffect(() => {
+    if (!open || !patientId) { setPatientProcedures([]); setSelectedProcIds({}); return; }
+    (async () => {
+      const { data: recs } = await supabase
+        .from("medical_records")
+        .select("id, visit_date")
+        .eq("patient_id", patientId)
+        .order("visit_date", { ascending: false })
+        .limit(50);
+      const recordIds = (recs ?? []).map((r: any) => r.id);
+      if (recordIds.length === 0) { setPatientProcedures([]); return; }
+      const { data: rps } = await supabase
+        .from("record_procedures")
+        .select("id, medical_record_id, procedure_id, quantity, tooth_number, created_at, procedures(name_en,name_ar,default_price)")
+        .in("medical_record_id", recordIds)
+        .order("created_at", { ascending: false });
+      const recMap = new Map((recs ?? []).map((r: any) => [r.id, r.visit_date]));
+      setPatientProcedures((rps ?? []).map((r: any) => ({ ...r, visit_date: recMap.get(r.medical_record_id) })));
+      setSelectedProcIds({});
+    })();
+  }, [open, patientId]);
+
+  const addSelectedProcedures = () => {
+    const picks = patientProcedures.filter((r) => selectedProcIds[r.id]);
+    if (picks.length === 0) { toast.error(lang === "ar" ? "اختر إجراء واحد على الأقل" : "Select at least one procedure"); return; }
+    const newItems: Item[] = picks.map((r) => ({
+      item_type: "procedure",
+      product_id: null,
+      description_en: `${r.procedures?.name_en ?? "Procedure"}${r.tooth_number ? ` (#${r.tooth_number})` : ""}`,
+      description_ar: `${r.procedures?.name_ar ?? r.procedures?.name_en ?? "إجراء"}${r.tooth_number ? ` (#${r.tooth_number})` : ""}`,
+      quantity: Number(r.quantity) || 1,
+      unit_price: Number(r.procedures?.default_price) || 0,
+    }));
+    setItems((prev) => {
+      const filtered = prev.filter((it) => it.description_en.trim() || it.unit_price > 0);
+      return [...filtered, ...newItems];
+    });
+    setSelectedProcIds({});
+    toast.success(lang === "ar" ? `تمت إضافة ${picks.length} إجراء` : `Added ${picks.length} procedure(s)`);
+  };
 
   const subtotal = useMemo(() => items.reduce((s, it) => s + (Number(it.quantity)||0) * (Number(it.unit_price)||0), 0), [items]);
   const discount = useMemo(() => +(subtotal * (Number(discountPct)||0) / 100).toFixed(2), [subtotal, discountPct]);
@@ -288,6 +332,44 @@ export function CreateInvoiceDialog({
             <NumberInput value={coverageRatio} onChange={setCoverageRatio} disabled={!insuranceCompanyId} />
           </div>
         </div>
+
+        {patientId && patientProcedures.length > 0 && (
+          <div className="border border-border rounded-lg overflow-hidden">
+            <div className="flex items-center justify-between bg-muted/50 px-3 py-2">
+              <div className="text-sm font-medium">
+                {lang === "ar" ? "إجراءات المريض المسجّلة" : "Patient's recorded procedures"}
+                <span className="ms-2 text-xs text-muted-foreground">({patientProcedures.length})</span>
+              </div>
+              <Button type="button" size="sm" variant="outline" onClick={addSelectedProcedures}>
+                <Plus className="me-1 size-4" />
+                {lang === "ar" ? "إضافة المحدد للفاتورة" : "Add selected to invoice"}
+              </Button>
+            </div>
+            <div className="max-h-48 overflow-y-auto divide-y divide-border">
+              {patientProcedures.map((r) => {
+                const checked = !!selectedProcIds[r.id];
+                const name = lang === "ar" ? (r.procedures?.name_ar || r.procedures?.name_en) : (r.procedures?.name_en || r.procedures?.name_ar);
+                return (
+                  <label key={r.id} className="flex items-center gap-3 px-3 py-2 hover:bg-muted/30 cursor-pointer text-sm">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => setSelectedProcIds((s) => ({ ...s, [r.id]: e.target.checked }))}
+                      className="size-4"
+                    />
+                    <span className="flex-1 truncate">
+                      {name || "—"}
+                      {r.tooth_number && <span className="text-xs text-muted-foreground"> · #{r.tooth_number}</span>}
+                    </span>
+                    <span className="text-xs text-muted-foreground tabular-nums">× {Number(r.quantity)}</span>
+                    <span className="text-xs text-muted-foreground">{r.visit_date ? new Date(r.visit_date).toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US") : ""}</span>
+                    <span className="font-medium tabular-nums w-24 text-end">{formatMoney(Number(r.procedures?.default_price) || 0, lang)}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="border border-border rounded-lg overflow-hidden">
           <div className="grid grid-cols-12 gap-2 bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground">

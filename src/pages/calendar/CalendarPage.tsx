@@ -86,6 +86,7 @@ export default function CalendarPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({
     patient_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "",
+    status: "scheduled" as Appt["status"],
   });
 
   const dayLabel = useMemo(
@@ -172,14 +173,14 @@ export default function CalendarPage() {
 
   const openNew = () => {
     setEditId(null);
-    setForm({ patient_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "" });
+    setForm({ patient_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "", status: "scheduled" });
     setOpen(true);
   };
   const openNewAt = (slot: Date) => {
     setEditId(null);
     const tz = slot.getTimezoneOffset();
     const local = new Date(slot.getTime() - tz * 60000).toISOString().slice(0, 16);
-    setForm({ patient_id: "", scheduled_at: local, duration_minutes: 30, procedure: "", room: "", notes: "" });
+    setForm({ patient_id: "", scheduled_at: local, duration_minutes: 30, procedure: "", room: "", notes: "", status: "scheduled" });
     setOpen(true);
   };
   const openEdit = (a: Appt) => {
@@ -194,6 +195,7 @@ export default function CalendarPage() {
       procedure: a.procedure ?? "",
       room: a.room ?? "",
       notes: a.notes ?? "",
+      status: a.status,
     });
     setOpen(true);
   };
@@ -202,6 +204,13 @@ export default function CalendarPage() {
     const { error } = await supabase.from("appointments").update({ deleted_at: new Date().toISOString() } as any).eq("id", a.id);
     if (error) { toast.error(error.message); return; }
     toast.success(t("delete"));
+    load();
+  };
+
+  const changeStatus = async (a: Appt, status: Appt["status"]): Promise<void> => {
+    const { error } = await supabase.from("appointments").update({ status } as any).eq("id", a.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("saved"));
     load();
   };
 
@@ -247,13 +256,14 @@ export default function CalendarPage() {
       room: form.room || null,
       notes: form.notes || null,
     };
+    if (editId) payload.status = form.status;
     const { error } = editId
       ? await supabase.from("appointments").update(payload).eq("id", editId)
       : await supabase.from("appointments").insert({ ...payload, branch_id: currentBranchId, status: "scheduled" });
     if (error) { toast.error(error.message); return; }
     toast.success(lang === "ar" ? "تم حفظ الموعد" : "Appointment saved");
     setOpen(false); setEditId(null);
-    setForm({ patient_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "" });
+    setForm({ patient_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "", status: "scheduled" });
     load();
   };
 
@@ -431,6 +441,23 @@ export default function CalendarPage() {
                   <Label>{t("notes")}</Label>
                   <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} maxLength={1000} />
                 </div>
+                {editId && (
+                  <div className="space-y-2">
+                    <Label>{t("status")}</Label>
+                    <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as Appt["status"] })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="scheduled">{t("statusScheduled")}</SelectItem>
+                        <SelectItem value="confirmed">{t("statusConfirmed")}</SelectItem>
+                        <SelectItem value="in_progress">{t("statusInProgress")}</SelectItem>
+                        <SelectItem value="completed">{t("statusCompleted")}</SelectItem>
+                        <SelectItem value="cancelled">{t("statusCancelled")}</SelectItem>
+                        <SelectItem value="no_show">{t("statusNoShow")}</SelectItem>
+                        <SelectItem value="departed">{t("statusDeparted")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <DialogFooter>
                   <Button type="button" variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button>
                   <Button type="submit" className="gradient-primary text-primary-foreground">{t("save")}</Button>
@@ -583,7 +610,20 @@ export default function CalendarPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
                           <div className="text-xs font-mono tabular-nums text-muted-foreground">{timeStr(new Date(a.scheduled_at))}</div>
-                          <Badge variant="outline" className={`text-[10px] shrink-0 ${statusClass[a.status]}`}>{statusLabel(a.status, t)}</Badge>
+                          <Select value={a.status} onValueChange={(v) => changeStatus(a, v as Appt["status"])}>
+                            <SelectTrigger className={`h-6 px-2 py-0 text-[10px] w-auto gap-1 ${statusClass[a.status]}`}>
+                              <SelectValue>{statusLabel(a.status, t)}</SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="scheduled">{t("statusScheduled")}</SelectItem>
+                              <SelectItem value="confirmed">{t("statusConfirmed")}</SelectItem>
+                              <SelectItem value="in_progress">{t("statusInProgress")}</SelectItem>
+                              <SelectItem value="completed">{t("statusCompleted")}</SelectItem>
+                              <SelectItem value="cancelled">{t("statusCancelled")}</SelectItem>
+                              <SelectItem value="no_show">{t("statusNoShow")}</SelectItem>
+                              <SelectItem value="departed">{t("statusDeparted")}</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                         <div className="text-sm font-medium break-words leading-snug mt-0.5">{fullName(p)}</div>
                         <div className="text-[11px] text-muted-foreground truncate">{a.procedure || "—"}</div>

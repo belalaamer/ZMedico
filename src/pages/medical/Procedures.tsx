@@ -23,7 +23,7 @@ export default function Procedures() {
   const [specFilter, setSpecFilter] = useState("all");
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<any>(null);
-  const [form, setForm] = useState({ specialty_id: "", code: "", name: "", description: "", default_duration: 30, default_price: 0, is_active: true });
+  const [form, setForm] = useState({ specialty_id: "", code: "", name: "", description: "", default_duration: 30, default_price: 0, doctor_commission_percent: 0, is_active: true });
 
   const load = async () => {
     const [{ data }, { data: s }] = await Promise.all([
@@ -48,8 +48,8 @@ export default function Procedures() {
     return true;
   }), [items, q, specFilter]);
 
-  const openNew = () => { setEdit(null); setForm({ specialty_id: "", code: "", name: "", description: "", default_duration: 30, default_price: 0, is_active: true }); setOpen(true); };
-  const openEdit = (p: any) => { setEdit(p); setForm({ specialty_id: p.specialty_id ?? "", code: p.code ?? "", name: p.name_en || p.name_ar || "", description: p.description_en || p.description_ar || "", default_duration: p.default_duration ?? 30, default_price: Number(p.default_price ?? 0), is_active: p.is_active }); setOpen(true); };
+  const openNew = () => { setEdit(null); setForm({ specialty_id: "", code: "", name: "", description: "", default_duration: 30, default_price: 0, doctor_commission_percent: 0, is_active: true }); setOpen(true); };
+  const openEdit = (p: any) => { setEdit(p); setForm({ specialty_id: p.specialty_id ?? "", code: p.code ?? "", name: p.name_en || p.name_ar || "", description: p.description_en || p.description_ar || "", default_duration: p.default_duration ?? 30, default_price: Number(p.default_price ?? 0), doctor_commission_percent: Number(p.doctor_commission_percent ?? 0), is_active: p.is_active }); setOpen(true); };
 
   const save = async () => {
     const name = form.name.trim();
@@ -61,6 +61,7 @@ export default function Procedures() {
       description_en: desc || null, description_ar: desc || null,
       default_duration: Number(form.default_duration) || null,
       default_price: Number(form.default_price) || null,
+      doctor_commission_percent: Math.max(0, Math.min(100, Number(form.doctor_commission_percent) || 0)),
       is_active: form.is_active,
     };
     const { error } = edit
@@ -104,6 +105,7 @@ export default function Procedures() {
                 <div className="space-y-2 col-span-2"><Label>{t("name")} / الاسم</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={200} /></div>
                 <div className="space-y-2"><Label>{t("defaultDuration")}</Label><Input type="number" min={0} value={form.default_duration} onChange={(e) => setForm({ ...form, default_duration: Number(e.target.value) })} /></div>
                 <div className="space-y-2"><Label>{t("defaultPrice")}</Label><Input type="number" min={0} step="0.01" value={form.default_price} onChange={(e) => setForm({ ...form, default_price: Number(e.target.value) })} /></div>
+                <div className="space-y-2"><Label>{t("doctorCommissionPercent")}</Label><Input type="number" min={0} max={100} step="0.01" value={form.doctor_commission_percent} onChange={(e) => setForm({ ...form, doctor_commission_percent: Number(e.target.value) })} /></div>
                 <div className="space-y-2 col-span-2"><Label>{t("description")}</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} maxLength={500} rows={2} /></div>
                 <div className="flex items-center justify-between border border-border rounded-lg px-3 py-2 col-span-2"><Label>{t("active")}</Label><Switch checked={form.is_active} onCheckedChange={(v) => setForm({ ...form, is_active: v })} /></div>
               </div>

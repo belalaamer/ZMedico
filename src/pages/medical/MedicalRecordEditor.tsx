@@ -730,6 +730,7 @@ function InvoicePreviewTab({ record, patient, procs, nav, userId }: any) {
       .insert({
         patient_id: patient.id,
         branch_id: record.branch_id,
+        medical_record_id: record.id,
         status: "draft",
         created_by: userId,
       } as any, { defaultToNull: false })

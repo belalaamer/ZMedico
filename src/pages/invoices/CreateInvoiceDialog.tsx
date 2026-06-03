@@ -96,8 +96,8 @@ export function CreateInvoiceDialog({
     void refetchPatients();
     supabase.from("products").select("id,sku,name_en,name_ar,selling_price,min_stock_level").eq("is_active", true).is("deleted_at", null).order("name_en").limit(1000)
       .then(({ data }) => setProducts(data ?? []));
-    supabase.from("procedures").select("id,name_en,name_ar,default_price").eq("is_active", true).order("name_en").limit(1000)
-      .then(({ data }) => setProcedures(data ?? []));
+    supabase.from("procedures").select("id,name_en,name_ar,default_price,is_active,deleted_at").eq("is_active", true).is("deleted_at", null).order("name_en").limit(1000)
+      .then(({ data }) => setProcedures((data ?? []).filter((p: any) => p.deleted_at == null && p.is_active !== false)));
     supabase.from("insurance_companies").select("id,name_en,name_ar,default_coverage_ratio,is_active").eq("is_active", true).order("name_en")
       .then(({ data }) => setInsuranceCompanies(data ?? []));
   }, [open, refetchPatients]);
@@ -140,26 +140,24 @@ export function CreateInvoiceDialog({
   useEffect(() => {
     if (!open || !patientId) { setPatientProcedures([]); setSelectedProcIds({}); return; }
     (async () => {
-      const { data: recs } = await supabase
-        .from("medical_records")
-        .select("id, visit_date")
-        .eq("patient_id", patientId)
-        .order("visit_date", { ascending: false })
-        .limit(50);
-      const recordIds = (recs ?? []).map((r: any) => r.id);
-      if (recordIds.length === 0) { setPatientProcedures([]); return; }
-      const { data: rps } = await supabase
+      const { data: rps, error } = await supabase
         .from("record_procedures")
-        .select("id, medical_record_id, procedure_id, quantity, tooth_number, created_at, procedures!inner(name_en,name_ar,default_price,deleted_at,is_active)")
-        .in("medical_record_id", recordIds)
+        .select("id, medical_record_id, procedure_id, quantity, tooth_number, created_at, medical_records!inner(patient_id,visit_date), procedures!inner(id,name_en,name_ar,default_price,deleted_at,is_active)")
+        .eq("medical_records.patient_id", patientId)
         .is("procedures.deleted_at", null)
         .eq("procedures.is_active", true)
-        .order("created_at", { ascending: false });
-      const recMap = new Map((recs ?? []).map((r: any) => [r.id, r.visit_date]));
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (error) {
+        console.error("[CreateInvoiceDialog] patient procedures query failed", error);
+        setPatientProcedures([]);
+        setSelectedProcIds({});
+        return;
+      }
       setPatientProcedures(
         (rps ?? [])
-          .filter((r: any) => r.procedures && r.procedures.deleted_at == null)
-          .map((r: any) => ({ ...r, visit_date: recMap.get(r.medical_record_id) })),
+          .filter((r: any) => r.procedures && r.procedures.deleted_at == null && r.procedures.is_active !== false)
+          .map((r: any) => ({ ...r, visit_date: r.medical_records?.visit_date })),
       );
       setSelectedProcIds({});
     })();

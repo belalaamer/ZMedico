@@ -120,7 +120,9 @@ function RevenueTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
 function CollectionTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
   const [rows, setRows] = useState<any[]>([]);
   useEffect(() => {
-    let q = supabase.from("payments").select("amount, payment_method").is("deleted_at", null).gte("payment_date", start).lte("payment_date", end);
+    let q = supabase.from("payments")
+      .select("amount, payment_method, patient_id, patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)")
+      .is("deleted_at", null).gte("payment_date", start).lte("payment_date", end);
     if (branchId) q = q.eq("branch_id", branchId);
     q.then(({ data }) => setRows(data ?? []));
   }, [start, end, branchId]);
@@ -134,16 +136,49 @@ function CollectionTab({ start, end, setStart, setEnd, branchId, lang, t }: any)
     });
     return Array.from(map.entries()).map(([method, v]) => ({ method, ...v }));
   }, [rows]);
+
+  const byCustomer = useMemo(() => {
+    const map = new Map<string, { name: string; code: any; methods: Map<string, number>; total: number }>();
+    rows.forEach((r: any) => {
+      const pid = r.patient_id || "—";
+      const p = r.patients;
+      const name = p
+        ? (lang === "ar"
+            ? `${p.first_name_ar ?? p.first_name_en ?? ""} ${p.last_name_ar ?? p.last_name_en ?? ""}`.trim()
+            : `${p.first_name_en ?? ""} ${p.last_name_en ?? ""}`.trim())
+        : "—";
+      const cur = map.get(pid) ?? { name, code: p?.patient_code ?? "", methods: new Map<string, number>(), total: 0 };
+      const m = r.payment_method || "cash";
+      cur.methods.set(m, (cur.methods.get(m) ?? 0) + Number(r.amount || 0));
+      cur.total += Number(r.amount || 0);
+      map.set(pid, cur);
+    });
+    return Array.from(map.values())
+      .map((c) => ({ ...c, methodsList: Array.from(c.methods.entries()).map(([m, a]) => ({ m, a })) }))
+      .sort((a, b) => b.total - a.total);
+  }, [rows, lang]);
+
   const total = rows.reduce((s, r) => s + Number(r.amount || 0), 0);
 
   const cols = [{ header: t("method"), key: "method" }, { header: t("count"), key: "count" }, { header: t("amount"), key: "amount" }];
   const expRows = grouped.map((g) => ({ method: g.method, count: g.count, amount: g.amount.toFixed(2) }));
 
+  const customerCols = [
+    { header: t("patient"), key: "patient" },
+    { header: t("method"), key: "methods" },
+    { header: t("amount"), key: "total" },
+  ];
+  const customerRows = byCustomer.map((c) => ({
+    patient: `${c.name}${c.code ? ` #${c.code}` : ""}`,
+    methods: c.methodsList.map((x) => `${t(x.m as any) ?? x.m}: ${x.a.toFixed(2)}`).join(" · "),
+    total: c.total.toFixed(2),
+  }));
+
   return (
     <div className="space-y-4 mt-4">
       <ReportFilterBar start={start} end={end} setStart={setStart} setEnd={setEnd}
-        onPdf={() => exportReportPDF({ title: t("collectionReport"), subtitle: `${start} → ${end}`, columns: cols, rows: expRows, summary: [{ label: t("totalCollected"), value: formatMoney(total, lang) }], lang })}
-        onExcel={() => exportReportExcel({ title: t("collectionReport"), columns: cols, rows: expRows, summary: [{ label: t("totalCollected"), value: formatMoney(total, lang) }] })} />
+        onPdf={() => exportReportPDF({ title: t("collectionReport"), subtitle: `${start} → ${end}`, columns: customerCols, rows: customerRows, summary: [{ label: t("totalCollected"), value: formatMoney(total, lang) }], lang })}
+        onExcel={() => exportReportExcel({ title: t("collectionReport"), columns: customerCols, rows: customerRows, summary: [{ label: t("totalCollected"), value: formatMoney(total, lang) }] })} />
       <StatCard label={t("totalCollected")} value={formatMoney(total, lang)} />
       <Card><CardContent className="pt-6">
         <div className="text-sm font-medium mb-2">{t("byMethod")}</div>
@@ -160,8 +195,25 @@ function CollectionTab({ start, end, setStart, setEnd, branchId, lang, t }: any)
           <TableHead>{t("method")}</TableHead><TableHead>{t("count")}</TableHead><TableHead className="text-end">{t("amount")}</TableHead>
         </TableRow></TableHeader>
         <TableBody>{grouped.map((g) => (
-          <TableRow key={g.method}><TableCell className="capitalize">{g.method}</TableCell><TableCell>{g.count}</TableCell><TableCell className="text-end">{formatMoney(g.amount, lang)}</TableCell></TableRow>
+          <TableRow key={g.method}><TableCell className="capitalize">{(t(g.method as any) ?? g.method)}</TableCell><TableCell>{g.count}</TableCell><TableCell className="text-end">{formatMoney(g.amount, lang)}</TableCell></TableRow>
         ))}{!grouped.length && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">{t("noData")}</TableCell></TableRow>}</TableBody></Table>
+      </CardContent></Card>
+      <Card><CardContent className="pt-6 overflow-x-auto">
+        <div className="text-sm font-medium mb-3">{lang === "ar" ? "حسب العميل" : "By Customer"}</div>
+        <Table><TableHeader><TableRow>
+          <TableHead>{t("patient")}</TableHead>
+          <TableHead>{t("method")}</TableHead>
+          <TableHead className="text-end">{t("amount")}</TableHead>
+        </TableRow></TableHeader>
+        <TableBody>{byCustomer.map((c, i) => (
+          <TableRow key={i}>
+            <TableCell>{c.name}{c.code ? <span className="text-xs text-muted-foreground ms-1">#{c.code}</span> : null}</TableCell>
+            <TableCell className="text-xs">{c.methodsList.map((x, j) => (
+              <span key={j} className="inline-block me-2">{(t(x.m as any) ?? x.m)}: <span className="font-medium tabular-nums">{formatMoney(x.a, lang)}</span></span>
+            ))}</TableCell>
+            <TableCell className="text-end font-semibold tabular-nums">{formatMoney(c.total, lang)}</TableCell>
+          </TableRow>
+        ))}{!byCustomer.length && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">{t("noData")}</TableCell></TableRow>}</TableBody></Table>
       </CardContent></Card>
     </div>
   );

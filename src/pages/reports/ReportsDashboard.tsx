@@ -7,7 +7,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { formatMoney } from "@/lib/format";
 import { StatCard, ReportPageHeader } from "./_shared";
-import { DollarSign, Users, CalendarDays, FileWarning, BarChart3, Briefcase, Stethoscope, Boxes, ClipboardList, Percent } from "lucide-react";
+import { DollarSign, Users, CalendarDays, FileWarning, BarChart3, Briefcase, Stethoscope, Boxes, ClipboardList, Percent, Award } from "lucide-react";
 
 export default function ReportsDashboard() {
   const { t, lang } = useI18n();
@@ -47,6 +47,7 @@ export default function ReportsDashboard() {
     { to: "/reports/inventory", icon: Boxes, label: t("inventoryReports") },
     { to: "/reports/scheduled", icon: ClipboardList, label: t("scheduledReports") },
     { to: "/reports/commissions", icon: Percent, label: t("doctorCommissions") },
+    { to: "/reports/doctor-performance", icon: Award, label: t("doctorPerformance") },
   ];
 
   return (

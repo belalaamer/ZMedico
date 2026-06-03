@@ -1,4 +1,5 @@
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -17,11 +18,12 @@ type Props = {
   canDelete?: boolean;
   deleteTitle?: string;
   deleteDescription?: string;
+  extraItems?: { label: string; icon?: ReactNode; onClick: () => void }[];
 };
 
 export function RowActions({
   onEdit, onDelete, canEdit = true, canDelete = true,
-  deleteTitle, deleteDescription,
+  deleteTitle, deleteDescription, extraItems,
 }: Props) {
   const { t, lang } = useI18n();
   const [confirm, setConfirm] = useState(false);
@@ -47,6 +49,12 @@ export function RowActions({
               <Pencil className="me-2 size-4" />{t("edit")}
             </DropdownMenuItem>
           )}
+          {extraItems?.map((it, idx) => (
+            <DropdownMenuItem key={idx} onClick={(e) => { e.stopPropagation(); it.onClick(); }}>
+              {it.icon ? <span className="me-2 inline-flex items-center">{it.icon}</span> : null}
+              {it.label}
+            </DropdownMenuItem>
+          ))}
           {canDelete && onDelete && (
             <DropdownMenuItem className="text-destructive focus:text-destructive"
               onClick={(e) => { e.stopPropagation(); setConfirm(true); }}>

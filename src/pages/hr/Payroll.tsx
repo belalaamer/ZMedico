@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, FileText, DollarSign } from "lucide-react";
+import { Plus, FileText, DollarSign, ListChecks } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,9 @@ export default function Payroll() {
   const [profiles, setProfiles] = useState<any[]>([]);
   const [openAdj, setOpenAdj] = useState<string | null>(null);
   const [adj, setAdj] = useState({ type: "bonus", amount: "", reason_en: "" });
+  const [openDetails, setOpenDetails] = useState<any | null>(null);
+  const [detailRows, setDetailRows] = useState<any[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const load = async () => {
     let q = supabase.from("payroll").select("*").eq("period_year", year).eq("period_month", month);
@@ -88,6 +91,30 @@ export default function Payroll() {
     load();
   };
 
+  const openCommissionDetails = async (p: any) => {
+    setOpenDetails(p);
+    setDetailLoading(true);
+    setDetailRows([]);
+    // If payroll is paid/has attached commissions, show those.
+    // Otherwise show currently unattached earned/partial commissions for this doctor.
+    let q = (supabase as any)
+      .from("doctor_commissions")
+      .select("id, base_amount, collected_amount, commission_amount, commission_percent, status, created_at, updated_at, paid_at, payroll_id, procedures(name_en,name_ar), patients(first_name_en,last_name_en,first_name_ar,last_name_ar)")
+      .eq("doctor_id", p.staff_id)
+      .order("updated_at", { ascending: false })
+      .limit(500);
+    const hasAttached = await (supabase as any)
+      .from("doctor_commissions").select("id", { count: "exact", head: true }).eq("payroll_id", p.id);
+    if ((hasAttached?.count ?? 0) > 0) {
+      q = q.eq("payroll_id", p.id);
+    } else {
+      q = q.is("payroll_id", null).in("status", ["earned", "partial"]);
+    }
+    const { data } = await q;
+    setDetailRows(data ?? []);
+    setDetailLoading(false);
+  };
+
   const addAdjustment = async () => {
     if (!openAdj || !adj.amount) return;
     const amount = Number(adj.amount);
@@ -140,6 +167,9 @@ export default function Payroll() {
                   <Badge variant="outline" className="text-base">{formatMoney(p.net_salary, lang)}</Badge>
                   <Badge variant="outline" className={p.status === "paid" ? "status-completed" : p.status === "approved" ? "status-confirmed" : ""}>{t(`status${p.status.charAt(0).toUpperCase()}${p.status.slice(1)}` as any)}</Badge>
                   <Button size="sm" variant="outline" onClick={() => setOpenAdj(p.id)}>{t("addAdjustment")}</Button>
+                  <Button size="sm" variant="outline" onClick={() => openCommissionDetails(p)}>
+                    <ListChecks className="size-4 me-1" />{lang === "ar" ? "تفاصيل العمولات" : "Commission details"}
+                  </Button>
                   {p.status === "draft" && <Button size="sm" onClick={() => setStatus(p.id, "approved")}>{t("approve")}</Button>}
                   {p.status === "approved" && <Button size="sm" className="gradient-primary text-primary-foreground" onClick={() => setStatus(p.id, "paid")}>{t("markAsPaid")}</Button>}
                   <Button size="sm" variant="ghost" onClick={() => window.print()}><FileText className="size-4" /></Button>
@@ -172,6 +202,73 @@ export default function Payroll() {
           <DialogFooter>
             <Button variant="ghost" onClick={() => setOpenAdj(null)}>{t("cancel")}</Button>
             <Button className="gradient-primary text-primary-foreground" onClick={addAdjustment}>{t("save")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!openDetails} onOpenChange={(o) => !o && setOpenDetails(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              {lang === "ar" ? "تفاصيل عمولات الإجراءات" : "Procedure commission details"}
+              {openDetails && <span className="ms-2 text-sm text-muted-foreground font-normal">— {profName(openDetails.staff_id)}</span>}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="overflow-x-auto">
+            {detailLoading ? (
+              <div className="p-6 text-center text-muted-foreground text-sm">…</div>
+            ) : detailRows.length === 0 ? (
+              <div className="p-6 text-center text-muted-foreground text-sm">
+                {lang === "ar" ? "لا توجد عمولات مرتبطة" : "No commissions to show"}
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-muted/40 text-xs uppercase">
+                  <tr>
+                    <th className="text-start p-2">{lang === "ar" ? "الإجراء" : "Procedure"}</th>
+                    <th className="text-start p-2">{lang === "ar" ? "المريض" : "Patient"}</th>
+                    <th className="text-end p-2">%</th>
+                    <th className="text-end p-2">{lang === "ar" ? "محصّل" : "Collected"}</th>
+                    <th className="text-end p-2">{lang === "ar" ? "العمولة" : "Commission"}</th>
+                    <th className="p-2">{lang === "ar" ? "الحالة" : "Status"}</th>
+                    <th className="text-start p-2">{lang === "ar" ? "تاريخ الاستحقاق" : "Accrual date"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {detailRows.map((r: any) => {
+                    const procName = lang === "ar" ? (r.procedures?.name_ar || r.procedures?.name_en) : (r.procedures?.name_en || r.procedures?.name_ar);
+                    const p = r.patients;
+                    const patient = !p ? "—" : (lang === "ar"
+                      ? `${p.first_name_ar ?? ""} ${p.last_name_ar ?? ""}`.trim() || `${p.first_name_en ?? ""} ${p.last_name_en ?? ""}`.trim()
+                      : `${p.first_name_en ?? ""} ${p.last_name_en ?? ""}`.trim());
+                    const accrual = r.paid_at || r.updated_at;
+                    return (
+                      <tr key={r.id} className="border-t border-border">
+                        <td className="p-2">{procName || "—"}</td>
+                        <td className="p-2">{patient}</td>
+                        <td className="p-2 text-end tabular-nums">{Number(r.commission_percent).toFixed(2)}%</td>
+                        <td className="p-2 text-end tabular-nums">{formatMoney(r.collected_amount, lang)}</td>
+                        <td className="p-2 text-end tabular-nums font-medium text-primary">{formatMoney(r.commission_amount, lang)}</td>
+                        <td className="p-2"><Badge variant="outline">{r.status}</Badge></td>
+                        <td className="p-2 text-xs">{accrual ? new Date(accrual).toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US") : "—"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-border font-semibold">
+                    <td className="p-2" colSpan={4}>{lang === "ar" ? "الإجمالي" : "Total"}</td>
+                    <td className="p-2 text-end tabular-nums text-primary">
+                      {formatMoney(detailRows.reduce((s, r) => s + Number(r.commission_amount), 0), lang)}
+                    </td>
+                    <td colSpan={2}></td>
+                  </tr>
+                </tfoot>
+              </table>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setOpenDetails(null)}>{t("cancel")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

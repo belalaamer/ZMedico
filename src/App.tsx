@@ -58,6 +58,7 @@ import MedicalReports from "@/pages/reports/MedicalReports";
 import HRReports from "@/pages/reports/HRReports";
 import InventoryReports from "@/pages/reports/InventoryReports";
 import ScheduledReports from "@/pages/reports/ScheduledReports";
+import DoctorCommissions from "@/pages/reports/DoctorCommissions";
 import GeneralSettings from "@/pages/settings/GeneralSettings";
 import AppointmentSettings from "@/pages/settings/AppointmentSettings";
 import InvoiceSettings from "@/pages/settings/InvoiceSettings";
@@ -146,6 +147,7 @@ const App = () => (
                   <Route path="/reports/hr" element={<PermissionRoute><HRReports /></PermissionRoute>} />
                   <Route path="/reports/inventory" element={<PermissionRoute><InventoryReports /></PermissionRoute>} />
                   <Route path="/reports/scheduled" element={<PermissionRoute><ScheduledReports /></PermissionRoute>} />
+                  <Route path="/reports/commissions" element={<PermissionRoute><DoctorCommissions /></PermissionRoute>} />
                   <Route path="/branches" element={<PermissionRoute><Branches /></PermissionRoute>} />
                   <Route path="/settings/branches" element={<PermissionRoute><Branches /></PermissionRoute>} />
                   <Route path="/settings" element={<PermissionRoute><GeneralSettings /></PermissionRoute>} />

@@ -1,10 +1,25 @@
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
 
 export type ReportColumn = { header: string; key: string; width?: number };
 
-export function exportReportPDF(opts: {
+function esc(s: any): string {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
+}
+
+async function ensureArabicFont() {
+  if (document.getElementById("__cairo_font__")) return;
+  const link = document.createElement("link");
+  link.id = "__cairo_font__";
+  link.rel = "stylesheet";
+  link.href = "https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap";
+  document.head.appendChild(link);
+  await new Promise((r) => setTimeout(r, 600));
+  try { await (document as any).fonts?.ready; } catch {}
+}
+
+export async function exportReportPDF(opts: {
   title: string;
   subtitle?: string;
   columns: ReportColumn[];
@@ -12,32 +27,79 @@ export function exportReportPDF(opts: {
   summary?: { label: string; value: string }[];
   lang: "en" | "ar";
 }) {
-  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  doc.setFontSize(16);
-  doc.text(opts.title, 14, 16);
-  if (opts.subtitle) {
-    doc.setFontSize(10);
-    doc.setTextColor(120);
-    doc.text(opts.subtitle, 14, 22);
-    doc.setTextColor(0);
+  const isAr = opts.lang === "ar";
+  const dir = isAr ? "rtl" : "ltr";
+  const fontFamily = isAr
+    ? "'Cairo','Tajawal','Noto Naskh Arabic','Segoe UI',Tahoma,Arial,sans-serif"
+    : "'Inter','Helvetica Neue',Arial,sans-serif";
+
+  if (isAr) await ensureArabicFont();
+
+  const headerCells = opts.columns
+    .map((c) => `<th style="padding:8px;text-align:${isAr ? "right" : "left"};font-weight:700;border-bottom:2px solid #3a1a5e;">${esc(c.header)}</th>`)
+    .join("");
+  const bodyRows = opts.rows.map((r, i) => `
+    <tr style="background:${i % 2 ? "#f7f7fb" : "#fff"};">
+      ${opts.columns.map((c) => `<td style="padding:7px 8px;border-bottom:1px solid #eee;text-align:${isAr ? "right" : "left"};">${esc(r[c.key] ?? "")}</td>`).join("")}
+    </tr>`).join("");
+
+  const summaryHtml = opts.summary?.length
+    ? `<div style="margin-top:14px;padding:12px 14px;background:#f0eef7;border-${isAr ? "right" : "left"}:4px solid #3a1a5e;">
+        ${opts.summary.map((s) => `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;"><span style="color:#555;">${esc(s.label)}</span><span style="font-weight:700;color:#3a1a5e;">${esc(s.value)}</span></div>`).join("")}
+       </div>`
+    : "";
+
+  const html = `
+  <div id="__report_pdf__" dir="${dir}" lang="${opts.lang}" style="
+    width: 1100px; padding: 28px; background:#fff; color:#111;
+    font-family:${fontFamily}; font-size:12px; line-height:1.45; box-sizing:border-box;">
+    <div style="border-bottom:2px solid #3a1a5e;padding-bottom:10px;margin-bottom:14px;">
+      <div style="font-size:20px;font-weight:700;color:#3a1a5e;">${esc(opts.title)}</div>
+      ${opts.subtitle ? `<div style="font-size:11px;color:#666;margin-top:2px;">${esc(opts.subtitle)}</div>` : ""}
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:11px;">
+      <thead><tr>${headerCells}</tr></thead>
+      <tbody>${bodyRows || `<tr><td colspan="${opts.columns.length}" style="padding:20px;text-align:center;color:#999;">—</td></tr>`}</tbody>
+    </table>
+    ${summaryHtml}
+    <div style="margin-top:18px;padding-top:8px;border-top:1px solid #eee;font-size:9px;color:#999;text-align:${isAr ? "left" : "right"};">
+      ${esc(new Date().toLocaleString(isAr ? "ar-EG" : "en-GB"))}
+    </div>
+  </div>`;
+
+  const container = document.createElement("div");
+  container.style.position = "fixed";
+  container.style.left = "-10000px";
+  container.style.top = "0";
+  container.innerHTML = html;
+  document.body.appendChild(container);
+  const node = container.firstElementChild as HTMLElement;
+  try {
+    const canvas = await html2canvas(node, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+    const imgData = canvas.toDataURL("image/jpeg", 0.95);
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const imgWidth = pageWidth;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    if (imgHeight <= pageHeight) {
+      doc.addImage(imgData, "JPEG", 0, 0, imgWidth, imgHeight);
+    } else {
+      let position = 0;
+      let heightLeft = imgHeight;
+      doc.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        doc.addPage();
+        doc.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+    }
+    doc.save(`${opts.title.replace(/\s+/g, "_")}.pdf`);
+  } finally {
+    document.body.removeChild(container);
   }
-  autoTable(doc, {
-    startY: 28,
-    head: [opts.columns.map((c) => c.header)],
-    body: opts.rows.map((r) => opts.columns.map((c) => String(r[c.key] ?? ""))),
-    headStyles: { fillColor: [124, 58, 237] },
-    styles: { fontSize: 9 },
-  });
-  if (opts.summary?.length) {
-    const finalY = (doc as any).lastAutoTable?.finalY ?? 40;
-    doc.setFontSize(11);
-    let y = finalY + 8;
-    opts.summary.forEach((s) => {
-      doc.text(`${s.label}: ${s.value}`, 14, y);
-      y += 6;
-    });
-  }
-  doc.save(`${opts.title.replace(/\s+/g, "_")}.pdf`);
 }
 
 export function exportReportExcel(opts: {

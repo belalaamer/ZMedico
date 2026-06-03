@@ -23,10 +23,11 @@ export default function DoctorCommissions() {
     (async () => {
       const { data } = await supabase
         .from("staff_profiles")
-        .select("id, full_name_en, full_name_ar")
-        .eq("status", "active")
-        .order("full_name_en");
-      setDoctors(data ?? []);
+        .select("id, status, profiles:profiles!staff_profiles_id_fkey(full_name)")
+        .eq("status", "active");
+      const list = (data ?? []).map((r: any) => ({ id: r.id, full_name: r.profiles?.full_name ?? r.id.slice(0,8) }));
+      list.sort((a,b) => (a.full_name||"").localeCompare(b.full_name||""));
+      setDoctors(list);
     })();
   }, []);
 
@@ -55,8 +56,7 @@ export default function DoctorCommissions() {
 
   const doctorName = (id: string) => {
     const d = doctors.find((x) => x.id === id);
-    if (!d) return id?.slice(0, 8);
-    return lang === "ar" ? (d.full_name_ar || d.full_name_en) : (d.full_name_en || d.full_name_ar);
+    return d?.full_name ?? id?.slice(0, 8);
   };
 
   const patientName = (p: any) =>
@@ -77,7 +77,7 @@ export default function DoctorCommissions() {
               <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{lang === "ar" ? "الكل" : "All"}</SelectItem>
-                {doctors.map((d) => <SelectItem key={d.id} value={d.id}>{lang === "ar" ? (d.full_name_ar || d.full_name_en) : (d.full_name_en || d.full_name_ar)}</SelectItem>)}
+                {doctors.map((d) => <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

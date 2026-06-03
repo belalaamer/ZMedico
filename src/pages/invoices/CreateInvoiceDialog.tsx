@@ -150,11 +150,17 @@ export function CreateInvoiceDialog({
       if (recordIds.length === 0) { setPatientProcedures([]); return; }
       const { data: rps } = await supabase
         .from("record_procedures")
-        .select("id, medical_record_id, procedure_id, quantity, tooth_number, created_at, procedures(name_en,name_ar,default_price)")
+        .select("id, medical_record_id, procedure_id, quantity, tooth_number, created_at, procedures!inner(name_en,name_ar,default_price,deleted_at,is_active)")
         .in("medical_record_id", recordIds)
+        .is("procedures.deleted_at", null)
+        .eq("procedures.is_active", true)
         .order("created_at", { ascending: false });
       const recMap = new Map((recs ?? []).map((r: any) => [r.id, r.visit_date]));
-      setPatientProcedures((rps ?? []).map((r: any) => ({ ...r, visit_date: recMap.get(r.medical_record_id) })));
+      setPatientProcedures(
+        (rps ?? [])
+          .filter((r: any) => r.procedures && r.procedures.deleted_at == null)
+          .map((r: any) => ({ ...r, visit_date: recMap.get(r.medical_record_id) })),
+      );
       setSelectedProcIds({});
     })();
   }, [open, patientId]);

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useDataSync } from "@/lib/dataSync";
 import { Link } from "react-router-dom";
-import { Plus, Search, FileText } from "lucide-react";
+import { Plus, Search, FileText, CreditCard } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -159,6 +159,15 @@ export default function Invoices() {
                     onDelete={() => softDelete(i)}
                     canEdit={can("invoices", "edit")}
                     canDelete={can("invoices", "delete") && (isAdmin || i.status === "draft")}
+                    extraItems={
+                      i.status !== "paid" && i.status !== "cancelled" && can("payments", "create")
+                        ? [{
+                            label: t("recordPayment"),
+                            icon: <CreditCard className="size-4" />,
+                            onClick: () => navigate(`/payments?invoice=${i.id}&patient=${i.patient_id}&amount=${(Number(i.total) - Number(i.paid_amount)).toFixed(2)}`),
+                          }]
+                        : undefined
+                    }
                   />
                 </div>
               );

@@ -207,6 +207,13 @@ export default function CalendarPage() {
     load();
   };
 
+  const changeStatus = async (a: Appt, status: Appt["status"]): Promise<void> => {
+    const { error } = await supabase.from("appointments").update({ status } as any).eq("id", a.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("saved"));
+    load();
+  };
+
   const sendReminderNow = async (a: Appt) => {
     // Find a pending reminder for this appointment (or create an immediate one) then trigger send.
     const { data: existing } = await supabase

@@ -434,6 +434,23 @@ export default function CalendarPage() {
                   <Label>{t("notes")}</Label>
                   <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} maxLength={1000} />
                 </div>
+                {editId && (
+                  <div className="space-y-2">
+                    <Label>{t("status")}</Label>
+                    <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as Appt["status"] })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="scheduled">{t("statusScheduled")}</SelectItem>
+                        <SelectItem value="confirmed">{t("statusConfirmed")}</SelectItem>
+                        <SelectItem value="in_progress">{t("statusInProgress")}</SelectItem>
+                        <SelectItem value="completed">{t("statusCompleted")}</SelectItem>
+                        <SelectItem value="cancelled">{t("statusCancelled")}</SelectItem>
+                        <SelectItem value="no_show">{t("statusNoShow")}</SelectItem>
+                        <SelectItem value="departed">{t("statusDeparted")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <DialogFooter>
                   <Button type="button" variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button>
                   <Button type="submit" className="gradient-primary text-primary-foreground">{t("save")}</Button>

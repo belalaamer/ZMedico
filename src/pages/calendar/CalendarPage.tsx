@@ -610,7 +610,20 @@ export default function CalendarPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
                           <div className="text-xs font-mono tabular-nums text-muted-foreground">{timeStr(new Date(a.scheduled_at))}</div>
-                          <Badge variant="outline" className={`text-[10px] shrink-0 ${statusClass[a.status]}`}>{statusLabel(a.status, t)}</Badge>
+                          <Select value={a.status} onValueChange={(v) => changeStatus(a, v as Appt["status"])}>
+                            <SelectTrigger className={`h-6 px-2 py-0 text-[10px] w-auto gap-1 ${statusClass[a.status]}`}>
+                              <SelectValue>{statusLabel(a.status, t)}</SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="scheduled">{t("statusScheduled")}</SelectItem>
+                              <SelectItem value="confirmed">{t("statusConfirmed")}</SelectItem>
+                              <SelectItem value="in_progress">{t("statusInProgress")}</SelectItem>
+                              <SelectItem value="completed">{t("statusCompleted")}</SelectItem>
+                              <SelectItem value="cancelled">{t("statusCancelled")}</SelectItem>
+                              <SelectItem value="no_show">{t("statusNoShow")}</SelectItem>
+                              <SelectItem value="departed">{t("statusDeparted")}</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                         <div className="text-sm font-medium break-words leading-snug mt-0.5">{fullName(p)}</div>
                         <div className="text-[11px] text-muted-foreground truncate">{a.procedure || "—"}</div>

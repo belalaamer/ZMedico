@@ -14,12 +14,26 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
 }) {
   const { t, lang } = useI18n();
   const [saving, setSaving] = useState(false);
+  const [doctors, setDoctors] = useState<{ id: string; full_name: string }[]>([]);
   const [form, setForm] = useState({
     first_name_en: "", last_name_en: "", first_name_ar: "", last_name_ar: "",
     phone: "", phone2: "", email: "", dob: "",
     gender: "" as "" | "male" | "female",
     blood_type: "", address: "", city: "", nationality: "", notes: "",
+    assigned_doctor_id: "",
   });
+
+  useEffect(() => {
+    (async () => {
+      const { data: staff } = await supabase.from("staff_profiles").select("id").eq("status", "active");
+      const ids = (staff ?? []).map((s: any) => s.id);
+      if (!ids.length) { setDoctors([]); return; }
+      const { data: profs } = await supabase.from("profiles").select("id, full_name").in("id", ids);
+      const list = (profs ?? []).map((p: any) => ({ id: p.id, full_name: p.full_name ?? p.id.slice(0, 8) }));
+      list.sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
+      setDoctors(list);
+    })();
+  }, []);
 
   useEffect(() => {
     if (!patient) return;
@@ -38,6 +52,7 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
       city: patient.city ?? "",
       nationality: patient.nationality ?? "",
       notes: patient.notes ?? "",
+      assigned_doctor_id: (patient as any).assigned_doctor_id ?? "",
     });
   }, [patient, open]);
 
@@ -77,6 +92,7 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
       city: form.city || null,
       nationality: form.nationality || null,
       notes: form.notes || null,
+      assigned_doctor_id: form.assigned_doctor_id || null,
     };
     const { error } = await supabase.from("patients").update(payload).eq("id", patient.id);
     setSaving(false);
@@ -137,6 +153,16 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
           <div className="space-y-2">
             <Label>{t("nationality")}</Label>
             <Input dir="auto" value={form.nationality} onChange={(e) => setForm({ ...form, nationality: e.target.value })} maxLength={120} />
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label>{lang === "ar" ? "الطبيب المسؤول" : "Assigned Doctor"}</Label>
+            <Select value={form.assigned_doctor_id || "none"} onValueChange={(v) => setForm({ ...form, assigned_doctor_id: v === "none" ? "" : v })}>
+              <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">— {lang === "ar" ? "لا يوجد" : "None"} —</SelectItem>
+                {doctors.map((d) => <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2 sm:col-span-2">
             <Label>{t("address")}</Label>

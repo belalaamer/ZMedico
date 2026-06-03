@@ -682,6 +682,113 @@ export type Database = {
         }
         Relationships: []
       }
+      doctor_commissions: {
+        Row: {
+          base_amount: number
+          branch_id: string | null
+          collected_amount: number
+          commission_amount: number
+          commission_percent: number
+          created_at: string
+          doctor_id: string
+          id: string
+          medical_record_id: string
+          paid_at: string | null
+          patient_id: string | null
+          payroll_id: string | null
+          procedure_id: string | null
+          record_procedure_id: string
+          status: Database["public"]["Enums"]["commission_status"]
+          updated_at: string
+        }
+        Insert: {
+          base_amount?: number
+          branch_id?: string | null
+          collected_amount?: number
+          commission_amount?: number
+          commission_percent?: number
+          created_at?: string
+          doctor_id: string
+          id?: string
+          medical_record_id: string
+          paid_at?: string | null
+          patient_id?: string | null
+          payroll_id?: string | null
+          procedure_id?: string | null
+          record_procedure_id: string
+          status?: Database["public"]["Enums"]["commission_status"]
+          updated_at?: string
+        }
+        Update: {
+          base_amount?: number
+          branch_id?: string | null
+          collected_amount?: number
+          commission_amount?: number
+          commission_percent?: number
+          created_at?: string
+          doctor_id?: string
+          id?: string
+          medical_record_id?: string
+          paid_at?: string | null
+          patient_id?: string | null
+          payroll_id?: string | null
+          procedure_id?: string | null
+          record_procedure_id?: string
+          status?: Database["public"]["Enums"]["commission_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "doctor_commissions_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "doctor_commissions_doctor_id_fkey"
+            columns: ["doctor_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "doctor_commissions_medical_record_id_fkey"
+            columns: ["medical_record_id"]
+            isOneToOne: false
+            referencedRelation: "medical_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "doctor_commissions_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "doctor_commissions_payroll_id_fkey"
+            columns: ["payroll_id"]
+            isOneToOne: false
+            referencedRelation: "payroll"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "doctor_commissions_procedure_id_fkey"
+            columns: ["procedure_id"]
+            isOneToOne: false
+            referencedRelation: "procedures"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "doctor_commissions_record_procedure_id_fkey"
+            columns: ["record_procedure_id"]
+            isOneToOne: true
+            referencedRelation: "record_procedures"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_templates: {
         Row: {
           body_ar: string
@@ -1176,6 +1283,7 @@ export type Database = {
           insurance_company_id: string | null
           invoice_date: string
           invoice_number: string
+          medical_record_id: string | null
           notes: string | null
           paid_amount: number
           patient_id: string
@@ -1201,6 +1309,7 @@ export type Database = {
           insurance_company_id?: string | null
           invoice_date?: string
           invoice_number: string
+          medical_record_id?: string | null
           notes?: string | null
           paid_amount?: number
           patient_id: string
@@ -1226,6 +1335,7 @@ export type Database = {
           insurance_company_id?: string | null
           invoice_date?: string
           invoice_number?: string
+          medical_record_id?: string | null
           notes?: string | null
           paid_amount?: number
           patient_id?: string
@@ -1248,6 +1358,13 @@ export type Database = {
             columns: ["insurance_company_id"]
             isOneToOne: false
             referencedRelation: "insurance_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_medical_record_id_fkey"
+            columns: ["medical_record_id"]
+            isOneToOne: false
+            referencedRelation: "medical_records"
             referencedColumns: ["id"]
           },
           {
@@ -2408,6 +2525,7 @@ export type Database = {
           deleted_at: string | null
           description_ar: string | null
           description_en: string | null
+          doctor_commission_percent: number
           id: string
           is_active: boolean
           name_ar: string
@@ -2422,6 +2540,7 @@ export type Database = {
           deleted_at?: string | null
           description_ar?: string | null
           description_en?: string | null
+          doctor_commission_percent?: number
           id?: string
           is_active?: boolean
           name_ar: string
@@ -2436,6 +2555,7 @@ export type Database = {
           deleted_at?: string | null
           description_ar?: string | null
           description_en?: string | null
+          doctor_commission_percent?: number
           id?: string
           is_active?: boolean
           name_ar?: string
@@ -4469,6 +4589,10 @@ export type Database = {
         Returns: boolean
       }
       is_tenant_owner: { Args: { _tenant_id: string }; Returns: boolean }
+      recalc_commissions_for_invoice: {
+        Args: { _invoice_id: string }
+        Returns: undefined
+      }
       recalc_invoice_payments: {
         Args: { _invoice_id: string }
         Returns: undefined
@@ -4530,6 +4654,7 @@ export type Database = {
         | "approved"
         | "rejected"
         | "paid"
+      commission_status: "pending" | "partial" | "earned" | "paid" | "cancelled"
       contract_type: "full_time" | "part_time" | "contract" | "freelance"
       document_type:
         | "lab_result"
@@ -4778,6 +4903,7 @@ export const Constants = {
         "rejected",
         "paid",
       ],
+      commission_status: ["pending", "partial", "earned", "paid", "cancelled"],
       contract_type: ["full_time", "part_time", "contract", "freelance"],
       document_type: [
         "lab_result",

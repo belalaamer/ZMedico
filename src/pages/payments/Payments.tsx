@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useDataSync } from "@/lib/dataSync";
 import { Plus, CreditCard } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -17,6 +18,23 @@ export default function Payments() {
   const { currentBranchId } = useBranch();
   const [items, setItems] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const prefillInvoice = searchParams.get("invoice") || undefined;
+  const prefillPatient = searchParams.get("patient") || undefined;
+  const prefillAmount = searchParams.get("amount");
+
+  useEffect(() => {
+    if (prefillInvoice || prefillPatient) {
+      setOpen(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillInvoice, prefillPatient]);
+
+  const clearPrefill = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("invoice"); next.delete("patient"); next.delete("amount");
+    setSearchParams(next, { replace: true });
+  };
 
   const load = async () => {
     let q = supabase.from("payments")
@@ -84,7 +102,14 @@ export default function Payments() {
         )}
       </Card>
 
-      <RecordPaymentDialog open={open} onOpenChange={setOpen} onSaved={() => { setOpen(false); load(); }} />
+      <RecordPaymentDialog
+        open={open}
+        onOpenChange={(o) => { setOpen(o); if (!o) clearPrefill(); }}
+        onSaved={() => { setOpen(false); clearPrefill(); load(); }}
+        invoiceId={prefillInvoice ?? null}
+        patientId={prefillPatient}
+        defaultAmount={prefillAmount ? Number(prefillAmount) : undefined}
+      />
     </div>
   );
 }

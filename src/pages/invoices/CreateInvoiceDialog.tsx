@@ -32,6 +32,7 @@ export function CreateInvoiceDialog({
   const { currentBranchId } = useBranch();
   const { user } = useAuth();
   const [products, setProducts] = useState<any[]>([]);
+  const [procedures, setProcedures] = useState<any[]>([]);
   const [stocks, setStocks] = useState<Record<string, number>>({});
   const [patientId, setPatientId] = useState<string>(presetPatientId ?? "");
   const [patientSelectOpen, setPatientSelectOpen] = useState(false);
@@ -95,6 +96,8 @@ export function CreateInvoiceDialog({
     void refetchPatients();
     supabase.from("products").select("id,sku,name_en,name_ar,selling_price,min_stock_level").eq("is_active", true).is("deleted_at", null).order("name_en").limit(1000)
       .then(({ data }) => setProducts(data ?? []));
+    supabase.from("procedures").select("id,name_en,name_ar,default_price").eq("is_active", true).order("name_en").limit(1000)
+      .then(({ data }) => setProcedures(data ?? []));
     supabase.from("insurance_companies").select("id,name_en,name_ar,default_coverage_ratio,is_active").eq("is_active", true).order("name_en")
       .then(({ data }) => setInsuranceCompanies(data ?? []));
   }, [open, refetchPatients]);
@@ -195,6 +198,18 @@ export function CreateInvoiceDialog({
       description_en: p.name_en,
       description_ar: p.name_ar,
       unit_price: Number(p.selling_price) || 0,
+    });
+  };
+
+  const pickProcedure = (idx: number, procedureId: string) => {
+    const p = procedures.find((x) => x.id === procedureId);
+    if (!p) return;
+    updateItem(idx, {
+      item_type: "procedure",
+      product_id: procedureId,
+      description_en: p.name_en,
+      description_ar: p.name_ar || p.name_en,
+      unit_price: Number(p.default_price) || 0,
     });
   };
 
@@ -411,6 +426,20 @@ export function CreateInvoiceDialog({
                           </SelectItem>
                         );
                       })}
+                    </SelectContent>
+                  </Select>
+                ) : it.item_type === "procedure" ? (
+                  <Select value={it.product_id ?? ""} onValueChange={(v) => pickProcedure(idx, v)}>
+                    <SelectTrigger><SelectValue placeholder={lang === "ar" ? "اختر إجراء" : "Select procedure"} /></SelectTrigger>
+                    <SelectContent>
+                      {procedures.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          <span className="flex items-center gap-2">
+                            <span>{lang === "ar" ? (p.name_ar || p.name_en) : p.name_en}</span>
+                            <span className="text-[10px] tabular-nums text-muted-foreground">· {formatMoney(Number(p.default_price)||0, lang)}</span>
+                          </span>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 ) : (

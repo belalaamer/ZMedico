@@ -53,13 +53,15 @@ export function RecordPaymentDialog({
     if (!pid) { setInvoices([]); return; }
     supabase
       .from("invoices")
-      .select("id,invoice_number,total,paid_amount,status,invoice_date")
+      .select("id,invoice_number,total,paid_amount,status,invoice_date,deleted_at")
       .eq("patient_id", pid)
+      .is("deleted_at", null)
       .in("status", ["pending", "partial", "draft"])
       .order("invoice_date", { ascending: false })
       .limit(50)
       .then(({ data }) => {
         const rows = (data ?? [])
+          .filter((i: any) => i.deleted_at == null)
           .map((i: any) => ({
             id: i.id,
             remaining: +(Number(i.total) - Number(i.paid_amount)).toFixed(2),

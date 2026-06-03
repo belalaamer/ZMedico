@@ -21,12 +21,12 @@ export default function DoctorCommissions() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
-        .from("staff_profiles")
-        .select("id, status, profiles:profiles!staff_profiles_id_fkey(full_name)")
-        .eq("status", "active");
-      const list = (data ?? []).map((r: any) => ({ id: r.id, full_name: r.profiles?.full_name ?? r.id.slice(0,8) }));
-      list.sort((a,b) => (a.full_name||"").localeCompare(b.full_name||""));
+      const { data: staff } = await supabase.from("staff_profiles").select("id").eq("status", "active");
+      const ids = (staff ?? []).map((s: any) => s.id);
+      if (ids.length === 0) { setDoctors([]); return; }
+      const { data: profs } = await supabase.from("profiles").select("id, full_name").in("id", ids);
+      const list = (profs ?? []).map((p: any) => ({ id: p.id, full_name: p.full_name ?? p.id.slice(0,8) }));
+      list.sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
       setDoctors(list);
     })();
   }, []);

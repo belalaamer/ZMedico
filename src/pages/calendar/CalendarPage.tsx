@@ -86,6 +86,7 @@ export default function CalendarPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({
     patient_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "",
+    status: "scheduled" as Appt["status"],
   });
 
   const dayLabel = useMemo(
@@ -172,14 +173,14 @@ export default function CalendarPage() {
 
   const openNew = () => {
     setEditId(null);
-    setForm({ patient_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "" });
+    setForm({ patient_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "", status: "scheduled" });
     setOpen(true);
   };
   const openNewAt = (slot: Date) => {
     setEditId(null);
     const tz = slot.getTimezoneOffset();
     const local = new Date(slot.getTime() - tz * 60000).toISOString().slice(0, 16);
-    setForm({ patient_id: "", scheduled_at: local, duration_minutes: 30, procedure: "", room: "", notes: "" });
+    setForm({ patient_id: "", scheduled_at: local, duration_minutes: 30, procedure: "", room: "", notes: "", status: "scheduled" });
     setOpen(true);
   };
   const openEdit = (a: Appt) => {
@@ -194,6 +195,7 @@ export default function CalendarPage() {
       procedure: a.procedure ?? "",
       room: a.room ?? "",
       notes: a.notes ?? "",
+      status: a.status,
     });
     setOpen(true);
   };

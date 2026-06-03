@@ -244,7 +244,7 @@ export function CreateInvoiceDialog({
       .map((it) => ({
         invoice_id: inv.id,
         item_type: it.item_type,
-        product_id: it.product_id ?? null,
+        product_id: it.item_type === "product" ? (it.product_id ?? null) : null,
         description_en: it.description_en,
         description_ar: it.description_ar || null,
         quantity: Number(it.quantity) || 1,

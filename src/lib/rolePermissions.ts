@@ -1,5 +1,5 @@
 export const ROLES = ["admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr", "staff"] as const;
-export const MODULES = ["patients", "appointments", "medical_records", "invoices", "treasury", "inventory", "reports", "hr", "settings"] as const;
+export const MODULES = ["patients", "appointments", "medical_records", "treatment_plans", "invoices", "treasury", "inventory", "reports", "hr", "settings"] as const;
 export const ACTIONS = ["view", "create", "edit", "delete", "export"] as const;
 
 export type RoleName = typeof ROLES[number] | string;
@@ -14,6 +14,7 @@ export const DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
     patients: ["view","edit"],
     appointments: ["view","create","edit"],
     medical_records: ["view","create","edit"],
+    treatment_plans: ["view","create","edit"],
     invoices: ["view"], // read-only billing
     treasury: [],
     inventory: [],
@@ -26,6 +27,7 @@ export const DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
     patients: ["view"],
     appointments: ["view","create","edit"],
     medical_records: ["view","create","edit"],
+    treatment_plans: ["view","edit"],
     invoices: ["view"],
     treasury: [],
     inventory: ["view"],
@@ -38,6 +40,7 @@ export const DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
     patients: ["view","create","edit"],
     appointments: ["view","create","edit","delete"],
     medical_records: [],
+    treatment_plans: ["view"],
     invoices: ["view","create","edit"],
     treasury: [],
     inventory: [],
@@ -50,6 +53,7 @@ export const DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
     patients: ["view"],
     appointments: ["view"],
     medical_records: [],
+    treatment_plans: ["view"],
     invoices: ["view","create","edit","delete","export"],
     treasury: ["view","create","edit","export"],
     inventory: ["view"],
@@ -58,11 +62,11 @@ export const DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
     settings: [],
   },
   hr: {
-    patients: [], appointments: [], medical_records: [], invoices: [], treasury: [],
+    patients: [], appointments: [], medical_records: [], treatment_plans: [], invoices: [], treasury: [],
     inventory: [], reports: ["view"], hr: ["view","create","edit","export"], settings: [],
   },
   staff: {
-    patients: [], appointments: ["view"], medical_records: [], invoices: [], treasury: [],
+    patients: [], appointments: ["view"], medical_records: [], treatment_plans: [], invoices: [], treasury: [],
     inventory: [], reports: [], hr: [], settings: [],
   },
 };

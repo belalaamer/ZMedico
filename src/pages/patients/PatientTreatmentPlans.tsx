@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Check, X, Trash2 } from "lucide-react";
+import { Calendar as CalendarIcon } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -28,6 +29,8 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name_ar: "", name_en: "", doctor_id: "", total_sessions: 10, price: 0, start_date: new Date().toISOString().slice(0, 10) });
+  const [schedSession, setSchedSession] = useState<Session | null>(null);
+  const [schedAt, setSchedAt] = useState<string>("");
 
   const load = async () => {
     const { data } = await (supabase as any)
@@ -104,6 +107,52 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
     else if (status === "pending") patch.performed_at = null;
     const { error } = await (supabase as any).from("treatment_sessions").update(patch).eq("id", s.id);
     if (error) { toast.error(error.message); return; }
+    // Sync linked appointment status if any
+    if (s.appointment_id) {
+      const apptStatus = status === "completed" ? "completed" : status === "missed" ? "no_show" : "scheduled";
+      await (supabase as any).from("appointments").update({ status: apptStatus }).eq("id", s.appointment_id);
+    }
+    load();
+  };
+
+  const openSchedule = (s: Session) => {
+    setSchedSession(s);
+    const base = s.scheduled_date ? new Date(s.scheduled_date + "T10:00") : new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    setSchedAt(`${base.getFullYear()}-${pad(base.getMonth() + 1)}-${pad(base.getDate())}T${pad(base.getHours())}:${pad(base.getMinutes())}`);
+  };
+
+  const saveSchedule = async () => {
+    if (!schedSession || !schedAt) return;
+    const plan = plans.find((p) => p.id === schedSession.treatment_plan_id);
+    const doctor_id = schedSession.doctor_id || plan?.doctor_id || null;
+    const scheduled_at = new Date(schedAt).toISOString();
+    let appointmentId = schedSession.appointment_id as string | null;
+    if (appointmentId) {
+      const { error } = await (supabase as any).from("appointments").update({ scheduled_at, doctor_id, branch_id: currentBranchId }).eq("id", appointmentId);
+      if (error) { toast.error(error.message); return; }
+    } else {
+      const { data, error } = await (supabase as any).from("appointments").insert({
+        patient_id: patientId,
+        doctor_id,
+        branch_id: currentBranchId,
+        scheduled_at,
+        duration_minutes: 30,
+        status: "scheduled",
+        procedure: (lang === "ar" ? (plan?.name_ar || plan?.name_en) : (plan?.name_en || plan?.name_ar)) ?? null,
+        notes: `Session #${schedSession.session_number}`,
+      }).select("id").single();
+      if (error) { toast.error(error.message); return; }
+      appointmentId = data.id;
+    }
+    const { error: e2 } = await (supabase as any).from("treatment_sessions").update({
+      appointment_id: appointmentId,
+      scheduled_date: scheduled_at.slice(0, 10),
+    }).eq("id", schedSession.id);
+    if (e2) { toast.error(e2.message); return; }
+    toast.success(lang === "ar" ? "تم جدولة الجلسة" : "Session scheduled");
+    setSchedSession(null);
+    setSchedAt("");
     load();
   };
 
@@ -195,12 +244,20 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
                         <span className="font-semibold">#{s.session_number}</span>
                         <span className="text-[10px] text-muted-foreground">{s.performed_at ? formatDate(s.performed_at, lang) : "—"}</span>
                       </div>
+                      {s.scheduled_date && (
+                        <div className="text-[10px] text-muted-foreground mb-1">
+                          {lang === "ar" ? "موعد:" : "Appt:"} {formatDate(s.scheduled_date, lang)}
+                        </div>
+                      )}
                       <div className="flex gap-1">
                         <Button size="sm" variant={s.status === "completed" ? "default" : "outline"} className="h-6 px-2 flex-1" onClick={() => setSessionStatus(s, s.status === "completed" ? "pending" : "completed")}>
                           <Check className="size-3" />
                         </Button>
                         <Button size="sm" variant={s.status === "missed" ? "destructive" : "outline"} className="h-6 px-2 flex-1" onClick={() => setSessionStatus(s, s.status === "missed" ? "pending" : "missed")}>
                           <X className="size-3" />
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-6 px-2" onClick={() => openSchedule(s)} title={lang === "ar" ? "جدولة" : "Schedule"}>
+                          <CalendarIcon className="size-3" />
                         </Button>
                       </div>
                     </div>
@@ -211,6 +268,19 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
           })}
         </div>
       )}
+      <Dialog open={!!schedSession} onOpenChange={(o) => { if (!o) { setSchedSession(null); setSchedAt(""); } }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{lang === "ar" ? "جدولة الجلسة" : "Schedule Session"}</DialogTitle></DialogHeader>
+          <div className="space-y-2">
+            <Label>{lang === "ar" ? "التاريخ والوقت" : "Date & Time"}</Label>
+            <Input type="datetime-local" value={schedAt} onChange={(e) => setSchedAt(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => { setSchedSession(null); setSchedAt(""); }}>{lang === "ar" ? "إلغاء" : "Cancel"}</Button>
+            <Button onClick={saveSchedule} className="gradient-primary text-primary-foreground">{lang === "ar" ? "حفظ" : "Save"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

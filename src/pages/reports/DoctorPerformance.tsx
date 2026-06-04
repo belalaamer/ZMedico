@@ -33,8 +33,11 @@ export default function DoctorPerformance() {
 
   useEffect(() => {
     (async () => {
-      // Active staff
-      const { data: staff } = await supabase.from("staff_profiles").select("id").eq("status", "active");
+      // Active staff with the doctor role
+      const { data: roles } = await supabase.from("user_roles").select("user_id").eq("role", "doctor");
+      const roleIds = (roles ?? []).map((r: any) => r.user_id);
+      if (!roleIds.length) { setRows([]); return; }
+      const { data: staff } = await supabase.from("staff_profiles").select("id").in("id", roleIds).eq("status", "active");
       const docIds = (staff ?? []).map((s: any) => s.id);
       if (!docIds.length) { setRows([]); return; }
       const { data: profs } = await supabase.from("profiles").select("id, full_name").in("id", docIds);

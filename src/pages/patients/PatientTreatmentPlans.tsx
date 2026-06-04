@@ -7,8 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Check, X, Trash2 } from "lucide-react";
+import { Plus, Check, X, Trash2, FileText } from "lucide-react";
 import { Calendar as CalendarIcon } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -226,6 +227,11 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    {p.invoice_id && (
+                      <Link to={`/invoices/${p.invoice_id}`}>
+                        <Button size="sm" variant="outline"><FileText className="size-4 me-1" />{lang === "ar" ? "الفاتورة" : "Invoice"}</Button>
+                      </Link>
+                    )}
                     {p.status === "active" && <Button size="sm" variant="outline" onClick={() => cancelPlan(p)}>{lang === "ar" ? "إلغاء" : "Cancel"}</Button>}
                     <Button size="sm" variant="ghost" onClick={() => deletePlan(p)}><Trash2 className="size-4 text-destructive" /></Button>
                   </div>

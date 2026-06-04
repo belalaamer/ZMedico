@@ -54,9 +54,12 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
 
   useEffect(() => {
     (async () => {
-      const { data: staff } = await supabase.from("staff_profiles").select("id").eq("status", "active");
+      const { data: roles } = await supabase.from("user_roles").select("user_id").eq("role", "doctor");
+      const doctorIds = (roles ?? []).map((r: any) => r.user_id);
+      if (!doctorIds.length) { setDoctors([]); return; }
+      const { data: staff } = await supabase.from("staff_profiles").select("id").in("id", doctorIds).eq("status", "active");
       const ids = (staff ?? []).map((s: any) => s.id);
-      if (!ids.length) return;
+      if (!ids.length) { setDoctors([]); return; }
       const { data: profs } = await supabase.from("profiles").select("id, full_name").in("id", ids);
       const list = (profs ?? []).map((p: any) => ({ id: p.id, full_name: p.full_name ?? p.id.slice(0, 8) }));
       list.sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));

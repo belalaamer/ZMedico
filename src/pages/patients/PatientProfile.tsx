@@ -77,7 +77,7 @@ export default function PatientProfile() {
         <Button asChild variant="ghost" size="sm"><Link to="/patients"><ArrowLeft className="me-2 size-4" />{t("patients")}</Link></Button>
         <div className="flex items-center gap-2">
           <Button asChild variant="outline" size="sm"><Link to={`/patients/${patient.id}/dental`}><Stethoscope className="me-2 size-4"/>{t("dentalChart")}</Link></Button>
-          <Can module="patients" action="update">
+          <Can module="patients" action="edit">
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
               <Pencil className="me-2 size-4" />{t("edit")}
             </Button>

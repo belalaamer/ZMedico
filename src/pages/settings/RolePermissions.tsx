@@ -16,6 +16,19 @@ const MODULES = [...ALL_MODULES];
 const ACTIONS = [...ALL_ACTIONS];
 const DEFAULT = DEFAULT_PERMISSIONS;
 
+const MODULE_LABELS: Record<string, { ar: string; en: string }> = {
+  patients: { ar: "المرضى", en: "Patients" },
+  appointments: { ar: "المواعيد", en: "Appointments" },
+  medical_records: { ar: "السجلات الطبية", en: "Medical Records" },
+  treatment_plans: { ar: "خطط العلاج", en: "Treatment Plans" },
+  invoices: { ar: "الفواتير", en: "Invoices" },
+  treasury: { ar: "الخزينة", en: "Treasury" },
+  inventory: { ar: "المخزون", en: "Inventory" },
+  reports: { ar: "التقارير", en: "Reports" },
+  hr: { ar: "الموارد البشرية", en: "HR" },
+  settings: { ar: "الإعدادات", en: "Settings" },
+};
+
 type Matrix = Record<string, Record<string, string[]>>;
 
 function emptyMatrix(): Matrix {
@@ -133,7 +146,7 @@ export default function RolePermissions() {
             <tbody>
               {MODULES.map(m => (
                 <tr key={m} className="border-t">
-                  <td className="p-3 font-medium capitalize">{m.replace("_"," ")}</td>
+                  <td className="p-3 font-medium">{MODULE_LABELS[m]?.[lang === "ar" ? "ar" : "en"] ?? m.replace("_"," ")}</td>
                   {ROLES.map(r => (
                     <td key={r} className="p-3 align-top">
                       <div className="flex flex-wrap gap-1 justify-center">

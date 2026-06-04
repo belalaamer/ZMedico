@@ -25,7 +25,10 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
 
   useEffect(() => {
     (async () => {
-      const { data: staff } = await supabase.from("staff_profiles").select("id").eq("status", "active");
+      const { data: roles } = await supabase.from("user_roles").select("user_id").eq("role", "doctor");
+      const doctorIds = (roles ?? []).map((r: any) => r.user_id);
+      if (!doctorIds.length) { setDoctors([]); return; }
+      const { data: staff } = await supabase.from("staff_profiles").select("id").in("id", doctorIds).eq("status", "active");
       const ids = (staff ?? []).map((s: any) => s.id);
       if (!ids.length) { setDoctors([]); return; }
       const { data: profs } = await supabase.from("profiles").select("id, full_name").in("id", ids);

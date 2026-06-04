@@ -228,7 +228,7 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
                   </div>
                   <div className="flex items-center gap-2">
                     {p.invoice_id && (
-                      <Link to={`/billing/invoices/${p.invoice_id}`}>
+                      <Link to={`/invoices/${p.invoice_id}`}>
                         <Button size="sm" variant="outline"><FileText className="size-4 me-1" />{lang === "ar" ? "الفاتورة" : "Invoice"}</Button>
                       </Link>
                     )}

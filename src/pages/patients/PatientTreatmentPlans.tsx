@@ -16,6 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate, formatMoney } from "@/lib/format";
 import { toast } from "sonner";
+import { Can } from "@/components/Can";
 
 type Plan = any;
 type Session = any;
@@ -176,6 +177,7 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold">{lang === "ar" ? "خطط العلاج / الجلسات" : "Treatment Plans / Sessions"}</h3>
+        <Can module="treatment_plans" action="create">
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button size="sm" className="gradient-primary text-primary-foreground"><Plus className="size-4 me-1" />{lang === "ar" ? "خطة جديدة" : "New Plan"}</Button>
@@ -203,6 +205,7 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </Can>
       </div>
 
       {plans.length === 0 ? (

@@ -145,7 +145,7 @@ export default function PatientProfile() {
         <TabsList>
           <TabsTrigger value="overview">{t("overview")}</TabsTrigger>
           <TabsTrigger value="medical">{t("medicalTab")}</TabsTrigger>
-          <Can module="patients" action="edit">
+          <Can module="treatment_plans" action="view">
             <TabsTrigger value="plans">{lang === "ar" ? "خطط العلاج" : "Treatment Plans"}</TabsTrigger>
           </Can>
           <TabsTrigger value="invoices">{t("invoices")}</TabsTrigger>
@@ -184,7 +184,7 @@ export default function PatientProfile() {
         </TabsContent>
 
         <TabsContent value="plans" className="mt-4">
-          <Can module="patients" action="edit" fallback={<div className="text-center text-muted-foreground py-10">{lang === "ar" ? "لا تملك صلاحية الوصول" : "Access denied"}</div>}>
+          <Can module="treatment_plans" action="view" fallback={<div className="text-center text-muted-foreground py-10">{lang === "ar" ? "لا تملك صلاحية الوصول" : "Access denied"}</div>}>
             <PatientTreatmentPlans patientId={patient.id} />
           </Can>
         </TabsContent>

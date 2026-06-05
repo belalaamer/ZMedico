@@ -87,14 +87,20 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
       created_by: user?.id ?? null,
     }).select("id").single();
     if (error) { setSaving(false); toast.error(error.message); return; }
-    // Pre-generate session placeholders
-    const rows = Array.from({ length: form.total_sessions }, (_, i) => ({
-      treatment_plan_id: data.id,
-      session_number: i + 1,
-      doctor_id: form.doctor_id || null,
-      status: "pending",
-      created_by: user?.id ?? null,
-    }));
+    // Pre-generate session placeholders, spaced weekly from start_date
+    const start = new Date(form.start_date);
+    const rows = Array.from({ length: form.total_sessions }, (_, i) => {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i * 7);
+      return {
+        treatment_plan_id: data.id,
+        session_number: i + 1,
+        doctor_id: form.doctor_id || null,
+        scheduled_date: d.toISOString().slice(0, 10),
+        status: "pending",
+        created_by: user?.id ?? null,
+      };
+    });
     await (supabase as any).from("treatment_sessions").insert(rows);
     setSaving(false);
     setOpen(false);

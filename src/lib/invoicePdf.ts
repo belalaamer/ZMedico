@@ -1,7 +1,37 @@
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import invoiceArabicRegularUrl from "@/assets/fonts/NotoNaskhArabic-Regular.ttf";
+import invoiceArabicBoldUrl from "@/assets/fonts/NotoNaskhArabic-Bold.ttf";
 
 type Lang = "en" | "ar";
+
+const INVOICE_ARABIC_FONT_FAMILY = "InvoiceArabic";
+
+function ensureInvoiceArabicFontFace() {
+  if (typeof document === "undefined" || document.getElementById("__invoice_arabic_font_face__")) {
+    return;
+  }
+
+  const style = document.createElement("style");
+  style.id = "__invoice_arabic_font_face__";
+  style.textContent = `
+    @font-face {
+      font-family: '${INVOICE_ARABIC_FONT_FAMILY}';
+      src: url('${invoiceArabicRegularUrl}') format('truetype');
+      font-style: normal;
+      font-weight: 400;
+      font-display: block;
+    }
+    @font-face {
+      font-family: '${INVOICE_ARABIC_FONT_FAMILY}';
+      src: url('${invoiceArabicBoldUrl}') format('truetype');
+      font-style: normal;
+      font-weight: 700;
+      font-display: block;
+    }
+  `;
+  document.head.appendChild(style);
+}
 
 function money(n: number, lang: Lang) {
   return new Intl.NumberFormat(lang === "ar" ? "ar-EG" : "en-US", {
@@ -29,7 +59,7 @@ function wrapText(value: any, opts?: { rtl?: boolean; arabic?: boolean }) {
     ? "direction:rtl;unicode-bidi:isolate;"
     : "direction:ltr;unicode-bidi:isolate;";
   const arabic = opts?.arabic
-    ? "font-family:'Noto Naskh Arabic','Amiri','Cairo','Tajawal',Tahoma,Arial,sans-serif;letter-spacing:0;word-spacing:normal;font-feature-settings:'liga','calt','rlig','init','medi','fina','isol';text-rendering:optimizeLegibility;"
+    ? `font-family:'${INVOICE_ARABIC_FONT_FAMILY}','Noto Naskh Arabic','Amiri','Cairo','Tajawal',Tahoma,Arial,sans-serif;letter-spacing:0;word-spacing:normal;font-feature-settings:'liga','calt','rlig','init','medi','fina','isol';text-rendering:optimizeLegibility;`
     : "";
   return `<bdi style="${rtl}${arabic}">${text}</bdi>`;
 }

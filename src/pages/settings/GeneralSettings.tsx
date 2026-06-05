@@ -15,6 +15,7 @@ export default function GeneralSettings() {
   const { t, lang } = useI18n();
   const { branches, currentBranchId } = useBranch();
   const [branchId, setBranchId] = useState<string>(currentBranchId ?? "");
+  const [uploading, setUploading] = useState(false);
   const [form, setForm] = useState<any>({
     clinic_name_ar: "", clinic_name_en: "", logo_url: "", favicon_url: "",
     tagline_ar: "", tagline_en: "", description_ar: "", description_en: "",
@@ -40,6 +41,29 @@ export default function GeneralSettings() {
     toast.success(t("saved"));
   };
 
+  const onLogoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return toast.error("Please pick an image file");
+    if (file.size > 1024 * 1024) return toast.error("Max 1 MB");
+    setUploading(true);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const r = new FileReader();
+        r.onloadend = () => resolve(r.result as string);
+        r.onerror = reject;
+        r.readAsDataURL(file);
+      });
+      setForm((f: any) => ({ ...f, logo_url: dataUrl }));
+      toast.success(lang === "ar" ? "تم رفع اللوجو، اضغط حفظ" : "Logo loaded — click Save");
+    } catch (err: any) {
+      toast.error(err?.message || "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <SettingsLayout>
       <div className="space-y-6">
@@ -56,7 +80,27 @@ export default function GeneralSettings() {
             <div><Label>{t("nameAr2")}</Label><Input dir="rtl" value={form.clinic_name_ar} onChange={e => setForm({ ...form, clinic_name_ar: e.target.value })} /></div>
             <div><Label>{t("tagline2")} (EN)</Label><Input value={form.tagline_en ?? ""} onChange={e => setForm({ ...form, tagline_en: e.target.value })} /></div>
             <div><Label>{t("tagline2")} (AR)</Label><Input dir="rtl" value={form.tagline_ar ?? ""} onChange={e => setForm({ ...form, tagline_ar: e.target.value })} /></div>
-            <div className="sm:col-span-2"><Label>Logo URL</Label><Input value={form.logo_url ?? ""} onChange={e => setForm({ ...form, logo_url: e.target.value })} /></div>
+            <div className="sm:col-span-2 space-y-2">
+              <Label>{lang === "ar" ? "لوجو العيادة" : "Clinic Logo"}</Label>
+              <div className="flex items-center gap-3 flex-wrap">
+                {form.logo_url ? (
+                  <img src={form.logo_url} alt="logo" className="h-16 w-16 object-contain rounded border bg-white p-1" />
+                ) : (
+                  <div className="h-16 w-16 rounded border bg-muted flex items-center justify-center text-xs text-muted-foreground">No logo</div>
+                )}
+                <Input type="file" accept="image/*" onChange={onLogoFile} disabled={uploading} className="max-w-xs" />
+                {form.logo_url && (
+                  <Button type="button" variant="outline" size="sm" onClick={() => setForm({ ...form, logo_url: "" })}>
+                    {lang === "ar" ? "حذف" : "Remove"}
+                  </Button>
+                )}
+              </div>
+              <Input
+                placeholder={lang === "ar" ? "أو الصق رابط صورة" : "Or paste an image URL"}
+                value={form.logo_url?.startsWith("data:") ? "" : (form.logo_url ?? "")}
+                onChange={e => setForm({ ...form, logo_url: e.target.value })}
+              />
+            </div>
             <div><Label>{t("phone")}</Label><Input value={form.phone ?? ""} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
             <div><Label>{t("email")}</Label><Input value={form.email ?? ""} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
             <div className="sm:col-span-2"><Label>{t("address")} (AR)</Label><Textarea dir="rtl" value={form.address_ar ?? ""} onChange={e => setForm({ ...form, address_ar: e.target.value })} /></div>

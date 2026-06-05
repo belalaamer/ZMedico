@@ -85,13 +85,32 @@ export default function InvoiceDetail() {
     load();
   };
 
+  const loadClinicLogo = async (): Promise<string | null> => {
+    const { data } = await supabase.from("clinic_profile").select("logo_url").maybeSingle();
+    const url = (data as any)?.logo_url;
+    if (!url) return null;
+    try {
+      const res = await fetch(url, { mode: "cors" });
+      const blob = await res.blob();
+      return await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      return url;
+    }
+  };
+
   const downloadPdf = async () => {
     let branch = null;
     if (inv.branch_id) {
       const { data } = await supabase.from("branches").select("name_en,name_ar,address,phone").eq("id", inv.branch_id).maybeSingle();
       branch = data;
     }
-    generateInvoicePdf({ invoice: inv, items, payments: pays, patient: inv.patients, branch, lang, t: t as any });
+    const logoUrl = await loadClinicLogo();
+    generateInvoicePdf({ invoice: inv, items, payments: pays, patient: inv.patients, branch, logoUrl, lang, t: t as any });
   };
 
   const sendWhatsApp = () => {
@@ -125,7 +144,8 @@ export default function InvoiceDetail() {
       const { data } = await supabase.from("branches").select("name_en,name_ar,address,phone").eq("id", inv.branch_id).maybeSingle();
       branch = data;
     }
-    generateInvoicePdf({ invoice: inv, items, payments: pays, patient: inv.patients, branch, lang, mode: "print", t: t as any });
+    const logoUrl = await loadClinicLogo();
+    generateInvoicePdf({ invoice: inv, items, payments: pays, patient: inv.patients, branch, logoUrl, lang, mode: "print", t: t as any });
   };
 
   return (

@@ -81,7 +81,16 @@ const Branches = lazy(() => import("@/pages/branches/Branches"));
 const Reminders = lazy(() => import("@/pages/reminders/Reminders"));
 const ScheduledReminders = lazy(() => import("@/pages/reminders/ScheduledReminders"));
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,
+      gcTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 function RouteLoader() {
   return (

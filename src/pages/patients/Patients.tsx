@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { Can } from "@/components/Can";
 import { usePermissions } from "@/hooks/usePermissions";
+import { ListSkeleton } from "@/components/ListSkeleton";
 
 type Patient = {
   id: string;
@@ -69,7 +70,9 @@ export default function PatientsPage() {
 
   const load = async () => {
     setLoading(true);
-    let query = supabase.from("patients").select("*").is("deleted_at", null).order("created_at", { ascending: false }).limit(200);
+    let query = supabase.from("patients")
+      .select("id,patient_code,first_name_en,last_name_en,first_name_ar,last_name_ar,phone,phone2,email,gender,city,address,dob,blood_type,notes,branch_id,created_at")
+      .is("deleted_at", null).order("created_at", { ascending: false }).limit(200);
     if (currentBranchId) query = query.eq("branch_id", currentBranchId);
     const { data, error } = await query;
     setLoading(false);
@@ -200,7 +203,7 @@ export default function PatientsPage() {
 
       <Card className="shadow-card overflow-hidden">
         {loading ? (
-          <div className="p-10 text-center text-muted-foreground">…</div>
+          <ListSkeleton rows={8} />
         ) : filtered.length === 0 ? (
           <div className="p-10 text-center text-muted-foreground">{t("noPatients")}</div>
         ) : (

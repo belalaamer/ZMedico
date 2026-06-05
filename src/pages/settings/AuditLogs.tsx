@@ -12,7 +12,9 @@ export default function AuditLogs() {
   const [q, setQ] = useState("");
 
   useEffect(() => {
-    (supabase as any).from("audit_logs").select("*").order("created_at", { ascending: false }).limit(200)
+    (supabase as any).from("audit_logs")
+      .select("id,action,entity_type,entity_id,created_at,user_id")
+      .order("created_at", { ascending: false }).limit(100)
       .then(({ data }: any) => setItems(data ?? []));
   }, []);
 

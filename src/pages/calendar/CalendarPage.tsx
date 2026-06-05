@@ -703,11 +703,11 @@ export default function CalendarPage() {
             <div className="text-sm font-semibold mb-3 inline-flex items-center gap-2">
               <Clock className="size-4" /> {lang === "ar" ? "أجندة اليوم" : "Today's agenda"}
             </div>
-            {items.filter((a) => sameDay(new Date(a.scheduled_at), date)).length === 0 ? (
+            {filteredItems.filter((a) => sameDay(new Date(a.scheduled_at), date)).length === 0 ? (
               <div className="text-xs text-muted-foreground py-4 text-center">{t("noAppointments")}</div>
             ) : (
               <div className="space-y-2 max-h-[40vh] overflow-auto">
-                {items.filter((a) => sameDay(new Date(a.scheduled_at), date)).map((a) => {
+                {filteredItems.filter((a) => sameDay(new Date(a.scheduled_at), date)).map((a) => {
                   const p = a.patients!;
                   return (
                     <div key={a.id} className="flex items-start gap-2 p-2 rounded-lg hover:bg-muted/40 transition-colors">

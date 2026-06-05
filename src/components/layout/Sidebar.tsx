@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap, FolderOpen, Briefcase, UserCog, Clock, CalendarDays, DollarSign, Star, PieChart } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap, FolderOpen, Briefcase, UserCog, Clock, CalendarDays, DollarSign, Star, PieChart, Award } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useBranch } from "@/contexts/BranchContext";
@@ -40,6 +40,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
     { to: "/treasury", icon: Banknote, label: t("treasury"), show: can("treasury") },
     { to: "/expenses", icon: Receipt, label: t("expenses"), show: can("treasury") },
     { to: "/reports", icon: PieChart, label: t("reports"), show: can("reports") },
+    { to: "/reports/doctor-performance", icon: Award, label: t("doctorPerformance"), show: can("reports") },
     { to: "/reminders", icon: Bell, label: t("reminders"), show: can("appointments") },
     { to: "/branches", icon: Building2, label: t("branches"), show: isAdmin },
     { to: "/settings", icon: Settings, label: t("settings"), show: can("settings") },

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./AuthContext";
+import { withTimeout } from "@/lib/withTimeout";
 
 export type Branch = { id: string; name_en: string; name_ar: string };
 
@@ -21,13 +22,22 @@ export function BranchProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!user) { setBranches([]); return; }
-    supabase.from("branches").select("id,name_en,name_ar").order("name_en").then(({ data }) => {
+    withTimeout(
+      supabase.from("branches").select("id,name_en,name_ar").order("name_en"),
+      {
+        ms: 8000,
+        fallback: { data: [], error: null, count: null, status: 200, statusText: "timeout-fallback" } as any,
+        label: "branches.bootstrap",
+      }
+    ).then(({ data }) => {
       const list = (data ?? []) as Branch[];
       setBranches(list);
       if (!currentBranchId && list.length) {
         setCurrentBranchIdState(list[0].id);
         localStorage.setItem("zmedico.branch", list[0].id);
       }
+    }).catch(() => {
+      setBranches([]);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);

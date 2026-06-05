@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { withTimeout } from "@/lib/withTimeout";
 
 export type AppRole = "admin" | "manager" | "doctor" | "receptionist" | "hr" | "accountant" | "staff" | string;
 
@@ -13,11 +14,26 @@ export function useUserRole() {
     let active = true;
     if (!user) { setRoles([]); setLoading(false); return; }
     setLoading(true);
-    supabase.from("user_roles").select("role").eq("user_id", user.id).then(({ data }) => {
-      if (!active) return;
-      setRoles((data ?? []).map((r: any) => r.role as AppRole));
-      setLoading(false);
-    });
+    withTimeout(
+      supabase.from("user_roles").select("role").eq("user_id", user.id),
+      {
+        ms: 8000,
+        fallback: { data: [], error: null, count: null, status: 200, statusText: "timeout-fallback" } as any,
+        label: "user_roles.bootstrap",
+      }
+    )
+      .then(({ data }) => {
+        if (!active) return;
+        setRoles((data ?? []).map((r: any) => r.role as AppRole));
+      })
+      .catch(() => {
+        if (!active) return;
+        setRoles([]);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
     return () => { active = false; };
   }, [user?.id]);
 

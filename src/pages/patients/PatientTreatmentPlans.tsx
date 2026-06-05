@@ -314,9 +314,18 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
                         <span className="text-[10px] text-muted-foreground">{s.performed_at ? formatDate(s.performed_at, lang) : "—"}</span>
                       </div>
                       {s.scheduled_date && (
-                        <div className="text-[10px] text-muted-foreground mb-1">
-                          {lang === "ar" ? "موعد:" : "Appt:"} {formatDate(s.scheduled_date, lang)}
-                        </div>
+                        s.appointment_id ? (
+                          <Link
+                            to={`/calendar?date=${s.scheduled_date}&appt=${s.appointment_id}`}
+                            className="block text-[10px] text-primary hover:underline mb-1"
+                          >
+                            {lang === "ar" ? "موعد:" : "Appt:"} {formatDate(s.scheduled_date, lang)}
+                          </Link>
+                        ) : (
+                          <div className="text-[10px] text-muted-foreground mb-1">
+                            {lang === "ar" ? "موعد:" : "Appt:"} {formatDate(s.scheduled_date, lang)}
+                          </div>
+                        )
                       )}
                       <div className="flex gap-1">
                         <Button size="sm" variant={s.status === "completed" ? "default" : "outline"} className="h-6 px-2 flex-1" onClick={() => setSessionStatus(s, s.status === "completed" ? "pending" : "completed")}>

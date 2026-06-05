@@ -33,12 +33,9 @@ export default function DoctorPerformance() {
 
   useEffect(() => {
     (async () => {
-      // Active staff with the doctor role
+      // All users with the doctor role (don't require staff_profiles — RLS may hide it from non-admins)
       const { data: roles } = await supabase.from("user_roles").select("user_id").eq("role", "doctor");
-      const roleIds = (roles ?? []).map((r: any) => r.user_id);
-      if (!roleIds.length) { setRows([]); return; }
-      const { data: staff } = await supabase.from("staff_profiles").select("id").in("id", roleIds).eq("status", "active");
-      const docIds = (staff ?? []).map((s: any) => s.id);
+      const docIds = Array.from(new Set((roles ?? []).map((r: any) => r.user_id).filter(Boolean)));
       if (!docIds.length) { setRows([]); return; }
       const { data: profs } = await supabase.from("profiles").select("id, full_name").in("id", docIds);
       const nameMap = new Map<string, string>((profs ?? []).map((p: any) => [p.id, p.full_name ?? p.id.slice(0, 8)]));
@@ -119,9 +116,11 @@ export default function DoctorPerformance() {
           revenue: cm.revenue,
           commissions: cm.commissions,
         };
-      }).filter((r) => r.assigned || r.unique_visits || r.completed_plans || r.active_plans || r.revenue);
-
-      out.sort((a, b) => b.retention - a.retention || b.unique_visits - a.unique_visits);
+      });
+      out.sort((a, b) =>
+        (b.assigned + b.unique_visits) - (a.assigned + a.unique_visits) ||
+        b.retention - a.retention
+      );
       setRows(out);
     })();
   }, [start, end, currentBranchId]);

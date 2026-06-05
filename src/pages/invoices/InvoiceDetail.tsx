@@ -86,9 +86,17 @@ export default function InvoiceDetail() {
   };
 
   const loadClinicLogo = async (): Promise<string | null> => {
-    const { data } = await supabase.from("clinic_profile").select("logo_url").maybeSingle();
-    const url = (data as any)?.logo_url;
+    let url: string | undefined;
+    if (inv.branch_id) {
+      const { data } = await supabase.from("clinic_profile").select("logo_url").eq("branch_id", inv.branch_id).maybeSingle();
+      url = (data as any)?.logo_url;
+    }
+    if (!url) {
+      const { data } = await supabase.from("clinic_profile").select("logo_url").limit(1).maybeSingle();
+      url = (data as any)?.logo_url;
+    }
     if (!url) return null;
+    if (url.startsWith("data:")) return url;
     try {
       const res = await fetch(url, { mode: "cors" });
       const blob = await res.blob();

@@ -1,0 +1,23 @@
+-- Performance indexes on frequently queried columns
+CREATE INDEX IF NOT EXISTS idx_patients_branch_deleted_created ON public.patients (branch_id, deleted_at, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_patients_assigned_doctor ON public.patients (assigned_doctor_id) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_invoices_branch_status_created ON public.invoices (branch_id, status, created_at DESC) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_invoices_patient ON public.invoices (patient_id) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_invoices_medical_record ON public.invoices (medical_record_id) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_payments_invoice ON public.payments (invoice_id) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_payments_branch_created ON public.payments (branch_id, created_at DESC) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_appointments_branch_scheduled ON public.appointments (branch_id, scheduled_at DESC);
+CREATE INDEX IF NOT EXISTS idx_appointments_patient ON public.appointments (patient_id);
+CREATE INDEX IF NOT EXISTS idx_medical_records_branch_visit ON public.medical_records (branch_id, visit_date DESC) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_medical_records_doctor ON public.medical_records (doctor_id) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_medical_records_patient ON public.medical_records (patient_id) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON public.audit_logs (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON public.audit_logs (entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_user ON public.user_roles (user_id);
+CREATE INDEX IF NOT EXISTS idx_doctor_commissions_doctor ON public.doctor_commissions (doctor_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_treatment_plans_doctor ON public.treatment_plans (doctor_id, created_at DESC) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_treatment_plans_patient ON public.treatment_plans (patient_id) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON public.notifications (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_inventory_product_branch ON public.inventory (product_id, branch_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_tx_product_created ON public.inventory_transactions (product_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_expenses_branch_created ON public.expenses (branch_id, created_at DESC) WHERE deleted_at IS NULL;

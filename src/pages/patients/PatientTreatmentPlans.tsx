@@ -202,6 +202,24 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
 
   const cancelPlan = async (p: Plan) => {
     await (supabase as any).from("treatment_plans").update({ status: "cancelled" }).eq("id", p.id);
+    // Cancel any pending sessions and their linked future appointments
+    const pending = (sessionsByPlan[p.id] ?? []).filter((s) => s.status === "pending");
+    const apptIds = pending.map((s) => s.appointment_id).filter(Boolean);
+    if (apptIds.length) {
+      await (supabase as any)
+        .from("appointments")
+        .update({ status: "cancelled" })
+        .in("id", apptIds)
+        .gte("scheduled_at", new Date().toISOString());
+    }
+    const pendingIds = pending.map((s) => s.id);
+    if (pendingIds.length) {
+      await (supabase as any)
+        .from("treatment_sessions")
+        .update({ status: "cancelled" })
+        .in("id", pendingIds);
+    }
+    toast.success(lang === "ar" ? "تم إلغاء الخطة والمواعيد المرتبطة" : "Plan and linked appointments cancelled");
     load();
   };
 

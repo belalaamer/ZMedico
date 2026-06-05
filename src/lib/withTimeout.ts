@@ -1,5 +1,5 @@
 export async function withTimeout<T>(
-  promise: Promise<T>,
+  promise: PromiseLike<T>,
   {
     ms = 8000,
     fallback,

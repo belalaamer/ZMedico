@@ -135,6 +135,30 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
     const plan = plans.find((p) => p.id === schedSession.treatment_plan_id);
     const doctor_id = schedSession.doctor_id || plan?.doctor_id || null;
     const scheduled_at = new Date(schedAt).toISOString();
+    // Conflict check: any active appointment overlapping ±30min for same doctor OR same patient
+    const start = new Date(scheduled_at);
+    const from = new Date(start.getTime() - 30 * 60 * 1000).toISOString();
+    const to = new Date(start.getTime() + 30 * 60 * 1000).toISOString();
+    let cq = (supabase as any)
+      .from("appointments")
+      .select("id, doctor_id, patient_id, scheduled_at, status")
+      .is("deleted_at", null)
+      .not("status", "in", "(cancelled,no_show,completed)")
+      .gte("scheduled_at", from)
+      .lte("scheduled_at", to);
+    if (schedSession.appointment_id) cq = cq.neq("id", schedSession.appointment_id);
+    const { data: conflicts } = await cq;
+    const clash = (conflicts ?? []).find((a: any) =>
+      (doctor_id && a.doctor_id === doctor_id) || a.patient_id === patientId
+    );
+    if (clash) {
+      toast.error(
+        lang === "ar"
+          ? `يوجد تعارض في الموعد (${clash.doctor_id === doctor_id ? "نفس الطبيب" : "نفس المريض"}) في ${new Date(clash.scheduled_at).toLocaleString()}`
+          : `Conflict (${clash.doctor_id === doctor_id ? "same doctor" : "same patient"}) at ${new Date(clash.scheduled_at).toLocaleString()}`
+      );
+      return;
+    }
     let appointmentId = schedSession.appointment_id as string | null;
     if (appointmentId) {
       const { error } = await (supabase as any).from("appointments").update({ scheduled_at, doctor_id, branch_id: currentBranchId }).eq("id", appointmentId);

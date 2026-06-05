@@ -22,6 +22,17 @@ function esc(s: any): string {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
 }
 
+function wrapText(value: any, opts?: { rtl?: boolean; arabic?: boolean }) {
+  const text = esc(value);
+  if (!text) return "";
+  const rtl = opts?.rtl ? "direction:rtl;text-align:right;unicode-bidi:plaintext;" : "direction:ltr;unicode-bidi:plaintext;";
+  const arabic = opts?.arabic
+    ? "font-family:'Cairo','Noto Naskh Arabic','Tajawal','Segoe UI',Tahoma,Arial,sans-serif;letter-spacing:0;word-spacing:0;"
+    : "";
+
+  return `<span style="${rtl}${arabic}display:inline-block;white-space:normal;">${text}</span>`;
+}
+
 export async function generateInvoicePdf(opts: {
   invoice: any;
   items: any[];
@@ -69,7 +80,7 @@ export async function generateInvoicePdf(opts: {
   const itemsRows = items.map((it, i) => `
     <tr>
       <td style="text-align:center;width:28px;">${i + 1}</td>
-      <td>${esc(isAr ? (it.description_ar || it.description_en) : (it.description_en || it.description_ar))}</td>
+      <td>${wrapText(isAr ? (it.description_ar || it.description_en) : (it.description_en || it.description_ar), { rtl: isAr, arabic: isAr })}</td>
       <td style="text-align:${isAr ? "left" : "right"};width:48px;">${esc(it.quantity)}</td>
       <td style="text-align:${isAr ? "left" : "right"};width:96px;">${esc(money(it.unit_price, lang))}</td>
       <td style="text-align:${isAr ? "left" : "right"};width:96px;">${esc(money(it.total, lang))}</td>
@@ -92,36 +103,38 @@ export async function generateInvoicePdf(opts: {
     font-family: ${isAr ? "'Cairo','Tajawal','Noto Naskh Arabic','Segoe UI',Tahoma,Arial,sans-serif" : "'Inter','Helvetica Neue',Arial,sans-serif"};
     font-size: 13px;
     line-height: 1.45;
+    letter-spacing: 0;
+    word-spacing: 0;
     box-sizing: border-box;
   ">
     <div style="background:#3a1a5e;color:#fff;padding:20px 28px;display:flex;justify-content:space-between;align-items:center;">
       <div style="display:flex;align-items:center;gap:14px;">
         <div style="background:#fff;color:#3a1a5e;width:44px;height:44px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:20px;">Z</div>
         <div>
-          <div style="font-size:18px;font-weight:700;">${esc(branchName)}</div>
-          ${branch?.address ? `<div style="font-size:11px;opacity:.9;">${esc(branch.address)}</div>` : ""}
-          ${branch?.phone ? `<div style="font-size:11px;opacity:.9;">${esc(branch.phone)}</div>` : ""}
+          <div style="font-size:18px;font-weight:700;">${wrapText(branchName, { rtl: isAr, arabic: isAr })}</div>
+          ${branch?.address ? `<div style="font-size:11px;opacity:.9;">${wrapText(branch.address, { rtl: isAr, arabic: isAr })}</div>` : ""}
+          ${branch?.phone ? `<div style="font-size:11px;opacity:.9;">${wrapText(branch.phone)}</div>` : ""}
         </div>
       </div>
       <div style="text-align:${isAr ? "left" : "right"};">
-        <div style="font-size:22px;font-weight:700;letter-spacing:1px;">${L.invoice}</div>
+        <div style="font-size:22px;font-weight:700;letter-spacing:${isAr ? 0 : 1}px;">${L.invoice}</div>
         <div style="font-size:12px;opacity:.9;">${esc(invoice.invoice_number)}</div>
       </div>
     </div>
 
     <div style="padding:18px 28px 0;display:flex;justify-content:space-between;gap:16px;">
       <div>
-        <div style="font-size:10px;font-weight:700;color:#666;letter-spacing:1px;">${L.billTo}</div>
-        <div style="font-weight:600;margin-top:4px;">${esc(patientName)}${patient?.patient_code ? `  #${esc(patient.patient_code)}` : ""}</div>
-        ${patient?.phone ? `<div style="color:#666;font-size:12px;">${esc(patient.phone)}</div>` : ""}
-        ${patient?.email ? `<div style="color:#666;font-size:12px;">${esc(patient.email)}</div>` : ""}
+        <div style="font-size:10px;font-weight:700;color:#666;letter-spacing:${isAr ? 0 : 1}px;">${L.billTo}</div>
+        <div style="font-weight:600;margin-top:4px;">${wrapText(patientName, { rtl: isAr, arabic: isAr })}${patient?.patient_code ? `  #${esc(patient.patient_code)}` : ""}</div>
+        ${patient?.phone ? `<div style="color:#666;font-size:12px;">${wrapText(patient.phone)}</div>` : ""}
+        ${patient?.email ? `<div style="color:#666;font-size:12px;">${wrapText(patient.email)}</div>` : ""}
       </div>
       <div style="text-align:${isAr ? "right" : "left"};">
-        <div style="font-size:10px;font-weight:700;color:#666;letter-spacing:1px;">${L.invoiceDate}</div>
+        <div style="font-size:10px;font-weight:700;color:#666;letter-spacing:${isAr ? 0 : 1}px;">${L.invoiceDate}</div>
         <div style="margin-top:4px;">${esc(fmtDate(invoice.invoice_date, lang))}</div>
       </div>
       <div style="text-align:${isAr ? "left" : "right"};">
-        <div style="font-size:10px;font-weight:700;color:#666;letter-spacing:1px;">${L.status}</div>
+        <div style="font-size:10px;font-weight:700;color:#666;letter-spacing:${isAr ? 0 : 1}px;">${L.status}</div>
         <div style="margin-top:4px;text-transform:uppercase;">${esc(invoice.status)}</div>
       </div>
     </div>
@@ -145,7 +158,7 @@ export async function generateInvoicePdf(opts: {
 
     <div style="padding:14px 28px 0;display:flex;justify-content:space-between;gap:24px;align-items:flex-start;">
       <div style="flex:1;">
-        ${invoice.notes ? `<div style="font-size:10px;font-weight:700;color:#666;letter-spacing:1px;">${L.notes}</div><div style="font-size:12px;color:#333;margin-top:4px;white-space:pre-wrap;">${esc(invoice.notes)}</div>` : ""}
+        ${invoice.notes ? `<div style="font-size:10px;font-weight:700;color:#666;letter-spacing:${isAr ? 0 : 1}px;">${L.notes}</div><div style="font-size:12px;color:#333;margin-top:4px;white-space:pre-wrap;direction:${dir};unicode-bidi:plaintext;letter-spacing:0;">${wrapText(invoice.notes, { rtl: isAr, arabic: isAr })}</div>` : ""}
       </div>
       <div style="width:260px;font-size:12px;">
         <div style="display:flex;justify-content:space-between;padding:3px 0;color:#555;"><span>${L.subtotal}</span><span>${esc(money(invoice.subtotal, lang))}</span></div>
@@ -159,7 +172,7 @@ export async function generateInvoicePdf(opts: {
 
     ${payments.length > 0 ? `
     <div style="padding:18px 28px 0;">
-      <table style="width:100%;border-collapse:collapse;font-size:12px;border:1px solid #eee;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;border:1px solid #eee;direction:${dir};unicode-bidi:embed;">
         <thead>
           <tr style="background:#f0f0f5;">
             <th style="padding:6px;text-align:${isAr ? "right" : "left"};">${L.payDate}</th>

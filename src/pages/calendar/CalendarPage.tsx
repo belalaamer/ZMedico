@@ -93,7 +93,7 @@ export default function CalendarPage() {
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({
-    patient_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "",
+    patient_id: "", doctor_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "",
     status: "scheduled" as Appt["status"],
   });
 
@@ -224,14 +224,14 @@ export default function CalendarPage() {
 
   const openNew = () => {
     setEditId(null);
-    setForm({ patient_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "", status: "scheduled" });
+    setForm({ patient_id: "", doctor_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "", status: "scheduled" });
     setOpen(true);
   };
   const openNewAt = (slot: Date) => {
     setEditId(null);
     const tz = slot.getTimezoneOffset();
     const local = new Date(slot.getTime() - tz * 60000).toISOString().slice(0, 16);
-    setForm({ patient_id: "", scheduled_at: local, duration_minutes: 30, procedure: "", room: "", notes: "", status: "scheduled" });
+    setForm({ patient_id: "", doctor_id: "", scheduled_at: local, duration_minutes: 30, procedure: "", room: "", notes: "", status: "scheduled" });
     setOpen(true);
   };
   const openEdit = (a: Appt) => {
@@ -241,6 +241,7 @@ export default function CalendarPage() {
     const local = new Date(dt.getTime() - tz * 60000).toISOString().slice(0,16);
     setForm({
       patient_id: a.patient_id,
+      doctor_id: a.doctor_id ?? "",
       scheduled_at: local,
       duration_minutes: a.duration_minutes,
       procedure: a.procedure ?? "",

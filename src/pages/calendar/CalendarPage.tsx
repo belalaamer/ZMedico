@@ -442,6 +442,19 @@ export default function CalendarPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-2">
+                  <Label>{lang === "ar" ? "الطبيب" : "Doctor"}</Label>
+                  <Select
+                    value={form.doctor_id || "__none__"}
+                    onValueChange={(v) => setForm({ ...form, doctor_id: v === "__none__" ? "" : v })}
+                  >
+                    <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">— {lang === "ar" ? "بدون" : "None"} —</SelectItem>
+                      {doctors.map((d) => <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label>{t("scheduledAt")}</Label>

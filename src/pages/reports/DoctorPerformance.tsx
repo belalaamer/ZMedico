@@ -41,7 +41,7 @@ export default function DoctorPerformance() {
       const nameMap = new Map<string, string>((profs ?? []).map((p: any) => [p.id, p.full_name ?? p.id.slice(0, 8)]));
 
       // Assigned patient counts
-      let aq = supabase.from("patients").select("assigned_doctor_id").is("deleted_at", null).not("assigned_doctor_id", "is", null);
+      let aq = supabase.from("patients").select("id, assigned_doctor_id").is("deleted_at", null).not("assigned_doctor_id", "is", null);
       if (currentBranchId) aq = aq.eq("branch_id", currentBranchId);
       const { data: assignedRows } = await aq;
       const assignedMap = new Map<string, number>();

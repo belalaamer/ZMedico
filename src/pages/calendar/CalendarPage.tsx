@@ -546,6 +546,48 @@ export default function CalendarPage() {
         ))}
       </div>
 
+      {/* Filters */}
+      <Card className="p-3 shadow-card flex flex-wrap items-center gap-2">
+        <div className="inline-flex items-center gap-1 text-xs text-muted-foreground me-1">
+          <Filter className="size-3.5" /> {lang === "ar" ? "تصفية:" : "Filter:"}
+        </div>
+        <Select value={doctorFilter} onValueChange={setDoctorFilter}>
+          <SelectTrigger className="h-8 w-auto min-w-[140px] text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{lang === "ar" ? "كل الأطباء" : "All doctors"}</SelectItem>
+            <SelectItem value="__none__">{lang === "ar" ? "بدون طبيب" : "Unassigned"}</SelectItem>
+            {doctors.map((d) => <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={roomFilter} onValueChange={setRoomFilter}>
+          <SelectTrigger className="h-8 w-auto min-w-[120px] text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{lang === "ar" ? "كل الغرف" : "All rooms"}</SelectItem>
+            <SelectItem value="__none__">{lang === "ar" ? "بدون غرفة" : "No room"}</SelectItem>
+            {rooms.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="h-8 w-auto min-w-[130px] text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{lang === "ar" ? "كل الحالات" : "All statuses"}</SelectItem>
+            <SelectItem value="scheduled">{t("statusScheduled")}</SelectItem>
+            <SelectItem value="confirmed">{t("statusConfirmed")}</SelectItem>
+            <SelectItem value="in_progress">{t("statusInProgress")}</SelectItem>
+            <SelectItem value="completed">{t("statusCompleted")}</SelectItem>
+            <SelectItem value="cancelled">{t("statusCancelled")}</SelectItem>
+            <SelectItem value="no_show">{t("statusNoShow")}</SelectItem>
+            <SelectItem value="departed">{t("statusDeparted")}</SelectItem>
+          </SelectContent>
+        </Select>
+        {(doctorFilter !== "all" || roomFilter !== "all" || statusFilter !== "all") && (
+          <Button size="sm" variant="ghost" className="h-8 text-xs"
+            onClick={() => { setDoctorFilter("all"); setRoomFilter("all"); setStatusFilter("all"); }}>
+            <X className="size-3 me-1" />{lang === "ar" ? "مسح" : "Clear"}
+          </Button>
+        )}
+      </Card>
+
       <div className="grid lg:grid-cols-[1fr,300px] gap-4">
         {/* Time grid */}
         <Card className="shadow-card overflow-hidden">

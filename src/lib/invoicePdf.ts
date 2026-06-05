@@ -1,7 +1,37 @@
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import invoiceArabicRegularUrl from "@/assets/fonts/NotoNaskhArabic-Regular.ttf";
+import invoiceArabicBoldUrl from "@/assets/fonts/NotoNaskhArabic-Bold.ttf";
 
 type Lang = "en" | "ar";
+
+const INVOICE_ARABIC_FONT_FAMILY = "InvoiceArabic";
+
+function ensureInvoiceArabicFontFace() {
+  if (typeof document === "undefined" || document.getElementById("__invoice_arabic_font_face__")) {
+    return;
+  }
+
+  const style = document.createElement("style");
+  style.id = "__invoice_arabic_font_face__";
+  style.textContent = `
+    @font-face {
+      font-family: '${INVOICE_ARABIC_FONT_FAMILY}';
+      src: url('${invoiceArabicRegularUrl}') format('truetype');
+      font-style: normal;
+      font-weight: 400;
+      font-display: block;
+    }
+    @font-face {
+      font-family: '${INVOICE_ARABIC_FONT_FAMILY}';
+      src: url('${invoiceArabicBoldUrl}') format('truetype');
+      font-style: normal;
+      font-weight: 700;
+      font-display: block;
+    }
+  `;
+  document.head.appendChild(style);
+}
 
 function money(n: number, lang: Lang) {
   return new Intl.NumberFormat(lang === "ar" ? "ar-EG" : "en-US", {
@@ -29,7 +59,7 @@ function wrapText(value: any, opts?: { rtl?: boolean; arabic?: boolean }) {
     ? "direction:rtl;unicode-bidi:isolate;"
     : "direction:ltr;unicode-bidi:isolate;";
   const arabic = opts?.arabic
-    ? "font-family:'Noto Naskh Arabic','Amiri','Cairo','Tajawal',Tahoma,Arial,sans-serif;letter-spacing:0;word-spacing:normal;font-feature-settings:'liga','calt','rlig','init','medi','fina','isol';text-rendering:optimizeLegibility;"
+    ? `font-family:'${INVOICE_ARABIC_FONT_FAMILY}','Noto Naskh Arabic','Amiri','Cairo','Tajawal',Tahoma,Arial,sans-serif;letter-spacing:0;word-spacing:normal;font-feature-settings:'liga','calt','rlig','init','medi','fina','isol';text-rendering:optimizeLegibility;`
     : "";
   return `<bdi style="${rtl}${arabic}">${text}</bdi>`;
 }
@@ -101,7 +131,7 @@ export async function generateInvoicePdf(opts: {
     padding: 0;
     background:#fff;
     color:#111;
-    font-family: ${isAr ? "'Cairo','Tajawal','Noto Naskh Arabic','Segoe UI',Tahoma,Arial,sans-serif" : "'Inter','Helvetica Neue',Arial,sans-serif"};
+    font-family: ${isAr ? `'${INVOICE_ARABIC_FONT_FAMILY}','Noto Naskh Arabic','Cairo','Tajawal','Segoe UI',Tahoma,Arial,sans-serif` : "'Inter','Helvetica Neue',Arial,sans-serif"};
     font-size: 13px;
     line-height: 1.45;
     letter-spacing: 0;
@@ -195,34 +225,12 @@ export async function generateInvoicePdf(opts: {
 
   // Load Arabic web font if needed and WAIT until it's actually usable
   if (isAr) {
-    if (!document.getElementById("__cairo_font__")) {
-      const pre1 = document.createElement("link");
-      pre1.rel = "preconnect";
-      pre1.href = "https://fonts.googleapis.com";
-      document.head.appendChild(pre1);
-      const pre2 = document.createElement("link");
-      pre2.rel = "preconnect";
-      pre2.href = "https://fonts.gstatic.com";
-      pre2.crossOrigin = "anonymous";
-      document.head.appendChild(pre2);
-      const link = document.createElement("link");
-      link.id = "__cairo_font__";
-      link.rel = "stylesheet";
-      link.href =
-        "https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Noto+Naskh+Arabic:wght@400;600;700&family=Amiri:wght@400;700&display=swap";
-      document.head.appendChild(link);
-    }
+    ensureInvoiceArabicFontFace();
     try {
-      // Explicitly request the weights we use with Arabic sample text so the
-      // browser fetches the Arabic subset before html2canvas snapshots.
       const sample = "التجمع الخامس النرجس عمارات أوزون مول الطبي مبنى الدور الأول عيادة ٠١٢٣٤٥٦٧٨٩";
       await Promise.all([
-        (document as any).fonts?.load(`400 13px "Noto Naskh Arabic"`, sample),
-        (document as any).fonts?.load(`600 13px "Noto Naskh Arabic"`, sample),
-        (document as any).fonts?.load(`700 14px "Noto Naskh Arabic"`, sample),
-        (document as any).fonts?.load(`400 13px "Cairo"`, sample),
-        (document as any).fonts?.load(`700 14px "Cairo"`, sample),
-        (document as any).fonts?.load(`400 13px "Noto Naskh Arabic"`, sample),
+        (document as any).fonts?.load(`400 13px "${INVOICE_ARABIC_FONT_FAMILY}"`, sample),
+        (document as any).fonts?.load(`700 14px "${INVOICE_ARABIC_FONT_FAMILY}"`, sample),
       ]);
       await (document as any).fonts?.ready;
     } catch {}
@@ -245,7 +253,7 @@ export async function generateInvoicePdf(opts: {
       backgroundColor: "#ffffff",
       letterRendering: true,
       allowTaint: true,
-      foreignObjectRendering: false,
+      foreignObjectRendering: isAr,
     } as any);
     const imgData = canvas.toDataURL("image/jpeg", 0.95);
     const doc = new jsPDF({ unit: "mm", format: "a4" });

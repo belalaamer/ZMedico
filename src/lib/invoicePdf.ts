@@ -179,16 +179,39 @@ export async function generateInvoicePdf(opts: {
     </div>
   </div>`;
 
-  // Load Arabic web font if needed
-  if (isAr && !document.getElementById("__cairo_font__")) {
-    const link = document.createElement("link");
-    link.id = "__cairo_font__";
-    link.rel = "stylesheet";
-    link.href = "https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap";
-    document.head.appendChild(link);
-    // give the font a moment to load
-    await new Promise((r) => setTimeout(r, 600));
-    try { await (document as any).fonts?.ready; } catch {}
+  // Load Arabic web font if needed and WAIT until it's actually usable
+  if (isAr) {
+    if (!document.getElementById("__cairo_font__")) {
+      const pre1 = document.createElement("link");
+      pre1.rel = "preconnect";
+      pre1.href = "https://fonts.googleapis.com";
+      document.head.appendChild(pre1);
+      const pre2 = document.createElement("link");
+      pre2.rel = "preconnect";
+      pre2.href = "https://fonts.gstatic.com";
+      pre2.crossOrigin = "anonymous";
+      document.head.appendChild(pre2);
+      const link = document.createElement("link");
+      link.id = "__cairo_font__";
+      link.rel = "stylesheet";
+      link.href =
+        "https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Noto+Naskh+Arabic:wght@400;600;700&display=swap";
+      document.head.appendChild(link);
+    }
+    try {
+      // Explicitly request the weights we use with Arabic sample text so the
+      // browser fetches the Arabic subset before html2canvas snapshots.
+      const sample = "أبجد هوز حطي كلمن سعفص قرشت ثخذ ضظغ ٠١٢٣٤٥٦٧٨٩";
+      await Promise.all([
+        (document as any).fonts?.load(`400 13px "Cairo"`, sample),
+        (document as any).fonts?.load(`600 13px "Cairo"`, sample),
+        (document as any).fonts?.load(`700 14px "Cairo"`, sample),
+        (document as any).fonts?.load(`400 13px "Noto Naskh Arabic"`, sample),
+      ]);
+      await (document as any).fonts?.ready;
+    } catch {}
+    // tiny extra tick to let layout settle
+    await new Promise((r) => setTimeout(r, 150));
   }
 
   const container = document.createElement("div");
@@ -200,7 +223,14 @@ export async function generateInvoicePdf(opts: {
 
   const node = container.firstElementChild as HTMLElement;
   try {
-    const canvas = await html2canvas(node, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+    const canvas = await html2canvas(node, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: "#ffffff",
+      letterRendering: true,
+      allowTaint: true,
+      foreignObjectRendering: false,
+    } as any);
     const imgData = canvas.toDataURL("image/jpeg", 0.95);
     const doc = new jsPDF({ unit: "mm", format: "a4" });
     const pageWidth = doc.internal.pageSize.getWidth();

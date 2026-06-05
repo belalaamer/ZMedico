@@ -18,6 +18,7 @@ import { useNavigate } from "react-router-dom";
 import { useUserRole } from "@/hooks/useUserRole";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Can } from "@/components/Can";
+import { ListSkeleton } from "@/components/ListSkeleton";
 
 type Inv = {
   id: string;
@@ -125,7 +126,7 @@ export default function Invoices() {
 
       <Card className="shadow-card overflow-hidden">
         {loading ? (
-          <div className="p-10 text-center text-muted-foreground">…</div>
+          <ListSkeleton rows={8} />
         ) : filtered.length === 0 ? (
           <div className="p-10 text-center text-muted-foreground">{t("noInvoices")}</div>
         ) : (

@@ -113,11 +113,12 @@ export async function generateInvoicePdf(opts: {
   payments: any[];
   patient: any;
   branch?: { name_en?: string; name_ar?: string; address?: string; phone?: string } | null;
+  logoUrl?: string | null;
   lang: Lang;
   mode?: "download" | "print";
   t: (k: string) => string;
 }) {
-  const { invoice, items, payments, patient, branch, lang, mode = "download", t } = opts;
+  const { invoice, items, payments, patient, branch, logoUrl, lang, mode = "download", t } = opts;
 
   const isAr = lang === "ar";
   const dir = isAr ? "rtl" : "ltr";
@@ -184,7 +185,9 @@ export async function generateInvoicePdf(opts: {
   ">
     <div style="background:#3a1a5e;color:#fff;padding:20px 28px;display:flex;justify-content:space-between;align-items:center;">
       <div style="display:flex;align-items:center;gap:14px;">
-        <div style="background:#fff;color:#3a1a5e;width:44px;height:44px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:20px;">Z</div>
+        ${logoUrl
+          ? `<div style="background:#fff;width:48px;height:48px;border-radius:6px;display:flex;align-items:center;justify-content:center;overflow:hidden;"><img src="${esc(logoUrl)}" crossorigin="anonymous" style="max-width:100%;max-height:100%;object-fit:contain;" /></div>`
+          : `<div style="background:#fff;color:#3a1a5e;width:44px;height:44px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:20px;">Z</div>`}
         <div>
           <div style="font-size:18px;font-weight:700;">${wrapText(branchName, { rtl: isAr, arabic: isAr })}</div>
           ${branchAddress ? `<div style="font-size:11px;opacity:.9;">${wrapText(branchAddress)}</div>` : ""}

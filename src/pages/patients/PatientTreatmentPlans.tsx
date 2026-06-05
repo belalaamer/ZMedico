@@ -1,3 +1,4 @@
+import { Textarea } from "@/components/ui/textarea";
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,7 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
   const [form, setForm] = useState({ name_ar: "", name_en: "", doctor_id: "", total_sessions: 10, price: 0, start_date: new Date().toISOString().slice(0, 10) });
   const [schedSession, setSchedSession] = useState<Session | null>(null);
   const [schedAt, setSchedAt] = useState<string>("");
+  const [conflict, setConflict] = useState<{ clash: any; reason: string } | null>(null);
 
   const load = async () => {
     const { data } = await (supabase as any)
@@ -130,38 +132,44 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
     setSchedAt(`${base.getFullYear()}-${pad(base.getMonth() + 1)}-${pad(base.getDate())}T${pad(base.getHours())}:${pad(base.getMinutes())}`);
   };
 
-  const saveSchedule = async () => {
+  const saveSchedule = async (overrideReason?: string) => {
     if (!schedSession || !schedAt) return;
     const plan = plans.find((p) => p.id === schedSession.treatment_plan_id);
     const doctor_id = schedSession.doctor_id || plan?.doctor_id || null;
     const scheduled_at = new Date(schedAt).toISOString();
-    // Conflict check: any active appointment overlapping ±30min for same doctor OR same patient
-    const start = new Date(scheduled_at);
-    const from = new Date(start.getTime() - 30 * 60 * 1000).toISOString();
-    const to = new Date(start.getTime() + 30 * 60 * 1000).toISOString();
-    let cq = (supabase as any)
-      .from("appointments")
-      .select("id, doctor_id, patient_id, scheduled_at, status")
-      .is("deleted_at", null)
-      .not("status", "in", "(cancelled,no_show,completed)")
-      .gte("scheduled_at", from)
-      .lte("scheduled_at", to);
-    if (schedSession.appointment_id) cq = cq.neq("id", schedSession.appointment_id);
-    const { data: conflicts } = await cq;
-    const clash = (conflicts ?? []).find((a: any) =>
-      (doctor_id && a.doctor_id === doctor_id) || a.patient_id === patientId
-    );
-    if (clash) {
-      toast.error(
-        lang === "ar"
-          ? `يوجد تعارض في الموعد (${clash.doctor_id === doctor_id ? "نفس الطبيب" : "نفس المريض"}) في ${new Date(clash.scheduled_at).toLocaleString()}`
-          : `Conflict (${clash.doctor_id === doctor_id ? "same doctor" : "same patient"}) at ${new Date(clash.scheduled_at).toLocaleString()}`
+    if (!overrideReason) {
+      // Conflict check: any active appointment overlapping ±30min for same doctor OR same patient
+      const start = new Date(scheduled_at);
+      const from = new Date(start.getTime() - 30 * 60 * 1000).toISOString();
+      const to = new Date(start.getTime() + 30 * 60 * 1000).toISOString();
+      let cq = (supabase as any)
+        .from("appointments")
+        .select("id, doctor_id, patient_id, scheduled_at, status")
+        .is("deleted_at", null)
+        .not("status", "in", "(cancelled,no_show,completed)")
+        .gte("scheduled_at", from)
+        .lte("scheduled_at", to);
+      if (schedSession.appointment_id) cq = cq.neq("id", schedSession.appointment_id);
+      const { data: conflicts } = await cq;
+      const clash = (conflicts ?? []).find((a: any) =>
+        (doctor_id && a.doctor_id === doctor_id) || a.patient_id === patientId
       );
-      return;
+      if (clash) {
+        setConflict({ clash, reason: "" });
+        return;
+      }
     }
     let appointmentId = schedSession.appointment_id as string | null;
+    const overrideNote = overrideReason
+      ? `\n[OVERRIDE ${new Date().toISOString()} by ${user?.email ?? user?.id ?? "user"}]: ${overrideReason}`
+      : "";
     if (appointmentId) {
-      const { error } = await (supabase as any).from("appointments").update({ scheduled_at, doctor_id, branch_id: currentBranchId }).eq("id", appointmentId);
+      const patch: any = { scheduled_at, doctor_id, branch_id: currentBranchId };
+      if (overrideReason) {
+        const { data: cur } = await (supabase as any).from("appointments").select("notes").eq("id", appointmentId).maybeSingle();
+        patch.notes = `${cur?.notes ?? ""}${overrideNote}`;
+      }
+      const { error } = await (supabase as any).from("appointments").update(patch).eq("id", appointmentId);
       if (error) { toast.error(error.message); return; }
     } else {
       const { data, error } = await (supabase as any).from("appointments").insert({
@@ -172,7 +180,7 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
         duration_minutes: 30,
         status: "scheduled",
         procedure: (lang === "ar" ? (plan?.name_ar || plan?.name_en) : (plan?.name_en || plan?.name_ar)) ?? null,
-        notes: `Session #${schedSession.session_number}`,
+        notes: `Session #${schedSession.session_number}${overrideNote}`,
       }).select("id").single();
       if (error) { toast.error(error.message); return; }
       appointmentId = data.id;
@@ -180,11 +188,15 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
     const { error: e2 } = await (supabase as any).from("treatment_sessions").update({
       appointment_id: appointmentId,
       scheduled_date: scheduled_at.slice(0, 10),
+      notes: overrideReason
+        ? `${schedSession.notes ?? ""}${overrideNote}`.trim()
+        : schedSession.notes,
     }).eq("id", schedSession.id);
     if (e2) { toast.error(e2.message); return; }
     toast.success(lang === "ar" ? "تم جدولة الجلسة" : "Session scheduled");
     setSchedSession(null);
     setSchedAt("");
+    setConflict(null);
     load();
   };
 
@@ -316,7 +328,37 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => { setSchedSession(null); setSchedAt(""); }}>{lang === "ar" ? "إلغاء" : "Cancel"}</Button>
-            <Button onClick={saveSchedule} className="gradient-primary text-primary-foreground">{lang === "ar" ? "حفظ" : "Save"}</Button>
+            <Button onClick={() => saveSchedule()} className="gradient-primary text-primary-foreground">{lang === "ar" ? "حفظ" : "Save"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!conflict} onOpenChange={(o) => { if (!o) setConflict(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{lang === "ar" ? "تعارض في الموعد" : "Schedule Conflict"}</DialogTitle></DialogHeader>
+          {conflict && (
+            <div className="space-y-3 text-sm">
+              <p className="text-muted-foreground">
+                {lang === "ar" ? "يوجد موعد آخر " : "Another appointment exists "}
+                ({conflict.clash.doctor_id && schedSession && (schedSession.doctor_id === conflict.clash.doctor_id || plans.find(p => p.id === schedSession.treatment_plan_id)?.doctor_id === conflict.clash.doctor_id)
+                  ? (lang === "ar" ? "لنفس الطبيب" : "for the same doctor")
+                  : (lang === "ar" ? "لنفس المريض" : "for the same patient")})
+                {" "}{lang === "ar" ? "في" : "at"} {new Date(conflict.clash.scheduled_at).toLocaleString()}.
+              </p>
+              <div className="space-y-1">
+                <Label>{lang === "ar" ? "سبب تجاوز التعارض (إلزامي)" : "Override reason (required)"}</Label>
+                <Textarea value={conflict.reason} onChange={(e) => setConflict({ ...conflict, reason: e.target.value })} rows={3} />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConflict(null)}>{lang === "ar" ? "إلغاء" : "Cancel"}</Button>
+            <Button
+              variant="destructive"
+              disabled={!conflict?.reason?.trim()}
+              onClick={() => { const r = conflict?.reason?.trim(); if (r) saveSchedule(r); }}
+            >
+              {lang === "ar" ? "تأكيد التجاوز" : "Confirm override"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

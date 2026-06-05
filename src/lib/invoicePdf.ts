@@ -64,6 +64,49 @@ function wrapText(value: any, opts?: { rtl?: boolean; arabic?: boolean }) {
   return `<bdi style="${rtl}${arabic}">${text}</bdi>`;
 }
 
+function transliterateInvoiceAddress(value: any) {
+  const input = String(value ?? "").trim();
+  if (!input || !/[\u0600-\u06FF]/.test(input)) return input;
+
+  const phraseMap: Array<[RegExp, string]> = [
+    [/التجمع الخامس/g, "Fifth Settlement"],
+    [/القاهرة الجديدة/g, "New Cairo"],
+    [/النرجس/g, "Al Narges"],
+    [/عمارات/g, "Buildings"],
+    [/(?:أ|ا)وزون مول الطبي/g, "Ozone Medical Mall"],
+    [/مبنى/g, "Building"],
+    [/الدور الأول/g, "First Floor"],
+    [/الدور الارضي|الدور الأرضي/g, "Ground Floor"],
+    [/الدور الثاني/g, "Second Floor"],
+    [/الدور الثالث/g, "Third Floor"],
+    [/عيادة/g, "Clinic"],
+    [/شارع/g, "St."],
+  ];
+
+  const charMap: Record<string, string> = {
+    "ا": "a", "أ": "a", "إ": "e", "آ": "aa", "ب": "b", "ت": "t", "ث": "th", "ج": "g", "ح": "h", "خ": "kh",
+    "د": "d", "ذ": "z", "ر": "r", "ز": "z", "س": "s", "ش": "sh", "ص": "s", "ض": "d", "ط": "t", "ظ": "z",
+    "ع": "a", "غ": "gh", "ف": "f", "ق": "q", "ك": "k", "ل": "l", "م": "m", "ن": "n", "ه": "h", "ة": "a",
+    "و": "w", "ؤ": "o", "ي": "y", "ى": "a", "ئ": "e", "ء": "", "ـ": "",
+    "٠": "0", "١": "1", "٢": "2", "٣": "3", "٤": "4", "٥": "5", "٦": "6", "٧": "7", "٨": "8", "٩": "9",
+    "،": ", ",
+  };
+
+  let text = input.replace(/\s+/g, " ");
+
+  for (const [pattern, replacement] of phraseMap) {
+    text = text.replace(pattern, replacement);
+  }
+
+  text = Array.from(text, (char) => charMap[char] ?? char).join("");
+
+  return text
+    .replace(/\s+,/g, ",")
+    .replace(/,\s*,/g, ", ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export async function generateInvoicePdf(opts: {
   invoice: any;
   items: any[];
@@ -83,6 +126,7 @@ export async function generateInvoicePdf(opts: {
     ? `${patient?.first_name_ar ?? patient?.first_name_en ?? ""} ${patient?.last_name_ar ?? patient?.last_name_en ?? ""}`.trim()
     : `${patient?.first_name_en ?? ""} ${patient?.last_name_en ?? ""}`.trim();
   const branchName = (isAr ? branch?.name_ar : branch?.name_en) || branch?.name_en || branch?.name_ar || "ZMedico Clinic";
+  const branchAddress = transliterateInvoiceAddress(branch?.address);
 
   const L = {
     invoice: isAr ? "فاتورة" : "INVOICE",
@@ -143,7 +187,7 @@ export async function generateInvoicePdf(opts: {
         <div style="background:#fff;color:#3a1a5e;width:44px;height:44px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:20px;">Z</div>
         <div>
           <div style="font-size:18px;font-weight:700;">${wrapText(branchName, { rtl: isAr, arabic: isAr })}</div>
-          ${branch?.address ? `<div style="font-size:11px;opacity:.9;">${wrapText(branch.address, { rtl: isAr, arabic: isAr })}</div>` : ""}
+          ${branchAddress ? `<div style="font-size:11px;opacity:.9;">${wrapText(branchAddress)}</div>` : ""}
           ${branch?.phone ? `<div style="font-size:11px;opacity:.9;">${wrapText(branch.phone)}</div>` : ""}
         </div>
       </div>

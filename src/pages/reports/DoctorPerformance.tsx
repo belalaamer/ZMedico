@@ -41,7 +41,7 @@ export default function DoctorPerformance() {
       const nameMap = new Map<string, string>((profs ?? []).map((p: any) => [p.id, p.full_name ?? p.id.slice(0, 8)]));
 
       // Assigned patient counts
-      let aq = supabase.from("patients").select("assigned_doctor_id").is("deleted_at", null).not("assigned_doctor_id", "is", null);
+      let aq = supabase.from("patients").select("id, assigned_doctor_id").is("deleted_at", null).not("assigned_doctor_id", "is", null);
       if (currentBranchId) aq = aq.eq("branch_id", currentBranchId);
       const { data: assignedRows } = await aq;
       const assignedMap = new Map<string, number>();
@@ -56,13 +56,36 @@ export default function DoctorPerformance() {
       if (currentBranchId) vq = vq.eq("branch_id", currentBranchId);
       const { data: visits } = await vq;
 
-      // Per-doctor patient visit counts
+      // Appointments in date range (with fallback to patient's assigned doctor when appt.doctor_id is null)
+      let aq2 = supabase.from("appointments")
+        .select("doctor_id, patient_id, scheduled_at, status")
+        .gte("scheduled_at", start)
+        .lte("scheduled_at", end + "T23:59:59")
+        .is("deleted_at", null)
+        .in("status", ["completed", "in_progress"] as any);
+      if (currentBranchId) aq2 = aq2.eq("branch_id", currentBranchId);
+      const { data: appts } = await aq2;
+
+      // Build patient → assigned doctor map for fallback
+      const assignedDocByPatient = new Map<string, string>();
+      (assignedRows ?? []).forEach((p: any) => {
+        if (p.id && p.assigned_doctor_id) assignedDocByPatient.set(p.id, p.assigned_doctor_id);
+      });
+
+      // Per-doctor patient visit counts (medical_records + appointments)
       const visitsByDoc = new Map<string, Map<string, number>>();
+      const bump = (docId: string, patientId: string) => {
+        if (!docId || !patientId) return;
+        let m = visitsByDoc.get(docId);
+        if (!m) { m = new Map(); visitsByDoc.set(docId, m); }
+        m.set(patientId, (m.get(patientId) ?? 0) + 1);
+      };
       (visits ?? []).forEach((v: any) => {
-        if (!v.doctor_id) return;
-        let m = visitsByDoc.get(v.doctor_id);
-        if (!m) { m = new Map(); visitsByDoc.set(v.doctor_id, m); }
-        m.set(v.patient_id, (m.get(v.patient_id) ?? 0) + 1);
+        bump(v.doctor_id, v.patient_id);
+      });
+      (appts ?? []).forEach((a: any) => {
+        const doc = a.doctor_id ?? assignedDocByPatient.get(a.patient_id);
+        bump(doc, a.patient_id);
       });
 
       // Treatment plans

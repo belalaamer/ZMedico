@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft, ChevronRight, Plus, Send, CalendarDays, LayoutGrid, Clock } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Send, CalendarDays, LayoutGrid, Clock, Filter, X } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,6 +32,7 @@ function statusLabel(s: Appt["status"], t: (k: any) => string) {
 type Appt = {
   id: string;
   patient_id: string;
+  doctor_id: string | null;
   scheduled_at: string;
   duration_minutes: number;
   status: "scheduled" | "confirmed" | "in_progress" | "completed" | "cancelled" | "no_show" | "departed";
@@ -81,6 +82,10 @@ export default function CalendarPage() {
   const [monthCursor, setMonthCursor] = useState<Date>(startOfMonth(new Date()));
   const [items, setItems] = useState<Appt[]>([]);
   const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [doctors, setDoctors] = useState<{ id: string; full_name: string }[]>([]);
+  const [doctorFilter, setDoctorFilter] = useState<string>("all");
+  const [roomFilter, setRoomFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [monthDots, setMonthDots] = useState<Record<string, number>>({});
   const [patients, setPatients] = useState<{ id: string; label: string }[]>([]);
   const [procedures, setProcedures] = useState<{ id: string; name: string; duration: number | null }[]>([]);
@@ -118,6 +123,19 @@ export default function CalendarPage() {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [rangeStart.getTime(), rangeEnd.getTime(), currentBranchId]);
   useDataSync(["appointments", "calendar"], () => { load(); });
+
+  // Load doctor options for filter
+  useEffect(() => {
+    (async () => {
+      const { data: roles } = await supabase.from("user_roles").select("user_id").eq("role", "doctor");
+      const ids = (roles ?? []).map((r: any) => r.user_id);
+      if (!ids.length) { setDoctors([]); return; }
+      const { data: profs } = await supabase.from("profiles").select("id, full_name").in("id", ids);
+      const list = (profs ?? []).map((p: any) => ({ id: p.id, full_name: p.full_name ?? p.id.slice(0, 8) }));
+      list.sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
+      setDoctors(list);
+    })();
+  }, []);
 
   // Read ?date=YYYY-MM-DD and ?appt=<id> from URL
   useEffect(() => {
@@ -302,24 +320,35 @@ export default function CalendarPage() {
 
   // Group items by day for week view
   const itemsByDay = useMemo(() => {
+    const filtered = items.filter((a) => {
+      if (doctorFilter !== "all" && (a.doctor_id ?? "__none__") !== doctorFilter) return false;
+      if (roomFilter !== "all" && (a.room ?? "__none__") !== roomFilter) return false;
+      if (statusFilter !== "all" && a.status !== statusFilter) return false;
+      return true;
+    });
     const map: Record<string, Appt[]> = {};
-    for (const a of items) {
+    for (const a of filtered) {
       const k = new Date(a.scheduled_at).toDateString();
       (map[k] ??= []).push(a);
     }
     return map;
-  }, [items]);
+  }, [items, doctorFilter, roomFilter, statusFilter]);
+
+  const filteredItems = useMemo(
+    () => Object.values(itemsByDay).flat(),
+    [itemsByDay]
+  );
 
   // Stats for current visible range
   const stats = useMemo(() => {
-    const s = { total: items.length, scheduled: 0, completed: 0, cancelled: 0 };
-    for (const a of items) {
+    const s = { total: filteredItems.length, scheduled: 0, completed: 0, cancelled: 0 };
+    for (const a of filteredItems) {
       if (a.status === "scheduled" || a.status === "confirmed") s.scheduled++;
       else if (a.status === "completed") s.completed++;
       else if (a.status === "cancelled" || a.status === "no_show") s.cancelled++;
     }
     return s;
-  }, [items]);
+  }, [filteredItems]);
 
   // Block position for time grid
   const blockStyle = (a: Appt) => {

@@ -245,7 +245,7 @@ export async function generateInvoicePdf(opts: {
       backgroundColor: "#ffffff",
       letterRendering: true,
       allowTaint: true,
-      foreignObjectRendering: isAr,
+      foreignObjectRendering: false,
     } as any);
     const imgData = canvas.toDataURL("image/jpeg", 0.95);
     const doc = new jsPDF({ unit: "mm", format: "a4" });

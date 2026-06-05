@@ -302,6 +302,7 @@ export default function CalendarPage() {
     if (!form.patient_id || !form.scheduled_at) { toast.error("Pick a patient and time"); return; }
     const payload: any = {
       patient_id: form.patient_id,
+      doctor_id: form.doctor_id || null,
       scheduled_at: new Date(form.scheduled_at).toISOString(),
       duration_minutes: Number(form.duration_minutes) || 30,
       procedure: form.procedure || null,
@@ -315,7 +316,7 @@ export default function CalendarPage() {
     if (error) { toast.error(error.message); return; }
     toast.success(lang === "ar" ? "تم حفظ الموعد" : "Appointment saved");
     setOpen(false); setEditId(null);
-    setForm({ patient_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "", status: "scheduled" });
+    setForm({ patient_id: "", doctor_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "", status: "scheduled" });
     load();
   };
 

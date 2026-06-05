@@ -328,7 +328,37 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => { setSchedSession(null); setSchedAt(""); }}>{lang === "ar" ? "إلغاء" : "Cancel"}</Button>
-            <Button onClick={saveSchedule} className="gradient-primary text-primary-foreground">{lang === "ar" ? "حفظ" : "Save"}</Button>
+            <Button onClick={() => saveSchedule()} className="gradient-primary text-primary-foreground">{lang === "ar" ? "حفظ" : "Save"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!conflict} onOpenChange={(o) => { if (!o) setConflict(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{lang === "ar" ? "تعارض في الموعد" : "Schedule Conflict"}</DialogTitle></DialogHeader>
+          {conflict && (
+            <div className="space-y-3 text-sm">
+              <p className="text-muted-foreground">
+                {lang === "ar" ? "يوجد موعد آخر " : "Another appointment exists "}
+                ({conflict.clash.doctor_id && schedSession && (schedSession.doctor_id === conflict.clash.doctor_id || plans.find(p => p.id === schedSession.treatment_plan_id)?.doctor_id === conflict.clash.doctor_id)
+                  ? (lang === "ar" ? "لنفس الطبيب" : "for the same doctor")
+                  : (lang === "ar" ? "لنفس المريض" : "for the same patient")})
+                {" "}{lang === "ar" ? "في" : "at"} {new Date(conflict.clash.scheduled_at).toLocaleString()}.
+              </p>
+              <div className="space-y-1">
+                <Label>{lang === "ar" ? "سبب تجاوز التعارض (إلزامي)" : "Override reason (required)"}</Label>
+                <Textarea value={conflict.reason} onChange={(e) => setConflict({ ...conflict, reason: e.target.value })} rows={3} />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConflict(null)}>{lang === "ar" ? "إلغاء" : "Cancel"}</Button>
+            <Button
+              variant="destructive"
+              disabled={!conflict?.reason?.trim()}
+              onClick={() => { const r = conflict?.reason?.trim(); if (r) saveSchedule(r); }}
+            >
+              {lang === "ar" ? "تأكيد التجاوز" : "Confirm override"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

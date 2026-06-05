@@ -653,7 +653,7 @@ export default function CalendarPage() {
             </div>
           </div>
 
-          {items.length === 0 && (
+          {filteredItems.length === 0 && (
             <div className="p-6 text-center text-sm text-muted-foreground border-t border-border">
               {t("noAppointments")} — {lang === "ar" ? "اضغط على أي خانة لإنشاء موعد" : "click any slot to create one"}
             </div>

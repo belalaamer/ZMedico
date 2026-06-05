@@ -93,7 +93,7 @@ export default function CalendarPage() {
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({
-    patient_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "",
+    patient_id: "", doctor_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "",
     status: "scheduled" as Appt["status"],
   });
 
@@ -224,14 +224,14 @@ export default function CalendarPage() {
 
   const openNew = () => {
     setEditId(null);
-    setForm({ patient_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "", status: "scheduled" });
+    setForm({ patient_id: "", doctor_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "", status: "scheduled" });
     setOpen(true);
   };
   const openNewAt = (slot: Date) => {
     setEditId(null);
     const tz = slot.getTimezoneOffset();
     const local = new Date(slot.getTime() - tz * 60000).toISOString().slice(0, 16);
-    setForm({ patient_id: "", scheduled_at: local, duration_minutes: 30, procedure: "", room: "", notes: "", status: "scheduled" });
+    setForm({ patient_id: "", doctor_id: "", scheduled_at: local, duration_minutes: 30, procedure: "", room: "", notes: "", status: "scheduled" });
     setOpen(true);
   };
   const openEdit = (a: Appt) => {
@@ -241,6 +241,7 @@ export default function CalendarPage() {
     const local = new Date(dt.getTime() - tz * 60000).toISOString().slice(0,16);
     setForm({
       patient_id: a.patient_id,
+      doctor_id: a.doctor_id ?? "",
       scheduled_at: local,
       duration_minutes: a.duration_minutes,
       procedure: a.procedure ?? "",
@@ -301,6 +302,7 @@ export default function CalendarPage() {
     if (!form.patient_id || !form.scheduled_at) { toast.error("Pick a patient and time"); return; }
     const payload: any = {
       patient_id: form.patient_id,
+      doctor_id: form.doctor_id || null,
       scheduled_at: new Date(form.scheduled_at).toISOString(),
       duration_minutes: Number(form.duration_minutes) || 30,
       procedure: form.procedure || null,
@@ -314,7 +316,7 @@ export default function CalendarPage() {
     if (error) { toast.error(error.message); return; }
     toast.success(lang === "ar" ? "تم حفظ الموعد" : "Appointment saved");
     setOpen(false); setEditId(null);
-    setForm({ patient_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "", status: "scheduled" });
+    setForm({ patient_id: "", doctor_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "", status: "scheduled" });
     load();
   };
 
@@ -437,6 +439,19 @@ export default function CalendarPage() {
                     <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                     <SelectContent>
                       {patients.map((p) => <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>{lang === "ar" ? "الطبيب" : "Doctor"}</Label>
+                  <Select
+                    value={form.doctor_id || "__none__"}
+                    onValueChange={(v) => setForm({ ...form, doctor_id: v === "__none__" ? "" : v })}
+                  >
+                    <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">— {lang === "ar" ? "بدون" : "None"} —</SelectItem>
+                      {doctors.map((d) => <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>

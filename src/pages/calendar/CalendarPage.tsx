@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useDataSync } from "@/lib/dataSync";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -74,10 +75,12 @@ const HOUR_HEIGHT = 56; // px
 export default function CalendarPage() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [date, setDate] = useState<Date>(startOfDay(new Date()));
   const [view, setView] = useState<"day" | "week">("day");
   const [monthCursor, setMonthCursor] = useState<Date>(startOfMonth(new Date()));
   const [items, setItems] = useState<Appt[]>([]);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
   const [monthDots, setMonthDots] = useState<Record<string, number>>({});
   const [patients, setPatients] = useState<{ id: string; label: string }[]>([]);
   const [procedures, setProcedures] = useState<{ id: string; name: string; duration: number | null }[]>([]);
@@ -115,6 +118,36 @@ export default function CalendarPage() {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [rangeStart.getTime(), rangeEnd.getTime(), currentBranchId]);
   useDataSync(["appointments", "calendar"], () => { load(); });
+
+  // Read ?date=YYYY-MM-DD and ?appt=<id> from URL
+  useEffect(() => {
+    const d = searchParams.get("date");
+    const appt = searchParams.get("appt");
+    if (d) {
+      const parsed = new Date(d + "T00:00:00");
+      if (!isNaN(parsed.getTime())) {
+        setDate(startOfDay(parsed));
+        setMonthCursor(startOfMonth(parsed));
+        setView("day");
+      }
+    }
+    if (appt) {
+      setHighlightId(appt);
+      const tm = setTimeout(() => {
+        const el = document.getElementById(`appt-${appt}`);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 300);
+      const clear = setTimeout(() => {
+        setHighlightId(null);
+        const next = new URLSearchParams(searchParams);
+        next.delete("appt");
+        next.delete("date");
+        setSearchParams(next, { replace: true });
+      }, 4000);
+      return () => { clearTimeout(tm); clearTimeout(clear); };
+    }
+    // eslint-disable-next-line
+  }, [searchParams]);
 
   // Month dots
   const loadMonthDots = async () => {
@@ -306,8 +339,9 @@ export default function CalendarPage() {
   const renderApptBlock = (a: Appt) => (
     <button
       key={a.id}
+      id={`appt-${a.id}`}
       onClick={() => openEdit(a)}
-      className={`absolute inset-x-1 rounded-md border text-start px-2 py-1 overflow-hidden hover:shadow-md transition-all ${statusBlock[a.status]}`}
+      className={`absolute inset-x-1 rounded-md border text-start px-2 py-1 overflow-hidden hover:shadow-md transition-all ${statusBlock[a.status]} ${highlightId === a.id ? "ring-2 ring-primary shadow-lg z-10" : ""}`}
       style={blockStyle(a)}
       title={`${fullName(a.patients!)} · ${timeStr(new Date(a.scheduled_at))}`}
     >

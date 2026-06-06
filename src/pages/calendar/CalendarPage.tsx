@@ -772,8 +772,8 @@ export default function CalendarPage() {
           )}
         </Card>
 
-        {/* Sidebar: mini month + agenda */}
-        <div className="space-y-4">
+        {/* Sidebar: mini month + agenda (desktop only) */}
+        <div className="space-y-4 hidden lg:block">
           <Card className="p-4 shadow-card">
             <div className="flex items-center justify-between mb-3">
               <button onClick={() => setMonthCursor(new Date(monthCursor.getFullYear(), monthCursor.getMonth() - 1, 1))}

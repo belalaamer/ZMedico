@@ -438,17 +438,55 @@ export default function CalendarPage() {
             <DialogTrigger asChild>
               <Button className="gradient-primary text-primary-foreground" onClick={openNew}><Plus className="me-2 size-4" />{t("newAppointment")}</Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-lg w-[calc(100vw-2rem)] sm:w-full p-5 sm:p-6 max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>{editId ? t("edit") : t("newAppointment")}</DialogTitle></DialogHeader>
               <form onSubmit={handleSave} className="space-y-4">
                 <div className="space-y-2">
                   <Label>{t("patientName")}</Label>
-                  <Select value={form.patient_id} onValueChange={(v) => setForm({ ...form, patient_id: v })}>
-                    <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                    <SelectContent>
-                      {patients.map((p) => <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={patientPickerOpen} onOpenChange={setPatientPickerOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={patientPickerOpen}
+                        className="w-full justify-between font-normal"
+                      >
+                        <span className={cn("truncate", !form.patient_id && "text-muted-foreground")}>
+                          {form.patient_id
+                            ? (patients.find((p) => p.id === form.patient_id)?.label ?? "—")
+                            : (lang === "ar" ? "ابحث عن مريض..." : "Search patient...")}
+                        </span>
+                        <ChevronsUpDown className="ms-2 size-4 opacity-50 shrink-0" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="p-0 w-[--radix-popover-trigger-width] max-w-[calc(100vw-2rem)]"
+                      align="start"
+                    >
+                      <Command>
+                        <CommandInput placeholder={lang === "ar" ? "ابحث بالاسم..." : "Search by name..."} />
+                        <CommandList className="max-h-[260px]">
+                          <CommandEmpty>{lang === "ar" ? "لا يوجد مرضى" : "No patients found"}</CommandEmpty>
+                          <CommandGroup>
+                            {patients.map((p) => (
+                              <CommandItem
+                                key={p.id}
+                                value={`${p.label} ${p.id}`}
+                                onSelect={() => {
+                                  setForm({ ...form, patient_id: p.id });
+                                  setPatientPickerOpen(false);
+                                }}
+                              >
+                                <Check className={cn("me-2 size-4", form.patient_id === p.id ? "opacity-100" : "opacity-0")} />
+                                {p.label}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="space-y-2">
                   <Label>{lang === "ar" ? "الطبيب" : "Doctor"}</Label>

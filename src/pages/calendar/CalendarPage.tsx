@@ -879,6 +879,9 @@ export default function CalendarPage() {
           </Card>
         </div>
       </div>
+      <Fab ariaLabel={t("newAppointment")} onClick={openNew}>
+        <Plus className="size-6" />
+      </Fab>
     </div>
   );
 }

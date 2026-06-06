@@ -547,16 +547,15 @@ export default function CalendarPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>{lang === "ar" ? "الطبيب" : "Doctor"}</Label>
-                  <Select
-                    value={form.doctor_id || "__none__"}
-                    onValueChange={(v) => setForm({ ...form, doctor_id: v === "__none__" ? "" : v })}
-                  >
-                    <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">— {lang === "ar" ? "بدون" : "None"} —</SelectItem>
-                      {doctors.map((d) => <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <Combobox
+                    value={form.doctor_id}
+                    onChange={(v) => setForm({ ...form, doctor_id: v })}
+                    options={doctors.map((d) => ({ value: d.id, label: d.full_name }))}
+                    placeholder={lang === "ar" ? "— بدون —" : "— None —"}
+                    searchPlaceholder={lang === "ar" ? "ابحث عن طبيب..." : "Search doctor..."}
+                    emptyText={lang === "ar" ? "لا يوجد أطباء" : "No doctors found"}
+                    allowClear
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">

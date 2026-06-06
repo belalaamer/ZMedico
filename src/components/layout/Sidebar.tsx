@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap, FolderOpen, Briefcase, UserCog, Clock, CalendarDays, DollarSign, Star, PieChart, Award } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap, FolderOpen, Briefcase, UserCog, Clock, CalendarDays, DollarSign, Star, PieChart, Award, Target } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useBranch } from "@/contexts/BranchContext";
@@ -75,6 +75,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
     { to: "/hr/leaves", icon: FileText, label: t("leaves") },
     { to: "/hr/payroll", icon: DollarSign, label: t("payroll") },
     { to: "/hr/performance", icon: Star, label: t("performance") },
+    { to: "/hr/target-bonuses", icon: Target, label: lang === "ar" ? "أهداف ومكافآت" : "Target Bonuses" },
   ];
 
   return (

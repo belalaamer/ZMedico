@@ -16,7 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Fab } from "@/components/ui/fab";
 
-type StaffOpt = { id: string; first_name_en: string; last_name_en: string | null; first_name_ar: string | null; last_name_ar: string | null };
+type StaffOpt = { id: string; full_name: string | null; email: string | null };
 type Target = {
   id: string;
   staff_id: string;
@@ -70,14 +70,18 @@ export default function TargetBonusesPage() {
     setLoading(true);
     let q = supabase.from("staff_targets").select("*").order("period_end", { ascending: false }).limit(200);
     if (currentBranchId) q = q.or(`branch_id.eq.${currentBranchId},branch_id.is.null`);
-    const [{ data: ts, error }, { data: sp }] = await Promise.all([
-      q,
-      supabase.from("staff_profiles").select("id,first_name_en,last_name_en,first_name_ar,last_name_ar").eq("status","active").order("first_name_en").limit(500),
-    ]);
+    const { data: ts, error } = await q;
+    const { data: sps } = await supabase.from("staff_profiles").select("id").eq("status","active").limit(500);
+    const ids = (sps ?? []).map((s: any) => s.id);
+    let sp: StaffOpt[] = [];
+    if (ids.length) {
+      const { data: profs } = await supabase.from("profiles").select("id,full_name,email").in("id", ids);
+      sp = (profs ?? []) as StaffOpt[];
+    }
     setLoading(false);
     if (error) { toast.error(error.message); return; }
     setItems((ts ?? []) as Target[]);
-    setStaff((sp ?? []) as StaffOpt[]);
+    setStaff(sp);
 
     // fetch actuals
     const rows = (ts ?? []) as Target[];
@@ -91,10 +95,8 @@ export default function TargetBonusesPage() {
 
   const staffOptions = useMemo(() => staff.map(s => ({
     value: s.id,
-    label: lang === "ar"
-      ? `${s.first_name_ar ?? s.first_name_en} ${s.last_name_ar ?? s.last_name_en ?? ""}`.trim()
-      : `${s.first_name_en} ${s.last_name_en ?? ""}`.trim(),
-  })), [staff, lang]);
+    label: s.full_name || s.email || s.id.slice(0, 8),
+  })), [staff]);
 
   const staffName = (id: string) => staffOptions.find(o => o.value === id)?.label ?? "—";
   const metricLabel = (m: string) => METRICS.find(x => x.value === m)?.[lang === "ar" ? "ar" : "en"] ?? m;

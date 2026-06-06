@@ -478,18 +478,32 @@ export default function CalendarPage() {
               onClick={() => setView("day")}
               className={`px-3 h-9 text-sm inline-flex items-center gap-1 ${view === "day" ? "bg-muted" : "hover:bg-muted/50"}`}
             >
-              <CalendarDays className="size-4" /> {t("today")}
+              <CalendarDays className="size-4" /> {lang === "ar" ? "يوم" : "Day"}
             </button>
+            {!isMobile && (
+              <button
+                onClick={() => setView("week")}
+                className={`px-3 h-9 text-sm inline-flex items-center gap-1 border-s border-border ${view === "week" ? "bg-muted" : "hover:bg-muted/50"}`}
+              >
+                <LayoutGrid className="size-4" /> {lang === "ar" ? "أسبوع" : "Week"}
+              </button>
+            )}
             <button
-              onClick={() => setView("week")}
-              className={`px-3 h-9 text-sm inline-flex items-center gap-1 border-s border-border ${view === "week" ? "bg-muted" : "hover:bg-muted/50"}`}
+              onClick={() => setView("month")}
+              className={`px-3 h-9 text-sm inline-flex items-center gap-1 border-s border-border ${view === "month" ? "bg-muted" : "hover:bg-muted/50"}`}
             >
-              <LayoutGrid className="size-4" /> {lang === "ar" ? "أسبوع" : "Week"}
+              <CalendarRange className="size-4" /> {lang === "ar" ? "شهر" : "Month"}
             </button>
           </div>
-          <Button variant="outline" size="icon" onClick={() => setDate(addDays(date, view === "week" ? -7 : -1))}><ChevronLeft className="size-4" /></Button>
+          <Button variant="outline" size="icon" onClick={() => {
+            if (view === "month") setDate(new Date(date.getFullYear(), date.getMonth() - 1, 1));
+            else setDate(addDays(date, view === "week" ? -7 : -1));
+          }}><ChevronLeft className="size-4" /></Button>
           <Button variant="outline" size="sm" onClick={() => setDate(startOfDay(new Date()))}>{t("today")}</Button>
-          <Button variant="outline" size="icon" onClick={() => setDate(addDays(date, view === "week" ? 7 : 1))}><ChevronRight className="size-4" /></Button>
+          <Button variant="outline" size="icon" onClick={() => {
+            if (view === "month") setDate(new Date(date.getFullYear(), date.getMonth() + 1, 1));
+            else setDate(addDays(date, view === "week" ? 7 : 1));
+          }}><ChevronRight className="size-4" /></Button>
           <Sheet open={miniOpen} onOpenChange={setMiniOpen}>
             <SheetTrigger asChild>
               <Button variant="outline" size="icon" className="lg:hidden" aria-label={lang === "ar" ? "التقويم" : "Calendar"}>

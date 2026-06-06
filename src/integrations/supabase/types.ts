@@ -3692,6 +3692,78 @@ export type Database = {
           },
         ]
       }
+      staff_targets: {
+        Row: {
+          bonus_type: string
+          bonus_value: number
+          branch_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          metric_type: string
+          name_ar: string | null
+          name_en: string | null
+          notes: string | null
+          period_end: string
+          period_start: string
+          staff_id: string
+          status: string
+          target_value: number
+          updated_at: string
+        }
+        Insert: {
+          bonus_type?: string
+          bonus_value?: number
+          branch_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          metric_type: string
+          name_ar?: string | null
+          name_en?: string | null
+          notes?: string | null
+          period_end: string
+          period_start: string
+          staff_id: string
+          status?: string
+          target_value: number
+          updated_at?: string
+        }
+        Update: {
+          bonus_type?: string
+          bonus_value?: number
+          branch_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          metric_type?: string
+          name_ar?: string | null
+          name_en?: string | null
+          notes?: string | null
+          period_end?: string
+          period_start?: string
+          staff_id?: string
+          status?: string
+          target_value?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_targets_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_targets_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_alerts: {
         Row: {
           alert_type: Database["public"]["Enums"]["alert_type"]
@@ -4790,6 +4862,7 @@ export type Database = {
       }
       renumber_active_invoices: { Args: never; Returns: undefined }
       renumber_active_patient_codes: { Args: never; Returns: undefined }
+      staff_target_actual: { Args: { _target_id: string }; Returns: number }
     }
     Enums: {
       addon_status: "active" | "cancelled"

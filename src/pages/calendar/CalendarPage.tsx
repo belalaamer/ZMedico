@@ -659,7 +659,6 @@ export default function CalendarPage() {
         )}
       </Card>
 
-      {(() => null)()}
       <div className="grid lg:grid-cols-[1fr,300px] gap-4">
         {/* Time grid */}
         <Card className="shadow-card overflow-hidden">

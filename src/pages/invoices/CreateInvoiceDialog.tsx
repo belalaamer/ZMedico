@@ -47,6 +47,9 @@ export function CreateInvoiceDialog({
   const [saving, setSaving] = useState(false);
   const [patientProcedures, setPatientProcedures] = useState<any[]>([]);
   const [selectedProcIds, setSelectedProcIds] = useState<Record<string, boolean>>({});
+  const [couponCode, setCouponCode] = useState("");
+  const [couponInfo, setCouponInfo] = useState<{ id: string; code: string; amount: number } | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
 
   useEffect(() => { setPatientId(presetPatientId ?? ""); }, [presetPatientId, open]);
 
@@ -184,9 +187,10 @@ export function CreateInvoiceDialog({
 
   const subtotal = useMemo(() => items.reduce((s, it) => s + (Number(it.quantity)||0) * (Number(it.unit_price)||0), 0), [items]);
   const discount = useMemo(() => +(subtotal * (Number(discountPct)||0) / 100).toFixed(2), [subtotal, discountPct]);
-  const taxBase = subtotal - discount;
+  const couponDiscount = couponInfo ? Math.min(couponInfo.amount, Math.max(0, subtotal - discount)) : 0;
+  const taxBase = subtotal - discount - couponDiscount;
   const tax = useMemo(() => +(taxBase * (Number(taxPct)||0) / 100).toFixed(2), [taxBase, taxPct]);
-  const total = +(subtotal - discount + tax).toFixed(2);
+  const total = +(subtotal - discount - couponDiscount + tax).toFixed(2);
   const claimAmount = +(total * (Number(coverageRatio)||0) / 100).toFixed(2);
   const patientShare = +(total - claimAmount).toFixed(2);
 
@@ -217,6 +221,23 @@ export function CreateInvoiceDialog({
     });
   };
 
+  const applyCoupon = async () => {
+    const code = couponCode.trim();
+    if (!code) return;
+    setCouponLoading(true);
+    const { data, error } = await (supabase as any).rpc("apply_coupon_code", { _code: code, _subtotal: subtotal - discount });
+    setCouponLoading(false);
+    if (error) { toast.error(error.message); return; }
+    if (!data?.ok) {
+      const msg = data?.error || "invalid";
+      toast.error(lang === "ar" ? `كوبون غير صالح: ${msg}` : `Invalid coupon: ${msg}`);
+      setCouponInfo(null);
+      return;
+    }
+    setCouponInfo({ id: data.coupon_id, code: data.code, amount: Number(data.discount_amount) || 0 });
+    toast.success(lang === "ar" ? "تم تطبيق الكوبون" : "Coupon applied");
+  };
+
   const save = async (status: "draft" | "pending") => {
     if (!patientId) { toast.error(t("selectPatient")); return; }
     if (items.length === 0 || items.every((it) => !it.description_en)) { toast.error("Add at least one item"); return; }
@@ -225,7 +246,7 @@ export function CreateInvoiceDialog({
       patient_id: patientId,
       branch_id: currentBranchId,
       invoice_date: date,
-      subtotal, discount, tax,
+      subtotal, discount: discount + couponDiscount, tax,
       status, notes: notes || null,
       created_by: user?.id ?? null,
       insurance_company_id: insuranceCompanyId || null,
@@ -242,6 +263,17 @@ export function CreateInvoiceDialog({
       .select("id, invoice_number")
       .single();
     if (error || !inv) { setSaving(false); toast.error(error?.message ?? "Failed"); return; }
+
+    if (couponInfo) {
+      await (supabase as any).from("coupon_redemptions").insert({
+        coupon_id: couponInfo.id,
+        invoice_id: inv.id,
+        patient_id: patientId,
+        discount_amount: couponDiscount,
+        redeemed_by: user?.id ?? null,
+      });
+      await (supabase as any).from("coupons").update({ usage_count: undefined }).eq("id", couponInfo.id);
+    }
 
     const rows = items
       .filter((it) => it.description_en.trim())
@@ -290,6 +322,7 @@ export function CreateInvoiceDialog({
     setItems([{ item_type: "service", description_en: "", description_ar: "", quantity: 1, unit_price: 0 }]);
     setDiscountPct(0); setTaxPct(0); setNotes(""); setPatientId("");
     setInsuranceCompanyId(""); setCoverageRatio(0);
+    setCouponCode(""); setCouponInfo(null);
     onSaved(inv.id);
   };
 

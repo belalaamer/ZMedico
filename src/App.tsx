@@ -54,6 +54,7 @@ const Leaves = lazy(() => import("@/pages/hr/Leaves"));
 const Payroll = lazy(() => import("@/pages/hr/Payroll"));
 const Performance = lazy(() => import("@/pages/hr/Performance"));
 const TargetBonuses = lazy(() => import("@/pages/hr/TargetBonuses"));
+const Coupons = lazy(() => import("@/pages/coupons/Coupons"));
 const ReportsDashboard = lazy(() => import("@/pages/reports/ReportsDashboard"));
 const FinancialReports = lazy(() => import("@/pages/reports/FinancialReports"));
 const OperationalReports = lazy(() => import("@/pages/reports/OperationalReports"));
@@ -130,6 +131,7 @@ function AppContent() {
               <Route path="/payments" element={<PermissionRoute><Payments /></PermissionRoute>} />
               <Route path="/treasury" element={<PermissionRoute><Treasury /></PermissionRoute>} />
               <Route path="/expenses" element={<PermissionRoute><Expenses /></PermissionRoute>} />
+              <Route path="/coupons" element={<PermissionRoute><Coupons /></PermissionRoute>} />
               <Route path="/reminders" element={<PermissionRoute><Reminders /></PermissionRoute>} />
               <Route path="/reminders/scheduled" element={<PermissionRoute><Reminders /></PermissionRoute>}>
                 <Route index element={<ScheduledReminders />} />

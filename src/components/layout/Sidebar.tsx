@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap, FolderOpen, Briefcase, UserCog, Clock, CalendarDays, DollarSign, Star, PieChart, Award, Target } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap, FolderOpen, Briefcase, UserCog, Clock, CalendarDays, DollarSign, Star, PieChart, Award, Target, Ticket } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useBranch } from "@/contexts/BranchContext";
@@ -39,6 +39,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
     { to: "/payments", icon: CreditCard, label: t("payments"), show: can("invoices") },
     { to: "/treasury", icon: Banknote, label: t("treasury"), show: can("treasury") },
     { to: "/expenses", icon: Receipt, label: t("expenses"), show: can("treasury") },
+    { to: "/coupons", icon: Ticket, label: lang === "ar" ? "الكوبونات" : "Coupons", show: can("invoices") },
     { to: "/reports", icon: PieChart, label: t("reports"), show: can("reports") },
     { to: "/reports/doctor-performance", icon: Award, label: t("doctorPerformance"), show: can("reports") },
     { to: "/reminders", icon: Bell, label: t("reminders"), show: can("appointments") },

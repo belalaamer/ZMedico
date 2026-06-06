@@ -1,5 +1,5 @@
 export const ROLES = ["admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr", "staff"] as const;
-export const MODULES = ["patients", "appointments", "medical_records", "treatment_plans", "invoices", "treasury", "inventory", "reports", "hr", "settings"] as const;
+export const MODULES = ["patients", "appointments", "medical_records", "treatment_plans", "invoices", "treasury", "inventory", "reports", "hr", "settings", "coupons"] as const;
 export const ACTIONS = ["view", "create", "edit", "delete", "export"] as const;
 
 export type RoleName = typeof ROLES[number] | string;
@@ -81,6 +81,7 @@ export function moduleForPath(path: string): string | null {
   if (path.startsWith("/patients")) return "patients";
   if (path.startsWith("/invoices") || path.startsWith("/payments")) return "invoices";
   if (path.startsWith("/treasury") || path.startsWith("/expenses")) return "treasury";
+  if (path.startsWith("/coupons")) return "invoices";
   if (path.startsWith("/inventory")) return "inventory";
   if (path.startsWith("/medical")) return "medical_records";
   if (path.startsWith("/hr")) return "hr";

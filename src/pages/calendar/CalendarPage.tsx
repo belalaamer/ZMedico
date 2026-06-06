@@ -720,7 +720,15 @@ export default function CalendarPage() {
           )}
 
           <div className="overflow-auto" style={{ maxHeight: "70vh" }}>
-            <div className="grid relative" style={{ gridTemplateColumns: view === "week" ? "56px repeat(7, minmax(0, 1fr))" : "56px 1fr" }}>
+            <div
+              className="grid relative"
+              style={{
+                gridTemplateColumns: view === "week"
+                  ? `56px repeat(7, minmax(${isMobile ? "72px" : "0"}, 1fr))`
+                  : "56px 1fr",
+                minWidth: view === "week" && isMobile ? "640px" : undefined,
+              }}
+            >
               {/* Hour labels column */}
               <div className="border-e border-border bg-muted/20">
                 {hours.map((h) => (

@@ -36,7 +36,6 @@ export function CreateInvoiceDialog({
   const [procedures, setProcedures] = useState<any[]>([]);
   const [stocks, setStocks] = useState<Record<string, number>>({});
   const [patientId, setPatientId] = useState<string>(presetPatientId ?? "");
-  const [patientSelectOpen, setPatientSelectOpen] = useState(false);
   const [date, setDate] = useState<string>(new Date().toISOString().slice(0,10));
   const [discountPct, setDiscountPct] = useState<number>(0);
   const [taxPct, setTaxPct] = useState<number>(0);

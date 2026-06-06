@@ -512,6 +512,26 @@ export function CreateInvoiceDialog({
               <NumberInput className="w-24 text-end" value={taxPct} onChange={setTaxPct} />
               <span className="font-medium tabular-nums w-28 text-end">+ {formatMoney(tax, lang)}</span>
             </div>
+            <div className="flex items-center justify-between gap-2 text-sm">
+              <span className="text-muted-foreground shrink-0">{lang === "ar" ? "كوبون" : "Coupon"}</span>
+              <Input
+                className="h-9 flex-1"
+                value={couponCode}
+                onChange={(e) => { setCouponCode(e.target.value); if (couponInfo) setCouponInfo(null); }}
+                placeholder={lang === "ar" ? "أدخل الكود" : "Enter code"}
+              />
+              {couponInfo ? (
+                <Button type="button" size="sm" variant="ghost" onClick={() => { setCouponInfo(null); setCouponCode(""); }}>{lang === "ar" ? "إزالة" : "Remove"}</Button>
+              ) : (
+                <Button type="button" size="sm" variant="outline" disabled={couponLoading || !couponCode.trim()} onClick={applyCoupon}>{lang === "ar" ? "تطبيق" : "Apply"}</Button>
+              )}
+            </div>
+            {couponInfo && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">{lang === "ar" ? `خصم الكوبون (${couponInfo.code})` : `Coupon discount (${couponInfo.code})`}</span>
+                <span className="font-medium tabular-nums w-28 text-end text-success">- {formatMoney(couponDiscount, lang)}</span>
+              </div>
+            )}
             <div className="flex items-center justify-between text-base font-bold border-t border-border pt-2">
               <span>{t("total")}</span>
               <span className="tabular-nums text-primary">{formatMoney(total, lang)}</span>

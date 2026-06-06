@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Combobox } from "@/components/ui/combobox";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
@@ -104,6 +105,11 @@ export default function CalendarPage() {
     patient_id: "", doctor_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "",
     status: "scheduled" as Appt["status"],
   });
+
+  // Force day view on mobile (week view is too cramped on small screens)
+  useEffect(() => {
+    if (isMobile && view === "week") setView("day");
+  }, [isMobile, view]);
 
   const dayLabel = useMemo(
     () => date.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" }),
@@ -541,16 +547,15 @@ export default function CalendarPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>{lang === "ar" ? "الطبيب" : "Doctor"}</Label>
-                  <Select
-                    value={form.doctor_id || "__none__"}
-                    onValueChange={(v) => setForm({ ...form, doctor_id: v === "__none__" ? "" : v })}
-                  >
-                    <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">— {lang === "ar" ? "بدون" : "None"} —</SelectItem>
-                      {doctors.map((d) => <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <Combobox
+                    value={form.doctor_id}
+                    onChange={(v) => setForm({ ...form, doctor_id: v })}
+                    options={doctors.map((d) => ({ value: d.id, label: d.full_name }))}
+                    placeholder={lang === "ar" ? "— بدون —" : "— None —"}
+                    searchPlaceholder={lang === "ar" ? "ابحث عن طبيب..." : "Search doctor..."}
+                    emptyText={lang === "ar" ? "لا يوجد أطباء" : "No doctors found"}
+                    allowClear
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">

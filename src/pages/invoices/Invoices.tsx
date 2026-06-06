@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney, formatDate } from "@/lib/format";
 import { CreateInvoiceDialog } from "./CreateInvoiceDialog";
+import { Fab } from "@/components/ui/fab";
 import { RowActions } from "@/components/RowActions";
 import { useNavigate } from "react-router-dom";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -117,7 +118,7 @@ export default function Invoices() {
             </SelectContent>
           </Select>
           <Can module="invoices" action="create">
-            <Button className="gradient-primary text-primary-foreground" onClick={() => setOpen(true)}>
+            <Button className="gradient-primary text-primary-foreground hidden sm:inline-flex" onClick={() => setOpen(true)}>
               <Plus className="me-2 size-4" />{t("newInvoice")}
             </Button>
           </Can>
@@ -178,6 +179,11 @@ export default function Invoices() {
       </Card>
 
       <CreateInvoiceDialog open={open} onOpenChange={setOpen} onSaved={() => { setOpen(false); load(); }} />
+      <Can module="invoices" action="create">
+        <Fab ariaLabel={t("newInvoice")} onClick={() => setOpen(true)}>
+          <Plus className="size-6" />
+        </Fab>
+      </Can>
     </div>
   );
 }

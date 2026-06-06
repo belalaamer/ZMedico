@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ChevronLeft, ChevronRight, Plus, Send, CalendarDays, LayoutGrid, Clock, Filter, X, CalendarRange, Check, ChevronsUpDown } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Fab } from "@/components/ui/fab";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -493,7 +494,7 @@ export default function CalendarPage() {
           </Sheet>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button className="gradient-primary text-primary-foreground" onClick={openNew}><Plus className="me-2 size-4" />{t("newAppointment")}</Button>
+              <Button className="gradient-primary text-primary-foreground hidden md:inline-flex" onClick={openNew}><Plus className="me-2 size-4" />{t("newAppointment")}</Button>
             </DialogTrigger>
             <DialogContent className="max-w-lg w-[calc(100vw-2rem)] sm:w-full p-5 sm:p-6 max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>{editId ? t("edit") : t("newAppointment")}</DialogTitle></DialogHeader>
@@ -878,6 +879,9 @@ export default function CalendarPage() {
           </Card>
         </div>
       </div>
+      <Fab ariaLabel={t("newAppointment")} onClick={openNew}>
+        <Plus className="size-6" />
+      </Fab>
     </div>
   );
 }

@@ -32,6 +32,7 @@ export default function InvoiceDetail() {
   const [items, setItems] = useState<any[]>([]);
   const [pays, setPays] = useState<any[]>([]);
   const [payOpen, setPayOpen] = useState(false);
+  const [coupon, setCoupon] = useState<{ code: string; amount: number } | null>(null);
 
   const load = async () => {
     if (!id) return;
@@ -41,6 +42,13 @@ export default function InvoiceDetail() {
       supabase.from("payments").select("*").eq("invoice_id", id).order("created_at", { ascending: false }),
     ]);
     setInv(i); setItems(it ?? []); setPays(ps ?? []);
+    const { data: cr } = await (supabase as any)
+      .from("coupon_redemptions")
+      .select("discount_amount, coupons(code)")
+      .eq("invoice_id", id)
+      .maybeSingle();
+    if (cr) setCoupon({ code: cr.coupons?.code ?? "", amount: Number(cr.discount_amount) || 0 });
+    else setCoupon(null);
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
 
@@ -238,6 +246,9 @@ export default function InvoiceDetail() {
           <div className="space-y-1.5 text-sm">
             <div className="flex justify-between"><span className="text-muted-foreground">{t("subtotal")}</span><span className="tabular-nums">{formatMoney(inv.subtotal, lang)}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">{t("discount")}</span><span className="tabular-nums">- {formatMoney(inv.discount, lang)}</span></div>
+            {coupon && (
+              <div className="flex justify-between"><span className="text-muted-foreground">{lang === "ar" ? `كوبون (${coupon.code})` : `Coupon (${coupon.code})`}</span><span className="tabular-nums text-success">- {formatMoney(coupon.amount, lang)}</span></div>
+            )}
             <div className="flex justify-between"><span className="text-muted-foreground">{t("tax")}</span><span className="tabular-nums">+ {formatMoney(inv.tax, lang)}</span></div>
             <div className="flex justify-between border-t border-border pt-2 text-base font-bold"><span>{t("total")}</span><span className="tabular-nums text-primary">{formatMoney(inv.total, lang)}</span></div>
             <div className="flex justify-between text-success"><span>{t("paid")}</span><span className="tabular-nums">{formatMoney(inv.paid_amount, lang)}</span></div>

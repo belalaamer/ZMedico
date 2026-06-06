@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Combobox } from "@/components/ui/combobox";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
@@ -104,6 +105,11 @@ export default function CalendarPage() {
     patient_id: "", doctor_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "",
     status: "scheduled" as Appt["status"],
   });
+
+  // Force day view on mobile (week view is too cramped on small screens)
+  useEffect(() => {
+    if (isMobile && view === "week") setView("day");
+  }, [isMobile, view]);
 
   const dayLabel = useMemo(
     () => date.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" }),

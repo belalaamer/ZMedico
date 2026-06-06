@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -27,7 +28,6 @@ export function RecordPaymentDialog({
 
   const [patients, setPatients] = useState<{ id: string; label: string }[]>([]);
   const [pid, setPid] = useState<string>(patientId ?? "");
-  const [pidSelectOpen, setPidSelectOpen] = useState(false);
   const [iid, setIid] = useState<string>(invoiceId ?? "");
   const [invoices, setInvoices] = useState<{ id: string; label: string; remaining: number }[]>([]);
   const [amount, setAmount] = useState<number>(defaultAmount ?? 0);
@@ -126,35 +126,25 @@ export function RecordPaymentDialog({
           {!patientId && (
             <div className="space-y-2">
               <Label>{t("patientName")}</Label>
-              <Select
+              <Combobox
                 value={pid}
-                onValueChange={setPid}
-                open={pidSelectOpen}
-                onOpenChange={(o) => {
-                  setPidSelectOpen(o);
-                  if (o) loadPatients();
-                }}
-              >
-                <SelectTrigger><SelectValue placeholder={t("selectPatient")} /></SelectTrigger>
-                <SelectContent>
-                  {patients.map((p) => <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
+                onChange={(v) => { setPid(v); loadPatients(); }}
+                options={patients.map((p) => ({ value: p.id, label: p.label }))}
+                placeholder={t("selectPatient")}
+                searchPlaceholder="Search patient..."
+              />
             </div>
           )}
           {!invoiceId && pid && (
             <div className="space-y-2">
               <Label>{t("invoice")}</Label>
-              <Select value={iid} onValueChange={onInvoiceChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder={invoices.length ? "—" : t("noInvoices") ?? "—"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {invoices.map((i) => (
-                    <SelectItem key={i.id} value={i.id}>{i.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                value={iid}
+                onChange={onInvoiceChange}
+                options={invoices.map((i) => ({ value: i.id, label: i.label }))}
+                placeholder={invoices.length ? "—" : (t("noInvoices") ?? "—")}
+                searchPlaceholder="Search invoice..."
+              />
             </div>
           )}
           <div className="grid grid-cols-2 gap-3">

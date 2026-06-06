@@ -68,7 +68,7 @@ export default function Pricing() {
     n >= 999 ? (isAr ? "غير محدود" : "Unlimited") : n.toLocaleString();
 
   return (
-    <div dir={dir} className="min-h-screen bg-background">
+    <div dir={dir} className="min-h-dvh bg-background">
       {/* Header */}
       <header className="border-b">
         <div className="container mx-auto flex items-center justify-between py-4 px-4">

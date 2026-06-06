@@ -60,7 +60,7 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen grid lg:grid-cols-2 bg-background">
+    <div className="min-h-dvh grid lg:grid-cols-2 bg-background">
       <div className="hidden lg:flex flex-col justify-between p-10 gradient-primary text-primary-foreground relative overflow-hidden">
         <div className="flex items-center gap-3">
           <div className="size-11 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center">

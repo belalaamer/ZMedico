@@ -221,7 +221,7 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="hidden md:flex w-64 shrink-0 flex-col border-e border-sidebar-border h-screen sticky top-0">
+    <aside className="hidden md:flex w-64 shrink-0 flex-col border-e border-sidebar-border h-dvh sticky top-0">
       <SidebarContent />
     </aside>
   );

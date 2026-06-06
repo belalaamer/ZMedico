@@ -704,7 +704,13 @@ export default function CalendarPage() {
         {/* Time grid */}
         <Card className="shadow-card overflow-hidden">
           {view === "week" && (
-            <div className="grid border-b border-border" style={{ gridTemplateColumns: "56px repeat(7, minmax(0, 1fr))" }}>
+            <div
+              className="grid border-b border-border overflow-x-auto"
+              style={{
+                gridTemplateColumns: `56px repeat(7, minmax(${isMobile ? "72px" : "0"}, 1fr))`,
+                minWidth: isMobile ? "640px" : undefined,
+              }}
+            >
               <div />
               {weekDays.map((d) => {
                 const today = sameDay(d, new Date());

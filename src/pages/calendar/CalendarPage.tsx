@@ -408,6 +408,47 @@ export default function CalendarPage() {
   const nowTop = ((now.getHours() - DAY_START_HOUR) * 60 + now.getMinutes()) / 60 * HOUR_HEIGHT;
   const showNowLine = now.getHours() >= DAY_START_HOUR && now.getHours() < DAY_END_HOUR;
 
+  const sidebarContent = (
+    <div className="space-y-4">
+      <Card className="p-4 shadow-card">
+        <div className="flex items-center justify-between mb-3">
+          <button onClick={() => setMonthCursor(new Date(monthCursor.getFullYear(), monthCursor.getMonth() - 1, 1))}
+            className="size-7 inline-flex items-center justify-center rounded hover:bg-muted">
+            <ChevronLeft className="size-4" />
+          </button>
+          <div className="text-sm font-semibold">
+            {monthCursor.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", { month: "long", year: "numeric" })}
+          </div>
+          <button onClick={() => setMonthCursor(new Date(monthCursor.getFullYear(), monthCursor.getMonth() + 1, 1))}
+            className="size-7 inline-flex items-center justify-center rounded hover:bg-muted">
+            <ChevronRight className="size-4" />
+          </button>
+        </div>
+        <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-muted-foreground mb-1">
+          {["S","M","T","W","T","F","S"].map((d, i) => <div key={i}>{d}</div>)}
+        </div>
+        <div className="grid grid-cols-7 gap-1 text-center text-xs">
+          {monthGrid.map((d, i) => {
+            if (!d) return <div key={i} />;
+            const active = sameDay(d, date);
+            const today = sameDay(d, new Date());
+            const count = monthDots[d.toDateString()] ?? 0;
+            return (
+              <button key={i} onClick={() => { setDate(d); setMiniOpen(false); }}
+                className={`aspect-square rounded-lg relative flex flex-col items-center justify-center
+                  ${active ? "gradient-primary text-primary-foreground" : today ? "ring-1 ring-primary text-primary" : "hover:bg-muted"}`}>
+                <span className="font-medium">{d.getDate()}</span>
+                {count > 0 && (
+                  <span className={`absolute bottom-1 size-1 rounded-full ${active ? "bg-primary-foreground" : "bg-primary"}`} />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       {/* Header */}

@@ -482,7 +482,7 @@ export default function CalendarPage() {
               </Button>
             </SheetTrigger>
             <SheetContent side={lang === "ar" ? "left" : "right"} className="w-[88vw] sm:w-[360px] p-4 overflow-y-auto">
-              <div id="calendar-mini-sheet-mount" />
+              {sidebarContent}
             </SheetContent>
           </Sheet>
           <Dialog open={open} onOpenChange={setOpen}>

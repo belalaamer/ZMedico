@@ -6,15 +6,20 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft, ChevronRight, Plus, Send, CalendarDays, LayoutGrid, Clock, Filter, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Send, CalendarDays, LayoutGrid, Clock, Filter, X, CalendarRange, Check, ChevronsUpDown } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { RowActions } from "@/components/RowActions";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 function statusLabel(s: Appt["status"], t: (k: any) => string) {
   const map: Record<Appt["status"], string> = {
@@ -76,9 +81,12 @@ const HOUR_HEIGHT = 56; // px
 export default function CalendarPage() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
+  const isMobile = useIsMobile();
   const [searchParams, setSearchParams] = useSearchParams();
   const [date, setDate] = useState<Date>(startOfDay(new Date()));
   const [view, setView] = useState<"day" | "week">("day");
+  const [patientPickerOpen, setPatientPickerOpen] = useState(false);
+  const [miniOpen, setMiniOpen] = useState(false);
   const [monthCursor, setMonthCursor] = useState<Date>(startOfMonth(new Date()));
   const [items, setItems] = useState<Appt[]>([]);
   const [highlightId, setHighlightId] = useState<string | null>(null);
@@ -400,6 +408,47 @@ export default function CalendarPage() {
   const nowTop = ((now.getHours() - DAY_START_HOUR) * 60 + now.getMinutes()) / 60 * HOUR_HEIGHT;
   const showNowLine = now.getHours() >= DAY_START_HOUR && now.getHours() < DAY_END_HOUR;
 
+  const sidebarContent = (
+    <div className="space-y-4">
+      <Card className="p-4 shadow-card">
+        <div className="flex items-center justify-between mb-3">
+          <button onClick={() => setMonthCursor(new Date(monthCursor.getFullYear(), monthCursor.getMonth() - 1, 1))}
+            className="size-7 inline-flex items-center justify-center rounded hover:bg-muted">
+            <ChevronLeft className="size-4" />
+          </button>
+          <div className="text-sm font-semibold">
+            {monthCursor.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", { month: "long", year: "numeric" })}
+          </div>
+          <button onClick={() => setMonthCursor(new Date(monthCursor.getFullYear(), monthCursor.getMonth() + 1, 1))}
+            className="size-7 inline-flex items-center justify-center rounded hover:bg-muted">
+            <ChevronRight className="size-4" />
+          </button>
+        </div>
+        <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-muted-foreground mb-1">
+          {["S","M","T","W","T","F","S"].map((d, i) => <div key={i}>{d}</div>)}
+        </div>
+        <div className="grid grid-cols-7 gap-1 text-center text-xs">
+          {monthGrid.map((d, i) => {
+            if (!d) return <div key={i} />;
+            const active = sameDay(d, date);
+            const today = sameDay(d, new Date());
+            const count = monthDots[d.toDateString()] ?? 0;
+            return (
+              <button key={i} onClick={() => { setDate(d); setMiniOpen(false); }}
+                className={`aspect-square rounded-lg relative flex flex-col items-center justify-center
+                  ${active ? "gradient-primary text-primary-foreground" : today ? "ring-1 ring-primary text-primary" : "hover:bg-muted"}`}>
+                <span className="font-medium">{d.getDate()}</span>
+                {count > 0 && (
+                  <span className={`absolute bottom-1 size-1 rounded-full ${active ? "bg-primary-foreground" : "bg-primary"}`} />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -426,21 +475,69 @@ export default function CalendarPage() {
           <Button variant="outline" size="icon" onClick={() => setDate(addDays(date, view === "week" ? -7 : -1))}><ChevronLeft className="size-4" /></Button>
           <Button variant="outline" size="sm" onClick={() => setDate(startOfDay(new Date()))}>{t("today")}</Button>
           <Button variant="outline" size="icon" onClick={() => setDate(addDays(date, view === "week" ? 7 : 1))}><ChevronRight className="size-4" /></Button>
+          <Sheet open={miniOpen} onOpenChange={setMiniOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="icon" className="lg:hidden" aria-label={lang === "ar" ? "التقويم" : "Calendar"}>
+                <CalendarRange className="size-4" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side={lang === "ar" ? "left" : "right"} className="w-[88vw] sm:w-[360px] p-4 overflow-y-auto">
+              {sidebarContent}
+            </SheetContent>
+          </Sheet>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button className="gradient-primary text-primary-foreground" onClick={openNew}><Plus className="me-2 size-4" />{t("newAppointment")}</Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-lg w-[calc(100vw-2rem)] sm:w-full p-5 sm:p-6 max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>{editId ? t("edit") : t("newAppointment")}</DialogTitle></DialogHeader>
               <form onSubmit={handleSave} className="space-y-4">
                 <div className="space-y-2">
                   <Label>{t("patientName")}</Label>
-                  <Select value={form.patient_id} onValueChange={(v) => setForm({ ...form, patient_id: v })}>
-                    <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                    <SelectContent>
-                      {patients.map((p) => <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={patientPickerOpen} onOpenChange={setPatientPickerOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={patientPickerOpen}
+                        className="w-full justify-between font-normal"
+                      >
+                        <span className={cn("truncate", !form.patient_id && "text-muted-foreground")}>
+                          {form.patient_id
+                            ? (patients.find((p) => p.id === form.patient_id)?.label ?? "—")
+                            : (lang === "ar" ? "ابحث عن مريض..." : "Search patient...")}
+                        </span>
+                        <ChevronsUpDown className="ms-2 size-4 opacity-50 shrink-0" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="p-0 w-[--radix-popover-trigger-width] max-w-[calc(100vw-2rem)]"
+                      align="start"
+                    >
+                      <Command>
+                        <CommandInput placeholder={lang === "ar" ? "ابحث بالاسم..." : "Search by name..."} />
+                        <CommandList className="max-h-[260px]">
+                          <CommandEmpty>{lang === "ar" ? "لا يوجد مرضى" : "No patients found"}</CommandEmpty>
+                          <CommandGroup>
+                            {patients.map((p) => (
+                              <CommandItem
+                                key={p.id}
+                                value={`${p.label} ${p.id}`}
+                                onSelect={() => {
+                                  setForm({ ...form, patient_id: p.id });
+                                  setPatientPickerOpen(false);
+                                }}
+                              >
+                                <Check className={cn("me-2 size-4", form.patient_id === p.id ? "opacity-100" : "opacity-0")} />
+                                {p.label}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="space-y-2">
                   <Label>{lang === "ar" ? "الطبيب" : "Doctor"}</Label>
@@ -607,7 +704,13 @@ export default function CalendarPage() {
         {/* Time grid */}
         <Card className="shadow-card overflow-hidden">
           {view === "week" && (
-            <div className="grid border-b border-border" style={{ gridTemplateColumns: "56px repeat(7, minmax(0, 1fr))" }}>
+            <div
+              className="grid border-b border-border overflow-x-auto"
+              style={{
+                gridTemplateColumns: `56px repeat(7, minmax(${isMobile ? "72px" : "0"}, 1fr))`,
+                minWidth: isMobile ? "640px" : undefined,
+              }}
+            >
               <div />
               {weekDays.map((d) => {
                 const today = sameDay(d, new Date());
@@ -623,7 +726,15 @@ export default function CalendarPage() {
           )}
 
           <div className="overflow-auto" style={{ maxHeight: "70vh" }}>
-            <div className="grid relative" style={{ gridTemplateColumns: view === "week" ? "56px repeat(7, minmax(0, 1fr))" : "56px 1fr" }}>
+            <div
+              className="grid relative"
+              style={{
+                gridTemplateColumns: view === "week"
+                  ? `56px repeat(7, minmax(${isMobile ? "72px" : "0"}, 1fr))`
+                  : "56px 1fr",
+                minWidth: view === "week" && isMobile ? "640px" : undefined,
+              }}
+            >
               {/* Hour labels column */}
               <div className="border-e border-border bg-muted/20">
                 {hours.map((h) => (
@@ -675,8 +786,8 @@ export default function CalendarPage() {
           )}
         </Card>
 
-        {/* Sidebar: mini month + agenda */}
-        <div className="space-y-4">
+        {/* Sidebar: mini month + agenda (desktop only) */}
+        <div className="space-y-4 hidden lg:block">
           <Card className="p-4 shadow-card">
             <div className="flex items-center justify-between mb-3">
               <button onClick={() => setMonthCursor(new Date(monthCursor.getFullYear(), monthCursor.getMonth() - 1, 1))}

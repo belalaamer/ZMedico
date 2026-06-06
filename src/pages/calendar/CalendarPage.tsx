@@ -76,8 +76,8 @@ const statusBlock: Record<Appt["status"], string> = {
   departed:    "bg-muted border-border text-muted-foreground",
 };
 
-const DAY_START_HOUR = 8;
-const DAY_END_HOUR = 21; // exclusive
+const DAY_START_HOUR = 0;
+const DAY_END_HOUR = 24; // exclusive — show full 24h
 const HOUR_HEIGHT = 56; // px
 
 export default function CalendarPage() {
@@ -86,7 +86,7 @@ export default function CalendarPage() {
   const isMobile = useIsMobile();
   const [searchParams, setSearchParams] = useSearchParams();
   const [date, setDate] = useState<Date>(startOfDay(new Date()));
-  const [view, setView] = useState<"day" | "week">("day");
+  const [view, setView] = useState<"day" | "week" | "month">("day");
   const [patientPickerOpen, setPatientPickerOpen] = useState(false);
   const [miniOpen, setMiniOpen] = useState(false);
   const [monthCursor, setMonthCursor] = useState<Date>(startOfMonth(new Date()));
@@ -107,7 +107,7 @@ export default function CalendarPage() {
     status: "scheduled" as Appt["status"],
   });
 
-  // Force day view on mobile (week view is too cramped on small screens)
+  // Force day view on mobile when user lands on week (too cramped). Month is fine.
   useEffect(() => {
     if (isMobile && view === "week") setView("day");
   }, [isMobile, view]);
@@ -117,8 +117,16 @@ export default function CalendarPage() {
     [date, lang]
   );
 
-  const rangeStart = useMemo(() => view === "day" ? startOfDay(date) : startOfWeek(date), [date, view]);
-  const rangeEnd = useMemo(() => view === "day" ? addDays(rangeStart, 1) : addDays(rangeStart, 7), [rangeStart, view]);
+  const rangeStart = useMemo(() => {
+    if (view === "day") return startOfDay(date);
+    if (view === "week") return startOfWeek(date);
+    return startOfMonth(date);
+  }, [date, view]);
+  const rangeEnd = useMemo(() => {
+    if (view === "day") return addDays(rangeStart, 1);
+    if (view === "week") return addDays(rangeStart, 7);
+    return new Date(rangeStart.getFullYear(), rangeStart.getMonth() + 1, 1);
+  }, [rangeStart, view]);
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(rangeStart, i)), [rangeStart]);
   const hours = useMemo(() => Array.from({ length: DAY_END_HOUR - DAY_START_HOUR }, (_, i) => DAY_START_HOUR + i), []);
 

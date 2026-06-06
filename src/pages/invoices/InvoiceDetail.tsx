@@ -32,6 +32,7 @@ export default function InvoiceDetail() {
   const [items, setItems] = useState<any[]>([]);
   const [pays, setPays] = useState<any[]>([]);
   const [payOpen, setPayOpen] = useState(false);
+  const [coupon, setCoupon] = useState<{ code: string; amount: number } | null>(null);
 
   const load = async () => {
     if (!id) return;
@@ -41,6 +42,13 @@ export default function InvoiceDetail() {
       supabase.from("payments").select("*").eq("invoice_id", id).order("created_at", { ascending: false }),
     ]);
     setInv(i); setItems(it ?? []); setPays(ps ?? []);
+    const { data: cr } = await (supabase as any)
+      .from("coupon_redemptions")
+      .select("discount_amount, coupons(code)")
+      .eq("invoice_id", id)
+      .maybeSingle();
+    if (cr) setCoupon({ code: cr.coupons?.code ?? "", amount: Number(cr.discount_amount) || 0 });
+    else setCoupon(null);
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
 

@@ -76,8 +76,8 @@ const statusBlock: Record<Appt["status"], string> = {
   departed:    "bg-muted border-border text-muted-foreground",
 };
 
-const DAY_START_HOUR = 8;
-const DAY_END_HOUR = 21; // exclusive
+const DAY_START_HOUR = 0;
+const DAY_END_HOUR = 24; // exclusive — show full 24h
 const HOUR_HEIGHT = 56; // px
 
 export default function CalendarPage() {
@@ -86,7 +86,7 @@ export default function CalendarPage() {
   const isMobile = useIsMobile();
   const [searchParams, setSearchParams] = useSearchParams();
   const [date, setDate] = useState<Date>(startOfDay(new Date()));
-  const [view, setView] = useState<"day" | "week">("day");
+  const [view, setView] = useState<"day" | "week" | "month">("day");
   const [patientPickerOpen, setPatientPickerOpen] = useState(false);
   const [miniOpen, setMiniOpen] = useState(false);
   const [monthCursor, setMonthCursor] = useState<Date>(startOfMonth(new Date()));
@@ -107,18 +107,35 @@ export default function CalendarPage() {
     status: "scheduled" as Appt["status"],
   });
 
-  // Force day view on mobile (week view is too cramped on small screens)
+  // Force day view on mobile when user lands on week (too cramped). Month is fine.
   useEffect(() => {
     if (isMobile && view === "week") setView("day");
   }, [isMobile, view]);
+
+  // Keep mini month cursor in sync with selected date
+  useEffect(() => {
+    setMonthCursor((mc) =>
+      (mc.getFullYear() === date.getFullYear() && mc.getMonth() === date.getMonth())
+        ? mc
+        : startOfMonth(date)
+    );
+  }, [date]);
 
   const dayLabel = useMemo(
     () => date.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" }),
     [date, lang]
   );
 
-  const rangeStart = useMemo(() => view === "day" ? startOfDay(date) : startOfWeek(date), [date, view]);
-  const rangeEnd = useMemo(() => view === "day" ? addDays(rangeStart, 1) : addDays(rangeStart, 7), [rangeStart, view]);
+  const rangeStart = useMemo(() => {
+    if (view === "day") return startOfDay(date);
+    if (view === "week") return startOfWeek(date);
+    return startOfMonth(date);
+  }, [date, view]);
+  const rangeEnd = useMemo(() => {
+    if (view === "day") return addDays(rangeStart, 1);
+    if (view === "week") return addDays(rangeStart, 7);
+    return new Date(rangeStart.getFullYear(), rangeStart.getMonth() + 1, 1);
+  }, [rangeStart, view]);
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(rangeStart, i)), [rangeStart]);
   const hours = useMemo(() => Array.from({ length: DAY_END_HOUR - DAY_START_HOUR }, (_, i) => DAY_START_HOUR + i), []);
 
@@ -470,18 +487,32 @@ export default function CalendarPage() {
               onClick={() => setView("day")}
               className={`px-3 h-9 text-sm inline-flex items-center gap-1 ${view === "day" ? "bg-muted" : "hover:bg-muted/50"}`}
             >
-              <CalendarDays className="size-4" /> {t("today")}
+              <CalendarDays className="size-4" /> {lang === "ar" ? "يوم" : "Day"}
             </button>
+            {!isMobile && (
+              <button
+                onClick={() => setView("week")}
+                className={`px-3 h-9 text-sm inline-flex items-center gap-1 border-s border-border ${view === "week" ? "bg-muted" : "hover:bg-muted/50"}`}
+              >
+                <LayoutGrid className="size-4" /> {lang === "ar" ? "أسبوع" : "Week"}
+              </button>
+            )}
             <button
-              onClick={() => setView("week")}
-              className={`px-3 h-9 text-sm inline-flex items-center gap-1 border-s border-border ${view === "week" ? "bg-muted" : "hover:bg-muted/50"}`}
+              onClick={() => setView("month")}
+              className={`px-3 h-9 text-sm inline-flex items-center gap-1 border-s border-border ${view === "month" ? "bg-muted" : "hover:bg-muted/50"}`}
             >
-              <LayoutGrid className="size-4" /> {lang === "ar" ? "أسبوع" : "Week"}
+              <CalendarRange className="size-4" /> {lang === "ar" ? "شهر" : "Month"}
             </button>
           </div>
-          <Button variant="outline" size="icon" onClick={() => setDate(addDays(date, view === "week" ? -7 : -1))}><ChevronLeft className="size-4" /></Button>
+          <Button variant="outline" size="icon" onClick={() => {
+            if (view === "month") setDate(new Date(date.getFullYear(), date.getMonth() - 1, 1));
+            else setDate(addDays(date, view === "week" ? -7 : -1));
+          }}><ChevronLeft className="size-4" /></Button>
           <Button variant="outline" size="sm" onClick={() => setDate(startOfDay(new Date()))}>{t("today")}</Button>
-          <Button variant="outline" size="icon" onClick={() => setDate(addDays(date, view === "week" ? 7 : 1))}><ChevronRight className="size-4" /></Button>
+          <Button variant="outline" size="icon" onClick={() => {
+            if (view === "month") setDate(new Date(date.getFullYear(), date.getMonth() + 1, 1));
+            else setDate(addDays(date, view === "week" ? 7 : 1));
+          }}><ChevronRight className="size-4" /></Button>
           <Sheet open={miniOpen} onOpenChange={setMiniOpen}>
             <SheetTrigger asChild>
               <Button variant="outline" size="icon" className="lg:hidden" aria-label={lang === "ar" ? "التقويم" : "Calendar"}>
@@ -665,12 +696,12 @@ export default function CalendarPage() {
       </div>
 
       {/* Filters */}
-      <Card className="p-3 shadow-card flex flex-wrap items-center gap-2">
-        <div className="inline-flex items-center gap-1 text-xs text-muted-foreground me-1">
+      <Card className="p-3 shadow-card flex md:flex-wrap items-stretch md:items-center gap-2 overflow-x-auto md:overflow-visible">
+        <div className="inline-flex items-center gap-1 text-xs text-muted-foreground me-1 shrink-0">
           <Filter className="size-3.5" /> {lang === "ar" ? "تصفية:" : "Filter:"}
         </div>
         <Select value={doctorFilter} onValueChange={setDoctorFilter}>
-          <SelectTrigger className="h-8 w-auto min-w-[140px] text-xs"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-10 md:h-9 w-auto min-w-[140px] text-sm md:text-xs shrink-0"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{lang === "ar" ? "كل الأطباء" : "All doctors"}</SelectItem>
             <SelectItem value="__none__">{lang === "ar" ? "بدون طبيب" : "Unassigned"}</SelectItem>
@@ -678,7 +709,7 @@ export default function CalendarPage() {
           </SelectContent>
         </Select>
         <Select value={roomFilter} onValueChange={setRoomFilter}>
-          <SelectTrigger className="h-8 w-auto min-w-[120px] text-xs"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-10 md:h-9 w-auto min-w-[120px] text-sm md:text-xs shrink-0"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{lang === "ar" ? "كل الغرف" : "All rooms"}</SelectItem>
             <SelectItem value="__none__">{lang === "ar" ? "بدون غرفة" : "No room"}</SelectItem>
@@ -686,7 +717,7 @@ export default function CalendarPage() {
           </SelectContent>
         </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="h-8 w-auto min-w-[130px] text-xs"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-10 md:h-9 w-auto min-w-[130px] text-sm md:text-xs shrink-0"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{lang === "ar" ? "كل الحالات" : "All statuses"}</SelectItem>
             <SelectItem value="scheduled">{t("statusScheduled")}</SelectItem>
@@ -707,7 +738,52 @@ export default function CalendarPage() {
       </Card>
 
       <div className="grid lg:grid-cols-[1fr,300px] gap-4">
-        {/* Time grid */}
+        {view === "month" ? (
+          <Card className="shadow-card p-3">
+            <div className="grid grid-cols-7 gap-1 text-center text-[11px] text-muted-foreground mb-2">
+              {(lang === "ar"
+                ? ["أحد","إثن","ثلا","أرب","خمي","جمع","سبت"]
+                : ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"]
+              ).map((d) => <div key={d} className="font-medium">{d}</div>)}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {(() => {
+                const first = startOfMonth(date);
+                const leading = first.getDay();
+                const daysIn = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+                const cells: (Date | null)[] = [];
+                for (let i = 0; i < leading; i++) cells.push(null);
+                for (let d = 1; d <= daysIn; d++) cells.push(new Date(date.getFullYear(), date.getMonth(), d));
+                while (cells.length % 7 !== 0) cells.push(null);
+                return cells.map((d, i) => {
+                  if (!d) return <div key={i} className="aspect-square sm:aspect-auto sm:min-h-[88px]" />;
+                  const today = sameDay(d, new Date());
+                  const dayItems = itemsByDay[d.toDateString()] ?? [];
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => { setDate(d); setView("day"); }}
+                      className={`text-start rounded-lg border border-border p-1.5 sm:p-2 hover:bg-muted/40 transition-colors min-h-[64px] sm:min-h-[88px] flex flex-col gap-1 ${today ? "ring-1 ring-primary" : ""}`}
+                    >
+                      <div className={`text-xs font-semibold ${today ? "text-primary" : ""}`}>{d.getDate()}</div>
+                      <div className="flex-1 flex flex-col gap-0.5 overflow-hidden">
+                        {dayItems.slice(0, isMobile ? 2 : 3).map((a) => (
+                          <div key={a.id} className={`text-[10px] leading-tight truncate rounded px-1 py-0.5 border ${statusBlock[a.status]}`}>
+                            {timeStr(new Date(a.scheduled_at))} {fullName(a.patients!)}
+                          </div>
+                        ))}
+                        {dayItems.length > (isMobile ? 2 : 3) && (
+                          <div className="text-[10px] text-muted-foreground">+{dayItems.length - (isMobile ? 2 : 3)}</div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                });
+              })()}
+            </div>
+          </Card>
+        ) : (
+        /* Time grid */
         <Card className="shadow-card overflow-hidden">
           {view === "week" && (
             <div
@@ -791,6 +867,7 @@ export default function CalendarPage() {
             </div>
           )}
         </Card>
+        )}
 
         {/* Sidebar: mini month + agenda (desktop only) */}
         <div className="space-y-4 hidden lg:block">

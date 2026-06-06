@@ -246,6 +246,9 @@ export default function InvoiceDetail() {
           <div className="space-y-1.5 text-sm">
             <div className="flex justify-between"><span className="text-muted-foreground">{t("subtotal")}</span><span className="tabular-nums">{formatMoney(inv.subtotal, lang)}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">{t("discount")}</span><span className="tabular-nums">- {formatMoney(inv.discount, lang)}</span></div>
+            {coupon && (
+              <div className="flex justify-between"><span className="text-muted-foreground">{lang === "ar" ? `كوبون (${coupon.code})` : `Coupon (${coupon.code})`}</span><span className="tabular-nums text-success">- {formatMoney(coupon.amount, lang)}</span></div>
+            )}
             <div className="flex justify-between"><span className="text-muted-foreground">{t("tax")}</span><span className="tabular-nums">+ {formatMoney(inv.tax, lang)}</span></div>
             <div className="flex justify-between border-t border-border pt-2 text-base font-bold"><span>{t("total")}</span><span className="tabular-nums text-primary">{formatMoney(inv.total, lang)}</span></div>
             <div className="flex justify-between text-success"><span>{t("paid")}</span><span className="tabular-nums">{formatMoney(inv.paid_amount, lang)}</span></div>

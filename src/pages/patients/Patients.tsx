@@ -19,6 +19,7 @@ import { z } from "zod";
 import { Can } from "@/components/Can";
 import { usePermissions } from "@/hooks/usePermissions";
 import { ListSkeleton } from "@/components/ListSkeleton";
+import { Fab } from "@/components/ui/fab";
 
 type Patient = {
   id: string;
@@ -130,15 +131,15 @@ export default function PatientsPage() {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("patients")}</h1>
           <p className="text-sm text-muted-foreground mt-1">{filtered.length} {t("patients").toLowerCase()}</p>
         </div>
-        <div className="flex gap-2 items-center">
-          <div className="relative w-64">
+        <div className="flex gap-2 items-center w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-64">
             <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("search")} className="ps-9" />
           </div>
           <Can module="patients" action="create">
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
-                <Button className="gradient-primary text-primary-foreground"><Plus className="me-2 size-4" />{t("addPatient")}</Button>
+                <Button className="gradient-primary text-primary-foreground hidden sm:inline-flex"><Plus className="me-2 size-4" />{t("addPatient")}</Button>
               </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>{t("newPatient")}</DialogTitle></DialogHeader>
@@ -213,25 +214,25 @@ export default function PatientsPage() {
                 ? `${p.first_name_ar ?? p.first_name_en} ${p.last_name_ar ?? p.last_name_en ?? ""}`.trim()
                 : `${p.first_name_en} ${p.last_name_en ?? ""}`.trim();
               return (
-                <div key={p.id} className="flex items-center gap-3 p-4 hover:bg-muted/40 transition-colors">
-                  <Link to={`/patients/${p.id}`} className="flex items-center gap-4 flex-1 min-w-0">
-                    <div className="size-10 rounded-full gradient-primary text-primary-foreground flex items-center justify-center font-semibold">
+                <div key={p.id} className="flex items-center gap-2 p-3 sm:p-4 hover:bg-muted/40 transition-colors">
+                  <Link to={`/patients/${p.id}`} className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                    <div className="size-11 rounded-full gradient-primary text-primary-foreground flex items-center justify-center font-semibold shrink-0">
                       {name.slice(0,1).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <div className="font-medium truncate">{name}</div>
-                        <Badge variant="outline" className="text-[10px]">#{p.patient_code}</Badge>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="font-semibold truncate text-[15px]">{name}</div>
+                        <Badge variant="outline" className="text-[10px] shrink-0">#{p.patient_code}</Badge>
                       </div>
-                      <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
+                      <div className="text-[13px] text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
                         {p.phone && <span className="flex items-center gap-1"><Phone className="size-3" />{p.phone}</span>}
-                        {p.email && <span className="flex items-center gap-1"><Mail className="size-3" />{p.email}</span>}
-                        {p.city && <span className="flex items-center gap-1"><UserIcon className="size-3" />{p.city}</span>}
+                        {p.email && <span className="hidden sm:flex items-center gap-1"><Mail className="size-3" />{p.email}</span>}
+                        {p.city && <span className="hidden sm:flex items-center gap-1"><UserIcon className="size-3" />{p.city}</span>}
                       </div>
                     </div>
                   </Link>
                   {can("patients", "delete") && (
-                    <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive hover:bg-destructive/10 size-11"
                       onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConfirmDel(p); }}
                       aria-label="Delete">
                       <Trash2 className="size-4" />
@@ -243,6 +244,12 @@ export default function PatientsPage() {
           </div>
         )}
       </Card>
+
+      <Can module="patients" action="create">
+        <Fab ariaLabel={t("addPatient")} onClick={() => setOpen(true)}>
+          <Plus className="size-6" />
+        </Fab>
+      </Can>
 
       <AlertDialog open={!!confirmDel} onOpenChange={(o) => !o && setConfirmDel(null)}>
         <AlertDialogContent>

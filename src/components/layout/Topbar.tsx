@@ -23,6 +23,7 @@ export function Topbar() {
   const [now, setNow] = useState(new Date());
   const [notifs, setNotifs] = useState<any[]>([]);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -157,7 +158,29 @@ export function Topbar() {
         <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
         <Input placeholder={t("search")} className="ps-9 bg-muted/50 border-transparent focus-visible:bg-background" />
       </div>
-      <div className="flex-1 sm:hidden" />
+      {searchOpen ? (
+        <div className="relative flex-1 sm:hidden">
+          <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <Input
+            autoFocus
+            placeholder={t("search")}
+            onBlur={() => setSearchOpen(false)}
+            className="ps-9 h-10 bg-muted/50 border-transparent focus-visible:bg-background"
+          />
+        </div>
+      ) : (
+        <div className="flex-1 sm:hidden flex justify-end">
+          <Button
+            variant="ghost"
+            size="icon"
+            type="button"
+            aria-label={t("search")}
+            onClick={() => setSearchOpen(true)}
+          >
+            <Search className="size-5" />
+          </Button>
+        </div>
+      )}
 
       <div className="hidden sm:block text-sm font-mono tabular-nums text-muted-foreground">
         {time}

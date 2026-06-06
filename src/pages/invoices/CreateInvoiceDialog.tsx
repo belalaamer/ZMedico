@@ -272,7 +272,6 @@ export function CreateInvoiceDialog({
         discount_amount: couponDiscount,
         redeemed_by: user?.id ?? null,
       });
-      await (supabase as any).from("coupons").update({ usage_count: undefined }).eq("id", couponInfo.id);
     }
 
     const rows = items

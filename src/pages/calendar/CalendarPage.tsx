@@ -738,7 +738,52 @@ export default function CalendarPage() {
       </Card>
 
       <div className="grid lg:grid-cols-[1fr,300px] gap-4">
-        {/* Time grid */}
+        {view === "month" ? (
+          <Card className="shadow-card p-3">
+            <div className="grid grid-cols-7 gap-1 text-center text-[11px] text-muted-foreground mb-2">
+              {(lang === "ar"
+                ? ["أحد","إثن","ثلا","أرب","خمي","جمع","سبت"]
+                : ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"]
+              ).map((d) => <div key={d} className="font-medium">{d}</div>)}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {(() => {
+                const first = startOfMonth(date);
+                const leading = first.getDay();
+                const daysIn = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+                const cells: (Date | null)[] = [];
+                for (let i = 0; i < leading; i++) cells.push(null);
+                for (let d = 1; d <= daysIn; d++) cells.push(new Date(date.getFullYear(), date.getMonth(), d));
+                while (cells.length % 7 !== 0) cells.push(null);
+                return cells.map((d, i) => {
+                  if (!d) return <div key={i} className="aspect-square sm:aspect-auto sm:min-h-[88px]" />;
+                  const today = sameDay(d, new Date());
+                  const dayItems = itemsByDay[d.toDateString()] ?? [];
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => { setDate(d); setView("day"); }}
+                      className={`text-start rounded-lg border border-border p-1.5 sm:p-2 hover:bg-muted/40 transition-colors min-h-[64px] sm:min-h-[88px] flex flex-col gap-1 ${today ? "ring-1 ring-primary" : ""}`}
+                    >
+                      <div className={`text-xs font-semibold ${today ? "text-primary" : ""}`}>{d.getDate()}</div>
+                      <div className="flex-1 flex flex-col gap-0.5 overflow-hidden">
+                        {dayItems.slice(0, isMobile ? 2 : 3).map((a) => (
+                          <div key={a.id} className={`text-[10px] leading-tight truncate rounded px-1 py-0.5 border ${statusBlock[a.status]}`}>
+                            {timeStr(new Date(a.scheduled_at))} {fullName(a.patients!)}
+                          </div>
+                        ))}
+                        {dayItems.length > (isMobile ? 2 : 3) && (
+                          <div className="text-[10px] text-muted-foreground">+{dayItems.length - (isMobile ? 2 : 3)}</div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                });
+              })()}
+            </div>
+          </Card>
+        ) : (
+        /* Time grid */
         <Card className="shadow-card overflow-hidden">
           {view === "week" && (
             <div
@@ -822,6 +867,7 @@ export default function CalendarPage() {
             </div>
           )}
         </Card>
+        )}
 
         {/* Sidebar: mini month + agenda (desktop only) */}
         <div className="space-y-4 hidden lg:block">

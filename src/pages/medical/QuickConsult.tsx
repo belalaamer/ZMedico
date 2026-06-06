@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -63,10 +64,16 @@ export default function QuickConsult() {
       <Card className="p-6 shadow-card space-y-4">
         <div className="grid sm:grid-cols-2 gap-3">
           <div className="space-y-2"><Label>{t("patientName")}</Label>
-            <Select value={form.patient_id} onValueChange={(v) => setForm({ ...form, patient_id: v })}>
-              <SelectTrigger><SelectValue placeholder={t("selectPatient")} /></SelectTrigger>
-              <SelectContent>{patients.map((p) => <SelectItem key={p.id} value={p.id}>#{p.patient_code} · {p.first_name_en} {p.last_name_en ?? ""}</SelectItem>)}</SelectContent>
-            </Select>
+            <Combobox
+              value={form.patient_id}
+              onChange={(v) => setForm({ ...form, patient_id: v })}
+              options={patients.map((p) => ({
+                value: p.id,
+                label: `#${p.patient_code} · ${p.first_name_en} ${p.last_name_en ?? ""}`.trim(),
+              }))}
+              placeholder={t("selectPatient")}
+              searchPlaceholder={lang === "ar" ? "ابحث عن مريض..." : "Search patient..."}
+            />
           </div>
           <div className="space-y-2"><Label>{t("specialty")}</Label>
             <Select value={form.specialty_id || "none"} onValueChange={(v) => setForm({ ...form, specialty_id: v === "none" ? "" : v })}>

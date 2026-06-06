@@ -545,6 +545,136 @@ export type Database = {
           },
         ]
       }
+      coupon_redemptions: {
+        Row: {
+          branch_id: string | null
+          coupon_id: string
+          created_at: string
+          discount_amount: number
+          id: string
+          invoice_id: string | null
+          patient_id: string | null
+          redeemed_by: string | null
+        }
+        Insert: {
+          branch_id?: string | null
+          coupon_id: string
+          created_at?: string
+          discount_amount: number
+          id?: string
+          invoice_id?: string | null
+          patient_id?: string | null
+          redeemed_by?: string | null
+        }
+        Update: {
+          branch_id?: string | null
+          coupon_id?: string
+          created_at?: string
+          discount_amount?: number
+          id?: string
+          invoice_id?: string | null
+          patient_id?: string | null
+          redeemed_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coupon_redemptions_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coupon_redemptions_coupon_id_fkey"
+            columns: ["coupon_id"]
+            isOneToOne: false
+            referencedRelation: "coupons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coupon_redemptions_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coupon_redemptions_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coupons: {
+        Row: {
+          branch_id: string | null
+          code: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          discount_type: string
+          discount_value: number
+          ends_at: string | null
+          id: string
+          is_active: boolean
+          max_discount_amount: number | null
+          min_order_amount: number | null
+          notes: string | null
+          starts_at: string | null
+          updated_at: string
+          usage_count: number
+          usage_limit: number | null
+        }
+        Insert: {
+          branch_id?: string | null
+          code: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          discount_type: string
+          discount_value: number
+          ends_at?: string | null
+          id?: string
+          is_active?: boolean
+          max_discount_amount?: number | null
+          min_order_amount?: number | null
+          notes?: string | null
+          starts_at?: string | null
+          updated_at?: string
+          usage_count?: number
+          usage_limit?: number | null
+        }
+        Update: {
+          branch_id?: string | null
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          discount_type?: string
+          discount_value?: number
+          ends_at?: string | null
+          id?: string
+          is_active?: boolean
+          max_discount_amount?: number | null
+          min_order_amount?: number | null
+          notes?: string | null
+          starts_at?: string | null
+          updated_at?: string
+          usage_count?: number
+          usage_limit?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coupons_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dental_chart: {
         Row: {
           created_at: string
@@ -4801,6 +4931,10 @@ export type Database = {
             }
             Returns: string
           }
+      apply_coupon_code: {
+        Args: { _code: string; _subtotal: number }
+        Returns: Json
+      }
       apply_inventory_tx: {
         Args: {
           _batch: string

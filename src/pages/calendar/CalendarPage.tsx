@@ -696,12 +696,12 @@ export default function CalendarPage() {
       </div>
 
       {/* Filters */}
-      <Card className="p-3 shadow-card flex flex-wrap items-center gap-2">
-        <div className="inline-flex items-center gap-1 text-xs text-muted-foreground me-1">
+      <Card className="p-3 shadow-card flex md:flex-wrap items-stretch md:items-center gap-2 overflow-x-auto md:overflow-visible">
+        <div className="inline-flex items-center gap-1 text-xs text-muted-foreground me-1 shrink-0">
           <Filter className="size-3.5" /> {lang === "ar" ? "تصفية:" : "Filter:"}
         </div>
         <Select value={doctorFilter} onValueChange={setDoctorFilter}>
-          <SelectTrigger className="h-8 w-auto min-w-[140px] text-xs"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-10 md:h-9 w-auto min-w-[140px] text-sm md:text-xs shrink-0"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{lang === "ar" ? "كل الأطباء" : "All doctors"}</SelectItem>
             <SelectItem value="__none__">{lang === "ar" ? "بدون طبيب" : "Unassigned"}</SelectItem>
@@ -709,7 +709,7 @@ export default function CalendarPage() {
           </SelectContent>
         </Select>
         <Select value={roomFilter} onValueChange={setRoomFilter}>
-          <SelectTrigger className="h-8 w-auto min-w-[120px] text-xs"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-10 md:h-9 w-auto min-w-[120px] text-sm md:text-xs shrink-0"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{lang === "ar" ? "كل الغرف" : "All rooms"}</SelectItem>
             <SelectItem value="__none__">{lang === "ar" ? "بدون غرفة" : "No room"}</SelectItem>
@@ -717,7 +717,7 @@ export default function CalendarPage() {
           </SelectContent>
         </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="h-8 w-auto min-w-[130px] text-xs"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-10 md:h-9 w-auto min-w-[130px] text-sm md:text-xs shrink-0"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{lang === "ar" ? "كل الحالات" : "All statuses"}</SelectItem>
             <SelectItem value="scheduled">{t("statusScheduled")}</SelectItem>

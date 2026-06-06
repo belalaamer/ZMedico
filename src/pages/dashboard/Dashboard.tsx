@@ -277,7 +277,7 @@ export default function Dashboard() {
         <div className="text-[11px] text-muted-foreground mt-1 tabular-nums">{subValue}</div>
       )}
       {to && !loading && (
-        <Button asChild variant="ghost" size="sm" className="mt-2 -ml-2 h-7 px-2 text-xs">
+        <Button asChild variant="ghost" size="sm" className="mt-2 -ms-2 h-7 px-2 text-xs">
           <Link to={to}>→</Link>
         </Button>
       )}
@@ -511,7 +511,7 @@ export default function Dashboard() {
                         <div className="font-medium text-sm truncate">{fullName(a.patient)}</div>
                         <div className="text-xs text-muted-foreground truncate">{(a.doctor_id && doctorNames[a.doctor_id]) || "—"}</div>
                       </div>
-                      <div className="text-right shrink-0">
+                      <div className="text-end shrink-0">
                         <div className="text-xs text-muted-foreground">{formatDateTime(a.scheduled_at, lang)}</div>
                         <Badge variant="outline" className="text-[10px] mt-1">{t(`status${a.status?.charAt(0).toUpperCase() + a.status?.slice(1).replace(/_(.)/g, (_: any, c: string) => c.toUpperCase())}` as any) ?? a.status}</Badge>
                       </div>

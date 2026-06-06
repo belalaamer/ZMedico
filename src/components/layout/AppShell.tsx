@@ -11,7 +11,7 @@ export default function AppShell() {
     mainRef.current?.scrollTo({ top: 0, behavior: "auto" });
   }, [pathname]);
   return (
-    <div className="h-screen flex w-full bg-background overflow-hidden">
+    <div className="h-dvh flex w-full bg-background overflow-hidden">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <Topbar />

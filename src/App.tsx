@@ -53,6 +53,7 @@ const Attendance = lazy(() => import("@/pages/hr/Attendance"));
 const Leaves = lazy(() => import("@/pages/hr/Leaves"));
 const Payroll = lazy(() => import("@/pages/hr/Payroll"));
 const Performance = lazy(() => import("@/pages/hr/Performance"));
+const TargetBonuses = lazy(() => import("@/pages/hr/TargetBonuses"));
 const ReportsDashboard = lazy(() => import("@/pages/reports/ReportsDashboard"));
 const FinancialReports = lazy(() => import("@/pages/reports/FinancialReports"));
 const OperationalReports = lazy(() => import("@/pages/reports/OperationalReports"));
@@ -162,6 +163,7 @@ function AppContent() {
               <Route path="/hr/leaves" element={<PermissionRoute><Leaves /></PermissionRoute>} />
               <Route path="/hr/payroll" element={<PermissionRoute><Payroll /></PermissionRoute>} />
               <Route path="/hr/performance" element={<PermissionRoute><Performance /></PermissionRoute>} />
+              <Route path="/hr/target-bonuses" element={<PermissionRoute><TargetBonuses /></PermissionRoute>} />
               <Route path="/reports" element={<PermissionRoute><ReportsDashboard /></PermissionRoute>} />
               <Route path="/reports/financial" element={<PermissionRoute><FinancialReports /></PermissionRoute>} />
               <Route path="/reports/operational" element={<PermissionRoute><OperationalReports /></PermissionRoute>} />

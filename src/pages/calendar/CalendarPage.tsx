@@ -434,6 +434,16 @@ export default function CalendarPage() {
           <Button variant="outline" size="icon" onClick={() => setDate(addDays(date, view === "week" ? -7 : -1))}><ChevronLeft className="size-4" /></Button>
           <Button variant="outline" size="sm" onClick={() => setDate(startOfDay(new Date()))}>{t("today")}</Button>
           <Button variant="outline" size="icon" onClick={() => setDate(addDays(date, view === "week" ? 7 : 1))}><ChevronRight className="size-4" /></Button>
+          <Sheet open={miniOpen} onOpenChange={setMiniOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="icon" className="lg:hidden" aria-label={lang === "ar" ? "التقويم" : "Calendar"}>
+                <CalendarRange className="size-4" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side={lang === "ar" ? "left" : "right"} className="w-[88vw] sm:w-[360px] p-4 overflow-y-auto">
+              <div id="calendar-mini-sheet-mount" />
+            </SheetContent>
+          </Sheet>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button className="gradient-primary text-primary-foreground" onClick={openNew}><Plus className="me-2 size-4" />{t("newAppointment")}</Button>

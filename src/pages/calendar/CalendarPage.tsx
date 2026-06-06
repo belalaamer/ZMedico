@@ -81,9 +81,12 @@ const HOUR_HEIGHT = 56; // px
 export default function CalendarPage() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
+  const isMobile = useIsMobile();
   const [searchParams, setSearchParams] = useSearchParams();
   const [date, setDate] = useState<Date>(startOfDay(new Date()));
   const [view, setView] = useState<"day" | "week">("day");
+  const [patientPickerOpen, setPatientPickerOpen] = useState(false);
+  const [miniOpen, setMiniOpen] = useState(false);
   const [monthCursor, setMonthCursor] = useState<Date>(startOfMonth(new Date()));
   const [items, setItems] = useState<Appt[]>([]);
   const [highlightId, setHighlightId] = useState<string | null>(null);

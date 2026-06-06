@@ -112,6 +112,15 @@ export default function CalendarPage() {
     if (isMobile && view === "week") setView("day");
   }, [isMobile, view]);
 
+  // Keep mini month cursor in sync with selected date
+  useEffect(() => {
+    setMonthCursor((mc) =>
+      (mc.getFullYear() === date.getFullYear() && mc.getMonth() === date.getMonth())
+        ? mc
+        : startOfMonth(date)
+    );
+  }, [date]);
+
   const dayLabel = useMemo(
     () => date.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" }),
     [date, lang]

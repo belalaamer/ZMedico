@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Plus, FileText, DollarSign, ListChecks } from "lucide-react";
+import { Plus, FileText, DollarSign, ListChecks, AlertCircle } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,7 @@ export default function Payroll() {
   const [openDetails, setOpenDetails] = useState<any | null>(null);
   const [detailRows, setDetailRows] = useState<any[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [commByStaff, setCommByStaff] = useState<Record<string, number>>({});
 
   const load = async () => {
     let q = supabase.from("payroll").select("*").eq("period_year", year).eq("period_month", month);
@@ -44,6 +46,24 @@ export default function Payroll() {
     setStaff(s ?? []);
     const { data: p } = await supabase.from("profiles").select("id,full_name,email");
     setProfiles(p ?? []);
+    // Build per-staff commission totals to show as a visible line on each payroll row.
+    const rows = data ?? [];
+    const out: Record<string, number> = {};
+    await Promise.all(rows.map(async (pr: any) => {
+      // Attached → use commissions tied to this payroll (post-paid).
+      const { data: att } = await (supabase as any)
+        .from("doctor_commissions").select("commission_amount").eq("payroll_id", pr.id);
+      if (att && att.length > 0) {
+        out[pr.id] = att.reduce((sum: number, r: any) => sum + Number(r.commission_amount || 0), 0);
+        return;
+      }
+      // Otherwise → preview unattached earned/partial for this doctor.
+      const { data: pend } = await (supabase as any)
+        .from("doctor_commissions").select("commission_amount")
+        .eq("doctor_id", pr.staff_id).is("payroll_id", null).in("status", ["earned", "partial"]);
+      out[pr.id] = (pend ?? []).reduce((sum: number, r: any) => sum + Number(r.commission_amount || 0), 0);
+    }));
+    setCommByStaff(out);
   };
   useEffect(() => { load(); }, [year, month, currentBranchId]);
 
@@ -138,6 +158,7 @@ export default function Payroll() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("payroll")}</h1>
         <div className="flex items-center gap-2">
+          <Button asChild variant="outline" size="sm"><Link to="/hr/pending-commissions"><AlertCircle className="me-2 size-4" />{t("pendingCommissions")}</Link></Button>
           <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
             <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
             <SelectContent>{[now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1].map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
@@ -162,7 +183,12 @@ export default function Payroll() {
                 <div className="flex items-center gap-3 flex-wrap">
                   <div className="flex-1 min-w-0">
                     <div className="font-medium truncate">{profName(p.staff_id)}</div>
-                    <div className="text-xs text-muted-foreground">{t("baseSalary")}: {formatMoney(p.base_salary, lang)} · {t("bonuses")}: {formatMoney(p.bonuses, lang)} · {t("deductions")}: {formatMoney(p.deductions, lang)}</div>
+                    <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5">
+                      <span>{t("baseSalary")}: <span className="tabular-nums">{formatMoney(p.base_salary, lang)}</span></span>
+                      <span className="text-primary">{t("commissions")}: <span className="tabular-nums font-medium">{formatMoney(commByStaff[p.id] ?? 0, lang)}</span></span>
+                      <span>{t("bonuses")}: <span className="tabular-nums">{formatMoney(p.bonuses, lang)}</span></span>
+                      <span>{t("deductions")}: <span className="tabular-nums">{formatMoney(p.deductions, lang)}</span></span>
+                    </div>
                   </div>
                   <Badge variant="outline" className="text-base">{formatMoney(p.net_salary, lang)}</Badge>
                   <Badge variant="outline" className={p.status === "paid" ? "status-completed" : p.status === "approved" ? "status-confirmed" : ""}>{t(`status${p.status.charAt(0).toUpperCase()}${p.status.slice(1)}` as any)}</Badge>

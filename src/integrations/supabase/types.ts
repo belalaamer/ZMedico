@@ -3765,6 +3765,7 @@ export type Database = {
           bank_account: string | null
           bank_name: string | null
           branch_id: string | null
+          commission_percent: number
           contract_end_date: string | null
           contract_type: Database["public"]["Enums"]["contract_type"]
           created_at: string
@@ -3794,6 +3795,7 @@ export type Database = {
           bank_account?: string | null
           bank_name?: string | null
           branch_id?: string | null
+          commission_percent?: number
           contract_end_date?: string | null
           contract_type?: Database["public"]["Enums"]["contract_type"]
           created_at?: string
@@ -3823,6 +3825,7 @@ export type Database = {
           bank_account?: string | null
           bank_name?: string | null
           branch_id?: string | null
+          commission_percent?: number
           contract_end_date?: string | null
           contract_type?: Database["public"]["Enums"]["contract_type"]
           created_at?: string

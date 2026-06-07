@@ -44,7 +44,7 @@ export default function Staff() {
   const [form, setForm] = useState<any>({
     profile_id: "", position_id: "", department_id: "", branch_id: "",
     hire_date: new Date().toISOString().slice(0, 10), contract_type: "full_time",
-    salary: "0", bank_name: "", bank_account: "", working_hours_per_week: 40,
+    salary: "0", commission_percent: "0", bank_name: "", bank_account: "", working_hours_per_week: 40,
     annual_leave_balance: 21, sick_leave_balance: 10,
     emergency_contact_name: "", emergency_contact_phone: "",
     national_id: "", date_of_birth: "", address: "",
@@ -99,6 +99,7 @@ export default function Staff() {
       hire_date: form.hire_date,
       contract_type: form.contract_type,
       salary: Number(form.salary || 0),
+      commission_percent: Number(form.commission_percent || 0),
       bank_name: form.bank_name || null,
       bank_account: form.bank_account || null,
       working_hours_per_week: Number(form.working_hours_per_week || 40),
@@ -237,6 +238,7 @@ export default function Staff() {
                   </Select>
                 </div>
                 <div className="space-y-2"><Label>{t("salary")}</Label><Input type="number" value={form.salary} onChange={(e) => setForm({ ...form, salary: e.target.value })} /></div>
+                <div className="space-y-2"><Label>{t("commissionPercent")}</Label><Input type="number" step="0.01" min="0" max="100" value={form.commission_percent} onChange={(e) => setForm({ ...form, commission_percent: e.target.value })} /></div>
                 <div className="space-y-2"><Label>{t("weeklyHours")}</Label><Input type="number" value={form.working_hours_per_week} onChange={(e) => setForm({ ...form, working_hours_per_week: e.target.value })} /></div>
                 <div className="space-y-2"><Label>{t("bankName")}</Label><Input value={form.bank_name} onChange={(e) => setForm({ ...form, bank_name: e.target.value })} /></div>
                 <div className="space-y-2"><Label>{t("bankAccount")}</Label><Input value={form.bank_account} onChange={(e) => setForm({ ...form, bank_account: e.target.value })} /></div>

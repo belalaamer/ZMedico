@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useDataSync } from "@/lib/dataSync";
 import { Link } from "react-router-dom";
-import { Plus, Search, FileText, CreditCard } from "lucide-react";
+import { Plus, Search, FileText, CreditCard, AlertCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -122,6 +122,9 @@ export default function Invoices() {
               <Plus className="me-2 size-4" />{t("newInvoice")}
             </Button>
           </Can>
+          <Button variant="outline" className="hidden sm:inline-flex" onClick={() => navigate("/invoices/outstanding")}>
+            <AlertCircle className="me-2 size-4" />{t("outstandingDebts")}
+          </Button>
         </div>
       </div>
 

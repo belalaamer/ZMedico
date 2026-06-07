@@ -14,6 +14,7 @@ import { CreateInvoiceDialog } from "../invoices/CreateInvoiceDialog";
 import PatientMedicalTab from "./PatientMedicalTab";
 import { EditPatientDialog } from "./EditPatientDialog";
 import PatientTreatmentPlans from "./PatientTreatmentPlans";
+import PatientTimeline from "./PatientTimeline";
 import { Can } from "@/components/Can";
 
 const statusClass: Record<string, string> = {
@@ -144,6 +145,7 @@ export default function PatientProfile() {
       <Tabs defaultValue="overview">
         <TabsList>
           <TabsTrigger value="overview">{t("overview")}</TabsTrigger>
+          <TabsTrigger value="timeline">{t("timelineTab")}</TabsTrigger>
           <TabsTrigger value="medical">{t("medicalTab")}</TabsTrigger>
           <Can module="treatment_plans" action="view">
             <TabsTrigger value="plans">{lang === "ar" ? "خطط العلاج" : "Treatment Plans"}</TabsTrigger>
@@ -181,6 +183,10 @@ export default function PatientProfile() {
 
         <TabsContent value="medical" className="mt-4">
           <PatientMedicalTab patientId={patient.id} />
+        </TabsContent>
+
+        <TabsContent value="timeline" className="mt-4">
+          <PatientTimeline patientId={patient.id} />
         </TabsContent>
 
         <TabsContent value="plans" className="mt-4">

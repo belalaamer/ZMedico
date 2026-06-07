@@ -25,7 +25,8 @@ export default function QuickConsult() {
   const [specs, setSpecs] = useState<any[]>([]);
   const [form, setForm] = useState({
     patient_id: "", specialty_id: "", visit_type: "consultation",
-    chief_complaint_en: "", present_illness_en: "", physical_exam_en: "",
+    chief_complaint_en: "", present_illness_en: "",
+    pe_general: "", pe_heent: "", pe_chest: "", pe_cvs: "", pe_abdomen: "", pe_extremities: "", pe_neuro: "",
     bp_sys: "", bp_dia: "", pulse: "", temp: "", weight: "", height: "",
   });
   const [saving, setSaving] = useState(false);
@@ -77,6 +78,21 @@ export default function QuickConsult() {
   const persist = async (status: "draft" | "completed"): Promise<string | null> => {
     if (!form.patient_id) { toast.error(t("selectPatient")); return null; }
     setSaving(true);
+    const peParts: string[] = [];
+    const peLabels: Record<string, string> = {
+      pe_general: lang === "ar" ? "عام" : "General",
+      pe_heent: "HEENT",
+      pe_chest: lang === "ar" ? "الصدر/الرئتين" : "Chest / Lungs",
+      pe_cvs: lang === "ar" ? "القلب والأوعية" : "CVS",
+      pe_abdomen: lang === "ar" ? "البطن" : "Abdomen",
+      pe_extremities: lang === "ar" ? "الأطراف" : "Extremities",
+      pe_neuro: lang === "ar" ? "العصبي" : "Neuro",
+    };
+    (["pe_general","pe_heent","pe_chest","pe_cvs","pe_abdomen","pe_extremities","pe_neuro"] as const).forEach((k) => {
+      const v = (form as any)[k]?.trim();
+      if (v) peParts.push(`• ${peLabels[k]}: ${v}`);
+    });
+    const physicalExamText = peParts.length ? `${lang === "ar" ? "الفحص السريري" : "Physical Examination"}\n${peParts.join("\n")}` : null;
     const { data: rec, error } = await supabase.from("medical_records").insert({
       patient_id: form.patient_id, branch_id: currentBranchId, doctor_id: user?.id ?? null,
       specialty_id: form.specialty_id || null, visit_type: form.visit_type as any,
@@ -84,8 +100,8 @@ export default function QuickConsult() {
       chief_complaint_ar: form.chief_complaint_en || null,
       present_illness_en: form.present_illness_en || null,
       present_illness_ar: form.present_illness_en || null,
-      notes_en: form.physical_exam_en || null,
-      notes_ar: form.physical_exam_en || null,
+      notes_en: physicalExamText,
+      notes_ar: physicalExamText,
       status,
     } as any).select("id").single();
     if (error || !rec) { setSaving(false); toast.error(error?.message ?? "error"); return null; }
@@ -208,7 +224,35 @@ export default function QuickConsult() {
 
         <div className="space-y-2"><Label>{t("chiefComplaint")}</Label><Textarea value={form.chief_complaint_en} onChange={(e) => setForm({ ...form, chief_complaint_en: e.target.value })} maxLength={1000} rows={2} /></div>
         <div className="space-y-2"><Label>{t("presentIllness")}</Label><Textarea value={form.present_illness_en} onChange={(e) => setForm({ ...form, present_illness_en: e.target.value })} maxLength={2000} rows={3} /></div>
-        <div className="space-y-2"><Label>{t("physicalExam")}</Label><Textarea value={form.physical_exam_en} onChange={(e) => setForm({ ...form, physical_exam_en: e.target.value })} maxLength={2000} rows={3} /></div>
+
+        <div className="rounded-lg border border-border p-4 space-y-3 bg-card">
+          <div className="flex items-center justify-between">
+            <Label className="text-base font-semibold">{t("physicalExam")}</Label>
+            <Badge variant="secondary" className="text-[10px]">{lang === "ar" ? "قسم سريري" : "Clinical Section"}</Badge>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {([
+              ["pe_general", lang === "ar" ? "عام / المظهر" : "General / Appearance"],
+              ["pe_heent", lang === "ar" ? "الرأس والعنق (HEENT)" : "HEENT"],
+              ["pe_chest", lang === "ar" ? "الصدر / الرئتين" : "Chest / Lungs"],
+              ["pe_cvs", lang === "ar" ? "القلب والأوعية (CVS)" : "Cardiovascular (CVS)"],
+              ["pe_abdomen", lang === "ar" ? "البطن" : "Abdomen"],
+              ["pe_extremities", lang === "ar" ? "الأطراف" : "Extremities"],
+              ["pe_neuro", lang === "ar" ? "العصبي" : "Neurological"],
+            ] as const).map(([key, label]) => (
+              <div key={key} className="space-y-1">
+                <Label className="text-xs text-muted-foreground">{label}</Label>
+                <Textarea
+                  value={(form as any)[key]}
+                  onChange={(e) => setForm({ ...form, [key]: e.target.value } as any)}
+                  maxLength={500}
+                  rows={2}
+                  placeholder={lang === "ar" ? "طبيعي / ملاحظات..." : "Normal / findings..."}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
 
         <div className="flex justify-end gap-2 pt-2 flex-wrap">
           <Button variant="outline" onClick={saveAndStay} disabled={saving}>{t("saveQuickConsult")}</Button>

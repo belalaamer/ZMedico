@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Combobox } from "@/components/ui/combobox";
+import { Switch } from "@/components/ui/switch";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -36,6 +37,10 @@ export function RecordPaymentDialog({
   const [ref, setRef] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [split, setSplit] = useState(false);
+  const [method2, setMethod2] = useState<Method>("wallet");
+  const [amount2, setAmount2] = useState<number>(0);
+  const [remaining, setRemaining] = useState<number>(defaultAmount ?? 0);
 
   useEffect(() => {
     if (!open) return;
@@ -44,6 +49,8 @@ export function RecordPaymentDialog({
     setAmount(defaultAmount ?? 0);
     setMethod("cash"); setRef(""); setNotes("");
     setDate(new Date().toISOString().slice(0,10));
+    setSplit(false); setMethod2("wallet"); setAmount2(0);
+    setRemaining(defaultAmount ?? 0);
     if (!patientId) loadPatients();
   }, [open, patientId, invoiceId, defaultAmount]);
 
@@ -75,8 +82,7 @@ export function RecordPaymentDialog({
   const onInvoiceChange = (v: string) => {
     setIid(v);
     const found = invoices.find((i) => i.id === v);
-    if (found && (!amount || amount <= 0)) setAmount(found.remaining);
-    else if (found) setAmount(found.remaining);
+    if (found) { setAmount(found.remaining); setRemaining(found.remaining); setAmount2(0); }
   };
 
   const loadPatients = () => {
@@ -100,18 +106,26 @@ export function RecordPaymentDialog({
   const save = async () => {
     if (!pid) { toast.error(t("selectPatient")); return; }
     if (!amount || amount <= 0) { toast.error("Amount required"); return; }
+    if (split) {
+      if (method === method2) { toast.error(t("bothMethodsRequired")); return; }
+      if (!amount2 || amount2 <= 0) { toast.error(t("bothMethodsRequired")); return; }
+      const sum = +(Number(amount) + Number(amount2)).toFixed(2);
+      const cap = remaining > 0 ? remaining : (defaultAmount ?? 0);
+      if (cap > 0 && sum > cap + 0.009) { toast.error(t("splitSumExceeds")); return; }
+    }
     setSaving(true);
-    const { error } = await supabase.from("payments").insert({
+    const base = {
       patient_id: pid,
       invoice_id: iid || null,
       branch_id: currentBranchId,
-      amount,
-      payment_method: method,
       payment_date: date,
       reference_number: ref || null,
       notes: notes || null,
       received_by: user?.id ?? null,
-    } as any);
+    };
+    const rows: any[] = [{ ...base, amount, payment_method: method }];
+    if (split) rows.push({ ...base, amount: amount2, payment_method: method2 });
+    const { error } = await supabase.from("payments").insert(rows as any);
     setSaving(false);
     if (error) { toast.error(error.message); return; }
     toast.success(t("paid"));
@@ -176,6 +190,35 @@ export function RecordPaymentDialog({
               <Input value={ref} onChange={(e) => setRef(e.target.value)} maxLength={60} />
             </div>
           </div>
+          <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+            <Label htmlFor="split-toggle" className="cursor-pointer">{t("splitPayment")}</Label>
+            <Switch id="split-toggle" checked={split} onCheckedChange={(v) => { setSplit(v); if (!v) setAmount2(0); }} />
+          </div>
+          {split && (
+            <div className="grid grid-cols-2 gap-3 rounded-md border border-dashed border-border p-3">
+              <div className="space-y-2">
+                <Label>{t("method2")}</Label>
+                <Select value={method2} onValueChange={(v) => setMethod2(v as Method)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">{t("cash")}</SelectItem>
+                    <SelectItem value="card">{t("card")}</SelectItem>
+                    <SelectItem value="bank_transfer">{t("bankTransfer")}</SelectItem>
+                    <SelectItem value="insurance">{t("insurance")}</SelectItem>
+                    <SelectItem value="wallet">{t("wallet")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>{t("amount")} ({t("method2")})</Label>
+                <NumberInput value={amount2} onChange={setAmount2} />
+              </div>
+              <div className="col-span-2 text-xs text-muted-foreground tabular-nums flex justify-between">
+                <span>{t("remaining")}: {(remaining || defaultAmount || 0).toFixed(2)}</span>
+                <span>{t("total")}: {(Number(amount) + Number(amount2)).toFixed(2)}</span>
+              </div>
+            </div>
+          )}
           <div className="space-y-2">
             <Label>{t("notes")}</Label>
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={1000} rows={2} />

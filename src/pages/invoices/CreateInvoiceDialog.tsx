@@ -532,14 +532,10 @@ export function CreateInvoiceDialog({
                 <span className="font-medium tabular-nums w-28 text-end text-success">- {formatMoney(couponDiscount, lang)}</span>
               </div>
             )}
-            <div className="flex items-center justify-between text-base font-bold border-t border-border pt-2">
-              <span>{t("total")}</span>
-              <span className="tabular-nums text-primary">{formatMoney(total, lang)}</span>
-            </div>
             {insuranceCompanyId && coverageRatio > 0 && (
               <>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{t("coveredAmount")}</span>
+                <div className="flex items-center justify-between text-sm border-t border-border pt-2">
+                  <span className="text-muted-foreground">{t("insuranceShare")} ({coverageRatio}%)</span>
                   <span className="font-medium tabular-nums text-success">{formatMoney(claimAmount, lang)}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
@@ -548,6 +544,10 @@ export function CreateInvoiceDialog({
                 </div>
               </>
             )}
+            <div className="flex items-center justify-between text-base font-bold border-t border-border pt-2">
+              <span>{t("finalTotal")}</span>
+              <span className="tabular-nums text-primary">{formatMoney(total, lang)}</span>
+            </div>
           </div>
         </div>
 

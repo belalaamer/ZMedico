@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
 import { RowActions } from "@/components/RowActions";
+import { ConsumablesEditor } from "@/components/ConsumablesEditor";
 
 export default function Procedures() {
   const { t, lang } = useI18n();
@@ -108,6 +109,9 @@ export default function Procedures() {
                 <div className="space-y-2"><Label>{t("doctorCommissionPercent")}</Label><Input type="number" min={0} max={100} step="0.01" value={form.doctor_commission_percent} onChange={(e) => setForm({ ...form, doctor_commission_percent: Number(e.target.value) })} /></div>
                 <div className="space-y-2 col-span-2"><Label>{t("description")}</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} maxLength={500} rows={2} /></div>
                 <div className="flex items-center justify-between border border-border rounded-lg px-3 py-2 col-span-2"><Label>{t("active")}</Label><Switch checked={form.is_active} onCheckedChange={(v) => setForm({ ...form, is_active: v })} /></div>
+              </div>
+              <div className="mt-3">
+                <ConsumablesEditor parentType="procedure" parentId={edit?.id ?? null} />
               </div>
               <DialogFooter><Button variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button><Button className="gradient-primary text-primary-foreground" onClick={save}>{t("save")}</Button></DialogFooter>
             </DialogContent>

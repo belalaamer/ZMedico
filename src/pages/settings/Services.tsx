@@ -14,6 +14,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { RowActions } from "@/components/RowActions";
+import { ConsumablesEditor } from "@/components/ConsumablesEditor";
 
 export default function Services() {
   const { t, lang } = useI18n();
@@ -121,6 +122,9 @@ export default function Services() {
                     <div><Label>{t("costPrice")}</Label><Input type="number" step="0.01" value={sf.cost_price ?? ""} onChange={e => setSF({ ...sf, cost_price: e.target.value === "" ? null : +e.target.value })} /></div>
                     <div className="flex items-center justify-between rounded-lg border p-2"><Label>{t("requiresAppointment")}</Label><Switch checked={!!sf.requires_appointment} onCheckedChange={v => setSF({ ...sf, requires_appointment: v })} /></div>
                     <div className="flex items-center justify-between rounded-lg border p-2"><Label>{t("availableOnline")}</Label><Switch checked={!!sf.available_online} onCheckedChange={v => setSF({ ...sf, available_online: v })} /></div>
+                  </div>
+                  <div className="mt-3">
+                    <ConsumablesEditor parentType="service" parentId={editS?.id ?? null} />
                   </div>
                   <DialogFooter><Button variant="ghost" onClick={() => setOS(false)}>{t("cancel")}</Button><Button className="gradient-primary text-primary-foreground" onClick={saveSv}>{t("save")}</Button></DialogFooter>
                 </DialogContent>

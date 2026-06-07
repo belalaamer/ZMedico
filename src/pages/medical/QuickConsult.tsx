@@ -75,7 +75,7 @@ export default function QuickConsult() {
   }, [form.weight, form.height]);
 
   const persist = async (status: "draft" | "completed"): Promise<string | null> => {
-    if (!form.patient_id) return toast.error(t("selectPatient"));
+    if (!form.patient_id) { toast.error(t("selectPatient")); return null; }
     setSaving(true);
     const { data: rec, error } = await supabase.from("medical_records").insert({
       patient_id: form.patient_id, branch_id: currentBranchId, doctor_id: user?.id ?? null,

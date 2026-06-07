@@ -224,7 +224,35 @@ export default function QuickConsult() {
 
         <div className="space-y-2"><Label>{t("chiefComplaint")}</Label><Textarea value={form.chief_complaint_en} onChange={(e) => setForm({ ...form, chief_complaint_en: e.target.value })} maxLength={1000} rows={2} /></div>
         <div className="space-y-2"><Label>{t("presentIllness")}</Label><Textarea value={form.present_illness_en} onChange={(e) => setForm({ ...form, present_illness_en: e.target.value })} maxLength={2000} rows={3} /></div>
-        <div className="space-y-2"><Label>{t("physicalExam")}</Label><Textarea value={form.physical_exam_en} onChange={(e) => setForm({ ...form, physical_exam_en: e.target.value })} maxLength={2000} rows={3} /></div>
+
+        <div className="rounded-lg border border-border p-4 space-y-3 bg-card">
+          <div className="flex items-center justify-between">
+            <Label className="text-base font-semibold">{t("physicalExam")}</Label>
+            <Badge variant="secondary" className="text-[10px]">{lang === "ar" ? "قسم سريري" : "Clinical Section"}</Badge>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {([
+              ["pe_general", lang === "ar" ? "عام / المظهر" : "General / Appearance"],
+              ["pe_heent", lang === "ar" ? "الرأس والعنق (HEENT)" : "HEENT"],
+              ["pe_chest", lang === "ar" ? "الصدر / الرئتين" : "Chest / Lungs"],
+              ["pe_cvs", lang === "ar" ? "القلب والأوعية (CVS)" : "Cardiovascular (CVS)"],
+              ["pe_abdomen", lang === "ar" ? "البطن" : "Abdomen"],
+              ["pe_extremities", lang === "ar" ? "الأطراف" : "Extremities"],
+              ["pe_neuro", lang === "ar" ? "العصبي" : "Neurological"],
+            ] as const).map(([key, label]) => (
+              <div key={key} className="space-y-1">
+                <Label className="text-xs text-muted-foreground">{label}</Label>
+                <Textarea
+                  value={(form as any)[key]}
+                  onChange={(e) => setForm({ ...form, [key]: e.target.value } as any)}
+                  maxLength={500}
+                  rows={2}
+                  placeholder={lang === "ar" ? "طبيعي / ملاحظات..." : "Normal / findings..."}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
 
         <div className="flex justify-end gap-2 pt-2 flex-wrap">
           <Button variant="outline" onClick={saveAndStay} disabled={saving}>{t("saveQuickConsult")}</Button>

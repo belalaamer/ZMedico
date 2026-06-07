@@ -3552,6 +3552,61 @@ export type Database = {
         }
         Relationships: []
       }
+      service_consumables: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          procedure_id: string | null
+          product_id: string
+          quantity: number
+          service_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          procedure_id?: string | null
+          product_id: string
+          quantity?: number
+          service_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          procedure_id?: string | null
+          product_id?: string
+          quantity?: number
+          service_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_consumables_procedure_id_fkey"
+            columns: ["procedure_id"]
+            isOneToOne: false
+            referencedRelation: "procedures"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_consumables_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_consumables_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       services: {
         Row: {
           available_online: boolean
@@ -4957,6 +5012,10 @@ export type Database = {
       default_treasury_for_branch: {
         Args: { _branch_id: string }
         Returns: string
+      }
+      fn_consume_for_invoice: {
+        Args: { _invoice_id: string }
+        Returns: undefined
       }
       generate_employee_id: { Args: never; Returns: string }
       generate_invoice_number: { Args: never; Returns: string }

@@ -72,6 +72,7 @@ export default function StaffDetail() {
             <Field label={t("hireDate")}>{formatDate(staff.hire_date, lang)}</Field>
             <Field label={t("contractType")}>{staff.contract_type}</Field>
             <Field label={t("salary")}>{formatMoney(staff.salary, lang, staff.salary_currency)}</Field>
+            <Field label={t("commissionPercent")}>{Number(staff.commission_percent ?? 0).toFixed(2)}%</Field>
             <Field label={t("weeklyHours")}>{staff.working_hours_per_week}</Field>
             <Field label={t("annualLeave")}>{staff.annual_leave_balance}</Field>
             <Field label={t("sickLeave")}>{staff.sick_leave_balance}</Field>

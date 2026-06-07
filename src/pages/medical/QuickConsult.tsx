@@ -25,7 +25,8 @@ export default function QuickConsult() {
   const [specs, setSpecs] = useState<any[]>([]);
   const [form, setForm] = useState({
     patient_id: "", specialty_id: "", visit_type: "consultation",
-    chief_complaint_en: "", present_illness_en: "", physical_exam_en: "",
+    chief_complaint_en: "", present_illness_en: "",
+    pe_general: "", pe_heent: "", pe_chest: "", pe_cvs: "", pe_abdomen: "", pe_extremities: "", pe_neuro: "",
     bp_sys: "", bp_dia: "", pulse: "", temp: "", weight: "", height: "",
   });
   const [saving, setSaving] = useState(false);
@@ -77,6 +78,21 @@ export default function QuickConsult() {
   const persist = async (status: "draft" | "completed"): Promise<string | null> => {
     if (!form.patient_id) { toast.error(t("selectPatient")); return null; }
     setSaving(true);
+    const peParts: string[] = [];
+    const peLabels: Record<string, string> = {
+      pe_general: lang === "ar" ? "عام" : "General",
+      pe_heent: "HEENT",
+      pe_chest: lang === "ar" ? "الصدر/الرئتين" : "Chest / Lungs",
+      pe_cvs: lang === "ar" ? "القلب والأوعية" : "CVS",
+      pe_abdomen: lang === "ar" ? "البطن" : "Abdomen",
+      pe_extremities: lang === "ar" ? "الأطراف" : "Extremities",
+      pe_neuro: lang === "ar" ? "العصبي" : "Neuro",
+    };
+    (["pe_general","pe_heent","pe_chest","pe_cvs","pe_abdomen","pe_extremities","pe_neuro"] as const).forEach((k) => {
+      const v = (form as any)[k]?.trim();
+      if (v) peParts.push(`• ${peLabels[k]}: ${v}`);
+    });
+    const physicalExamText = peParts.length ? `${lang === "ar" ? "الفحص السريري" : "Physical Examination"}\n${peParts.join("\n")}` : null;
     const { data: rec, error } = await supabase.from("medical_records").insert({
       patient_id: form.patient_id, branch_id: currentBranchId, doctor_id: user?.id ?? null,
       specialty_id: form.specialty_id || null, visit_type: form.visit_type as any,
@@ -84,8 +100,8 @@ export default function QuickConsult() {
       chief_complaint_ar: form.chief_complaint_en || null,
       present_illness_en: form.present_illness_en || null,
       present_illness_ar: form.present_illness_en || null,
-      notes_en: form.physical_exam_en || null,
-      notes_ar: form.physical_exam_en || null,
+      notes_en: physicalExamText,
+      notes_ar: physicalExamText,
       status,
     } as any).select("id").single();
     if (error || !rec) { setSaving(false); toast.error(error?.message ?? "error"); return null; }

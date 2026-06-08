@@ -257,6 +257,11 @@ export default function Schedules() {
                       <td className="p-2">
                         <div className="font-medium truncate">{profName(s.id)}</div>
                         <div className="text-[11px] text-muted-foreground">{s.employee_id}</div>
+                        {dirtyStaff[s.id] && (
+                          <Badge variant="outline" className="mt-1 text-[10px] py-0 px-1 border-amber-500 text-amber-600 bg-amber-500/10">
+                            {lang === "ar" ? "تغييرات غير محفوظة" : "Unsaved"}
+                          </Badge>
+                        )}
                         {rowIdx > 0 && (
                           <Button size="sm" variant="ghost" className="h-6 text-[11px] px-1 mt-1" onClick={() => copyFromAbove(s.id, rowIdx)}>
                             {t("copyFromAbove")}
@@ -324,7 +329,14 @@ export default function Schedules() {
                         </td>
                       ))}
                       <td className="p-2">
-                        <Button size="sm" variant="outline" onClick={() => saveCell(s.id)}>{t("save")}</Button>
+                        <Button
+                          size="sm"
+                          variant={dirtyStaff[s.id] ? "default" : "outline"}
+                          className={dirtyStaff[s.id] ? "gradient-primary text-primary-foreground" : ""}
+                          onClick={() => saveCell(s.id)}
+                        >
+                          {t("save")}{dirtyStaff[s.id] ? " •" : ""}
+                        </Button>
                       </td>
                     </tr>
                   );
@@ -353,6 +365,11 @@ export default function Schedules() {
               {lang === "ar" ? `تطبيق ساعات الفرع (${branchHours.start} - ${branchHours.end})` : `Apply branch hours (${branchHours.start} - ${branchHours.end})`}
             </Button>
             <Button className="gradient-primary text-primary-foreground" onClick={save} disabled={!staffId}>{t("save")}</Button>
+            {detailedDirty && staffId && (
+              <Badge variant="outline" className="text-[11px] border-amber-500 text-amber-600 bg-amber-500/10">
+                {lang === "ar" ? "تغييرات غير محفوظة" : "Unsaved changes"}
+              </Badge>
+            )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
             {slots.map((s, i) => (

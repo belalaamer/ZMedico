@@ -168,7 +168,7 @@ export default function Schedules() {
   };
 
   const confirmApply = () => {
-    if (selectedIds.length === 0) { toast.error(t("clearSelection") ?? "Select staff first"); return; }
+    if (selectedIds.length === 0) { toast.error(lang === "ar" ? "اختر موظفين أولاً" : "Select staff first"); return; }
     setPendingApply({ kind: "branch" });
   };
 
@@ -210,7 +210,7 @@ export default function Schedules() {
         <TabsContent value="weekly" className="space-y-3">
           <div className="flex items-center gap-2 flex-wrap">
             <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("search") ?? "Search"} className="w-64" />
-            <Badge variant="outline">{selectedIds.length} {t("selected") ?? "selected"}</Badge>
+            <Badge variant="outline">{selectedIds.length} {lang === "ar" ? "محدد" : "selected"}</Badge>
             <Button variant="outline" size="sm" onClick={() => { const m: Record<string, boolean> = {}; filteredStaff.forEach((s) => { m[s.id] = true; }); setSelected(m); }}>
               {lang === "ar" ? "تحديد الكل" : "Select all"}
             </Button>
@@ -366,7 +366,7 @@ export default function Schedules() {
             <AlertDialogDescription>{t("overwriteScheduleConfirm")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("cancel") ?? "Cancel"}</AlertDialogCancel>
+            <AlertDialogCancel>{lang === "ar" ? "إلغاء" : "Cancel"}</AlertDialogCancel>
             <AlertDialogAction onClick={doApplyBranchHoursToSelected}>{t("save")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

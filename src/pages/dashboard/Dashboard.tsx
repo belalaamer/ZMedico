@@ -287,26 +287,38 @@ export default function Dashboard() {
     return lang === "ar" ? (ar || en || "—") : (en || ar || "—");
   };
 
-  const StatCard = ({ label, value, sub, icon: Icon, tone, to, subValue }: any) => (
-    <Card className="p-4 shadow-card border-border/60 hover:shadow-elegant transition-shadow">
-      <div className="flex items-start justify-between">
-        <div className="text-xs font-medium text-muted-foreground">{label}</div>
-        <div className={`size-8 rounded-lg bg-gradient-to-br ${tone} text-white flex items-center justify-center`}>
-          <Icon className="size-4" />
+  const StatCard = ({ label, value, sub, icon: Icon, tone, to, subValue }: any) => {
+    const inner = (
+      <>
+        <div className="flex items-start justify-between">
+          <div className="text-xs font-medium text-muted-foreground">{label}</div>
+          <div className={`size-8 rounded-lg bg-gradient-to-br ${tone} text-white flex items-center justify-center`}>
+            <Icon className="size-4" />
+          </div>
         </div>
-      </div>
-      <div className="mt-3 text-2xl font-bold tabular-nums">{loading ? <Skeleton className="h-7 w-24" /> : value}</div>
-      {sub && <div className="text-[11px] text-muted-foreground mt-1">{loading ? <Skeleton className="h-3 w-20" /> : sub}</div>}
-      {subValue !== undefined && !loading && (
-        <div className="text-[11px] text-muted-foreground mt-1 tabular-nums">{subValue}</div>
-      )}
-      {to && !loading && (
-        <Button asChild variant="ghost" size="sm" className="mt-2 -ms-2 h-7 px-2 text-xs">
-          <Link to={to}>→</Link>
-        </Button>
-      )}
-    </Card>
-  );
+        <div className="mt-3 text-2xl font-bold tabular-nums">{loading ? <Skeleton className="h-7 w-24" /> : value}</div>
+        {sub && <div className="text-[11px] text-muted-foreground mt-1">{loading ? <Skeleton className="h-3 w-20" /> : sub}</div>}
+        {subValue !== undefined && !loading && (
+          <div className="text-[11px] text-muted-foreground mt-1 tabular-nums">{subValue}</div>
+        )}
+      </>
+    );
+    const baseCls = "p-4 shadow-card border-border/60 transition-shadow";
+    if (to && !loading) {
+      return (
+        <Link
+          to={to}
+          aria-label={typeof label === "string" ? label : undefined}
+          className="block rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
+          <Card className={`${baseCls} hover:shadow-elegant hover:border-primary/40 cursor-pointer h-full`}>
+            {inner}
+          </Card>
+        </Link>
+      );
+    }
+    return <Card className={`${baseCls} hover:shadow-elegant`}>{inner}</Card>;
+  };
 
   return (
     <div className="space-y-6">
@@ -368,7 +380,7 @@ export default function Dashboard() {
             <StatCard
               label={t("todayAppointments")} value={todayAppts}
               sub={`${apptStatusToday.completed ?? 0} ${t("statusCompleted")} · ${apptStatusToday.scheduled ?? 0} ${t("statusScheduled")}`}
-              icon={CalendarCheck} tone="from-primary to-primary-glow" to="/calendar"
+              icon={CalendarCheck} tone="from-primary to-primary-glow" to={`/calendar?date=${new Date().toISOString().slice(0,10)}`}
             />
             <StatCard
               label={t("newPatientsToday")} value={newPatientsToday}
@@ -385,7 +397,7 @@ export default function Dashboard() {
             />
             <StatCard
               label={t("todaysConsultations")} value={todayConsults}
-              icon={Stethoscope} tone="from-primary-glow to-primary" to="/medical/quick-consult"
+              icon={Stethoscope} tone="from-primary-glow to-primary" to={`/calendar?date=${new Date().toISOString().slice(0,10)}`}
             />
             <StatCard
               label={t("pendingRecords")} value={draftRecords}

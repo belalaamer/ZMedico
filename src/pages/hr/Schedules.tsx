@@ -37,6 +37,8 @@ export default function Schedules() {
   const [roomSuggestions, setRoomSuggestions] = useState<string[]>([]);
   const [pendingApply, setPendingApply] = useState<null | { kind: "branch" | "template"; template?: Slot[] }>(null);
   const [savingPlanner, setSavingPlanner] = useState(false);
+  const [dirtyStaff, setDirtyStaff] = useState<Record<string, boolean>>({});
+  const [detailedDirty, setDetailedDirty] = useState(false);
 
   useEffect(() => {
     if (!currentBranchId) return;
@@ -104,7 +106,12 @@ export default function Schedules() {
   }, [staffId, branchHours.start, branchHours.end]);
 
   const profName = (id: string) => profiles.find((p) => p.id === id)?.full_name ?? profiles.find((p) => p.id === id)?.email ?? id;
-  const update = (i: number, patch: Partial<Slot>) => setSlots((arr) => arr.map((s, idx) => idx === i ? { ...s, ...patch } : s));
+  const update = (i: number, patch: Partial<Slot>) => {
+    setSlots((arr) => arr.map((s, idx) => idx === i ? { ...s, ...patch } : s));
+    setDetailedDirty(true);
+  };
+
+  const invalidShift = (s: Slot) => s.is_working_day && s.start_time >= s.end_time;
 
   const applyBranchHours = () => {
     setSlots((arr) => arr.map((s) => s.is_working_day ? { ...s, start_time: branchHours.start, end_time: branchHours.end } : s));
@@ -113,6 +120,8 @@ export default function Schedules() {
 
   const save = async () => {
     if (!staffId) { toast.error("Select staff"); return; }
+    const bad = slots.find(invalidShift);
+    if (bad) { toast.error(lang === "ar" ? "وقت البدء يجب أن يكون قبل وقت الانتهاء" : "Start time must be before end time"); return; }
     await supabase.from("work_schedules").delete().eq("staff_id", staffId).eq("branch_id", currentBranchId ?? "");
     const rows = slots.map((s) => ({
       staff_id: staffId, branch_id: currentBranchId ?? null,
@@ -124,6 +133,7 @@ export default function Schedules() {
     toast.success(t("save"));
     // refresh planner cache
     setAllSchedules((prev) => ({ ...prev, [staffId]: slots.map((s) => ({ ...s })) }));
+    setDetailedDirty(false);
   };
 
   // ---------- Planner helpers ----------
@@ -141,6 +151,7 @@ export default function Schedules() {
       const next = base.map((s) => s.day_of_week === day ? { ...s, ...patch } : s);
       return { ...prev, [sid]: next };
     });
+    setDirtyStaff((p) => ({ ...p, [sid]: true }));
   };
 
   const saveStaffSchedule = async (sid: string, rows: Slot[]) => {
@@ -155,8 +166,12 @@ export default function Schedules() {
 
   const saveCell = async (sid: string) => {
     const rows = allSchedules[sid] ?? blank(branchHours.start, branchHours.end);
+    const bad = rows.find(invalidShift);
+    if (bad) { toast.error(lang === "ar" ? "وقت البدء يجب أن يكون قبل وقت الانتهاء" : "Start time must be before end time"); return; }
     const { error } = await saveStaffSchedule(sid, rows);
-    if (error) toast.error(error.message); else toast.success(t("save"));
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("save"));
+    setDirtyStaff((p) => { const n = { ...p }; delete n[sid]; return n; });
   };
 
   const copyFromAbove = (sid: string, index: number) => {
@@ -164,6 +179,7 @@ export default function Schedules() {
     const aboveId = filteredStaff[index - 1].id;
     const above = allSchedules[aboveId] ?? blank(branchHours.start, branchHours.end);
     setAllSchedules((prev) => ({ ...prev, [sid]: above.map((s) => ({ ...s })) }));
+    setDirtyStaff((p) => ({ ...p, [sid]: true }));
     toast.message(t("copyFromAbove"));
   };
 
@@ -183,6 +199,7 @@ export default function Schedules() {
         if (error) { toast.error(error.message); return; }
       }
       setAllSchedules(next);
+      setDirtyStaff((p) => { const n = { ...p }; selectedIds.forEach((id) => delete n[id]); return n; });
       toast.success(t("save"));
       setSelected({});
     } finally {

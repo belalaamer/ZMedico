@@ -61,6 +61,7 @@ export default function Dashboard() {
   const [revenue7d, setRevenue7d] = useState<{ date: string; revenue: number }[]>([]);
   const [apptStatusAll, setApptStatusAll] = useState<{ name: string; value: number }[]>([]);
   const [ageGroups, setAgeGroups] = useState<{ name: string; value: number }[]>([]);
+  const [referralGroups, setReferralGroups] = useState<{ name: string; value: number }[]>([]);
   const [doctorPerf, setDoctorPerf] = useState<{ name: string; value: number }[]>([]);
   const [topServices, setTopServices] = useState<{ name: string; count: number; revenue: number }[]>([]);
 
@@ -128,7 +129,7 @@ export default function Dashboard() {
         branchEq(supabase.from("payments").select("payment_date,amount").is("deleted_at", null)
           .gte("payment_date", rangeStart).lte("payment_date", rangeEnd)),
         branchEq(supabase.from("appointments").select("status").is("deleted_at", null).gte("scheduled_at", rs.toISOString()).lte("scheduled_at", re.toISOString())),
-        branchEq(supabase.from("patients").select("dob").is("deleted_at", null)),
+        branchEq(supabase.from("patients").select("dob,referral_source").is("deleted_at", null)),
         branchEq(supabase.from("patients").select("id,first_name_en,first_name_ar,last_name_en,last_name_ar,phone,created_at")
           .is("deleted_at", null)
           .order("created_at", { ascending: false }).limit(5)),
@@ -192,6 +193,29 @@ export default function Dashboard() {
         if (b) ageMap.set(b, (ageMap.get(b) ?? 0) + 1);
       }
       setAgeGroups(Array.from(ageMap, ([name, value]) => ({ name, value })));
+
+      // Referral sources (top N + Unknown bucket). Light normalization only (trim + lowercase key).
+      const refMap = new Map<string, { label: string; count: number }>();
+      const unknownLabel = lang === "ar" ? "غير محدد" : "Unknown";
+      for (const r of (ptAllRes.data ?? []) as any[]) {
+        const raw = (r.referral_source ?? "").toString().trim();
+        const key = raw ? raw.toLowerCase() : "__unknown__";
+        const label = raw || unknownLabel;
+        const cur = refMap.get(key) ?? { label, count: 0 };
+        cur.count += 1;
+        refMap.set(key, cur);
+      }
+      const sortedRefs = Array.from(refMap.values()).sort((a, b) => b.count - a.count);
+      const topRefs = sortedRefs.slice(0, 6);
+      const restRefs = sortedRefs.slice(6);
+      // Merge tail into Unknown to keep chart readable
+      if (restRefs.length) {
+        const restTotal = restRefs.reduce((s, r) => s + r.count, 0);
+        const existingIdx = topRefs.findIndex((r) => r.label === unknownLabel);
+        if (existingIdx >= 0) topRefs[existingIdx].count += restTotal;
+        else topRefs.push({ label: unknownLabel, count: restTotal });
+      }
+      setReferralGroups(topRefs.map((r) => ({ name: r.label, value: r.count })));
 
       setRecentPatients(recentPtRes.data ?? []);
       setRecentAppts(recentApptRes.data ?? []);

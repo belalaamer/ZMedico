@@ -34,6 +34,7 @@ export default function Payroll() {
   const [detailRows, setDetailRows] = useState<any[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [commByStaff, setCommByStaff] = useState<Record<string, number>>({});
+  const [commAttached, setCommAttached] = useState<Record<string, boolean>>({});
 
   const load = async () => {
     let q = supabase.from("payroll").select("*").eq("period_year", year).eq("period_month", month);
@@ -49,12 +50,14 @@ export default function Payroll() {
     // Build per-staff commission totals to show as a visible line on each payroll row.
     const rows = data ?? [];
     const out: Record<string, number> = {};
+    const attachedFlag: Record<string, boolean> = {};
     await Promise.all(rows.map(async (pr: any) => {
       // Attached → use commissions tied to this payroll (post-paid).
       const { data: att } = await (supabase as any)
         .from("doctor_commissions").select("commission_amount").eq("payroll_id", pr.id);
       if (att && att.length > 0) {
         out[pr.id] = att.reduce((sum: number, r: any) => sum + Number(r.commission_amount || 0), 0);
+        attachedFlag[pr.id] = true;
         return;
       }
       // Otherwise → preview unattached earned/partial for this doctor.
@@ -62,8 +65,10 @@ export default function Payroll() {
         .from("doctor_commissions").select("commission_amount")
         .eq("doctor_id", pr.staff_id).is("payroll_id", null).in("status", ["earned", "partial"]);
       out[pr.id] = (pend ?? []).reduce((sum: number, r: any) => sum + Number(r.commission_amount || 0), 0);
+      attachedFlag[pr.id] = false;
     }));
     setCommByStaff(out);
+    setCommAttached(attachedFlag);
   };
   useEffect(() => { load(); }, [year, month, currentBranchId]);
 
@@ -186,7 +191,12 @@ export default function Payroll() {
                     <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5">
                       <span>{t("baseSalary")}: <span className="tabular-nums">{formatMoney(p.base_salary, lang)}</span></span>
                       <span className="text-primary">{t("commissions")}: <span className="tabular-nums font-medium">{formatMoney(commByStaff[p.id] ?? 0, lang)}</span></span>
-                      <span>{t("bonuses")}: <span className="tabular-nums">{formatMoney(p.bonuses, lang)}</span></span>
+                      <span>{t("bonuses")}: <span className="tabular-nums">{formatMoney(
+                        commAttached[p.id]
+                          ? Math.max(0, Number(p.bonuses || 0) - Number(commByStaff[p.id] ?? 0))
+                          : Number(p.bonuses || 0),
+                        lang
+                      )}</span></span>
                       <span>{t("deductions")}: <span className="tabular-nums">{formatMoney(p.deductions, lang)}</span></span>
                     </div>
                   </div>

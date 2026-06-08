@@ -34,6 +34,7 @@ export default function Payroll() {
   const [detailRows, setDetailRows] = useState<any[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [commByStaff, setCommByStaff] = useState<Record<string, number>>({});
+  const [commAttached, setCommAttached] = useState<Record<string, boolean>>({});
 
   const load = async () => {
     let q = supabase.from("payroll").select("*").eq("period_year", year).eq("period_month", month);

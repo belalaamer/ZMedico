@@ -44,6 +44,14 @@ function ageBucket(dob: string | null): string | null {
   return "60+";
 }
 
+function localToday(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export default function Dashboard() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
@@ -305,10 +313,13 @@ export default function Dashboard() {
     );
     const baseCls = "p-4 shadow-card border-border/60 transition-shadow";
     if (to && !loading) {
+      const ariaLabel = typeof label === "string"
+        ? (value !== undefined && value !== null && value !== "" ? `${label}: ${value}` : label)
+        : undefined;
       return (
         <Link
           to={to}
-          aria-label={typeof label === "string" ? label : undefined}
+          aria-label={ariaLabel}
           className="block rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           <Card className={`${baseCls} hover:shadow-elegant hover:border-primary/40 cursor-pointer h-full`}>
@@ -380,7 +391,7 @@ export default function Dashboard() {
             <StatCard
               label={t("todayAppointments")} value={todayAppts}
               sub={`${apptStatusToday.completed ?? 0} ${t("statusCompleted")} · ${apptStatusToday.scheduled ?? 0} ${t("statusScheduled")}`}
-              icon={CalendarCheck} tone="from-primary to-primary-glow" to={`/calendar?date=${new Date().toISOString().slice(0,10)}`}
+              icon={CalendarCheck} tone="from-primary to-primary-glow" to={`/calendar?date=${localToday()}`}
             />
             <StatCard
               label={t("newPatientsToday")} value={newPatientsToday}
@@ -397,7 +408,7 @@ export default function Dashboard() {
             />
             <StatCard
               label={t("todaysConsultations")} value={todayConsults}
-              icon={Stethoscope} tone="from-primary-glow to-primary" to={`/calendar?date=${new Date().toISOString().slice(0,10)}`}
+              icon={Stethoscope} tone="from-primary-glow to-primary" to={`/calendar?date=${localToday()}`}
             />
             <StatCard
               label={t("pendingRecords")} value={draftRecords}

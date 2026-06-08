@@ -445,22 +445,43 @@ export default function Dashboard() {
             </Card>
           </div>
 
-          <Card className="p-5 shadow-card border-border/60">
-            <div className="text-sm font-medium mb-3">{t("patientsByAge")}</div>
-            {loading ? <Skeleton className="h-56 w-full" /> : (
-              <div className="h-56">
-                <ResponsiveContainer>
-                  <BarChart data={ageGroups}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} allowDecimals={false} />
-                    <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} />
-                    <Bar dataKey="value" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </Card>
+          <div className="grid lg:grid-cols-2 gap-4">
+            <Card className="p-5 shadow-card border-border/60">
+              <div className="text-sm font-medium mb-3">{t("patientsByAge")}</div>
+              {loading ? <Skeleton className="h-56 w-full" /> : (
+                <div className="h-56">
+                  <ResponsiveContainer>
+                    <BarChart data={ageGroups}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                      <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} allowDecimals={false} />
+                      <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} />
+                      <Bar dataKey="value" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </Card>
+
+            <Card className="p-5 shadow-card border-border/60">
+              <div className="text-sm font-medium mb-3">{t("patientsByReferral")}</div>
+              {loading ? <Skeleton className="h-56 w-full" /> : referralGroups.length === 0 || referralGroups.every((r) => r.value === 0) ? (
+                <div className="h-56 flex items-center justify-center text-sm text-muted-foreground">{t("noDataYet")}</div>
+              ) : (
+                <div className="h-56">
+                  <ResponsiveContainer>
+                    <BarChart data={referralGroups} layout="vertical" margin={{ left: 8, right: 16 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12} allowDecimals={false} />
+                      <YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} width={110} />
+                      <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} />
+                      <Bar dataKey="value" fill="hsl(var(--info))" radius={[0, 6, 6, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </Card>
+          </div>
 
           <div className="grid lg:grid-cols-2 gap-4">
             <Card className="p-5 shadow-card border-border/60">

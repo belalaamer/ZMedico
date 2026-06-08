@@ -191,7 +191,12 @@ export default function Payroll() {
                     <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5">
                       <span>{t("baseSalary")}: <span className="tabular-nums">{formatMoney(p.base_salary, lang)}</span></span>
                       <span className="text-primary">{t("commissions")}: <span className="tabular-nums font-medium">{formatMoney(commByStaff[p.id] ?? 0, lang)}</span></span>
-                      <span>{t("bonuses")}: <span className="tabular-nums">{formatMoney(p.bonuses, lang)}</span></span>
+                      <span>{t("bonuses")}: <span className="tabular-nums">{formatMoney(
+                        commAttached[p.id]
+                          ? Math.max(0, Number(p.bonuses || 0) - Number(commByStaff[p.id] ?? 0))
+                          : Number(p.bonuses || 0),
+                        lang
+                      )}</span></span>
                       <span>{t("deductions")}: <span className="tabular-nums">{formatMoney(p.deductions, lang)}</span></span>
                     </div>
                   </div>

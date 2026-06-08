@@ -4913,6 +4913,7 @@ export type Database = {
           end_time: string
           id: string
           is_working_day: boolean
+          room: string | null
           staff_id: string
           start_time: string
           updated_at: string
@@ -4924,6 +4925,7 @@ export type Database = {
           end_time: string
           id?: string
           is_working_day?: boolean
+          room?: string | null
           staff_id: string
           start_time: string
           updated_at?: string
@@ -4935,6 +4937,7 @@ export type Database = {
           end_time?: string
           id?: string
           is_working_day?: boolean
+          room?: string | null
           staff_id?: string
           start_time?: string
           updated_at?: string

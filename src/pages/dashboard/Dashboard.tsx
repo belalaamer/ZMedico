@@ -61,6 +61,7 @@ export default function Dashboard() {
   const [revenue7d, setRevenue7d] = useState<{ date: string; revenue: number }[]>([]);
   const [apptStatusAll, setApptStatusAll] = useState<{ name: string; value: number }[]>([]);
   const [ageGroups, setAgeGroups] = useState<{ name: string; value: number }[]>([]);
+  const [referralGroups, setReferralGroups] = useState<{ name: string; value: number }[]>([]);
   const [doctorPerf, setDoctorPerf] = useState<{ name: string; value: number }[]>([]);
   const [topServices, setTopServices] = useState<{ name: string; count: number; revenue: number }[]>([]);
 
@@ -128,7 +129,7 @@ export default function Dashboard() {
         branchEq(supabase.from("payments").select("payment_date,amount").is("deleted_at", null)
           .gte("payment_date", rangeStart).lte("payment_date", rangeEnd)),
         branchEq(supabase.from("appointments").select("status").is("deleted_at", null).gte("scheduled_at", rs.toISOString()).lte("scheduled_at", re.toISOString())),
-        branchEq(supabase.from("patients").select("dob").is("deleted_at", null)),
+        branchEq(supabase.from("patients").select("dob,referral_source").is("deleted_at", null)),
         branchEq(supabase.from("patients").select("id,first_name_en,first_name_ar,last_name_en,last_name_ar,phone,created_at")
           .is("deleted_at", null)
           .order("created_at", { ascending: false }).limit(5)),
@@ -192,6 +193,29 @@ export default function Dashboard() {
         if (b) ageMap.set(b, (ageMap.get(b) ?? 0) + 1);
       }
       setAgeGroups(Array.from(ageMap, ([name, value]) => ({ name, value })));
+
+      // Referral sources (top N + Unknown bucket). Light normalization only (trim + lowercase key).
+      const refMap = new Map<string, { label: string; count: number }>();
+      const unknownLabel = lang === "ar" ? "غير محدد" : "Unknown";
+      for (const r of (ptAllRes.data ?? []) as any[]) {
+        const raw = (r.referral_source ?? "").toString().trim();
+        const key = raw ? raw.toLowerCase() : "__unknown__";
+        const label = raw || unknownLabel;
+        const cur = refMap.get(key) ?? { label, count: 0 };
+        cur.count += 1;
+        refMap.set(key, cur);
+      }
+      const sortedRefs = Array.from(refMap.values()).sort((a, b) => b.count - a.count);
+      const topRefs = sortedRefs.slice(0, 6);
+      const restRefs = sortedRefs.slice(6);
+      // Merge tail into Unknown to keep chart readable
+      if (restRefs.length) {
+        const restTotal = restRefs.reduce((s, r) => s + r.count, 0);
+        const existingIdx = topRefs.findIndex((r) => r.label === unknownLabel);
+        if (existingIdx >= 0) topRefs[existingIdx].count += restTotal;
+        else topRefs.push({ label: unknownLabel, count: restTotal });
+      }
+      setReferralGroups(topRefs.map((r) => ({ name: r.label, value: r.count })));
 
       setRecentPatients(recentPtRes.data ?? []);
       setRecentAppts(recentApptRes.data ?? []);
@@ -263,26 +287,38 @@ export default function Dashboard() {
     return lang === "ar" ? (ar || en || "—") : (en || ar || "—");
   };
 
-  const StatCard = ({ label, value, sub, icon: Icon, tone, to, subValue }: any) => (
-    <Card className="p-4 shadow-card border-border/60 hover:shadow-elegant transition-shadow">
-      <div className="flex items-start justify-between">
-        <div className="text-xs font-medium text-muted-foreground">{label}</div>
-        <div className={`size-8 rounded-lg bg-gradient-to-br ${tone} text-white flex items-center justify-center`}>
-          <Icon className="size-4" />
+  const StatCard = ({ label, value, sub, icon: Icon, tone, to, subValue }: any) => {
+    const inner = (
+      <>
+        <div className="flex items-start justify-between">
+          <div className="text-xs font-medium text-muted-foreground">{label}</div>
+          <div className={`size-8 rounded-lg bg-gradient-to-br ${tone} text-white flex items-center justify-center`}>
+            <Icon className="size-4" />
+          </div>
         </div>
-      </div>
-      <div className="mt-3 text-2xl font-bold tabular-nums">{loading ? <Skeleton className="h-7 w-24" /> : value}</div>
-      {sub && <div className="text-[11px] text-muted-foreground mt-1">{loading ? <Skeleton className="h-3 w-20" /> : sub}</div>}
-      {subValue !== undefined && !loading && (
-        <div className="text-[11px] text-muted-foreground mt-1 tabular-nums">{subValue}</div>
-      )}
-      {to && !loading && (
-        <Button asChild variant="ghost" size="sm" className="mt-2 -ms-2 h-7 px-2 text-xs">
-          <Link to={to}>→</Link>
-        </Button>
-      )}
-    </Card>
-  );
+        <div className="mt-3 text-2xl font-bold tabular-nums">{loading ? <Skeleton className="h-7 w-24" /> : value}</div>
+        {sub && <div className="text-[11px] text-muted-foreground mt-1">{loading ? <Skeleton className="h-3 w-20" /> : sub}</div>}
+        {subValue !== undefined && !loading && (
+          <div className="text-[11px] text-muted-foreground mt-1 tabular-nums">{subValue}</div>
+        )}
+      </>
+    );
+    const baseCls = "p-4 shadow-card border-border/60 transition-shadow";
+    if (to && !loading) {
+      return (
+        <Link
+          to={to}
+          aria-label={typeof label === "string" ? label : undefined}
+          className="block rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
+          <Card className={`${baseCls} hover:shadow-elegant hover:border-primary/40 cursor-pointer h-full`}>
+            {inner}
+          </Card>
+        </Link>
+      );
+    }
+    return <Card className={`${baseCls} hover:shadow-elegant`}>{inner}</Card>;
+  };
 
   return (
     <div className="space-y-6">
@@ -344,7 +380,7 @@ export default function Dashboard() {
             <StatCard
               label={t("todayAppointments")} value={todayAppts}
               sub={`${apptStatusToday.completed ?? 0} ${t("statusCompleted")} · ${apptStatusToday.scheduled ?? 0} ${t("statusScheduled")}`}
-              icon={CalendarCheck} tone="from-primary to-primary-glow" to="/calendar"
+              icon={CalendarCheck} tone="from-primary to-primary-glow" to={`/calendar?date=${new Date().toISOString().slice(0,10)}`}
             />
             <StatCard
               label={t("newPatientsToday")} value={newPatientsToday}
@@ -361,7 +397,7 @@ export default function Dashboard() {
             />
             <StatCard
               label={t("todaysConsultations")} value={todayConsults}
-              icon={Stethoscope} tone="from-primary-glow to-primary" to="/medical/quick-consult"
+              icon={Stethoscope} tone="from-primary-glow to-primary" to={`/calendar?date=${new Date().toISOString().slice(0,10)}`}
             />
             <StatCard
               label={t("pendingRecords")} value={draftRecords}
@@ -409,22 +445,43 @@ export default function Dashboard() {
             </Card>
           </div>
 
-          <Card className="p-5 shadow-card border-border/60">
-            <div className="text-sm font-medium mb-3">{t("patientsByAge")}</div>
-            {loading ? <Skeleton className="h-56 w-full" /> : (
-              <div className="h-56">
-                <ResponsiveContainer>
-                  <BarChart data={ageGroups}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} allowDecimals={false} />
-                    <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} />
-                    <Bar dataKey="value" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </Card>
+          <div className="grid lg:grid-cols-2 gap-4">
+            <Card className="p-5 shadow-card border-border/60">
+              <div className="text-sm font-medium mb-3">{t("patientsByAge")}</div>
+              {loading ? <Skeleton className="h-56 w-full" /> : (
+                <div className="h-56">
+                  <ResponsiveContainer>
+                    <BarChart data={ageGroups}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                      <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} allowDecimals={false} />
+                      <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} />
+                      <Bar dataKey="value" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </Card>
+
+            <Card className="p-5 shadow-card border-border/60">
+              <div className="text-sm font-medium mb-3">{t("patientsByReferral")}</div>
+              {loading ? <Skeleton className="h-56 w-full" /> : referralGroups.length === 0 || referralGroups.every((r) => r.value === 0) ? (
+                <div className="h-56 flex items-center justify-center text-sm text-muted-foreground">{t("noDataYet")}</div>
+              ) : (
+                <div className="h-56">
+                  <ResponsiveContainer>
+                    <BarChart data={referralGroups} layout="vertical" margin={{ left: 8, right: 16 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12} allowDecimals={false} />
+                      <YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} width={110} />
+                      <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} />
+                      <Bar dataKey="value" fill="hsl(var(--info))" radius={[0, 6, 6, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </Card>
+          </div>
 
           <div className="grid lg:grid-cols-2 gap-4">
             <Card className="p-5 shadow-card border-border/60">

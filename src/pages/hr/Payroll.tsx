@@ -49,12 +49,14 @@ export default function Payroll() {
     // Build per-staff commission totals to show as a visible line on each payroll row.
     const rows = data ?? [];
     const out: Record<string, number> = {};
+    const attachedFlag: Record<string, boolean> = {};
     await Promise.all(rows.map(async (pr: any) => {
       // Attached → use commissions tied to this payroll (post-paid).
       const { data: att } = await (supabase as any)
         .from("doctor_commissions").select("commission_amount").eq("payroll_id", pr.id);
       if (att && att.length > 0) {
         out[pr.id] = att.reduce((sum: number, r: any) => sum + Number(r.commission_amount || 0), 0);
+        attachedFlag[pr.id] = true;
         return;
       }
       // Otherwise → preview unattached earned/partial for this doctor.
@@ -62,8 +64,10 @@ export default function Payroll() {
         .from("doctor_commissions").select("commission_amount")
         .eq("doctor_id", pr.staff_id).is("payroll_id", null).in("status", ["earned", "partial"]);
       out[pr.id] = (pend ?? []).reduce((sum: number, r: any) => sum + Number(r.commission_amount || 0), 0);
+      attachedFlag[pr.id] = false;
     }));
     setCommByStaff(out);
+    setCommAttached(attachedFlag);
   };
   useEffect(() => { load(); }, [year, month, currentBranchId]);
 

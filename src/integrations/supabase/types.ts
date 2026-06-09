@@ -4616,6 +4616,72 @@ export type Database = {
           },
         ]
       }
+      treasury_daily_closes: {
+        Row: {
+          branch_id: string
+          business_date: string
+          closed_at: string
+          closed_by: string | null
+          counted_cash: number
+          created_at: string
+          expected_cash: number
+          id: string
+          non_cash_total: number
+          notes: string | null
+          opening_cash: number
+          treasury_id: string
+          updated_at: string
+          variance: number | null
+        }
+        Insert: {
+          branch_id: string
+          business_date: string
+          closed_at?: string
+          closed_by?: string | null
+          counted_cash?: number
+          created_at?: string
+          expected_cash?: number
+          id?: string
+          non_cash_total?: number
+          notes?: string | null
+          opening_cash?: number
+          treasury_id: string
+          updated_at?: string
+          variance?: number | null
+        }
+        Update: {
+          branch_id?: string
+          business_date?: string
+          closed_at?: string
+          closed_by?: string | null
+          counted_cash?: number
+          created_at?: string
+          expected_cash?: number
+          id?: string
+          non_cash_total?: number
+          notes?: string | null
+          opening_cash?: number
+          treasury_id?: string
+          updated_at?: string
+          variance?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "treasury_daily_closes_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "treasury_daily_closes_treasury_id_fkey"
+            columns: ["treasury_id"]
+            isOneToOne: false
+            referencedRelation: "treasury"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       treasury_transactions: {
         Row: {
           amount: number
@@ -5146,6 +5212,16 @@ export type Database = {
         Returns: {
           covered_amount: number
           rule_id: string
+        }[]
+      }
+      fn_treasury_day_cash_summary: {
+        Args: { _business_date: string; _treasury_id: string }
+        Returns: {
+          cash_expense: number
+          cash_income: number
+          expected_cash: number
+          non_cash_total: number
+          opening_cash: number
         }[]
       }
       generate_employee_id: { Args: never; Returns: string }

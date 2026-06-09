@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
-import { Settings, Building2, Calendar, FileText, CreditCard, Briefcase, Bell, Mail, MessageSquare, Phone, Languages, ShieldCheck, Users, HardDrive, ScrollText, Info, GitBranch, Send, Shield } from "lucide-react";
+import { Settings, Building2, Calendar, FileText, CreditCard, Briefcase, Bell, Mail, MessageSquare, Phone, Languages, ShieldCheck, Users, HardDrive, ScrollText, Info, GitBranch, Send, Shield, FileSignature } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { cn } from "@/lib/utils";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -16,6 +16,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
     { to: "/settings/payments", icon: CreditCard, label: t("paymentMethods") },
     { to: "/settings/services", icon: Briefcase, label: t("servicesMgmt") },
     { to: "/settings/insurance", icon: Shield, label: t("insuranceCompanies") },
+    { to: "/settings/insurance-contracts", icon: FileSignature, label: t("insuranceContracts") },
     { to: "/settings/notifications", icon: Bell, label: t("notificationSettings") },
     { to: "/settings/reminders", icon: Send, label: t("reminders") },
     { to: "/settings/templates/email", icon: Mail, label: t("emailTemplates") },

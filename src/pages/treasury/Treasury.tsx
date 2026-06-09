@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useDataSync } from "@/lib/dataSync";
-import { Banknote, ArrowDownToLine, ArrowUpFromLine, TrendingUp, ArrowLeftRight } from "lucide-react";
+import { Banknote, ArrowDownToLine, ArrowUpFromLine, TrendingUp, ArrowLeftRight, Lock } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -89,6 +90,11 @@ export default function Treasury() {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("treasury")}</h1>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link to="/treasury/daily-close">
+              <Lock className="me-2 size-4" />{lang === "ar" ? "الإقفال اليومي" : "Daily close"}
+            </Link>
+          </Button>
           <Button variant="outline" onClick={() => setTransferOpen(true)} disabled={treasuries.length < 2}>
             <ArrowLeftRight className="me-2 size-4" />{t("transferFunds")}
           </Button>

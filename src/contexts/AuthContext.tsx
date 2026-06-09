@@ -54,10 +54,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearTimeout(timer);
       timer = setTimeout(() => { void signOut(); }, IDLE_TIMEOUT_MS);
     };
-    const events: (keyof WindowEventMap)[] = [
-      "mousemove", "mousedown", "keydown", "touchstart", "scroll", "visibilitychange",
-    ];
-    events.forEach((e) => window.addEventListener(e, reset, { passive: true }));
+    const events = ["mousemove", "mousedown", "keydown", "touchstart", "scroll", "visibilitychange"];
+    events.forEach((e) => window.addEventListener(e, reset, { passive: true } as AddEventListenerOptions));
     reset();
     return () => {
       clearTimeout(timer);

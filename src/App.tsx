@@ -73,6 +73,7 @@ const InvoiceSettings = lazy(() => import("@/pages/settings/InvoiceSettings"));
 const PaymentMethodsPage = lazy(() => import("@/pages/settings/PaymentMethods"));
 const ServicesPage = lazy(() => import("@/pages/settings/Services"));
 const InsuranceCompanies = lazy(() => import("@/pages/settings/InsuranceCompanies"));
+const InsuranceContracts = lazy(() => import("@/pages/settings/InsuranceContracts"));
 const NotificationSettings = lazy(() => import("@/pages/settings/NotificationSettings"));
 const RemindersSettings = lazy(() => import("@/pages/settings/RemindersSettings"));
 const Templates = lazy(() => import("@/pages/settings/Templates"));
@@ -190,6 +191,7 @@ function AppContent() {
               <Route path="/settings/payments" element={<PermissionRoute><PaymentMethodsPage /></PermissionRoute>} />
               <Route path="/settings/services" element={<PermissionRoute><ServicesPage /></PermissionRoute>} />
               <Route path="/settings/insurance" element={<PermissionRoute><InsuranceCompanies /></PermissionRoute>} />
+              <Route path="/settings/insurance-contracts" element={<PermissionRoute><InsuranceContracts /></PermissionRoute>} />
               <Route path="/settings/notifications" element={<PermissionRoute><NotificationSettings /></PermissionRoute>} />
               <Route path="/settings/reminders" element={<PermissionRoute><RemindersSettings /></PermissionRoute>} />
               <Route path="/settings/templates/email" element={<PermissionRoute><Templates kind="email" /></PermissionRoute>} />

@@ -5215,7 +5215,7 @@ export type Database = {
         }[]
       }
       fn_treasury_day_cash_summary: {
-        Args: { _business_date: string; _treasury_id: string }
+        Args: { _business_date: string; _treasury_id: string; _tz?: string }
         Returns: {
           cash_expense: number
           cash_income: number

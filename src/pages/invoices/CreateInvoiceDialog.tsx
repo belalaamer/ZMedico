@@ -450,8 +450,15 @@ export function CreateInvoiceDialog({
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>{t("coverageRatio")}</Label>
-            <NumberInput value={coverageRatio} onChange={setCoverageRatio} disabled={!insuranceCompanyId} />
+            <Label>{t("coverageRatio")} <span className="text-xs text-muted-foreground">{lang === "ar" ? "(احتياطي إذا لا يوجد عقد)" : "(fallback if no contract)"}</span></Label>
+            <NumberInput value={coverageRatio} onChange={setCoverageRatio} disabled={!insuranceCompanyId || !!activeContract} />
+            {insuranceCompanyId && (
+              <div className="text-[11px] text-muted-foreground">
+                {activeContract
+                  ? <>📄 {lang === "ar" ? "العقد النشط:" : "Active contract:"} <span className="font-medium text-foreground">{lang === "ar" ? (activeContract.name_ar || activeContract.name_en) : activeContract.name_en}</span> · {activeContract.default_coverage_percent}% {lang === "ar" ? "افتراضي" : "default"}</>
+                  : <>⚠ {lang === "ar" ? "لا يوجد عقد نشط — استخدام النسبة الثابتة." : "No active contract — using flat coverage."}</>}
+              </div>
+            )}
           </div>
         </div>
 
@@ -612,15 +619,47 @@ export function CreateInvoiceDialog({
                 <span className="font-medium tabular-nums w-28 text-end text-success">- {formatMoney(couponDiscount, lang)}</span>
               </div>
             )}
-            {insuranceCompanyId && coverageRatio > 0 && (
+            {insuranceCompanyId && (
               <>
-                <div className="flex items-center justify-between text-sm border-t border-border pt-2">
-                  <span className="text-muted-foreground">{t("insuranceShare")} ({coverageRatio}%)</span>
-                  <span className="font-medium tabular-nums text-success">{formatMoney(claimAmount, lang)}</span>
+                <div className="flex items-center justify-between text-sm border-t border-border pt-2 gap-2">
+                  <span className="text-muted-foreground flex items-center gap-1.5">
+                    {t("insuranceShare")}
+                    {claimSource === "contract" && (
+                      <Badge variant="outline" className="text-[10px] border-success text-success">{lang === "ar" ? "من العقد" : "Contract"}</Badge>
+                    )}
+                    {claimSource === "manual" && (
+                      <Badge variant="outline" className="text-[10px] border-warning text-warning">{lang === "ar" ? "تعديل يدوي" : "Manual"}</Badge>
+                    )}
+                    {claimSource === "flat" && (
+                      <Badge variant="outline" className="text-[10px]">{lang === "ar" ? `ثابت ${coverageRatio}%` : `Flat ${coverageRatio}%`}</Badge>
+                    )}
+                  </span>
+                  {manualOverride ? (
+                    <NumberInput
+                      className="w-32 text-end"
+                      value={manualClaim}
+                      onChange={(v) => setManualClaim(Math.max(0, Math.min(total, Number(v) || 0)))}
+                    />
+                  ) : (
+                    <span className="font-medium tabular-nums text-success">{formatMoney(claimAmount, lang)}</span>
+                  )}
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{t("patientShare")}</span>
-                  <span className="font-medium tabular-nums">{formatMoney(patientShare, lang)}</span>
+                <div className="flex items-center justify-between text-xs">
+                  <button
+                    type="button"
+                    className="text-primary hover:underline"
+                    onClick={() => {
+                      if (manualOverride) { setManualOverride(false); }
+                      else { setManualClaim(claimAmount); setManualOverride(true); }
+                    }}
+                  >
+                    {manualOverride
+                      ? (lang === "ar" ? "استعادة من العقد" : "Reset to contract")
+                      : (lang === "ar" ? "تعديل يدوي للمبلغ" : "Override manually")}
+                  </button>
+                  <span className="text-muted-foreground">
+                    {t("patientShare")}: <span className="font-medium tabular-nums text-foreground">{formatMoney(patientShare, lang)}</span>
+                  </span>
                 </div>
               </>
             )}

@@ -749,8 +749,10 @@ function LabRequestDialog({ open, onOpenChange, patient, record, userId, onSaved
       document_type: "other" as any,
       title_ar: labTitle, title_en: labTitle,
       description: notes || null,
-      file_url: `lab-request:${record.id}:${Date.now()}`,
-      file_name: "lab-request.txt",
+      // Honest internal marker — not a real uploaded file. Display layers should treat
+      // tags=['lab_request'] as "no file attached yet".
+      file_url: `internal://lab-request/${record.id}/${Date.now()}`,
+      file_name: T("(no file attached)", "(لا يوجد ملف مرفق)"),
       uploaded_by: userId,
       tags: ["lab_request"],
     } as any);

@@ -25,6 +25,7 @@ const InvoiceDetail = lazy(() => import("@/pages/invoices/InvoiceDetail"));
 const OutstandingDebts = lazy(() => import("@/pages/invoices/OutstandingDebts"));
 const Payments = lazy(() => import("@/pages/payments/Payments"));
 const Treasury = lazy(() => import("@/pages/treasury/Treasury"));
+const TreasuryDailyClose = lazy(() => import("@/pages/treasury/DailyClose"));
 const Expenses = lazy(() => import("@/pages/expenses/Expenses"));
 const Products = lazy(() => import("@/pages/inventory/Products"));
 const ProductDetail = lazy(() => import("@/pages/inventory/ProductDetail"));
@@ -135,6 +136,7 @@ function AppContent() {
               <Route path="/invoices/:id" element={<PermissionRoute><InvoiceDetail /></PermissionRoute>} />
               <Route path="/payments" element={<PermissionRoute><Payments /></PermissionRoute>} />
               <Route path="/treasury" element={<PermissionRoute><Treasury /></PermissionRoute>} />
+              <Route path="/treasury/daily-close" element={<PermissionRoute><TreasuryDailyClose /></PermissionRoute>} />
               <Route path="/expenses" element={<PermissionRoute><Expenses /></PermissionRoute>} />
               <Route path="/coupons" element={<PermissionRoute><Coupons /></PermissionRoute>} />
               <Route path="/reminders" element={<PermissionRoute><Reminders /></PermissionRoute>} />

@@ -255,7 +255,7 @@ export default function ConsultationDashboard() {
           </section>
 
           <section>
-            <div className="text-xs uppercase text-muted-foreground mb-1.5">{T("Active diagnoses", "التشخيصات النشطة")}</div>
+            <div className="text-xs uppercase text-muted-foreground mb-1.5">{T("Recent diagnoses", "تشخيصات حديثة")}</div>
             {activeDx.length === 0 ? (
               <div className="text-sm text-muted-foreground">—</div>
             ) : (
@@ -661,7 +661,7 @@ function PrescriptionDialog({
 }
 
 /* ───────────── Procedure dialog ───────────── */
-function ProcedureDialog({ open, onOpenChange, onStart }: any) {
+function ProcedureDialog({ open, onOpenChange, onStart, busy }: any) {
   const { lang } = useI18n();
   const isAr = lang === "ar";
   const T = (en: string, ar: string) => (isAr ? ar : en);
@@ -720,8 +720,8 @@ function ProcedureDialog({ open, onOpenChange, onStart }: any) {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>{T("Cancel", "إلغاء")}</Button>
-          <Button disabled={!selected} onClick={() => selected && onStart(selected, Number(qty) || 1)} className="gradient-primary text-primary-foreground">
-            <Stethoscope className="me-2 size-4"/>{T("Start", "بدء")}
+          <Button disabled={!selected || busy} onClick={() => selected && !busy && onStart(selected, Number(qty) || 1)} className="gradient-primary text-primary-foreground">
+            <Stethoscope className="me-2 size-4"/>{busy ? T("Starting…", "جارٍ البدء…") : T("Start", "بدء")}
           </Button>
         </DialogFooter>
       </DialogContent>

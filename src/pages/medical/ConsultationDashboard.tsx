@@ -48,6 +48,7 @@ export default function ConsultationDashboard() {
   const [rxOpen, setRxOpen] = useState(false);
   const [procOpen, setProcOpen] = useState(false);
   const [labOpen, setLabOpen] = useState(false);
+  const [startingProc, setStartingProc] = useState(false);
 
   const load = useCallback(async () => {
     if (!recordId) return;
@@ -120,6 +121,9 @@ export default function ConsultationDashboard() {
 
   /* ────────── Start Procedure → idempotent draft invoice ────────── */
   const startProcedure = async (proc: any, qty: number) => {
+    if (startingProc) return; // guard against double-clicks / parallel flows
+    setStartingProc(true);
+    try {
     // 1) insert record_procedures (trigger handles commissions)
     const { error: rpErr } = await supabase.from("record_procedures").insert({
       medical_record_id: record.id,
@@ -174,6 +178,9 @@ export default function ConsultationDashboard() {
     toast.success(T("Procedure added + draft invoice updated", "تم إضافة الإجراء + تحديث فاتورة المسودة"));
     setProcOpen(false);
     load();
+    } finally {
+      setStartingProc(false);
+    }
   };
 
   return (
@@ -401,6 +408,7 @@ export default function ConsultationDashboard() {
         <ProcedureDialog
           open={procOpen} onOpenChange={setProcOpen}
           onStart={startProcedure}
+          busy={startingProc}
         />
       )}
       {labOpen && (

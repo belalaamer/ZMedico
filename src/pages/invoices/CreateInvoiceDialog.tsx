@@ -16,6 +16,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
 import { useDataSync } from "@/lib/dataSync";
+import { fetchActiveContract, resolveAllLines, distributeClaim, type LineForCoverage } from "@/lib/insuranceContracts";
+import { Badge } from "@/components/ui/badge";
 
 type Item = {
   item_type: "service" | "product" | "procedure";
@@ -43,6 +45,10 @@ export function CreateInvoiceDialog({
   const [insuranceCompanies, setInsuranceCompanies] = useState<any[]>([]);
   const [insuranceCompanyId, setInsuranceCompanyId] = useState<string>("");
   const [coverageRatio, setCoverageRatio] = useState<number>(0);
+  const [activeContract, setActiveContract] = useState<any>(null);
+  const [lineCoverage, setLineCoverage] = useState<Array<{ rule_id: string | null; covered_amount: number }>>([]);
+  const [manualOverride, setManualOverride] = useState(false);
+  const [manualClaim, setManualClaim] = useState<number>(0);
   const [items, setItems] = useState<Item[]>([{ item_type: "service", description_en: "", description_ar: "", quantity: 1, unit_price: 0 }]);
   const [saving, setSaving] = useState(false);
   const [patientProcedures, setPatientProcedures] = useState<any[]>([]);
@@ -139,6 +145,14 @@ export function CreateInvoiceDialog({
       });
   }, [patientId]);
 
+  // When the insurance company changes, fetch its currently-active contract.
+  // Null means "no contract" — the flat coverage path is used as a safe fallback.
+  useEffect(() => {
+    setManualOverride(false);
+    if (!insuranceCompanyId) { setActiveContract(null); return; }
+    fetchActiveContract(insuranceCompanyId).then(setActiveContract);
+  }, [insuranceCompanyId]);
+
   // Load patient's recorded procedures (from medical records) for quick add
   useEffect(() => {
     if (!open || !patientId) { setPatientProcedures([]); setSelectedProcIds({}); return; }
@@ -191,8 +205,40 @@ export function CreateInvoiceDialog({
   const taxBase = subtotal - discount - couponDiscount;
   const tax = useMemo(() => +(taxBase * (Number(taxPct)||0) / 100).toFixed(2), [taxBase, taxPct]);
   const total = +(subtotal - discount - couponDiscount + tax).toFixed(2);
-  const claimAmount = +(total * (Number(coverageRatio)||0) / 100).toFixed(2);
+
+  // Recompute per-line coverage whenever items / contract change. Keeps invoice_items
+  // audit amounts in lockstep with the contract resolver.
+  useEffect(() => {
+    if (!insuranceCompanyId || !activeContract?.id) { setLineCoverage([]); return; }
+    let cancelled = false;
+    const lines: LineForCoverage[] = items.map((it) => ({
+      item_type: it.item_type,
+      product_id: it.item_type === "service" ? null : (it.product_id ?? null),
+      line_total: (Number(it.quantity) || 0) * (Number(it.unit_price) || 0),
+    }));
+    resolveAllLines(activeContract.id, lines).then((res) => { if (!cancelled) setLineCoverage(res); });
+    return () => { cancelled = true; };
+  }, [items, activeContract?.id, insuranceCompanyId]);
+
+  // Contract-derived claim = sum of per-line resolver outputs.
+  const contractClaim = useMemo(
+    () => +(lineCoverage.reduce((s, r) => s + (Number(r.covered_amount) || 0), 0)).toFixed(2),
+    [lineCoverage],
+  );
+  // Flat fallback (legacy behaviour) — used when company is selected but no contract exists.
+  const flatClaim = +(total * (Number(coverageRatio) || 0) / 100).toFixed(2);
+
+  // Final claim: manual override wins, else contract-derived if contract exists, else flat fallback.
+  const claimAmount = !insuranceCompanyId
+    ? 0
+    : manualOverride
+      ? Math.max(0, Math.min(total, +manualClaim.toFixed(2)))
+      : activeContract
+        ? Math.min(total, contractClaim)
+        : flatClaim;
   const patientShare = +(total - claimAmount).toFixed(2);
+  const claimSource: "manual" | "contract" | "flat" | "none" =
+    !insuranceCompanyId ? "none" : manualOverride ? "manual" : activeContract ? "contract" : "flat";
 
   const updateItem = (idx: number, patch: Partial<Item>) =>
     setItems((arr) => arr.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
@@ -274,9 +320,40 @@ export function CreateInvoiceDialog({
       });
     }
 
+    // Per-line audit coverage so SUM(insurance_covered_amount) === invoices.claim_amount.
+    // - contract mode: use resolver outputs directly
+    // - manual / flat fallback: distribute claim proportionally to gross line totals
+    const grossPerLine = items
+      .filter((it) => it.description_en.trim())
+      .map((it) => (Number(it.quantity) || 0) * (Number(it.unit_price) || 0));
+    let perLineCovered: number[];
+    let perLineRuleId: (string | null)[];
+    if (insuranceCompanyId && activeContract && !manualOverride) {
+      // align with current resolver output, but cap to claimAmount in case of rounding drift
+      const raw = items
+        .map((it, i) => ({ it, cov: lineCoverage[i] }))
+        .filter(({ it }) => it.description_en.trim());
+      perLineCovered = raw.map(({ cov }) => Number(cov?.covered_amount) || 0);
+      perLineRuleId = raw.map(({ cov }) => cov?.rule_id ?? null);
+      // Force sum == claimAmount (correct last non-zero on rounding drift).
+      const sum = +perLineCovered.reduce((a, b) => a + b, 0).toFixed(2);
+      const drift = +(claimAmount - sum).toFixed(2);
+      if (drift !== 0) {
+        for (let i = perLineCovered.length - 1; i >= 0; i--) {
+          if (grossPerLine[i] > 0) { perLineCovered[i] = +(perLineCovered[i] + drift).toFixed(2); break; }
+        }
+      }
+    } else if (insuranceCompanyId && claimAmount > 0) {
+      perLineCovered = distributeClaim(grossPerLine, claimAmount);
+      perLineRuleId = grossPerLine.map(() => null);
+    } else {
+      perLineCovered = grossPerLine.map(() => 0);
+      perLineRuleId = grossPerLine.map(() => null);
+    }
+
     const rows = items
       .filter((it) => it.description_en.trim())
-      .map((it) => ({
+      .map((it, i) => ({
         invoice_id: inv.id,
         item_type: it.item_type,
         product_id: it.item_type === "product" ? (it.product_id ?? null) : null,
@@ -284,6 +361,8 @@ export function CreateInvoiceDialog({
         description_ar: it.description_ar || null,
         quantity: Number(it.quantity) || 1,
         unit_price: Number(it.unit_price) || 0,
+        insurance_covered_amount: perLineCovered[i] || 0,
+        insurance_rule_id: perLineRuleId[i] ?? null,
       }));
     if (rows.length) {
       const { error: e2 } = await supabase.from("invoice_items").insert(rows as any);
@@ -321,6 +400,7 @@ export function CreateInvoiceDialog({
     setItems([{ item_type: "service", description_en: "", description_ar: "", quantity: 1, unit_price: 0 }]);
     setDiscountPct(0); setTaxPct(0); setNotes(""); setPatientId("");
     setInsuranceCompanyId(""); setCoverageRatio(0);
+    setActiveContract(null); setLineCoverage([]); setManualOverride(false); setManualClaim(0);
     setCouponCode(""); setCouponInfo(null);
     onSaved(inv.id);
   };

@@ -105,6 +105,9 @@ export default function MedicalRecordEditor() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <Button asChild variant="ghost" size="sm"><Link to="/medical/records"><ArrowLeft className="me-2 size-4" />{t("backToRecords")}</Link></Button>
         <div className="flex items-center gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link to={`/medical/consultation/${record.id}`}>{lang === "ar" ? "عرض الاستشارة" : "Consultation view"}</Link>
+          </Button>
           <Badge variant="outline">{t(("visit_" + record.visit_type) as any) ?? record.visit_type}</Badge>
           <Badge variant="outline" className={record.status === "completed" ? "status-completed" : record.status === "reviewed" ? "status-progress" : "status-cancelled"}>
             {record.status === "draft" ? t("statusDraft") : record.status === "completed" ? t("statusCompleted") : t("statusReviewed")}

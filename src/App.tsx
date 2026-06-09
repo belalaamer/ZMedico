@@ -41,6 +41,7 @@ const ProceduresPage = lazy(() => import("@/pages/medical/Procedures"));
 const MedicalRecords = lazy(() => import("@/pages/medical/MedicalRecords"));
 const QuickConsult = lazy(() => import("@/pages/medical/QuickConsult"));
 const MedicalRecordEditor = lazy(() => import("@/pages/medical/MedicalRecordEditor"));
+const ConsultationDashboard = lazy(() => import("@/pages/medical/ConsultationDashboard"));
 const Prescriptions = lazy(() => import("@/pages/medical/Prescriptions"));
 const PrescriptionDetail = lazy(() => import("@/pages/medical/PrescriptionDetail"));
 const DocumentsCenter = lazy(() => import("@/pages/medical/DocumentsCenter"));
@@ -150,6 +151,7 @@ function AppContent() {
               <Route path="/inventory/alerts" element={<PermissionRoute><Alerts /></PermissionRoute>} />
               <Route path="/medical/records" element={<PermissionRoute><MedicalRecords /></PermissionRoute>} />
               <Route path="/medical/records/:id" element={<PermissionRoute><MedicalRecordEditor /></PermissionRoute>} />
+              <Route path="/medical/consultation/:recordId" element={<PermissionRoute><ConsultationDashboard /></PermissionRoute>} />
               <Route path="/medical/quick-consult" element={<PermissionRoute><QuickConsult /></PermissionRoute>} />
               <Route path="/medical/prescriptions" element={<PermissionRoute><Prescriptions /></PermissionRoute>} />
               <Route path="/medical/prescriptions/:id" element={<PermissionRoute><PrescriptionDetail /></PermissionRoute>} />

@@ -754,6 +754,7 @@ export const dict = {
     paymentMethods: "Payment Methods",
     servicesMgmt: "Services",
     insuranceCompanies: "Insurance Companies",
+    insuranceContracts: "Insurance Contracts",
     insuranceCompany: "Insurance Company",
     coverageRatio: "Coverage Ratio %",
     coveredAmount: "Covered Amount",

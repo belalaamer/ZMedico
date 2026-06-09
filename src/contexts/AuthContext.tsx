@@ -12,6 +12,9 @@ type Ctx = {
 
 const AuthContext = createContext<Ctx | null>(null);
 
+// Auto-logout after this many ms of user inactivity (no mouse/keyboard/touch).
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -42,6 +45,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = async () => { await supabase.auth.signOut(); };
+
+  // Idle auto-logout: signs the user out after IDLE_TIMEOUT_MS without activity.
+  useEffect(() => {
+    if (!user) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const reset = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => { void signOut(); }, IDLE_TIMEOUT_MS);
+    };
+    const events: (keyof WindowEventMap)[] = [
+      "mousemove", "mousedown", "keydown", "touchstart", "scroll", "visibilitychange",
+    ];
+    events.forEach((e) => window.addEventListener(e, reset, { passive: true }));
+    reset();
+    return () => {
+      clearTimeout(timer);
+      events.forEach((e) => window.removeEventListener(e, reset));
+    };
+  }, [user]);
 
   return <AuthContext.Provider value={{ user, session, loading, signOut }}>{children}</AuthContext.Provider>;
 }

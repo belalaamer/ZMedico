@@ -1123,6 +1123,106 @@ export type Database = {
         }
         Relationships: []
       }
+      insurance_contract_rules: {
+        Row: {
+          contract_id: string
+          coverage_percent: number
+          created_at: string
+          excluded: boolean
+          id: string
+          item_type: Database["public"]["Enums"]["invoice_item_type"] | null
+          max_amount_per_item: number | null
+          priority: number
+          scope: string
+          target_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          contract_id: string
+          coverage_percent?: number
+          created_at?: string
+          excluded?: boolean
+          id?: string
+          item_type?: Database["public"]["Enums"]["invoice_item_type"] | null
+          max_amount_per_item?: number | null
+          priority?: number
+          scope: string
+          target_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          contract_id?: string
+          coverage_percent?: number
+          created_at?: string
+          excluded?: boolean
+          id?: string
+          item_type?: Database["public"]["Enums"]["invoice_item_type"] | null
+          max_amount_per_item?: number | null
+          priority?: number
+          scope?: string
+          target_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insurance_contract_rules_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "insurance_contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      insurance_contracts: {
+        Row: {
+          created_at: string
+          default_coverage_percent: number
+          id: string
+          insurance_company_id: string
+          is_active: boolean
+          name_ar: string | null
+          name_en: string
+          notes: string | null
+          updated_at: string
+          valid_from: string | null
+          valid_to: string | null
+        }
+        Insert: {
+          created_at?: string
+          default_coverage_percent?: number
+          id?: string
+          insurance_company_id: string
+          is_active?: boolean
+          name_ar?: string | null
+          name_en: string
+          notes?: string | null
+          updated_at?: string
+          valid_from?: string | null
+          valid_to?: string | null
+        }
+        Update: {
+          created_at?: string
+          default_coverage_percent?: number
+          id?: string
+          insurance_company_id?: string
+          is_active?: boolean
+          name_ar?: string | null
+          name_en?: string
+          notes?: string | null
+          updated_at?: string
+          valid_from?: string | null
+          valid_to?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insurance_contracts_insurance_company_id_fkey"
+            columns: ["insurance_company_id"]
+            isOneToOne: false
+            referencedRelation: "insurance_companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory: {
         Row: {
           available_quantity: number | null
@@ -1274,6 +1374,8 @@ export type Database = {
           description_ar: string | null
           description_en: string
           id: string
+          insurance_covered_amount: number
+          insurance_rule_id: string | null
           invoice_id: string
           item_type: Database["public"]["Enums"]["invoice_item_type"]
           product_id: string | null
@@ -1286,6 +1388,8 @@ export type Database = {
           description_ar?: string | null
           description_en: string
           id?: string
+          insurance_covered_amount?: number
+          insurance_rule_id?: string | null
           invoice_id: string
           item_type?: Database["public"]["Enums"]["invoice_item_type"]
           product_id?: string | null
@@ -1298,6 +1402,8 @@ export type Database = {
           description_ar?: string | null
           description_en?: string
           id?: string
+          insurance_covered_amount?: number
+          insurance_rule_id?: string | null
           invoice_id?: string
           item_type?: Database["public"]["Enums"]["invoice_item_type"]
           product_id?: string | null
@@ -1306,6 +1412,13 @@ export type Database = {
           unit_price?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "invoice_items_insurance_rule_id_fkey"
+            columns: ["insurance_rule_id"]
+            isOneToOne: false
+            referencedRelation: "insurance_contract_rules"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "invoice_items_invoice_id_fkey"
             columns: ["invoice_id"]
@@ -5022,6 +5135,18 @@ export type Database = {
       fn_consume_for_invoice: {
         Args: { _invoice_id: string }
         Returns: undefined
+      }
+      fn_resolve_coverage: {
+        Args: {
+          _contract_id: string
+          _item_type: Database["public"]["Enums"]["invoice_item_type"]
+          _line_total: number
+          _product_id: string
+        }
+        Returns: {
+          covered_amount: number
+          rule_id: string
+        }[]
       }
       generate_employee_id: { Args: never; Returns: string }
       generate_invoice_number: { Args: never; Returns: string }

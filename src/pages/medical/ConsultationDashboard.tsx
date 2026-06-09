@@ -48,6 +48,7 @@ export default function ConsultationDashboard() {
   const [rxOpen, setRxOpen] = useState(false);
   const [procOpen, setProcOpen] = useState(false);
   const [labOpen, setLabOpen] = useState(false);
+  const [startingProc, setStartingProc] = useState(false);
 
   const load = useCallback(async () => {
     if (!recordId) return;
@@ -120,6 +121,9 @@ export default function ConsultationDashboard() {
 
   /* ────────── Start Procedure → idempotent draft invoice ────────── */
   const startProcedure = async (proc: any, qty: number) => {
+    if (startingProc) return; // guard against double-clicks / parallel flows
+    setStartingProc(true);
+    try {
     // 1) insert record_procedures (trigger handles commissions)
     const { error: rpErr } = await supabase.from("record_procedures").insert({
       medical_record_id: record.id,
@@ -174,6 +178,9 @@ export default function ConsultationDashboard() {
     toast.success(T("Procedure added + draft invoice updated", "تم إضافة الإجراء + تحديث فاتورة المسودة"));
     setProcOpen(false);
     load();
+    } finally {
+      setStartingProc(false);
+    }
   };
 
   return (
@@ -248,7 +255,7 @@ export default function ConsultationDashboard() {
           </section>
 
           <section>
-            <div className="text-xs uppercase text-muted-foreground mb-1.5">{T("Active diagnoses", "التشخيصات النشطة")}</div>
+            <div className="text-xs uppercase text-muted-foreground mb-1.5">{T("Recent diagnoses", "تشخيصات حديثة")}</div>
             {activeDx.length === 0 ? (
               <div className="text-sm text-muted-foreground">—</div>
             ) : (
@@ -401,6 +408,7 @@ export default function ConsultationDashboard() {
         <ProcedureDialog
           open={procOpen} onOpenChange={setProcOpen}
           onStart={startProcedure}
+          busy={startingProc}
         />
       )}
       {labOpen && (
@@ -653,7 +661,7 @@ function PrescriptionDialog({
 }
 
 /* ───────────── Procedure dialog ───────────── */
-function ProcedureDialog({ open, onOpenChange, onStart }: any) {
+function ProcedureDialog({ open, onOpenChange, onStart, busy }: any) {
   const { lang } = useI18n();
   const isAr = lang === "ar";
   const T = (en: string, ar: string) => (isAr ? ar : en);
@@ -712,8 +720,8 @@ function ProcedureDialog({ open, onOpenChange, onStart }: any) {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>{T("Cancel", "إلغاء")}</Button>
-          <Button disabled={!selected} onClick={() => selected && onStart(selected, Number(qty) || 1)} className="gradient-primary text-primary-foreground">
-            <Stethoscope className="me-2 size-4"/>{T("Start", "بدء")}
+          <Button disabled={!selected || busy} onClick={() => selected && !busy && onStart(selected, Number(qty) || 1)} className="gradient-primary text-primary-foreground">
+            <Stethoscope className="me-2 size-4"/>{busy ? T("Starting…", "جارٍ البدء…") : T("Start", "بدء")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -741,8 +749,10 @@ function LabRequestDialog({ open, onOpenChange, patient, record, userId, onSaved
       document_type: "other" as any,
       title_ar: labTitle, title_en: labTitle,
       description: notes || null,
-      file_url: `lab-request:${record.id}:${Date.now()}`,
-      file_name: "lab-request.txt",
+      // Honest internal marker — not a real uploaded file. Display layers should treat
+      // tags=['lab_request'] as "no file attached yet".
+      file_url: `internal://lab-request/${record.id}/${Date.now()}`,
+      file_name: T("(no file attached)", "(لا يوجد ملف مرفق)"),
       uploaded_by: userId,
       tags: ["lab_request"],
     } as any);

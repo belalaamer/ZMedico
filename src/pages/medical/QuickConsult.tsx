@@ -134,7 +134,7 @@ export default function QuickConsult() {
   };
   const saveAndOpen = async () => {
     const id = await persist("draft");
-    if (id) nav(`/medical/records/${id}`);
+    if (id) nav(`/medical/consultation/${id}`);
   };
 
   return (

@@ -15,6 +15,7 @@ import PatientMedicalTab from "./PatientMedicalTab";
 import { EditPatientDialog } from "./EditPatientDialog";
 import PatientTreatmentPlans from "./PatientTreatmentPlans";
 import PatientTimeline from "./PatientTimeline";
+import PatientWalletTab from "./PatientWalletTab";
 import { Can } from "@/components/Can";
 
 const statusClass: Record<string, string> = {
@@ -152,6 +153,7 @@ export default function PatientProfile() {
           </Can>
           <TabsTrigger value="invoices">{t("invoices")}</TabsTrigger>
           <TabsTrigger value="payments">{t("paymentHistory")}</TabsTrigger>
+          <TabsTrigger value="wallet">{t("walletTab")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-4">

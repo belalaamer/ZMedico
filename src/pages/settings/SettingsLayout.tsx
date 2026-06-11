@@ -19,6 +19,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
     { to: "/settings/insurance-contracts", icon: FileSignature, label: t("insuranceContracts") },
     { to: "/settings/notifications", icon: Bell, label: t("notificationSettings") },
     { to: "/settings/reminders", icon: Send, label: t("reminders") },
+    { to: "/settings/automated-comm", icon: Bell, label: t("automatedComm") },
     { to: "/settings/templates/email", icon: Mail, label: t("emailTemplates") },
     { to: "/settings/templates/sms", icon: MessageSquare, label: t("smsTemplates") },
     { to: "/settings/templates/whatsapp", icon: Phone, label: t("whatsappTemplates") },

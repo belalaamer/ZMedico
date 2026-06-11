@@ -77,6 +77,7 @@ const InsuranceCompanies = lazy(() => import("@/pages/settings/InsuranceCompanie
 const InsuranceContracts = lazy(() => import("@/pages/settings/InsuranceContracts"));
 const NotificationSettings = lazy(() => import("@/pages/settings/NotificationSettings"));
 const RemindersSettings = lazy(() => import("@/pages/settings/RemindersSettings"));
+const AutomatedCommunication = lazy(() => import("@/pages/settings/AutomatedCommunication"));
 const Templates = lazy(() => import("@/pages/settings/Templates"));
 const LanguagesPage = lazy(() => import("@/pages/settings/Languages"));
 const RolePermissions = lazy(() => import("@/pages/settings/RolePermissions"));
@@ -196,6 +197,7 @@ function AppContent() {
               <Route path="/settings/insurance-contracts" element={<PermissionRoute><InsuranceContracts /></PermissionRoute>} />
               <Route path="/settings/notifications" element={<PermissionRoute><NotificationSettings /></PermissionRoute>} />
               <Route path="/settings/reminders" element={<PermissionRoute><RemindersSettings /></PermissionRoute>} />
+              <Route path="/settings/automated-comm" element={<PermissionRoute><AutomatedCommunication /></PermissionRoute>} />
               <Route path="/settings/templates/email" element={<PermissionRoute><Templates kind="email" /></PermissionRoute>} />
               <Route path="/settings/templates/sms" element={<PermissionRoute><Templates kind="sms" /></PermissionRoute>} />
               <Route path="/settings/templates/whatsapp" element={<PermissionRoute><Templates kind="whatsapp" /></PermissionRoute>} />

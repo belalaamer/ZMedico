@@ -195,7 +195,7 @@ export function RecordPaymentDialog({
               />
             </div>
           )}
-          {!invoiceId && pid && (
+          {!invoiceId && pid && !isTopup && (
             <div className="space-y-2">
               <Label>{t("invoice")}</Label>
               <Combobox
@@ -227,9 +227,17 @@ export function RecordPaymentDialog({
                   <SelectItem value="card">{t("card")}</SelectItem>
                   <SelectItem value="bank_transfer">{t("bankTransfer")}</SelectItem>
                   <SelectItem value="insurance">{t("insurance")}</SelectItem>
-                  <SelectItem value="wallet">{t("wallet")}</SelectItem>
+                  {!isTopup && <SelectItem value="wallet">{t("wallet")}</SelectItem>}
                 </SelectContent>
               </Select>
+              {pid && !isTopup && (method === "wallet" || (split && method2 === "wallet")) && (
+                <p className={`text-[11px] tabular-nums ${
+                  ((method === "wallet" ? amount : 0) + (split && method2 === "wallet" ? amount2 : 0)) > walletBalance + 0.009
+                    ? "text-destructive" : "text-muted-foreground"
+                }`}>
+                  {t("walletBalanceLabel")}: {walletBalance.toFixed(2)}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>{t("referenceNumber")}</Label>

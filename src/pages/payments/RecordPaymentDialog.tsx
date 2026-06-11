@@ -244,11 +244,13 @@ export function RecordPaymentDialog({
               <Input value={ref} onChange={(e) => setRef(e.target.value)} maxLength={60} />
             </div>
           </div>
-          <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
-            <Label htmlFor="split-toggle" className="cursor-pointer">{t("splitPayment")}</Label>
-            <Switch id="split-toggle" checked={split} onCheckedChange={(v) => { setSplit(v); if (!v) setAmount2(0); }} />
-          </div>
-          {split && (
+          {!isTopup && (
+            <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+              <Label htmlFor="split-toggle" className="cursor-pointer">{t("splitPayment")}</Label>
+              <Switch id="split-toggle" checked={split} onCheckedChange={(v) => { setSplit(v); if (!v) setAmount2(0); }} />
+            </div>
+          )}
+          {split && !isTopup && (
             <div className="grid grid-cols-2 gap-3 rounded-md border border-dashed border-border p-3">
               <div className="space-y-2">
                 <Label>{t("method2")}</Label>

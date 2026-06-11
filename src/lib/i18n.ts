@@ -914,6 +914,11 @@ export const dict = {
     walletTopupMethodHint: "Top-up cannot use Wallet as payment method",
     referredByPatient: "Referred by (patient)",
     selfReferralNotAllowed: "A patient cannot refer themselves",
+    walletTopupMode: "Wallet top-up",
+    walletTopupModeHint: "Receive money to credit this patient's wallet",
+    walletBalanceLabel: "Wallet balance",
+    walletInsufficient: "Insufficient wallet balance",
+    walletTopupCannotUseWallet: "Wallet top-up cannot use Wallet as payment method",
   },
   ar: {
     appName: "ZMedico",
@@ -1829,6 +1834,11 @@ export const dict = {
     walletTopupMethodHint: "لا يمكن شحن المحفظة باستخدام طريقة (محفظة)",
     referredByPatient: "أحاله مريض",
     selfReferralNotAllowed: "لا يمكن أن يحيل المريض نفسه",
+    walletTopupMode: "شحن المحفظة",
+    walletTopupModeHint: "استلام مبلغ لإضافته إلى محفظة المريض",
+    walletBalanceLabel: "رصيد المحفظة",
+    walletInsufficient: "رصيد المحفظة غير كافٍ",
+    walletTopupCannotUseWallet: "لا يمكن شحن المحفظة باستخدام طريقة (محفظة)",
   },
 } as const;
 

@@ -42,6 +42,7 @@ export function RecordPaymentDialog({
   const [amount2, setAmount2] = useState<number>(0);
   const [remaining, setRemaining] = useState<number>(defaultAmount ?? 0);
   const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [walletBalanceLoading, setWalletBalanceLoading] = useState<boolean>(false);
   const [isTopup, setIsTopup] = useState<boolean>(false);
 
   useEffect(() => {
@@ -85,16 +86,21 @@ export function RecordPaymentDialog({
 
   // Load wallet balance when wallet is relevant (selected as method or method2).
   useEffect(() => {
-    if (!open || !pid) { setWalletBalance(0); return; }
+    if (!open || !pid) { setWalletBalance(0); setWalletBalanceLoading(false); return; }
     let active = true;
+    setWalletBalanceLoading(true);
     (supabase as any)
       .from("patient_wallets")
       .select("balance")
       .eq("patient_id", pid)
       .maybeSingle()
-      .then(({ data }: any) => { if (active) setWalletBalance(Number(data?.balance ?? 0)); });
+      .then(({ data }: any) => {
+        if (!active) return;
+        setWalletBalance(Number(data?.balance ?? 0));
+        setWalletBalanceLoading(false);
+      });
     return () => { active = false; };
-  }, [open, pid, method, method2, split]);
+  }, [open, pid]);
 
   const onInvoiceChange = (v: string) => {
     setIid(v);
@@ -128,6 +134,10 @@ export function RecordPaymentDialog({
         toast.error(t("walletTopupCannotUseWallet")); return;
       }
     } else {
+      const walletInvolved = method === "wallet" || (split && method2 === "wallet");
+      if (walletInvolved && walletBalanceLoading) {
+        toast.error(t("walletBalanceLoading")); return;
+      }
       // Validate wallet usage against current balance.
       const walletSpend = (method === "wallet" ? Number(amount) : 0) + (split && method2 === "wallet" ? Number(amount2) : 0);
       if (walletSpend > walletBalance + 0.009) {
@@ -156,7 +166,16 @@ export function RecordPaymentDialog({
     if (split) rows.push({ ...base, amount: amount2, payment_method: method2 });
     const { error } = await supabase.from("payments").insert(rows as any);
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      const raw = `${error.message ?? ""} ${(error as any).details ?? ""} ${(error as any).hint ?? ""}`.toLowerCase();
+      const isInsufficient =
+        !isTopup &&
+        (method === "wallet" || (split && method2 === "wallet")) &&
+        (raw.includes("insufficient") ||
+         raw.includes("balance") && (raw.includes("check") || raw.includes("negative") || raw.includes(">= 0") || raw.includes(">=0")));
+      toast.error(isInsufficient ? t("walletInsufficient") : (error.message ?? "Error"));
+      return;
+    }
     toast.success(t("paid"));
     onSaved();
   };
@@ -282,7 +301,12 @@ export function RecordPaymentDialog({
         </div>
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>{t("cancel")}</Button>
-          <Button type="button" className="gradient-primary text-primary-foreground" onClick={save} disabled={saving}>{t("save")}</Button>
+          <Button
+            type="button"
+            className="gradient-primary text-primary-foreground"
+            onClick={save}
+            disabled={saving || (!isTopup && (method === "wallet" || (split && method2 === "wallet")) && walletBalanceLoading)}
+          >{t("save")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

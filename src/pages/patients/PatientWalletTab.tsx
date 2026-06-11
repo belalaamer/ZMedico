@@ -263,17 +263,20 @@ function AdjustDialog({
   const [amount, setAmount] = useState(0);
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
+  const [refId, setRefId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setDirection("adjustment_credit"); setAmount(0); setReason("");
+    const id = (globalThis.crypto as any)?.randomUUID?.() ?? null;
+    setRefId(id);
   }, [open]);
 
   const save = async () => {
     if (!amount || amount <= 0) { toast.error(t("amount")); return; }
     if (!reason.trim()) { toast.error(t("reasonRequired")); return; }
+    if (!refId) { toast.error("Missing reference id"); return; }
     setSaving(true);
-    const refId = (globalThis.crypto as any)?.randomUUID?.() ?? null;
     const { error } = await (supabase as any).rpc("apply_wallet_tx", {
       _patient_id: patientId,
       _tx_type: direction,

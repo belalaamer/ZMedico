@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -176,15 +176,19 @@ function TopupDialog({
   const [ref, setRef] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     if (!open) return;
     setAmount(0); setMethod("cash"); setRef(""); setNotes("");
     setDate(new Date().toISOString().slice(0, 10));
+    submittingRef.current = false;
   }, [open]);
 
   const save = async () => {
+    if (submittingRef.current || saving) return;
     if (!amount || amount <= 0) { toast.error(t("amount")); return; }
+    submittingRef.current = true;
     setSaving(true);
     const { error } = await (supabase as any).from("payments").insert({
       patient_id: patientId,
@@ -199,7 +203,7 @@ function TopupDialog({
       is_wallet_topup: true,
     });
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { submittingRef.current = false; toast.error(error.message); return; }
     toast.success(t("walletTopupSuccess"));
     onSaved();
   };
@@ -244,8 +248,8 @@ function TopupDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>{t("cancel")}</Button>
-          <Button onClick={save} disabled={saving} className="gradient-primary text-primary-foreground">{t("save")}</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>{t("cancel")}</Button>
+          <Button onClick={save} disabled={saving || !amount || amount <= 0} className="gradient-primary text-primary-foreground">{t("save")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

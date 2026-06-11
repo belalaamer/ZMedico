@@ -167,12 +167,18 @@ export function RecordPaymentDialog({
     const { error } = await supabase.from("payments").insert(rows as any);
     setSaving(false);
     if (error) {
+      const walletInvolved = method === "wallet" || (split && method2 === "wallet");
+      const code = (error as any).code as string | undefined;
       const raw = `${error.message ?? ""} ${(error as any).details ?? ""} ${(error as any).hint ?? ""}`.toLowerCase();
+      // Prefer Postgres SQLSTATE for CHECK violations (23514) — the wallet
+      // balance constraint surfaces this code. Fall back to a heuristic string
+      // match for older drivers that don't propagate `code`.
       const isInsufficient =
-        !isTopup &&
-        (method === "wallet" || (split && method2 === "wallet")) &&
-        (raw.includes("insufficient") ||
-         raw.includes("balance") && (raw.includes("check") || raw.includes("negative") || raw.includes(">= 0") || raw.includes(">=0")));
+        !isTopup && walletInvolved && (
+          code === "23514" ||
+          raw.includes("insufficient") ||
+          (raw.includes("balance") && (raw.includes("check") || raw.includes("negative") || raw.includes(">= 0") || raw.includes(">=0")))
+        );
       toast.error(isInsufficient ? t("walletInsufficient") : (error.message ?? "Error"));
       return;
     }

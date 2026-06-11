@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { ReferrerPicker } from "./ReferrerPicker";
 
 export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
   open: boolean; onOpenChange: (v: boolean) => void; patient: any; onSaved: () => void;
@@ -21,6 +22,7 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
     gender: "" as "" | "male" | "female",
     blood_type: "", address: "", city: "", nationality: "", notes: "",
     assigned_doctor_id: "",
+    referred_by_patient_id: null as string | null,
   });
 
   useEffect(() => {
@@ -56,6 +58,7 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
       nationality: patient.nationality ?? "",
       notes: patient.notes ?? "",
       assigned_doctor_id: (patient as any).assigned_doctor_id ?? "",
+      referred_by_patient_id: (patient as any).referred_by_patient_id ?? null,
     });
   }, [patient, open]);
 
@@ -79,6 +82,9 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
     e.preventDefault();
     if (!form.first_name_en && !form.first_name_ar) { toast.error(t("fullName")); return; }
     if (!form.phone.trim()) { toast.error(t("phone")); return; }
+    if (form.referred_by_patient_id && form.referred_by_patient_id === patient?.id) {
+      toast.error(t("selfReferralNotAllowed")); return;
+    }
     setSaving(true);
     const payload: any = {
       first_name_en: form.first_name_en || form.first_name_ar,
@@ -96,6 +102,7 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
       nationality: form.nationality || null,
       notes: form.notes || null,
       assigned_doctor_id: form.assigned_doctor_id || null,
+      referred_by_patient_id: form.referred_by_patient_id || null,
     };
     const { error } = await supabase.from("patients").update(payload).eq("id", patient.id);
     setSaving(false);
@@ -166,6 +173,15 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
                 {doctors.map((d) => <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>)}
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label>{t("referredByPatient")}</Label>
+            <ReferrerPicker
+              value={form.referred_by_patient_id}
+              onChange={(v) => setForm({ ...form, referred_by_patient_id: v })}
+              excludeId={patient?.id}
+              branchId={(patient as any)?.branch_id ?? null}
+            />
           </div>
           <div className="space-y-2 sm:col-span-2">
             <Label>{t("address")}</Label>

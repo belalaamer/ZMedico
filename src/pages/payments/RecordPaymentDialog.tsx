@@ -41,6 +41,8 @@ export function RecordPaymentDialog({
   const [method2, setMethod2] = useState<Method>("wallet");
   const [amount2, setAmount2] = useState<number>(0);
   const [remaining, setRemaining] = useState<number>(defaultAmount ?? 0);
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [isTopup, setIsTopup] = useState<boolean>(false);
 
   useEffect(() => {
     if (!open) return;
@@ -51,6 +53,8 @@ export function RecordPaymentDialog({
     setDate(new Date().toISOString().slice(0,10));
     setSplit(false); setMethod2("wallet"); setAmount2(0);
     setRemaining(defaultAmount ?? 0);
+    setIsTopup(false);
+    setWalletBalance(0);
     if (!patientId) loadPatients();
   }, [open, patientId, invoiceId, defaultAmount]);
 
@@ -79,6 +83,19 @@ export function RecordPaymentDialog({
       });
   }, [open, pid, invoiceId]);
 
+  // Load wallet balance when wallet is relevant (selected as method or method2).
+  useEffect(() => {
+    if (!open || !pid) { setWalletBalance(0); return; }
+    let active = true;
+    (supabase as any)
+      .from("patient_wallets")
+      .select("balance")
+      .eq("patient_id", pid)
+      .maybeSingle()
+      .then(({ data }: any) => { if (active) setWalletBalance(Number(data?.balance ?? 0)); });
+    return () => { active = false; };
+  }, [open, pid, method, method2, split]);
+
   const onInvoiceChange = (v: string) => {
     setIid(v);
     const found = invoices.find((i) => i.id === v);
@@ -106,6 +123,17 @@ export function RecordPaymentDialog({
   const save = async () => {
     if (!pid) { toast.error(t("selectPatient")); return; }
     if (!amount || amount <= 0) { toast.error("Amount required"); return; }
+    if (isTopup) {
+      if (method === "wallet" || (split && method2 === "wallet")) {
+        toast.error(t("walletTopupCannotUseWallet")); return;
+      }
+    } else {
+      // Validate wallet usage against current balance.
+      const walletSpend = (method === "wallet" ? Number(amount) : 0) + (split && method2 === "wallet" ? Number(amount2) : 0);
+      if (walletSpend > walletBalance + 0.009) {
+        toast.error(t("walletInsufficient")); return;
+      }
+    }
     if (split) {
       if (method === method2) { toast.error(t("bothMethodsRequired")); return; }
       if (!amount2 || amount2 <= 0) { toast.error(t("bothMethodsRequired")); return; }
@@ -116,12 +144,13 @@ export function RecordPaymentDialog({
     setSaving(true);
     const base = {
       patient_id: pid,
-      invoice_id: iid || null,
+      invoice_id: isTopup ? null : (iid || null),
       branch_id: currentBranchId,
       payment_date: date,
       reference_number: ref || null,
       notes: notes || null,
       received_by: user?.id ?? null,
+      ...(isTopup ? { is_wallet_topup: true } : {}),
     };
     const rows: any[] = [{ ...base, amount, payment_method: method }];
     if (split) rows.push({ ...base, amount: amount2, payment_method: method2 });
@@ -137,6 +166,23 @@ export function RecordPaymentDialog({
       <DialogContent>
         <DialogHeader><DialogTitle>{t("recordPayment")}</DialogTitle></DialogHeader>
         <div className="space-y-4">
+          <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+            <div>
+              <Label htmlFor="topup-toggle" className="cursor-pointer">{t("walletTopupMode")}</Label>
+              <p className="text-[11px] text-muted-foreground">{t("walletTopupModeHint")}</p>
+            </div>
+            <Switch
+              id="topup-toggle"
+              checked={isTopup}
+              onCheckedChange={(v) => {
+                setIsTopup(v);
+                if (v) {
+                  setSplit(false);
+                  if (method === "wallet") setMethod("cash");
+                }
+              }}
+            />
+          </div>
           {!patientId && (
             <div className="space-y-2">
               <Label>{t("patientName")}</Label>

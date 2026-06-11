@@ -1730,6 +1730,30 @@ export type Database = {
         }
         Relationships: []
       }
+      loyalty_settings: {
+        Row: {
+          created_at: string
+          id: number
+          referral_reward_active: boolean
+          referral_reward_amount: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          referral_reward_active?: boolean
+          referral_reward_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          referral_reward_active?: boolean
+          referral_reward_amount?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       medical_history: {
         Row: {
           allergies_ar: string | null
@@ -2242,6 +2266,104 @@ export type Database = {
           },
         ]
       }
+      patient_wallet_transactions: {
+        Row: {
+          amount: number
+          balance_after: number
+          branch_id: string | null
+          created_at: string
+          created_by: string | null
+          direction: number
+          id: string
+          notes_ar: string | null
+          notes_en: string | null
+          patient_id: string
+          reference_id: string | null
+          reference_type: string | null
+          tx_type: Database["public"]["Enums"]["wallet_tx_type"]
+        }
+        Insert: {
+          amount: number
+          balance_after: number
+          branch_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          direction: number
+          id?: string
+          notes_ar?: string | null
+          notes_en?: string | null
+          patient_id: string
+          reference_id?: string | null
+          reference_type?: string | null
+          tx_type: Database["public"]["Enums"]["wallet_tx_type"]
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          branch_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          direction?: number
+          id?: string
+          notes_ar?: string | null
+          notes_en?: string | null
+          patient_id?: string
+          reference_id?: string | null
+          reference_type?: string | null
+          tx_type?: Database["public"]["Enums"]["wallet_tx_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patient_wallet_transactions_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_wallet_transactions_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      patient_wallets: {
+        Row: {
+          balance: number
+          created_at: string
+          currency: string
+          id: string
+          patient_id: string
+          updated_at: string
+        }
+        Insert: {
+          balance?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          patient_id: string
+          updated_at?: string
+        }
+        Update: {
+          balance?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          patient_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patient_wallets_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: true
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       patients: {
         Row: {
           address: string | null
@@ -2270,6 +2392,7 @@ export type Database = {
           phone: string | null
           phone2: string | null
           referral_source: string | null
+          referred_by_patient_id: string | null
           updated_at: string
         }
         Insert: {
@@ -2299,6 +2422,7 @@ export type Database = {
           phone?: string | null
           phone2?: string | null
           referral_source?: string | null
+          referred_by_patient_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -2328,6 +2452,7 @@ export type Database = {
           phone?: string | null
           phone2?: string | null
           referral_source?: string | null
+          referred_by_patient_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -2350,6 +2475,13 @@ export type Database = {
             columns: ["insurance_company_id"]
             isOneToOne: false
             referencedRelation: "insurance_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patients_referred_by_patient_id_fkey"
+            columns: ["referred_by_patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
             referencedColumns: ["id"]
           },
         ]
@@ -2415,6 +2547,7 @@ export type Database = {
           deleted_at: string | null
           id: string
           invoice_id: string | null
+          is_wallet_topup: boolean
           notes: string | null
           patient_id: string
           payment_date: string
@@ -2422,6 +2555,7 @@ export type Database = {
           received_by: string | null
           reference_number: string | null
           treasury_id: string | null
+          wallet_credit_tx_id: string | null
         }
         Insert: {
           amount: number
@@ -2430,6 +2564,7 @@ export type Database = {
           deleted_at?: string | null
           id?: string
           invoice_id?: string | null
+          is_wallet_topup?: boolean
           notes?: string | null
           patient_id: string
           payment_date?: string
@@ -2437,6 +2572,7 @@ export type Database = {
           received_by?: string | null
           reference_number?: string | null
           treasury_id?: string | null
+          wallet_credit_tx_id?: string | null
         }
         Update: {
           amount?: number
@@ -2445,6 +2581,7 @@ export type Database = {
           deleted_at?: string | null
           id?: string
           invoice_id?: string | null
+          is_wallet_topup?: boolean
           notes?: string | null
           patient_id?: string
           payment_date?: string
@@ -2452,6 +2589,7 @@ export type Database = {
           received_by?: string | null
           reference_number?: string | null
           treasury_id?: string | null
+          wallet_credit_tx_id?: string | null
         }
         Relationships: [
           {
@@ -5192,6 +5330,19 @@ export type Database = {
         }
         Returns: string
       }
+      apply_wallet_tx: {
+        Args: {
+          _amount: number
+          _branch_id?: string
+          _notes_ar: string
+          _notes_en: string
+          _patient_id: string
+          _reference_id: string
+          _reference_type: string
+          _tx_type: Database["public"]["Enums"]["wallet_tx_type"]
+        }
+        Returns: string
+      }
       check_expiry_alerts: { Args: never; Returns: number }
       current_user_branch_id: { Args: never; Returns: string }
       default_treasury_for_branch: {
@@ -5381,6 +5532,13 @@ export type Database = {
         | "bridge"
       treasury_tx_type: "income" | "expense" | "transfer"
       visit_type: "consultation" | "follow_up" | "procedure" | "emergency"
+      wallet_tx_type:
+        | "topup"
+        | "spend"
+        | "refund"
+        | "referral_reward"
+        | "adjustment_credit"
+        | "adjustment_debit"
       whatsapp_provider: "twilio" | "meta" | "custom"
     }
     CompositeTypes: {
@@ -5637,6 +5795,14 @@ export const Constants = {
       ],
       treasury_tx_type: ["income", "expense", "transfer"],
       visit_type: ["consultation", "follow_up", "procedure", "emergency"],
+      wallet_tx_type: [
+        "topup",
+        "spend",
+        "refund",
+        "referral_reward",
+        "adjustment_credit",
+        "adjustment_debit",
+      ],
       whatsapp_provider: ["twilio", "meta", "custom"],
     },
   },

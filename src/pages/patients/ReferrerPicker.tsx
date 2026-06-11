@@ -1,0 +1,69 @@
+import { useEffect, useState } from "react";
+import { Combobox } from "@/components/ui/combobox";
+import { supabase } from "@/integrations/supabase/client";
+
+/**
+ * Searchable picker for another patient (used as "Referred by").
+ * - Loads up to 500 patients from the current branch / non-deleted.
+ * - Excludes `excludeId` to enforce the self-referral rule at the UI level.
+ */
+export function ReferrerPicker({
+  value, onChange, excludeId, branchId, placeholder, searchPlaceholder,
+}: {
+  value: string | null;
+  onChange: (v: string | null) => void;
+  excludeId?: string | null;
+  branchId?: string | null;
+  placeholder?: string;
+  searchPlaceholder?: string;
+}) {
+  const [options, setOptions] = useState<{ value: string; label: string }[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      let q = (supabase as any)
+        .from("patients")
+        .select("id,patient_code,first_name_en,last_name_en,first_name_ar,last_name_ar,phone,deleted_at,branch_id")
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (branchId) q = q.eq("branch_id", branchId);
+      const { data } = await q;
+      if (!active) return;
+      const rows = (data ?? [])
+        .filter((p: any) => !excludeId || p.id !== excludeId)
+        .map((p: any) => {
+          const name = `${p.first_name_en ?? p.first_name_ar ?? ""} ${p.last_name_en ?? p.last_name_ar ?? ""}`.trim();
+          const phone = p.phone ? ` · ${p.phone}` : "";
+          return { value: p.id, label: `#${p.patient_code} · ${name}${phone}` };
+        });
+      // Keep current value selectable even if it's outside the page window.
+      if (value && !rows.find((r) => r.value === value)) {
+        const { data: cur } = await (supabase as any)
+          .from("patients")
+          .select("id,patient_code,first_name_en,last_name_ar,phone")
+          .eq("id", value)
+          .maybeSingle();
+        if (cur) {
+          rows.unshift({
+            value: cur.id,
+            label: `#${cur.patient_code} · ${cur.first_name_en ?? cur.last_name_ar ?? ""}${cur.phone ? " · " + cur.phone : ""}`,
+          });
+        }
+      }
+      setOptions(rows);
+    })();
+    return () => { active = false; };
+  }, [branchId, excludeId, value]);
+
+  return (
+    <Combobox
+      value={value ?? ""}
+      onChange={(v) => onChange(v || null)}
+      options={options}
+      placeholder={placeholder ?? "—"}
+      searchPlaceholder={searchPlaceholder ?? "Search patient..."}
+    />
+  );
+}

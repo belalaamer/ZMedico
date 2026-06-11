@@ -20,6 +20,7 @@ import { Can } from "@/components/Can";
 import { usePermissions } from "@/hooks/usePermissions";
 import { ListSkeleton } from "@/components/ListSkeleton";
 import { Fab } from "@/components/ui/fab";
+import { ReferrerPicker } from "./ReferrerPicker";
 
 type Patient = {
   id: string;
@@ -67,6 +68,7 @@ export default function PatientsPage() {
     name: "", phone: "", phone2: "", email: "",
     dob: "", gender: "" as "" | "male" | "female",
     blood_type: "", address: "", notes: "",
+    referred_by_patient_id: null as string | null,
   });
 
   const load = async () => {
@@ -101,12 +103,13 @@ export default function PatientsPage() {
       address: d.address || null,
       notes: d.notes || null,
       branch_id: currentBranchId,
+      referred_by_patient_id: form.referred_by_patient_id || null,
     };
     const { error } = await supabase.from("patients").insert(payload);
     if (error) { toast.error(error.message); return; }
     toast.success(lang === "ar" ? "تمت إضافة المريض" : "Patient added");
     setOpen(false);
-    setForm({ name: "", phone: "", phone2: "", email: "", dob: "", gender: "", blood_type: "", address: "", notes: "" });
+    setForm({ name: "", phone: "", phone2: "", email: "", dob: "", gender: "", blood_type: "", address: "", notes: "", referred_by_patient_id: null });
     load();
   };
 
@@ -186,6 +189,14 @@ export default function PatientsPage() {
                 <div className="space-y-2 sm:col-span-2">
                   <Label>{t("address")}</Label>
                   <Input dir="auto" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} maxLength={255} />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>{t("referredByPatient")}</Label>
+                  <ReferrerPicker
+                    value={form.referred_by_patient_id}
+                    onChange={(v) => setForm({ ...form, referred_by_patient_id: v })}
+                    branchId={currentBranchId}
+                  />
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label>{t("notes")}</Label>

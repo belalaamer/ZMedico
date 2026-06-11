@@ -912,6 +912,8 @@ export const dict = {
     txAdjustmentCredit: "Adjustment (credit)",
     txAdjustmentDebit: "Adjustment (debit)",
     walletTopupMethodHint: "Top-up cannot use Wallet as payment method",
+    referredByPatient: "Referred by (patient)",
+    selfReferralNotAllowed: "A patient cannot refer themselves",
   },
   ar: {
     appName: "ZMedico",
@@ -1825,6 +1827,8 @@ export const dict = {
     txAdjustmentCredit: "تعديل (إضافة)",
     txAdjustmentDebit: "تعديل (خصم)",
     walletTopupMethodHint: "لا يمكن شحن المحفظة باستخدام طريقة (محفظة)",
+    referredByPatient: "أحاله مريض",
+    selfReferralNotAllowed: "لا يمكن أن يحيل المريض نفسه",
   },
 } as const;
 

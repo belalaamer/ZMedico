@@ -919,6 +919,7 @@ export const dict = {
     walletBalanceLabel: "Wallet balance",
     walletInsufficient: "Insufficient wallet balance",
     walletTopupCannotUseWallet: "Wallet top-up cannot use Wallet as payment method",
+    walletBalanceLoading: "Loading wallet balance…",
   },
   ar: {
     appName: "ZMedico",
@@ -1839,6 +1840,7 @@ export const dict = {
     walletBalanceLabel: "رصيد المحفظة",
     walletInsufficient: "رصيد المحفظة غير كافٍ",
     walletTopupCannotUseWallet: "لا يمكن شحن المحفظة باستخدام طريقة (محفظة)",
+    walletBalanceLoading: "جارٍ تحميل رصيد المحفظة…",
   },
 } as const;
 

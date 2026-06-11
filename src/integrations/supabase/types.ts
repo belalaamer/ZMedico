@@ -545,6 +545,53 @@ export type Database = {
           },
         ]
       }
+      communication_templates: {
+        Row: {
+          body_ar: string
+          body_en: string
+          branch_id: string
+          channel: string
+          created_at: string
+          enabled: boolean
+          event_type: string
+          hours_before: number | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          body_ar?: string
+          body_en?: string
+          branch_id: string
+          channel: string
+          created_at?: string
+          enabled?: boolean
+          event_type: string
+          hours_before?: number | null
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          body_ar?: string
+          body_en?: string
+          branch_id?: string
+          channel?: string
+          created_at?: string
+          enabled?: boolean
+          event_type?: string
+          hours_before?: number | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "communication_templates_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       coupon_redemptions: {
         Row: {
           branch_id: string | null
@@ -2068,6 +2115,8 @@ export type Database = {
           whatsapp_business_number: string | null
           whatsapp_enabled: boolean
           whatsapp_provider: Database["public"]["Enums"]["whatsapp_provider"]
+          winback_enabled: boolean
+          winback_inactive_days: number
         }
         Insert: {
           birthday_discount_percentage?: number
@@ -2101,6 +2150,8 @@ export type Database = {
           whatsapp_business_number?: string | null
           whatsapp_enabled?: boolean
           whatsapp_provider?: Database["public"]["Enums"]["whatsapp_provider"]
+          winback_enabled?: boolean
+          winback_inactive_days?: number
         }
         Update: {
           birthday_discount_percentage?: number
@@ -2134,6 +2185,8 @@ export type Database = {
           whatsapp_business_number?: string | null
           whatsapp_enabled?: boolean
           whatsapp_provider?: Database["public"]["Enums"]["whatsapp_provider"]
+          winback_enabled?: boolean
+          winback_inactive_days?: number
         }
         Relationships: [
           {
@@ -3377,45 +3430,63 @@ export type Database = {
           branch_id: string | null
           created_at: string
           created_by: string | null
+          destination_channel: string | null
+          destination_phone: string | null
           error_message: string | null
+          event_type: string
           id: string
           message_ar: string
           message_en: string
           patient_id: string | null
+          payload: Json
           reminder_type: Database["public"]["Enums"]["reminder_channel"]
           scheduled_time: string
           sent_at: string | null
           status: Database["public"]["Enums"]["reminder_status"]
+          template_key: string | null
+          winback_month: string | null
         }
         Insert: {
           appointment_id?: string | null
           branch_id?: string | null
           created_at?: string
           created_by?: string | null
+          destination_channel?: string | null
+          destination_phone?: string | null
           error_message?: string | null
+          event_type?: string
           id?: string
           message_ar?: string
           message_en?: string
           patient_id?: string | null
+          payload?: Json
           reminder_type?: Database["public"]["Enums"]["reminder_channel"]
           scheduled_time: string
           sent_at?: string | null
           status?: Database["public"]["Enums"]["reminder_status"]
+          template_key?: string | null
+          winback_month?: string | null
         }
         Update: {
           appointment_id?: string | null
           branch_id?: string | null
           created_at?: string
           created_by?: string | null
+          destination_channel?: string | null
+          destination_phone?: string | null
           error_message?: string | null
+          event_type?: string
           id?: string
           message_ar?: string
           message_en?: string
           patient_id?: string | null
+          payload?: Json
           reminder_type?: Database["public"]["Enums"]["reminder_channel"]
           scheduled_time?: string
           sent_at?: string | null
           status?: Database["public"]["Enums"]["reminder_status"]
+          template_key?: string | null
+          winback_month?: string | null
         }
         Relationships: []
       }
@@ -5349,6 +5420,10 @@ export type Database = {
         Args: { _branch_id: string }
         Returns: string
       }
+      enqueue_appointment_reminders: {
+        Args: { p_appointment_id: string }
+        Returns: undefined
+      }
       fn_consume_for_invoice: {
         Args: { _invoice_id: string }
         Returns: undefined
@@ -5410,6 +5485,10 @@ export type Database = {
           _qty: number
         }
         Returns: undefined
+      }
+      render_template: {
+        Args: { body: string; payload: Json }
+        Returns: string
       }
       renumber_active_invoices: { Args: never; Returns: undefined }
       renumber_active_patient_codes: { Args: never; Returns: undefined }

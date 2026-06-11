@@ -338,13 +338,22 @@ Deno.serve(async (req) => {
       sent++;
       await supabase
         .from("reminders")
-        .update({ status: "sent", sent_at: new Date().toISOString(), error_message: null })
+        .update({
+          status: "sent",
+          sent_at: new Date().toISOString(),
+          error_message: null,
+          destination_phone: phone,
+        })
         .eq("id", r.id);
     } else {
       failed++;
       await supabase
         .from("reminders")
-        .update({ status: "failed", error_message: res.error ?? "unknown" })
+        .update({
+          status: "failed",
+          error_message: res.error ?? "unknown",
+          destination_phone: phone,
+        })
         .eq("id", r.id);
     }
   }

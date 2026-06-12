@@ -935,6 +935,8 @@ export const dict = {
     placeholdersHint: "Placeholders: {{patient_name}}, {{patient_name_ar}}, {{appt_time}}",
     saveTemplates: "Save",
     templateSavedToast: "Templates saved",
+    errSelectBranchFirst: "Select a branch first",
+    errStaffNoBranch: "Some staff have no branch assigned",
   },
   ar: {
     appName: "ZMedico",
@@ -1871,6 +1873,8 @@ export const dict = {
     placeholdersHint: "متغيرات: {{patient_name}}، {{patient_name_ar}}، {{appt_time}}",
     saveTemplates: "حفظ",
     templateSavedToast: "تم حفظ القوالب",
+    errSelectBranchFirst: "اختر الفرع أولًا",
+    errStaffNoBranch: "بعض الموظفين بدون فرع محدد",
   },
 } as const;
 

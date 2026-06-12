@@ -137,13 +137,13 @@ export function Topbar() {
           aria-modal="true"
           aria-label={t("appName")}
           style={{ willChange: "transform" }}
-          className={`fixed inset-y-0 py-2 ${lang === "ar" ? "right-0 rounded-l-2xl" : "left-0 rounded-r-2xl"} z-50 w-[280px] max-w-[82vw] bg-sidebar text-sidebar-foreground shadow-2xl ring-1 ring-border overflow-hidden transform-gpu transition-transform duration-150 ease-out ${
+          className={`fixed inset-y-0 ${lang === "ar" ? "right-0 rounded-l-2xl" : "left-0 rounded-r-2xl"} z-50 w-[280px] max-w-[82vw] bg-sidebar text-sidebar-foreground shadow-2xl ring-1 ring-border overflow-hidden transform-gpu transition-transform duration-150 ease-out ${
             mobileOpen
               ? "translate-x-0 pointer-events-auto"
               : `${lang === "ar" ? "translate-x-full" : "-translate-x-full"} pointer-events-none`
           }`}
         >
-          <div className="flex h-16 items-center justify-end border-b border-sidebar-border px-3">
+          <div className="flex h-16 items-center justify-end border-b border-sidebar-border px-3 py-2">
             <Button
               variant="ghost"
               size="icon"
@@ -155,7 +155,7 @@ export function Topbar() {
               <X className="size-5" />
             </Button>
           </div>
-          <div className="h-[calc(100%-4rem)] overflow-y-auto">
+          <div className="h-[calc(100%-4rem)] overflow-y-auto py-2">
             <SidebarContent onNavigate={() => setMobileOpen(false)} />
           </div>
         </aside>

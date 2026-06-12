@@ -1022,6 +1022,18 @@ export default function CalendarPage() {
                         <div className="text-sm font-medium break-words leading-snug mt-0.5">{fullName(p)}</div>
                         <div className="text-[11px] text-muted-foreground truncate">{a.procedure || "—"}</div>
                         <div className="flex items-center gap-1 mt-1 -ms-1">
+                          {nextStatus(a.status) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-[11px] gap-1"
+                              onClick={() => changeStatus(a, nextStatus(a.status)!)}
+                              title={nextStatusLabel(a.status) ?? undefined}
+                            >
+                              <ArrowRight className="size-3.5" />
+                              {nextStatusLabel(a.status)}
+                            </Button>
+                          )}
                           <Button variant="ghost" size="icon" className="size-7" title={t("sendReminder")} onClick={() => sendReminderNow(a)}>
                             <Send className="size-3.5" />
                           </Button>

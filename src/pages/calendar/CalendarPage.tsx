@@ -724,17 +724,30 @@ export default function CalendarPage() {
 
       {/* Stats strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { label: lang === "ar" ? "إجمالي" : "Total", value: stats.total, cls: "text-foreground" },
-          { label: lang === "ar" ? "قادمة" : "Upcoming", value: stats.scheduled, cls: "text-primary" },
-          { label: lang === "ar" ? "مكتمل" : "Completed", value: stats.completed, cls: "text-emerald-500" },
-          { label: lang === "ar" ? "ملغية" : "Cancelled", value: stats.cancelled, cls: "text-destructive" },
-        ].map((s) => (
-          <Card key={s.label} className="p-4 shadow-card">
-            <div className="text-xs text-muted-foreground">{s.label}</div>
-            <div className={`text-2xl font-bold mt-1 ${s.cls}`}>{s.value}</div>
-          </Card>
-        ))}
+        {([
+          { key: "all",      label: lang === "ar" ? "إجمالي"  : "Total",     value: stats.total,     cls: "text-foreground" },
+          { key: "scheduled",label: lang === "ar" ? "قادمة"   : "Upcoming",  value: stats.scheduled, cls: "text-primary" },
+          { key: "completed",label: lang === "ar" ? "مكتمل"   : "Completed", value: stats.completed, cls: "text-emerald-500" },
+          { key: "cancelled",label: lang === "ar" ? "ملغية"   : "Cancelled", value: stats.cancelled, cls: "text-destructive" },
+        ] as const).map((s) => {
+          const active = (s.key === "all" && statusFilter === "all")
+            || (s.key === "scheduled" && (statusFilter === "scheduled" || statusFilter === "confirmed"))
+            || (s.key === "completed" && statusFilter === "completed")
+            || (s.key === "cancelled" && (statusFilter === "cancelled" || statusFilter === "no_show"));
+          return (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => setStatusFilter(s.key === "all" ? "all" : s.key === "scheduled" ? "scheduled" : s.key)}
+              className="text-start"
+            >
+              <Card className={`p-4 shadow-card transition-all hover:shadow-elegant ${active ? "ring-2 ring-primary" : ""}`}>
+                <div className="text-xs text-muted-foreground">{s.label}</div>
+                <div className={`text-2xl font-bold mt-1 ${s.cls}`}>{s.value}</div>
+              </Card>
+            </button>
+          );
+        })}
       </div>
 
       {/* Filters */}

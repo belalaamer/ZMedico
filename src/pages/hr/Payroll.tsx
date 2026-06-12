@@ -75,11 +75,11 @@ export default function Payroll() {
   const profName = (sid: string) => profiles.find((p) => p.id === sid)?.full_name ?? sid;
 
   const generate = async () => {
-    if (!currentBranchId) { toast.error("Select a branch first"); return; }
+    if (!currentBranchId) { toast.error(t("errSelectBranchFirst")); return; }
     const existing = new Set(items.map((i) => i.staff_id));
     const candidates = staff.filter((s) => !existing.has(s.id));
     const missing = candidates.filter((s) => !s.branch_id && !currentBranchId);
-    if (missing.length) { toast.error("Some staff have no branch"); return; }
+    if (missing.length) { toast.error(t("errStaffNoBranch")); return; }
     const rows = candidates.map((s) => ({
       staff_id: s.id,
       branch_id: s.branch_id ?? currentBranchId,

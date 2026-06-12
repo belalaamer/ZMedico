@@ -44,7 +44,7 @@ export default function Departments() {
     if (!name) { toast.error("Name required"); return; }
     const effectiveBranchId = form.branch_id || currentBranchId;
     if (!effectiveBranchId) {
-      toast.error(lang === "ar" ? "اختر الفرع أولاً" : "Select a branch first");
+      toast.error(t("errSelectBranchFirst"));
       return;
     }
     const payload: any = { name_en: name, name_ar: name, description: form.description || null, branch_id: effectiveBranchId, manager_id: form.manager_id || null };

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "react-router-dom";
 import {
-  Wallet, Receipt, CalendarCheck, FileText, Clock, Users, UserPlus, Stethoscope, Inbox,
+  Wallet, Receipt, CalendarCheck, FileText, Clock, Users, UserPlus, Stethoscope, Inbox, Landmark, ArrowDownUp,
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
@@ -65,6 +65,11 @@ export default function Dashboard() {
   const [pendingInvoicesAmount, setPendingInvoicesAmount] = useState(0);
   const [todayConsults, setTodayConsults] = useState(0);
   const [draftRecords, setDraftRecords] = useState(0);
+
+  // Treasury at-a-glance (today + last close)
+  const [lastClose, setLastClose] = useState<{ business_date: string; counted_cash: number; variance: number } | null>(null);
+  const [todayTreasuryIn, setTodayTreasuryIn] = useState(0);
+  const [todayTreasuryOut, setTodayTreasuryOut] = useState(0);
 
   const [revenue7d, setRevenue7d] = useState<{ date: string; revenue: number }[]>([]);
   const [apptStatusAll, setApptStatusAll] = useState<{ name: string; value: number }[]>([]);
@@ -155,6 +160,31 @@ export default function Dashboard() {
           .is("invoice.deleted_at", null)
           .gte("invoice.issue_date", rangeStart).lte("invoice.issue_date", rangeEnd),
       ]);
+
+      // Treasury (separate, optional — failures shouldn't break dashboard)
+      const [lastCloseRes, treasuryTxRes] = await Promise.all([
+        branchEq(
+          (supabase as any).from("treasury_daily_closes")
+            .select("business_date,counted_cash,variance,branch_id")
+            .order("business_date", { ascending: false })
+            .limit(1)
+        ),
+        branchEq(
+          (supabase as any).from("treasury_transactions")
+            .select("amount,is_cash,branch_id,created_at")
+            .gte("created_at", start.toISOString())
+            .lte("created_at", end.toISOString())
+        ),
+      ]);
+      const lc = (lastCloseRes?.data ?? [])[0] as any;
+      setLastClose(lc ? { business_date: lc.business_date, counted_cash: Number(lc.counted_cash || 0), variance: Number(lc.variance || 0) } : null);
+      let tIn = 0, tOut = 0;
+      for (const r of ((treasuryTxRes?.data ?? []) as any[])) {
+        const v = Number(r.amount || 0);
+        if (v >= 0) tIn += v; else tOut += -v;
+      }
+      setTodayTreasuryIn(tIn);
+      setTodayTreasuryOut(tOut);
 
       const apptRows = (apptsTodayRes.data ?? []) as { status: string }[];
       setTodayAppts(apptRows.length);
@@ -387,6 +417,8 @@ export default function Dashboard() {
         </Card>
       ) : (
         <>
+          <section>
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">{lang === "ar" ? "اليوم" : "Today"}</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
             <StatCard
               label={t("todayAppointments")} value={todayAppts}
@@ -415,6 +447,28 @@ export default function Dashboard() {
               icon={FileText} tone="from-warning to-warning" to="/medical/records"
             />
           </div>
+          {/* Treasury at-a-glance */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mt-3">
+            <StatCard
+              label={lang === "ar" ? "آخر إقفال يومي" : "Last daily close"}
+              value={lastClose ? formatMoney(lastClose.counted_cash, lang) : (lang === "ar" ? "—" : "—")}
+              sub={lastClose
+                ? `${formatDate(lastClose.business_date, lang)} · ${lang === "ar" ? "فرق" : "variance"}: ${formatMoney(lastClose.variance, lang)}`
+                : (lang === "ar" ? "لا يوجد إقفال بعد" : "No close yet")}
+              icon={Landmark}
+              tone={lastClose && Math.abs(lastClose.variance) > 0.01 ? "from-warning to-warning" : "from-success to-success"}
+              to="/treasury/daily-close"
+            />
+            <StatCard
+              label={lang === "ar" ? "حركات الخزينة اليوم" : "Treasury movements today"}
+              value={formatMoney(todayTreasuryIn - todayTreasuryOut, lang)}
+              sub={`${lang === "ar" ? "داخل" : "In"}: ${formatMoney(todayTreasuryIn, lang)} · ${lang === "ar" ? "خارج" : "Out"}: ${formatMoney(todayTreasuryOut, lang)}`}
+              icon={ArrowDownUp} tone="from-info to-info" to="/treasury"
+            />
+          </div>
+          </section>
+
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{lang === "ar" ? "هذا الأسبوع" : "This week"}</h2>
 
           <div className="grid lg:grid-cols-3 gap-4">
             <Card className="p-5 shadow-card border-border/60 lg:col-span-2">
@@ -456,6 +510,7 @@ export default function Dashboard() {
             </Card>
           </div>
 
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{lang === "ar" ? "هذا الشهر / النطاق" : "This month / range"}</h2>
           <div className="grid lg:grid-cols-2 gap-4">
             <Card className="p-5 shadow-card border-border/60">
               <div className="text-sm font-medium mb-3">{t("patientsByAge")}</div>

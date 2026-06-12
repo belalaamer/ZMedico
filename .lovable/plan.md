@@ -1,110 +1,117 @@
 
-# Automated Communication v1 — Final Plan
+# Appointment Hub & Dashboard UX — v1 Plan (Analysis Only)
 
-Scope: 3 events only — `booking_confirmation`, `appointment_reminder`, `win_back`. Status-tracked via existing `public.reminders`. No marketing suite, no segmentation, no provider abstraction changes.
+## 1. Current state
 
-## Decisions locked
-- Win-back: at most one per patient per calendar month.
-- Channel: send only on the channel configured on the matching template row (no automatic fallback).
-- Reschedule/cancel: auto-cancel pending `appointment_reminder` rows and re-enqueue at the new time (skip re-enqueue when appointment cancelled/no_show).
-- Cron: `send-reminder` every 5 min; `enqueue-winback` daily 09:00 UTC.
+### Appointments / Calendar
+- **Single file**: `src/pages/calendar/CalendarPage.tsx` (~960 lines) handles Day / Week / Month views, mini-month sidebar, filters (doctor, room, status), and the create/edit dialog. There is **no separate "Appointments list" page** — the calendar IS the list. Booking dialog is `Dialog` inline.
+- Status schema in code: `scheduled | confirmed | in_progress | completed | cancelled | no_show | departed` (matches DB enum).
+- Filters (doctor / room / status) live behind a "Filter" pill — not visible above the fold on first paint.
+- Patient picker in the booking dialog is a generic combobox: **no debt, wallet, or last-visit signal**. Reception cannot see if the patient owes money before confirming the slot.
+- Status changes go through `RowActions` → 1 click to open menu + 1 click per status. No quick "Arrived / Start / Complete" inline buttons on the day view.
+- Stats strip (`stats.total/scheduled/completed/cancelled`) is computed but only shown deep inside the view; not a focused KPI band.
 
-## Sanity checks the user asked for
+### Dashboard
+- `src/pages/dashboard/Dashboard.tsx` (~617 lines): fires ~14 parallel queries, renders KPI cards, line/pie/bar charts (recharts), and three "recent" lists (patients, appointments, payments).
+- KPIs mix scopes: today (appts, revenue, new patients), all-time pending invoices, range-based charts — **no visual grouping** of "Today vs Week vs Month".
+- KPI cards are static — **not clickable** to a filtered list.
+- No treasury / daily-close awareness even though Treasury v1 hardening is live.
+- Heavy: charts re-render on every branch switch; mobile experience is dense.
 
-**1) Timezone of the monthly win-back uniqueness.**
-`scheduled_time` is `timestamptz`, so `date_trunc('month', scheduled_time)` evaluates in the session timezone — non-deterministic for a unique index. Fix: add a generated column on `reminders`:
+## 2. UX issues (summary)
 
-```sql
-winback_month date GENERATED ALWAYS AS (
-  CASE WHEN event_type = 'win_back'
-       THEN (date_trunc('month', scheduled_time AT TIME ZONE 'UTC'))::date
-  END
-) STORED
+| Area | Issue |
+|---|---|
+| Calendar header | Three view buttons + 3 nav buttons + Today + Sheet + New CTA crowd the top bar on tablets. |
+| Filters | Hidden behind a sheet; doctor/status filters are the most-used and should be inline on day view. |
+| Booking | No financial context (debt / wallet) on the patient row, no last-visit hint. |
+| Status flow | Requires opening row menu; no one-tap "Arrived → In-Progress → Completed". |
+| Today focus | No "Today at a glance" panel: counts by status + next-up patient. |
+| Dashboard | Mixed time scopes, non-clickable KPIs, no treasury signal, charts overload. |
+
+## 3. Proposed Appointment Hub v1
+
+Keep the file `CalendarPage.tsx` as the single hub. No new route, no new heavy state lib.
+
+### Layout (above the fold, day view)
+```text
+┌─ Header: title · date · [Day|Week|Month] · ‹ Today › · [+ New] ─┐
+├─ Today strip: [Total N] [Scheduled N] [Arrived N] [In-Prog N]   │
+│                [Completed N] [Cancelled/No-show N]              │
+├─ Primary filters (inline): Doctor ▾ · Status ▾ · Room ▾ · 🔎   │
+├─ Time grid (existing) ──────────── │ Mini-month + Next-up card  │
+└──────────────────────────────────── │  (lg only, sticky)        ┘
+```
+- Move doctor/status/room filters out of the sheet, into an inline row visible on day view (collapse to sheet only on `<sm`).
+- The "Today strip" replaces the buried `stats` block. Each chip is **clickable** → sets `statusFilter` for the day.
+- Add a "Next up" card in the right rail showing the next non-completed appointment with quick actions.
+
+### Status flow (mapped to existing enum)
+```text
+scheduled ──► confirmed ──► in_progress ──► completed
+    │             │              │
+    └─► cancelled / no_show      └─► departed
+```
+- On each appointment block in day view, add a tiny inline "next-status" button (e.g. `→ Arrived`, `→ Start`, `→ Done`) that calls the existing `changeStatus()` with the next legal state. Right-click / long-press still opens the existing RowActions menu for the full set.
+
+### Patient financial context at booking
+At booking-dialog open, after a patient is selected, fetch in parallel (read-only, no logic changes):
+- `patient_wallets.balance` (existing table)
+- `invoices` sum where `status in ('pending','partial')` and `patient_id = X`, computing `Σ(total - paid_amount)`
+- `appointments` last completed/departed `scheduled_at` for the patient
+
+Render as a small read-only card under the patient picker:
+```text
+Wallet: 320 EGP   Outstanding: 1,200 EGP   Last visit: 12 Apr 2026
+```
+Color the outstanding chip in `text-destructive` when > 0. No write paths. No wallet/treasury logic touched.
+
+### Out of scope (v1)
+- Multi-branch cross-scheduling, drag-to-reschedule, resource (chair) grid, recurring appointments UI, waitlist.
+
+## 4. Proposed Dashboard v1.1
+
+Same file, same queries (with 2 small additions). Reorganize layout into **3 horizontal bands** by time scope.
+
+```text
+Today
+  [Appts today ▸] [Revenue today] [New patients] [Pending invoices ▸]
+  [Last close · variance]   [Cash in treasury today]   ← NEW (2 cards)
+
+This week
+  [Revenue chart 7d]   [Appts by status 7d]
+
+This month / range
+  [Top services]  [Doctor performance]  [Age groups]  [Referral mix]
 ```
 
-Then `UNIQUE (patient_id, winback_month) WHERE event_type = 'win_back' AND patient_id IS NOT NULL`.
-UTC is used deterministically; clinic-local boundary drift is at most a few hours, acceptable for a "once per month" guard and documented. A future per-branch `winback_tz` can replace `'UTC'` without changing call sites.
+### Concrete changes
+- **Group + label** the KPI cards under "Today / This week / This month" headings instead of one flat grid.
+- **Make Today KPIs clickable** (wrap in `<Link>`):
+  - Appts today → `/calendar?date=YYYY-MM-DD`
+  - Pending invoices → `/invoices/outstanding`
+  - Today revenue → `/payments?date=today` (Payments already supports date filter)
+  - New patients → `/patients?created=today` (add a simple URL filter; trivial UI-only)
+- **2 new cards from already-hardened data** (no backend change):
+  - *Last daily close*: most recent row from `treasury_daily_closes` for current branch → show business_date, counted_cash, variance, color variance.
+  - *Today's treasury movements*: sum of `treasury_transactions.amount` grouped by sign for today.
+- Drop the recent-payments and recent-patients lists to a single compact "Recent activity" tabbed card to reduce density (NICE).
+- Lazy-load chart section under an "Insights" accordion to speed first paint (NICE).
 
-**2) Storing the resolved destination phone for auditability.**
-Yes — add `destination_phone text` and `destination_channel text` (mirrors `reminder_type` at enqueue time; both kept because patient phone can change after the row is created). Populated by enqueue triggers/function from `patients.phone`, and overwritten by `send-reminder` right before dispatch with the actual phone used. Lets ops verify what number was contacted even if the patient row is later edited.
+## 5. Touch list
 
-## Schema (single migration)
+| File | Change | MUST/NICE |
+|---|---|---|
+| `src/pages/calendar/CalendarPage.tsx` | Add Today-strip chips; promote doctor/status/room filters inline; add Next-up rail card; add inline next-status button on appointment blocks. | MUST |
+| `src/pages/calendar/CalendarPage.tsx` (booking dialog section) | After patient selected, fetch wallet/outstanding/last-visit and render context strip. | MUST |
+| `src/pages/dashboard/Dashboard.tsx` | Regroup KPIs under Today/Week/Month bands; wrap Today KPIs in `<Link>`; add 2 cards (last close + today treasury movement). | MUST |
+| `src/pages/dashboard/Dashboard.tsx` | Collapse recents into a tabbed card; lazy "Insights" section. | NICE |
+| `src/pages/patients/Patients.tsx` | Accept `?created=today` query filter (1-liner). | NICE (only if we want the dashboard link to filter) |
 
-`reminders` additions:
-- `event_type text` check in `('booking_confirmation','appointment_reminder','win_back','manual')` default `'manual'`
-- `template_key text null`
-- `payload jsonb not null default '{}'::jsonb` (snapshot: patient name, appt time formatted, clinic name)
-- `destination_phone text null`
-- `destination_channel text null`
-- `winback_month date` (generated, see above)
+No new components library, no new routes, no schema/migration, no edits to wallet / treasury / audit / automated comm code paths. All new data reads use existing tables with existing RLS.
 
-Indexes:
-- `UNIQUE (appointment_id, event_type, scheduled_time) WHERE appointment_id IS NOT NULL AND event_type IN ('booking_confirmation','appointment_reminder')` — idempotent enqueue + safe re-run.
-- `UNIQUE (patient_id, winback_month) WHERE event_type='win_back' AND patient_id IS NOT NULL` — monthly cap.
-- `(status, scheduled_time)` for due-poller efficiency.
+## 6. Verification after build (when approved)
+- Day view: filter chips toggle the list; next-status button advances status; booking dialog shows financial strip within 500ms of patient pick.
+- Dashboard: Today cards navigate to correctly-filtered pages; last-close + today-treasury cards show real numbers and respect branch switch; first paint not slower than current.
 
-New `communication_templates`:
-- `branch_id`, `event_type`, `channel` (`whatsapp|sms|email`), `enabled bool`, `body_en text`, `body_ar text`, `hours_before int null` (only for `appointment_reminder`).
-- `UNIQUE (branch_id, event_type, channel, COALESCE(hours_before,-1))`.
-- Standard authenticated RLS via `branch_id` membership.
-
-`notification_settings` additions:
-- `winback_enabled bool default false`
-- `winback_inactive_days int default 120 check >0`
-
-## Triggers (Postgres)
-
-- `trg_enqueue_on_booking` `AFTER INSERT ON appointments`:
-  for each enabled (event_type, channel, hours_before) template row in the appointment's branch:
-  - if `event_type='booking_confirmation'` → insert reminder at `now()`.
-  - if `event_type='appointment_reminder'` → for each `hours_before` (template row), insert at `scheduled_at - hours_before*interval '1h'`.
-  Skip insert if `scheduled_at - hours <= now()` (already past). All inserts use `ON CONFLICT DO NOTHING` via the unique index.
-
-- `trg_reschedule_or_cancel` `AFTER UPDATE OF scheduled_at, status ON appointments`:
-  - If `status` changed to `cancelled`/`no_show` OR `scheduled_at` changed: `UPDATE reminders SET status='cancelled' WHERE appointment_id=NEW.id AND status='pending' AND event_type='appointment_reminder'`.
-  - If still active (status in scheduled/confirmed/etc) and `scheduled_at` changed: re-run enqueue loop for `appointment_reminder` rows at the new time. `booking_confirmation` is left alone.
-
-Triggers resolve templates per branch and copy `body_en/ar` (rendered with payload placeholders `{{patient_name}}`, `{{appt_time}}`, `{{clinic}}`) into `message_en/ar`, and set `destination_phone` from `patients.phone`, `destination_channel` from template `channel`, `reminder_type` from template `channel`. If no enabled template exists for an event/channel, nothing is enqueued (intentional — admin opts in by creating a template).
-
-## Edge functions
-
-- `send-reminder` (existing): two small additions only — write back `destination_phone` actually used; treat per-row `reminder_type` as the channel (already does). No fallback logic.
-- `enqueue-winback` (new, JWT-validated, called by cron with service role): for each branch where `winback_enabled`, find patients in that branch with `max(appointments.scheduled_at) < now() - winback_inactive_days` (or never), insert one `win_back` reminder per (patient, channel from enabled win-back template), `scheduled_time = now()`. Uses `ON CONFLICT DO NOTHING` against the monthly unique index.
-
-## Cron (run via `supabase--insert`, NOT migration — contains project URL + anon key)
-
-```
-*/5 * * * *   → POST /functions/v1/send-reminder  { "due_only": true }
-0   9 * * *   → POST /functions/v1/enqueue-winback {}
-```
-
-Enables `pg_cron` + `pg_net` if not already on.
-
-## Frontend
-
-- New page `src/pages/settings/AutomatedCommunication.tsx` under Settings: three sections (booking_confirmation, appointment_reminder, win_back), per-branch template editor (channel + EN/AR body + enabled + hours_before for reminder), win-back toggle + inactivity days input. Reuses existing `ScheduledReminders` page for the audit log (already shows status/sent_at/error).
-- Sidebar link to the new settings page (settings module).
-- i18n keys for labels.
-
-No changes to Treasury, Wallet, Insurance, Inventory, HR, Sidebar architecture, RecordPaymentDialog, or appointment create dialog UI.
-
-## Affected files
-
-Migration (new): `supabase/migrations/<ts>_automated_comm_v1.sql` — schema + triggers.
-Cron seed (via `supabase--insert`): pg_cron jobs.
-Edge functions:
-- `supabase/functions/send-reminder/index.ts` (small patch: write back destination_phone)
-- `supabase/functions/enqueue-winback/index.ts` (new)
-Frontend:
-- `src/pages/settings/AutomatedCommunication.tsx` (new)
-- `src/App.tsx` (route)
-- `src/pages/settings/SettingsLayout.tsx` (nav entry)
-- `src/lib/i18n.ts` (EN/AR keys)
-
-## Order of execution
-
-1. Apply migration (await approval).
-2. Patch `send-reminder`, deploy `enqueue-winback`.
-3. Seed cron via `supabase--insert`.
-4. Add settings page + route + i18n.
-5. Post-implementation self-audit.
+Awaiting approval to implement.

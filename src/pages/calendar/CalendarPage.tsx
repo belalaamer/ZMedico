@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft, ChevronRight, Plus, Send, CalendarDays, LayoutGrid, Clock, Filter, X, CalendarRange, Check, ChevronsUpDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Send, CalendarDays, LayoutGrid, Clock, Filter, X, CalendarRange, Check, ChevronsUpDown, ArrowRight, Wallet as WalletIcon, AlertCircle, History } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Fab } from "@/components/ui/fab";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
+import { formatMoney, formatDate } from "@/lib/format";
 import { toast } from "sonner";
 import { RowActions } from "@/components/RowActions";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -106,6 +107,29 @@ export default function CalendarPage() {
     patient_id: "", doctor_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "",
     status: "scheduled" as Appt["status"],
   });
+  const [patientCtx, setPatientCtx] = useState<{ wallet: number; outstanding: number; lastVisit: string | null } | null>(null);
+  const [patientCtxLoading, setPatientCtxLoading] = useState(false);
+
+  // Load patient financial context whenever a patient is picked in the booking dialog
+  useEffect(() => {
+    if (!open || !form.patient_id) { setPatientCtx(null); return; }
+    let cancelled = false;
+    setPatientCtxLoading(true);
+    (async () => {
+      const [walletRes, invRes, lastApptRes] = await Promise.all([
+        (supabase as any).from("patient_wallets").select("balance").eq("patient_id", form.patient_id).maybeSingle(),
+        supabase.from("invoices").select("total,paid_amount").eq("patient_id", form.patient_id).is("deleted_at", null).in("status", ["pending", "partial"]),
+        supabase.from("appointments").select("scheduled_at").eq("patient_id", form.patient_id).is("deleted_at", null).in("status", ["completed", "departed"]).order("scheduled_at", { ascending: false }).limit(1).maybeSingle(),
+      ]);
+      if (cancelled) return;
+      const wallet = Number(walletRes?.data?.balance ?? 0);
+      const outstanding = ((invRes.data ?? []) as any[]).reduce((s, r) => s + (Number(r.total || 0) - Number(r.paid_amount || 0)), 0);
+      const lastVisit = (lastApptRes.data as any)?.scheduled_at ?? null;
+      setPatientCtx({ wallet, outstanding, lastVisit });
+      setPatientCtxLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [form.patient_id, open]);
 
   // Force day view on mobile when user lands on week (too cramped). Month is fine.
   useEffect(() => {
@@ -296,6 +320,24 @@ export default function CalendarPage() {
     if (error) { toast.error(error.message); return; }
     toast.success(t("saved"));
     load();
+  };
+
+  // Forward-only progression along the standard reception flow.
+  const nextStatus = (s: Appt["status"]): Appt["status"] | null => {
+    switch (s) {
+      case "scheduled":   return "confirmed";
+      case "confirmed":   return "in_progress";
+      case "in_progress": return "completed";
+      default: return null;
+    }
+  };
+  const nextStatusLabel = (s: Appt["status"]): string | null => {
+    const n = nextStatus(s);
+    if (!n) return null;
+    if (lang === "ar") {
+      return n === "confirmed" ? "وصل" : n === "in_progress" ? "ابدأ" : "تم";
+    }
+    return n === "confirmed" ? "Arrived" : n === "in_progress" ? "Start" : "Done";
   };
 
   const sendReminderNow = async (a: Appt) => {
@@ -576,6 +618,31 @@ export default function CalendarPage() {
                       </Command>
                     </PopoverContent>
                   </Popover>
+                  {form.patient_id && (
+                    <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs flex flex-wrap items-center gap-x-4 gap-y-1">
+                      {patientCtxLoading || !patientCtx ? (
+                        <span className="text-muted-foreground">{lang === "ar" ? "جارٍ تحميل بيانات المريض..." : "Loading patient context..."}</span>
+                      ) : (
+                        <>
+                          <span className="inline-flex items-center gap-1">
+                            <WalletIcon className="size-3.5 text-muted-foreground" />
+                            <span className="text-muted-foreground">{lang === "ar" ? "المحفظة:" : "Wallet:"}</span>
+                            <span className={`font-medium tabular-nums ${patientCtx.wallet > 0 ? "text-emerald-600" : ""}`}>{formatMoney(patientCtx.wallet, lang)}</span>
+                          </span>
+                          <span className="inline-flex items-center gap-1">
+                            <AlertCircle className={`size-3.5 ${patientCtx.outstanding > 0 ? "text-destructive" : "text-muted-foreground"}`} />
+                            <span className="text-muted-foreground">{lang === "ar" ? "متبقي:" : "Outstanding:"}</span>
+                            <span className={`font-medium tabular-nums ${patientCtx.outstanding > 0 ? "text-destructive" : ""}`}>{formatMoney(patientCtx.outstanding, lang)}</span>
+                          </span>
+                          <span className="inline-flex items-center gap-1">
+                            <History className="size-3.5 text-muted-foreground" />
+                            <span className="text-muted-foreground">{lang === "ar" ? "آخر زيارة:" : "Last visit:"}</span>
+                            <span className="font-medium">{patientCtx.lastVisit ? formatDate(patientCtx.lastVisit, lang) : (lang === "ar" ? "—" : "—")}</span>
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>{lang === "ar" ? "الطبيب" : "Doctor"}</Label>
@@ -682,17 +749,30 @@ export default function CalendarPage() {
 
       {/* Stats strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { label: lang === "ar" ? "إجمالي" : "Total", value: stats.total, cls: "text-foreground" },
-          { label: lang === "ar" ? "قادمة" : "Upcoming", value: stats.scheduled, cls: "text-primary" },
-          { label: lang === "ar" ? "مكتمل" : "Completed", value: stats.completed, cls: "text-emerald-500" },
-          { label: lang === "ar" ? "ملغية" : "Cancelled", value: stats.cancelled, cls: "text-destructive" },
-        ].map((s) => (
-          <Card key={s.label} className="p-4 shadow-card">
-            <div className="text-xs text-muted-foreground">{s.label}</div>
-            <div className={`text-2xl font-bold mt-1 ${s.cls}`}>{s.value}</div>
-          </Card>
-        ))}
+        {([
+          { key: "all",      label: lang === "ar" ? "إجمالي"  : "Total",     value: stats.total,     cls: "text-foreground" },
+          { key: "scheduled",label: lang === "ar" ? "قادمة"   : "Upcoming",  value: stats.scheduled, cls: "text-primary" },
+          { key: "completed",label: lang === "ar" ? "مكتمل"   : "Completed", value: stats.completed, cls: "text-emerald-500" },
+          { key: "cancelled",label: lang === "ar" ? "ملغية"   : "Cancelled", value: stats.cancelled, cls: "text-destructive" },
+        ] as const).map((s) => {
+          const active = (s.key === "all" && statusFilter === "all")
+            || (s.key === "scheduled" && (statusFilter === "scheduled" || statusFilter === "confirmed"))
+            || (s.key === "completed" && statusFilter === "completed")
+            || (s.key === "cancelled" && (statusFilter === "cancelled" || statusFilter === "no_show"));
+          return (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => setStatusFilter(s.key === "all" ? "all" : s.key === "scheduled" ? "scheduled" : s.key)}
+              className="text-start"
+            >
+              <Card className={`p-4 shadow-card transition-all hover:shadow-elegant ${active ? "ring-2 ring-primary" : ""}`}>
+                <div className="text-xs text-muted-foreground">{s.label}</div>
+                <div className={`text-2xl font-bold mt-1 ${s.cls}`}>{s.value}</div>
+              </Card>
+            </button>
+          );
+        })}
       </div>
 
       {/* Filters */}
@@ -942,6 +1022,18 @@ export default function CalendarPage() {
                         <div className="text-sm font-medium break-words leading-snug mt-0.5">{fullName(p)}</div>
                         <div className="text-[11px] text-muted-foreground truncate">{a.procedure || "—"}</div>
                         <div className="flex items-center gap-1 mt-1 -ms-1">
+                          {nextStatus(a.status) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-[11px] gap-1"
+                              onClick={() => changeStatus(a, nextStatus(a.status)!)}
+                              title={nextStatusLabel(a.status) ?? undefined}
+                            >
+                              <ArrowRight className="size-3.5" />
+                              {nextStatusLabel(a.status)}
+                            </Button>
+                          )}
                           <Button variant="ghost" size="icon" className="size-7" title={t("sendReminder")} onClick={() => sendReminderNow(a)}>
                             <Send className="size-3.5" />
                           </Button>

@@ -120,11 +120,12 @@ export default function Schedules() {
 
   const save = async () => {
     if (!staffId) { toast.error("Select staff"); return; }
+    if (!currentBranchId) { toast.error(lang === "ar" ? "اختر الفرع أولاً" : "Select a branch first"); return; }
     const bad = slots.find(invalidShift);
     if (bad) { toast.error(lang === "ar" ? "وقت البدء يجب أن يكون قبل وقت الانتهاء" : "Start time must be before end time"); return; }
-    await supabase.from("work_schedules").delete().eq("staff_id", staffId).eq("branch_id", currentBranchId ?? "");
+    await supabase.from("work_schedules").delete().eq("staff_id", staffId).eq("branch_id", currentBranchId);
     const rows = slots.map((s) => ({
-      staff_id: staffId, branch_id: currentBranchId ?? null,
+      staff_id: staffId, branch_id: currentBranchId,
       day_of_week: s.day_of_week, start_time: s.start_time, end_time: s.end_time, is_working_day: s.is_working_day,
       room: s.room ?? null,
     }));
@@ -155,9 +156,12 @@ export default function Schedules() {
   };
 
   const saveStaffSchedule = async (sid: string, rows: Slot[]) => {
-    await supabase.from("work_schedules").delete().eq("staff_id", sid).eq("branch_id", currentBranchId ?? "");
+    if (!currentBranchId) {
+      return { error: { message: lang === "ar" ? "اختر الفرع أولاً" : "Select a branch first" } } as any;
+    }
+    await supabase.from("work_schedules").delete().eq("staff_id", sid).eq("branch_id", currentBranchId);
     const payload = rows.map((s) => ({
-      staff_id: sid, branch_id: currentBranchId ?? null,
+      staff_id: sid, branch_id: currentBranchId,
       day_of_week: s.day_of_week, start_time: s.start_time, end_time: s.end_time,
       is_working_day: s.is_working_day, room: s.room ?? null,
     }));

@@ -66,6 +66,11 @@ export default function Dashboard() {
   const [todayConsults, setTodayConsults] = useState(0);
   const [draftRecords, setDraftRecords] = useState(0);
 
+  // Treasury at-a-glance (today + last close)
+  const [lastClose, setLastClose] = useState<{ business_date: string; counted_cash: number; variance: number } | null>(null);
+  const [todayTreasuryIn, setTodayTreasuryIn] = useState(0);
+  const [todayTreasuryOut, setTodayTreasuryOut] = useState(0);
+
   const [revenue7d, setRevenue7d] = useState<{ date: string; revenue: number }[]>([]);
   const [apptStatusAll, setApptStatusAll] = useState<{ name: string; value: number }[]>([]);
   const [ageGroups, setAgeGroups] = useState<{ name: string; value: number }[]>([]);
@@ -155,6 +160,31 @@ export default function Dashboard() {
           .is("invoice.deleted_at", null)
           .gte("invoice.issue_date", rangeStart).lte("invoice.issue_date", rangeEnd),
       ]);
+
+      // Treasury (separate, optional — failures shouldn't break dashboard)
+      const [lastCloseRes, treasuryTxRes] = await Promise.all([
+        branchEq(
+          (supabase as any).from("treasury_daily_closes")
+            .select("business_date,counted_cash,variance,branch_id")
+            .order("business_date", { ascending: false })
+            .limit(1)
+        ),
+        branchEq(
+          (supabase as any).from("treasury_transactions")
+            .select("amount,is_cash,branch_id,created_at")
+            .gte("created_at", start.toISOString())
+            .lte("created_at", end.toISOString())
+        ),
+      ]);
+      const lc = (lastCloseRes?.data ?? [])[0] as any;
+      setLastClose(lc ? { business_date: lc.business_date, counted_cash: Number(lc.counted_cash || 0), variance: Number(lc.variance || 0) } : null);
+      let tIn = 0, tOut = 0;
+      for (const r of ((treasuryTxRes?.data ?? []) as any[])) {
+        const v = Number(r.amount || 0);
+        if (v >= 0) tIn += v; else tOut += -v;
+      }
+      setTodayTreasuryIn(tIn);
+      setTodayTreasuryOut(tOut);
 
       const apptRows = (apptsTodayRes.data ?? []) as { status: string }[];
       setTodayAppts(apptRows.length);

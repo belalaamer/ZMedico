@@ -139,6 +139,9 @@ export default function CalendarPage() {
   // Per-branch working hours window (source of truth: branches.working_hours_start/end).
   const [dayStartHour, setDayStartHour] = useState<number>(DEFAULT_DAY_START_HOUR);
   const [dayEndHour, setDayEndHour] = useState<number>(DEFAULT_DAY_END_HOUR);
+  // Exact minutes-since-midnight for the working band (null if branch has no config).
+  const [workStartMin, setWorkStartMin] = useState<number | null>(null);
+  const [workEndMin, setWorkEndMin] = useState<number | null>(null);
 
   const loadBranchHours = async () => {
     if (!currentBranchId) {
@@ -153,12 +156,21 @@ export default function CalendarPage() {
       .maybeSingle();
     const start = parseHour((data as any)?.working_hours_start, "floor");
     const end = parseHour((data as any)?.working_hours_end, "ceil");
+    const sMin = parseMinutes((data as any)?.working_hours_start);
+    const eMin = parseMinutes((data as any)?.working_hours_end);
     if (start != null && end != null && end > start) {
       setDayStartHour(start);
       setDayEndHour(end);
     } else {
       setDayStartHour(DEFAULT_DAY_START_HOUR);
       setDayEndHour(DEFAULT_DAY_END_HOUR);
+    }
+    if (sMin != null && eMin != null && eMin > sMin) {
+      setWorkStartMin(sMin);
+      setWorkEndMin(eMin);
+    } else {
+      setWorkStartMin(null);
+      setWorkEndMin(null);
     }
   };
   useEffect(() => { loadBranchHours(); /* eslint-disable-next-line */ }, [currentBranchId]);

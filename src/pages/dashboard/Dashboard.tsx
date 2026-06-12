@@ -510,6 +510,7 @@ export default function Dashboard() {
             </Card>
           </div>
 
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{lang === "ar" ? "هذا الشهر / النطاق" : "This month / range"}</h2>
           <div className="grid lg:grid-cols-2 gap-4">
             <Card className="p-5 shadow-card border-border/60">
               <div className="text-sm font-medium mb-3">{t("patientsByAge")}</div>

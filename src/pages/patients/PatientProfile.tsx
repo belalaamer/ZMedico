@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, FileText, CreditCard, Phone, Mail, MapPin, Calendar, Stethoscope, Trash2, Shield, Pencil } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,12 @@ import PatientTreatmentPlans from "./PatientTreatmentPlans";
 import PatientTimeline from "./PatientTimeline";
 import PatientWalletTab from "./PatientWalletTab";
 import { Can } from "@/components/Can";
+import PatientSummaryStrip from "./PatientSummaryStrip";
+import PatientFinancialCard from "./PatientFinancialCard";
+import PatientQuickActions from "./PatientQuickActions";
+import PatientDocumentsTab from "./PatientDocumentsTab";
+import { RecordPaymentDialog } from "../payments/RecordPaymentDialog";
+import { usePermissions } from "@/hooks/usePermissions";
 
 const statusClass: Record<string, string> = {
   draft: "status-cancelled", pending: "status-review", paid: "status-completed", partial: "status-progress", cancelled: "status-departed",
@@ -26,6 +32,10 @@ export default function PatientProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t, lang } = useI18n();
+  const { can } = usePermissions();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab") ?? "overview";
+  const uploadFlag = searchParams.get("upload") === "1";
   const [patient, setPatient] = useState<any>(null);
   const [insurer, setInsurer] = useState<any>(null);
   const [assignedDoctorName, setAssignedDoctorName] = useState<string>("");
@@ -34,6 +44,16 @@ export default function PatientProfile() {
   const [createOpen, setCreateOpen] = useState(false);
   const [delOpen, setDelOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
+  const [clinicalView, setClinicalView] = useState<"medical" | "plans">("medical");
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const setTab = (next: string) => {
+    const p = new URLSearchParams(searchParams);
+    p.set("tab", next);
+    p.delete("upload");
+    setSearchParams(p, { replace: true });
+  };
 
   const load = async () => {
     if (!id) return;
@@ -143,17 +163,43 @@ export default function PatientProfile() {
         </div>
       </Card>
 
-      <Tabs defaultValue="overview">
-        <TabsList>
+      <PatientSummaryStrip patientId={patient.id} patient={patient} insurer={insurer} />
+
+      <PatientQuickActions
+        onBook={() => navigate("/calendar")}
+        onCreateInvoice={() => setCreateOpen(true)}
+        onRecordPayment={() => setPayOpen(true)}
+        onTopupWallet={() => setTab("financial")}
+        onUploadDocument={() => {
+          const p = new URLSearchParams(searchParams);
+          p.set("tab", "documents"); p.set("upload", "1");
+          setSearchParams(p, { replace: true });
+        }}
+      />
+
+      {can("invoices", "view") && (
+        <PatientFinancialCard
+          patientId={patient.id}
+          invoices={invoices}
+          payments={payments}
+          onRecordPayment={() => setPayOpen(true)}
+          onTopupWallet={() => setTab("financial")}
+          onOpenFinancial={() => setTab("financial")}
+          canPay={can("invoices", "create")}
+          canTopup={can("invoices", "create")}
+          reloadKey={reloadKey}
+        />
+      )}
+
+      <Tabs value={tabParam} onValueChange={setTab}>
+        <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="overview">{t("overview")}</TabsTrigger>
           <TabsTrigger value="timeline">{t("timelineTab")}</TabsTrigger>
-          <TabsTrigger value="medical">{t("medicalTab")}</TabsTrigger>
-          <Can module="treatment_plans" action="view">
-            <TabsTrigger value="plans">{lang === "ar" ? "خطط العلاج" : "Treatment Plans"}</TabsTrigger>
-          </Can>
-          <TabsTrigger value="invoices">{t("invoices")}</TabsTrigger>
-          <TabsTrigger value="payments">{t("paymentHistory")}</TabsTrigger>
-          <TabsTrigger value="wallet">{t("walletTab")}</TabsTrigger>
+          <TabsTrigger value="clinical">{lang === "ar" ? "السريري" : "Clinical"}</TabsTrigger>
+          {can("invoices", "view") && (
+            <TabsTrigger value="financial">{lang === "ar" ? "المالي" : "Financial"}</TabsTrigger>
+          )}
+          <TabsTrigger value="documents">{lang === "ar" ? "المستندات" : "Documents"}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-4">
@@ -183,21 +229,115 @@ export default function PatientProfile() {
           )}
         </TabsContent>
 
-        <TabsContent value="medical" className="mt-4">
-          <PatientMedicalTab patientId={patient.id} />
-        </TabsContent>
-
         <TabsContent value="timeline" className="mt-4">
           <PatientTimeline patientId={patient.id} />
         </TabsContent>
 
-        <TabsContent value="plans" className="mt-4">
-          <Can module="treatment_plans" action="view" fallback={<div className="text-center text-muted-foreground py-10">{lang === "ar" ? "لا تملك صلاحية الوصول" : "Access denied"}</div>}>
-            <PatientTreatmentPlans patientId={patient.id} />
+        <TabsContent value="clinical" className="mt-4 space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-md border border-border bg-muted/30 p-1">
+              <button
+                type="button"
+                onClick={() => setClinicalView("medical")}
+                className={`px-3 py-1 text-sm rounded ${clinicalView === "medical" ? "bg-background shadow-sm" : "text-muted-foreground"}`}
+              >
+                {t("medicalTab")}
+              </button>
+              {can("treatment_plans", "view") && (
+                <button
+                  type="button"
+                  onClick={() => setClinicalView("plans")}
+                  className={`px-3 py-1 text-sm rounded ${clinicalView === "plans" ? "bg-background shadow-sm" : "text-muted-foreground"}`}
+                >
+                  {lang === "ar" ? "خطط العلاج" : "Treatment Plans"}
+                </button>
+              )}
+            </div>
+            <Button asChild variant="ghost" size="sm" className="ms-auto">
+              <Link to={`/patients/${patient.id}/dental`}>
+                <Stethoscope className="me-2 size-4" />{t("dentalChart")}
+              </Link>
+            </Button>
+          </div>
+          {clinicalView === "medical" ? (
+            <PatientMedicalTab patientId={patient.id} />
+          ) : (
+            <Can module="treatment_plans" action="view" fallback={<div className="text-center text-muted-foreground py-10">{lang === "ar" ? "لا تملك صلاحية الوصول" : "Access denied"}</div>}>
+              <PatientTreatmentPlans patientId={patient.id} />
+            </Can>
+          )}
+        </TabsContent>
+
+        <TabsContent value="financial" className="mt-4 space-y-6">
+          <Can module="invoices" action="view" fallback={<div className="text-center text-muted-foreground py-10">{lang === "ar" ? "لا تملك صلاحية الوصول" : "Access denied"}</div>}>
+            <PatientWalletTab patientId={patient.id} />
+
+            <section className="space-y-2">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{t("invoices")}</h3>
+              <Card className="shadow-card overflow-hidden">
+                {invoices.length === 0 ? (
+                  <div className="p-10 text-center text-muted-foreground">{t("noInvoices")}</div>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {invoices.map((inv) => {
+                      const remaining = +(Number(inv.total) - Number(inv.paid_amount)).toFixed(2);
+                      const statusLabel = ({ draft: t("statusDraft"), pending: t("statusPending"), paid: t("statusPaid"), partial: t("statusPartial"), cancelled: t("statusCancelled") } as any)[inv.status];
+                      return (
+                        <Link key={inv.id} to={`/invoices/${inv.id}`} className="flex items-center gap-4 p-4 hover:bg-muted/40 transition-colors">
+                          <FileText className="size-5 text-muted-foreground" />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium">{inv.invoice_number}</div>
+                            <div className="text-xs text-muted-foreground">{formatDate(inv.invoice_date, lang)}</div>
+                          </div>
+                          <Badge variant="outline" className={statusClass[inv.status]}>{statusLabel}</Badge>
+                          <div className="text-end">
+                            <div className="font-semibold tabular-nums">{formatMoney(inv.total, lang)}</div>
+                            {remaining > 0 && <div className="text-xs text-warning tabular-nums">{formatMoney(remaining, lang)}</div>}
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </Card>
+            </section>
+
+            <section className="space-y-2">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{t("paymentHistory")}</h3>
+              <Card className="shadow-card overflow-hidden">
+                {payments.length === 0 ? (
+                  <div className="p-10 text-center text-muted-foreground">{t("noPayments")}</div>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {payments.map((pay) => (
+                      <div key={pay.id} className="flex items-center gap-4 p-4">
+                        <div className="size-9 rounded-lg bg-success/10 text-success flex items-center justify-center">
+                          <CreditCard className="size-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium tabular-nums">{formatMoney(pay.amount, lang)}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {formatDateTime(pay.created_at, lang)} · {t(pay.payment_method as any) ?? pay.payment_method}
+                            {pay.invoices?.invoice_number && <> · <Link to={`/invoices/${pay.invoice_id}`} className="text-primary hover:underline">{pay.invoices.invoice_number}</Link></>}
+                          </div>
+                        </div>
+                        {pay.reference_number && <Badge variant="outline" className="text-[10px]">{pay.reference_number}</Badge>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            </section>
           </Can>
         </TabsContent>
 
-        <TabsContent value="invoices" className="mt-4">
+        <TabsContent value="documents" className="mt-4">
+          <PatientDocumentsTab patientId={patient.id} autoOpenUpload={uploadFlag} />
+        </TabsContent>
+
+        {/* Legacy hidden content kept out for v1 */}
+        <div className="hidden">
+          <TabsContent value="invoices" className="mt-4">
           <Card className="shadow-card overflow-hidden">
             {invoices.length === 0 ? (
               <div className="p-10 text-center text-muted-foreground">{t("noInvoices")}</div>
@@ -251,12 +391,18 @@ export default function PatientProfile() {
             )}
           </Card>
         </TabsContent>
+        </div>
       </Tabs>
 
       <CreateInvoiceDialog
         open={createOpen} onOpenChange={setCreateOpen}
         presetPatientId={patient.id}
-        onSaved={() => { setCreateOpen(false); load(); }}
+        onSaved={() => { setCreateOpen(false); load(); setReloadKey((k) => k + 1); }}
+      />
+      <RecordPaymentDialog
+        open={payOpen} onOpenChange={setPayOpen}
+        patientId={patient.id}
+        onSaved={() => { setPayOpen(false); load(); setReloadKey((k) => k + 1); }}
       />
       <EditPatientDialog
         open={editOpen} onOpenChange={setEditOpen}

@@ -322,6 +322,24 @@ export default function CalendarPage() {
     load();
   };
 
+  // Forward-only progression along the standard reception flow.
+  const nextStatus = (s: Appt["status"]): Appt["status"] | null => {
+    switch (s) {
+      case "scheduled":   return "confirmed";
+      case "confirmed":   return "in_progress";
+      case "in_progress": return "completed";
+      default: return null;
+    }
+  };
+  const nextStatusLabel = (s: Appt["status"]): string | null => {
+    const n = nextStatus(s);
+    if (!n) return null;
+    if (lang === "ar") {
+      return n === "confirmed" ? "وصل" : n === "in_progress" ? "ابدأ" : "تم";
+    }
+    return n === "confirmed" ? "Arrived" : n === "in_progress" ? "Start" : "Done";
+  };
+
   const sendReminderNow = async (a: Appt) => {
     // Find a pending reminder for this appointment (or create an immediate one) then trigger send.
     const { data: existing } = await supabase

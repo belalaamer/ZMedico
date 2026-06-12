@@ -15,6 +15,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SidebarContent } from "./Sidebar";
 import { supabase } from "@/integrations/supabase/client";
+import { GlobalSearch } from "@/components/search/GlobalSearch";
 
 export function Topbar() {
   const { t, lang, setLang } = useI18n();
@@ -154,19 +155,12 @@ export function Topbar() {
         </div>
       )}
 
-      <div className="relative flex-1 max-w-xl hidden sm:block">
-        <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-        <Input placeholder={t("search")} className="ps-9 bg-muted/50 border-transparent focus-visible:bg-background" />
+      <div className="hidden sm:flex flex-1 max-w-xl">
+        <GlobalSearch variant="desktop" />
       </div>
       {searchOpen ? (
-        <div className="relative flex-1 sm:hidden">
-          <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input
-            autoFocus
-            placeholder={t("search")}
-            onBlur={() => setSearchOpen(false)}
-            className="ps-9 h-10 bg-muted/50 border-transparent focus-visible:bg-background"
-          />
+        <div className="flex-1 sm:hidden">
+          <GlobalSearch variant="mobile" onClose={() => setSearchOpen(false)} />
         </div>
       ) : (
         <div className="flex-1 sm:hidden flex justify-end">

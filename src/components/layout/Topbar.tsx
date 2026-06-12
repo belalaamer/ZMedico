@@ -121,39 +121,45 @@ export function Topbar() {
         <Menu className="size-5" />
       </Button>
 
-      {mobileOpen && (
-        <div className="md:hidden">
-          <button
-            type="button"
-            aria-label="Close menu overlay"
-            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[1px]"
-            onClick={() => setMobileOpen(false)}
-          />
+      <div className="md:hidden" aria-hidden={!mobileOpen}>
+        <button
+          type="button"
+          aria-label="Close menu overlay"
+          tabIndex={mobileOpen ? 0 : -1}
+          className={`fixed inset-0 z-40 bg-black/50 backdrop-blur-[1px] transition-opacity duration-150 ease-out ${
+            mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+          }`}
+          onClick={() => setMobileOpen(false)}
+        />
 
-          <aside
-            role="dialog"
-            aria-modal="true"
-            aria-label={t("appName")}
-            className={`fixed inset-y-0 ${lang === "ar" ? "right-0" : "left-0"} z-50 w-[280px] max-w-[82vw] border-sidebar-border bg-sidebar text-sidebar-foreground shadow-elegant`}
-          >
-            <div className="flex h-16 items-center justify-end border-b border-sidebar-border px-3">
-              <Button
-                variant="ghost"
-                size="icon"
-                type="button"
-                className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                aria-label="Close menu"
-                onClick={() => setMobileOpen(false)}
-              >
-                <X className="size-5" />
-              </Button>
-            </div>
-            <div className="h-[calc(100%-4rem)] overflow-y-auto">
-              <SidebarContent onNavigate={() => setMobileOpen(false)} />
-            </div>
-          </aside>
-        </div>
-      )}
+        <aside
+          role="dialog"
+          aria-modal="true"
+          aria-label={t("appName")}
+          style={{ willChange: "transform" }}
+          className={`fixed inset-y-0 ${lang === "ar" ? "right-0" : "left-0"} z-50 w-[280px] max-w-[82vw] border-sidebar-border bg-sidebar text-sidebar-foreground shadow-elegant transform-gpu transition-transform duration-150 ease-out ${
+            mobileOpen
+              ? "translate-x-0 pointer-events-auto"
+              : `${lang === "ar" ? "translate-x-full" : "-translate-x-full"} pointer-events-none`
+          }`}
+        >
+          <div className="flex h-16 items-center justify-end border-b border-sidebar-border px-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              type="button"
+              className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              aria-label="Close menu"
+              onClick={() => setMobileOpen(false)}
+            >
+              <X className="size-5" />
+            </Button>
+          </div>
+          <div className="h-[calc(100%-4rem)] overflow-y-auto">
+            <SidebarContent onNavigate={() => setMobileOpen(false)} />
+          </div>
+        </aside>
+      </div>
 
       <div className="hidden sm:flex flex-1 max-w-xl">
         <GlobalSearch variant="desktop" />

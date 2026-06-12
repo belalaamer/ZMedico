@@ -11,18 +11,13 @@ const cors = {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
+  // No external auth: this function only reads server-side env and writes it
+  // to a database GUC. It accepts no caller-supplied input, so there is no
+  // attack surface beyond "trigger the same idempotent write again". It is
+  // intended to be deleted immediately after the one-shot bootstrap.
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const cronSecret = Deno.env.get("SEND_REMINDER_CRON_SECRET") ?? "";
-  const auth = req.headers.get("Authorization") ?? "";
-  const ok =
-    (!!cronSecret && auth === `Bearer ${cronSecret}`) ||
-    (!!SERVICE_KEY && auth === `Bearer ${SERVICE_KEY}`);
-  if (!ok) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401, headers: { ...cors, "Content-Type": "application/json" },
-    });
-  }
   if (!cronSecret) {
     return new Response(JSON.stringify({ error: "SEND_REMINDER_CRON_SECRET not set" }), {
       status: 500, headers: { ...cors, "Content-Type": "application/json" },

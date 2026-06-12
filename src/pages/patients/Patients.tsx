@@ -63,6 +63,7 @@ export default function PatientsPage() {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [confirmDel, setConfirmDel] = useState<Patient | null>(null);
+  const [duesByPatient, setDuesByPatient] = useState<Record<string, number>>({});
 
   const [form, setForm] = useState({
     name: "", phone: "", phone2: "", email: "",
@@ -85,6 +86,31 @@ export default function PatientsPage() {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId]);
   useDataSync(["patients"], () => { load(); });
+
+  // Lightweight batched outstanding-debt badge: a single query for the visible
+  // patients, no per-row work, no joins.
+  useEffect(() => {
+    if (!items.length) { setDuesByPatient({}); return; }
+    let active = true;
+    const ids = items.map((p) => p.id);
+    (async () => {
+      let q = supabase
+        .from("invoices")
+        .select("patient_id,total,paid_amount,status,deleted_at")
+        .in("patient_id", ids)
+        .is("deleted_at", null)
+        .in("status", ["pending", "partial"]);
+      const { data } = await q;
+      if (!active) return;
+      const map: Record<string, number> = {};
+      for (const r of (data ?? []) as any[]) {
+        const due = Number(r.total || 0) - Number(r.paid_amount || 0);
+        if (due > 0.009) map[r.patient_id] = (map[r.patient_id] ?? 0) + due;
+      }
+      setDuesByPatient(map);
+    })();
+    return () => { active = false; };
+  }, [items]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -241,6 +267,11 @@ export default function PatientsPage() {
                         {p.city && <span className="hidden sm:flex items-center gap-1"><UserIcon className="size-3" />{p.city}</span>}
                       </div>
                     </div>
+                    {duesByPatient[p.id] > 0 && (
+                      <Badge variant="outline" className="text-[10px] shrink-0 bg-warning/10 text-warning border-warning/30 tabular-nums">
+                        {lang === "ar" ? "متبقي" : "Due"} {duesByPatient[p.id].toFixed(2)}
+                      </Badge>
+                    )}
                   </Link>
                   {can("patients", "delete") && (
                     <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive hover:bg-destructive/10 size-11"

@@ -137,7 +137,7 @@ export function Topbar() {
           aria-modal="true"
           aria-label={t("appName")}
           style={{ willChange: "transform" }}
-          className={`fixed inset-y-2 ${lang === "ar" ? "right-0 rounded-l-2xl" : "left-0 rounded-r-2xl"} z-50 w-[280px] max-w-[82vw] bg-sidebar text-sidebar-foreground shadow-2xl ring-1 ring-black/5 overflow-hidden transform-gpu transition-transform duration-150 ease-out ${
+          className={`fixed inset-y-0 py-2 ${lang === "ar" ? "right-0 rounded-l-2xl" : "left-0 rounded-r-2xl"} z-50 w-[280px] max-w-[82vw] bg-sidebar text-sidebar-foreground shadow-2xl ring-1 ring-border overflow-hidden transform-gpu transition-transform duration-150 ease-out ${
             mobileOpen
               ? "translate-x-0 pointer-events-auto"
               : `${lang === "ar" ? "translate-x-full" : "-translate-x-full"} pointer-events-none`

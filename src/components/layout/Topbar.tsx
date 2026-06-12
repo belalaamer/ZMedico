@@ -126,7 +126,7 @@ export function Topbar() {
           type="button"
           aria-label="Close menu overlay"
           tabIndex={mobileOpen ? 0 : -1}
-          className={`fixed inset-0 z-40 bg-black/50 backdrop-blur-[1px] transition-opacity duration-150 ease-out ${
+          className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px] transition-opacity duration-150 ease-out ${
             mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
           }`}
           onClick={() => setMobileOpen(false)}
@@ -137,7 +137,7 @@ export function Topbar() {
           aria-modal="true"
           aria-label={t("appName")}
           style={{ willChange: "transform" }}
-          className={`fixed inset-y-0 ${lang === "ar" ? "right-0" : "left-0"} z-50 w-[280px] max-w-[82vw] border-sidebar-border bg-sidebar text-sidebar-foreground shadow-elegant transform-gpu transition-transform duration-150 ease-out ${
+          className={`fixed inset-y-2 ${lang === "ar" ? "right-0 rounded-l-2xl" : "left-0 rounded-r-2xl"} z-50 w-[280px] max-w-[82vw] bg-sidebar text-sidebar-foreground shadow-2xl ring-1 ring-black/5 overflow-hidden transform-gpu transition-transform duration-150 ease-out ${
             mobileOpen
               ? "translate-x-0 pointer-events-auto"
               : `${lang === "ar" ? "translate-x-full" : "-translate-x-full"} pointer-events-none`

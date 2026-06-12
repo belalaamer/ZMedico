@@ -334,64 +334,6 @@ export default function PatientProfile() {
         <TabsContent value="documents" className="mt-4">
           <PatientDocumentsTab patientId={patient.id} autoOpenUpload={uploadFlag} />
         </TabsContent>
-
-        {/* Legacy hidden content kept out for v1 */}
-        <div className="hidden">
-          <TabsContent value="invoices" className="mt-4">
-          <Card className="shadow-card overflow-hidden">
-            {invoices.length === 0 ? (
-              <div className="p-10 text-center text-muted-foreground">{t("noInvoices")}</div>
-            ) : (
-              <div className="divide-y divide-border">
-                {invoices.map((inv) => {
-                  const remaining = +(Number(inv.total) - Number(inv.paid_amount)).toFixed(2);
-                  const statusLabel = ({ draft: t("statusDraft"), pending: t("statusPending"), paid: t("statusPaid"), partial: t("statusPartial"), cancelled: t("statusCancelled") } as any)[inv.status];
-                  return (
-                    <Link key={inv.id} to={`/invoices/${inv.id}`} className="flex items-center gap-4 p-4 hover:bg-muted/40 transition-colors">
-                      <FileText className="size-5 text-muted-foreground" />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium">{inv.invoice_number}</div>
-                        <div className="text-xs text-muted-foreground">{formatDate(inv.invoice_date, lang)}</div>
-                      </div>
-                      <Badge variant="outline" className={statusClass[inv.status]}>{statusLabel}</Badge>
-                      <div className="text-end">
-                        <div className="font-semibold tabular-nums">{formatMoney(inv.total, lang)}</div>
-                        {remaining > 0 && <div className="text-xs text-warning tabular-nums">{formatMoney(remaining, lang)}</div>}
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="payments" className="mt-4">
-          <Card className="shadow-card overflow-hidden">
-            {payments.length === 0 ? (
-              <div className="p-10 text-center text-muted-foreground">{t("noPayments")}</div>
-            ) : (
-              <div className="divide-y divide-border">
-                {payments.map((pay) => (
-                  <div key={pay.id} className="flex items-center gap-4 p-4">
-                    <div className="size-9 rounded-lg bg-success/10 text-success flex items-center justify-center">
-                      <CreditCard className="size-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium tabular-nums">{formatMoney(pay.amount, lang)}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {formatDateTime(pay.created_at, lang)} · {t(pay.payment_method as any) ?? pay.payment_method}
-                        {pay.invoices?.invoice_number && <> · <Link to={`/invoices/${pay.invoice_id}`} className="text-primary hover:underline">{pay.invoices.invoice_number}</Link></>}
-                      </div>
-                    </div>
-                    {pay.reference_number && <Badge variant="outline" className="text-[10px]">{pay.reference_number}</Badge>}
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-        </TabsContent>
-        </div>
       </Tabs>
 
       <CreateInvoiceDialog

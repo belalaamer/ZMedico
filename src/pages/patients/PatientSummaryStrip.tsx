@@ -17,6 +17,10 @@ export default function PatientSummaryStrip({ patientId, patient, insurer }: Pro
 
   useEffect(() => {
     let active = true;
+    // Reset so previous patient's data never bleeds while the new fetch runs.
+    setNext(null);
+    setLast(null);
+    setHistory(null);
     const nowIso = new Date().toISOString();
     Promise.all([
       supabase

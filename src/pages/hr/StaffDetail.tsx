@@ -9,6 +9,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatMoney, formatDate } from "@/lib/format";
 import { statusLabel } from "./Staff";
+import StaffBranchesTab from "./StaffBranchesTab";
 
 const DAYS = ["sun","mon","tue","wed","thu","fri","sat"] as const;
 
@@ -66,6 +67,7 @@ export default function StaffDetail() {
           <TabsTrigger value="attendance">{t("attendance")}</TabsTrigger>
           <TabsTrigger value="leaves">{t("leaves")}</TabsTrigger>
           <TabsTrigger value="payroll">{t("payroll")}</TabsTrigger>
+          <TabsTrigger value="branches">{lang === "ar" ? "الفروع" : "Branches"}</TabsTrigger>
         </TabsList>
         <TabsContent value="info">
           <Card className="p-5 shadow-card grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
@@ -149,6 +151,9 @@ export default function StaffDetail() {
               </div>
             )}
           </Card>
+        </TabsContent>
+        <TabsContent value="branches">
+          {id && <StaffBranchesTab userId={id} />}
         </TabsContent>
       </Tabs>
     </div>

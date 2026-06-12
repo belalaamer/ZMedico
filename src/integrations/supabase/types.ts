@@ -4835,6 +4835,7 @@ export type Database = {
           created_at: string
           expected_cash: number
           id: string
+          locked: boolean
           non_cash_total: number
           notes: string | null
           opening_cash: number
@@ -4851,6 +4852,7 @@ export type Database = {
           created_at?: string
           expected_cash?: number
           id?: string
+          locked?: boolean
           non_cash_total?: number
           notes?: string | null
           opening_cash?: number
@@ -4867,6 +4869,7 @@ export type Database = {
           created_at?: string
           expected_cash?: number
           id?: string
+          locked?: boolean
           non_cash_total?: number
           notes?: string | null
           opening_cash?: number
@@ -5366,6 +5369,14 @@ export type Database = {
       }
       _get_cron_secret: { Args: never; Returns: string }
       _set_cron_secret: { Args: { p_secret: string }; Returns: undefined }
+      _treasury_assert_open_period: {
+        Args: {
+          _branch_id: string
+          _business_date: string
+          _treasury_id: string
+        }
+        Returns: undefined
+      }
       add_treasury_tx:
         | {
             Args: {

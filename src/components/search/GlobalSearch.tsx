@@ -27,6 +27,8 @@ export function GlobalSearch({ variant = "desktop", onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [groups, setGroups] = useState<SearchGroup[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [highlight, setHighlight] = useState(0);
+  const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const minLen = useMemo(() => (/^\d+$/.test(q.trim()) ? 1 : 2), [q]);
 
@@ -111,11 +113,46 @@ export function GlobalSearch({ variant = "desktop", onClose }: Props) {
   // Flat list for Enter navigation
   const flatHits = useMemo(() => visibleGroups.flatMap((g) => g.hits), [visibleGroups]);
 
+  // Reset highlight to first item whenever the result set changes.
+  useEffect(() => { setHighlight(0); }, [flatHits.length, q]);
+
+  // Keep highlighted row in view as the user arrows through results.
+  useEffect(() => {
+    const el = itemRefs.current[highlight];
+    if (el) el.scrollIntoView({ block: "nearest" });
+  }, [highlight]);
+
+  // Global Ctrl+K / Cmd+K to open & focus the search input.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) {
+        e.preventDefault();
+        setOpen(true);
+        // Defer focus to next tick so the input is mounted/visible.
+        setTimeout(() => inputRef.current?.focus(), 0);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") { setOpen(false); (e.target as HTMLInputElement).blur(); }
-    if (e.key === "Enter" && flatHits.length > 0) {
+    if (e.key === "Escape") {
+      setOpen(false);
+      (e.target as HTMLInputElement).blur();
+      return;
+    }
+    if (flatHits.length === 0) return;
+    if (e.key === "ArrowDown") {
       e.preventDefault();
-      go(flatHits[0].to);
+      setHighlight((h) => (h + 1) % flatHits.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlight((h) => (h - 1 + flatHits.length) % flatHits.length);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const target = flatHits[Math.min(highlight, flatHits.length - 1)];
+      if (target) go(target.to);
     }
   };
 
@@ -155,27 +192,35 @@ export function GlobalSearch({ variant = "desktop", onClose }: Props) {
           <div className="p-4 text-sm text-muted-foreground text-center">{t("noResults")}</div>
         ) : (
           <div className="py-2">
-            {visibleGroups.map((g) => (
+            {(() => { itemRefs.current = []; let idx = -1; return visibleGroups.map((g) => (
               <div key={g.key} className="px-1">
                 <div className="px-3 pt-2 pb-1 text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">
                   {groupLabel(g.key)} <span className="opacity-60">({g.hits.length})</span>
                 </div>
                 <ul>
-                  {g.hits.map((h) => (
-                    <li key={`${g.key}:${h.id}`}>
-                      <button
-                        type="button"
-                        onClick={() => go(h.to)}
-                        className="w-full text-start px-3 py-2 rounded-md hover:bg-muted focus:bg-muted focus:outline-none"
-                      >
-                        <div className="text-sm font-medium truncate">{h.label}</div>
-                        {h.sub && <div className="text-xs text-muted-foreground truncate">{h.sub}</div>}
-                      </button>
-                    </li>
-                  ))}
+                  {g.hits.map((h) => {
+                    idx += 1;
+                    const myIdx = idx;
+                    const active = myIdx === highlight;
+                    return (
+                      <li key={`${g.key}:${h.id}`}>
+                        <button
+                          type="button"
+                          ref={(el) => { itemRefs.current[myIdx] = el; }}
+                          onMouseEnter={() => setHighlight(myIdx)}
+                          onClick={() => go(h.to)}
+                          aria-selected={active}
+                          className={`w-full text-start px-3 py-2 rounded-md focus:outline-none ${active ? "bg-muted ring-1 ring-primary/40" : "hover:bg-muted"}`}
+                        >
+                          <div className="text-sm font-medium truncate">{h.label}</div>
+                          {h.sub && <div className="text-xs text-muted-foreground truncate">{h.sub}</div>}
+                        </button>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
-            ))}
+            )); })()}
           </div>
         )}
       </PopoverContent>

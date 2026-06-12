@@ -77,9 +77,24 @@ const statusBlock: Record<Appt["status"], string> = {
   departed:    "bg-muted border-border text-muted-foreground",
 };
 
-const DAY_START_HOUR = 0;
-const DAY_END_HOUR = 24; // exclusive — show full 24h
+// Default fallback when a branch has no working hours configured.
+const DEFAULT_DAY_START_HOUR = 0;
+const DEFAULT_DAY_END_HOUR = 24; // exclusive
 const HOUR_HEIGHT = 56; // px
+
+// Parse "HH:MM[:SS]" → hour number (0..24). Returns null on bad input.
+function parseHour(s: string | null | undefined, mode: "floor" | "ceil"): number | null {
+  if (!s) return null;
+  const m = /^(\d{1,2}):(\d{2})/.exec(s);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const mm = Number(m[2]);
+  if (Number.isNaN(h)) return null;
+  if (mode === "floor") return Math.max(0, Math.min(24, h));
+  // ceil to next full hour if any minutes
+  const ceil = mm > 0 ? h + 1 : h;
+  return Math.max(0, Math.min(24, ceil));
+}
 
 export default function CalendarPage() {
   const { t, lang } = useI18n();
@@ -109,6 +124,34 @@ export default function CalendarPage() {
   });
   const [patientCtx, setPatientCtx] = useState<{ wallet: number; outstanding: number; lastVisit: string | null } | null>(null);
   const [patientCtxLoading, setPatientCtxLoading] = useState(false);
+
+  // Per-branch working hours window (source of truth: branches.working_hours_start/end).
+  const [dayStartHour, setDayStartHour] = useState<number>(DEFAULT_DAY_START_HOUR);
+  const [dayEndHour, setDayEndHour] = useState<number>(DEFAULT_DAY_END_HOUR);
+
+  const loadBranchHours = async () => {
+    if (!currentBranchId) {
+      setDayStartHour(DEFAULT_DAY_START_HOUR);
+      setDayEndHour(DEFAULT_DAY_END_HOUR);
+      return;
+    }
+    const { data } = await supabase
+      .from("branches")
+      .select("working_hours_start,working_hours_end")
+      .eq("id", currentBranchId)
+      .maybeSingle();
+    const start = parseHour((data as any)?.working_hours_start, "floor");
+    const end = parseHour((data as any)?.working_hours_end, "ceil");
+    if (start != null && end != null && end > start) {
+      setDayStartHour(start);
+      setDayEndHour(end);
+    } else {
+      setDayStartHour(DEFAULT_DAY_START_HOUR);
+      setDayEndHour(DEFAULT_DAY_END_HOUR);
+    }
+  };
+  useEffect(() => { loadBranchHours(); /* eslint-disable-next-line */ }, [currentBranchId]);
+  useDataSync(["branches"], () => { loadBranchHours(); });
 
   // Load patient financial context whenever a patient is picked in the booking dialog
   useEffect(() => {
@@ -161,7 +204,10 @@ export default function CalendarPage() {
     return new Date(rangeStart.getFullYear(), rangeStart.getMonth() + 1, 1);
   }, [rangeStart, view]);
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(rangeStart, i)), [rangeStart]);
-  const hours = useMemo(() => Array.from({ length: DAY_END_HOUR - DAY_START_HOUR }, (_, i) => DAY_START_HOUR + i), []);
+  const hours = useMemo(
+    () => Array.from({ length: Math.max(1, dayEndHour - dayStartHour) }, (_, i) => dayStartHour + i),
+    [dayStartHour, dayEndHour]
+  );
 
   const load = async () => {
     const start = rangeStart.toISOString();
@@ -429,7 +475,7 @@ export default function CalendarPage() {
   // Block position for time grid
   const blockStyle = (a: Appt) => {
     const dt = new Date(a.scheduled_at);
-    const minutesFromStart = (dt.getHours() - DAY_START_HOUR) * 60 + dt.getMinutes();
+    const minutesFromStart = (dt.getHours() - dayStartHour) * 60 + dt.getMinutes();
     const top = (minutesFromStart / 60) * HOUR_HEIGHT;
     const height = Math.max(28, (a.duration_minutes / 60) * HOUR_HEIGHT - 2);
     return { top: `${top}px`, height: `${height}px` };
@@ -471,8 +517,8 @@ export default function CalendarPage() {
 
   // Now-line position (only on current day cells)
   const now = new Date();
-  const nowTop = ((now.getHours() - DAY_START_HOUR) * 60 + now.getMinutes()) / 60 * HOUR_HEIGHT;
-  const showNowLine = now.getHours() >= DAY_START_HOUR && now.getHours() < DAY_END_HOUR;
+  const nowTop = ((now.getHours() - dayStartHour) * 60 + now.getMinutes()) / 60 * HOUR_HEIGHT;
+  const showNowLine = now.getHours() >= dayStartHour && now.getHours() < dayEndHour;
 
   const sidebarContent = (
     <div className="space-y-4">

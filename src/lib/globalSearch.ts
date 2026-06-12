@@ -98,7 +98,7 @@ export async function searchInvoices(
   const patientIds = await patientIdsMatching(q, branchId);
 
   // Two simple queries: by invoice_number, and (if any patient matches) by patient_id IN (...)
-  const queries: Promise<any>[] = [];
+  const queries: any[] = [];
 
   let qByNumber = supabase
     .from("invoices")

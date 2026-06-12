@@ -116,6 +116,14 @@ export function GlobalSearch({ variant = "desktop", onClose }: Props) {
   // Reset highlight to first item whenever the result set changes.
   useEffect(() => { setHighlight(0); }, [flatHits.length, q]);
 
+  // Keep itemRefs aligned with flatHits OUTSIDE of render (anti-pattern fix).
+  // Resizing the ref array here means render only assigns into existing slots
+  // via the `ref` callback, never mutates `itemRefs.current` directly.
+  useEffect(() => {
+    itemRefs.current = itemRefs.current.slice(0, flatHits.length);
+    while (itemRefs.current.length < flatHits.length) itemRefs.current.push(null);
+  }, [flatHits.length]);
+
   // Keep highlighted row in view as the user arrows through results.
   useEffect(() => {
     const el = itemRefs.current[highlight];
@@ -123,6 +131,9 @@ export function GlobalSearch({ variant = "desktop", onClose }: Props) {
   }, [highlight]);
 
   // Global Ctrl+K / Cmd+K to open & focus the search input.
+  // Intentionally global: we DO NOT bail out when another input/textarea is
+  // focused — typical SaaS behavior (Linear, Notion, GitHub) is to hijack
+  // Cmd+K from any context. preventDefault avoids browser/extension defaults.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) {
@@ -158,6 +169,10 @@ export function GlobalSearch({ variant = "desktop", onClose }: Props) {
 
   const isMobile = variant === "mobile";
 
+  // Platform-appropriate shortcut hint label.
+  const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+  const shortcutLabel = isMac ? "⌘K" : "Ctrl+K";
+
   return (
     <Popover open={open && q.trim().length >= minLen} onOpenChange={setOpen}>
       <PopoverAnchor asChild>
@@ -171,10 +186,18 @@ export function GlobalSearch({ variant = "desktop", onClose }: Props) {
             onKeyDown={onKeyDown}
             placeholder={t("search")}
             autoFocus={isMobile}
-            className="ps-9 bg-muted/50 border-transparent focus-visible:bg-background"
+            className="ps-9 pe-16 bg-muted/50 border-transparent focus-visible:bg-background"
           />
           {loading && (
-            <Loader2 className="absolute end-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground animate-spin" />
+            <Loader2 className="absolute end-14 top-1/2 -translate-y-1/2 size-4 text-muted-foreground animate-spin" />
+          )}
+          {!isMobile && (
+            <kbd
+              aria-hidden="true"
+              className="pointer-events-none absolute end-2 top-1/2 -translate-y-1/2 hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground"
+            >
+              {shortcutLabel}
+            </kbd>
           )}
         </div>
       </PopoverAnchor>
@@ -191,13 +214,13 @@ export function GlobalSearch({ variant = "desktop", onClose }: Props) {
         ) : totalHits === 0 ? (
           <div className="p-4 text-sm text-muted-foreground text-center">{t("noResults")}</div>
         ) : (
-          <div className="py-2">
-            {(() => { itemRefs.current = []; let idx = -1; return visibleGroups.map((g) => (
+          <div className="py-2" role="listbox" aria-label={t("search")}>
+            {(() => { let idx = -1; return visibleGroups.map((g) => (
               <div key={g.key} className="px-1">
                 <div className="px-3 pt-2 pb-1 text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">
                   {groupLabel(g.key)} <span className="opacity-60">({g.hits.length})</span>
                 </div>
-                <ul>
+                <ul role="group" aria-label={groupLabel(g.key)}>
                   {g.hits.map((h) => {
                     idx += 1;
                     const myIdx = idx;
@@ -206,6 +229,7 @@ export function GlobalSearch({ variant = "desktop", onClose }: Props) {
                       <li key={`${g.key}:${h.id}`}>
                         <button
                           type="button"
+                          role="option"
                           ref={(el) => { itemRefs.current[myIdx] = el; }}
                           onMouseEnter={() => setHighlight(myIdx)}
                           onClick={() => go(h.to)}

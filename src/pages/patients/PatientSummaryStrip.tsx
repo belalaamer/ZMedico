@@ -25,7 +25,7 @@ export default function PatientSummaryStrip({ patientId, patient, insurer }: Pro
         .eq("patient_id", patientId)
         .is("deleted_at", null)
         .gte("scheduled_at", nowIso)
-        .in("status", ["scheduled", "confirmed", "checked_in"])
+        .in("status", ["scheduled", "confirmed", "in_progress"])
         .order("scheduled_at", { ascending: true })
         .limit(1)
         .maybeSingle(),

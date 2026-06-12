@@ -53,6 +53,11 @@ export function GlobalSearch({ variant = "desktop", onClose }: Props) {
     return defs.filter((d) => can(d.module, "view")).map((d) => ({ ...d, label: labels[d.key] }));
   }, [can, lang, permLoading]);
 
+  // Stable signature so the search effect doesn't re-fire on every render
+  // (usePermissions returns a fresh `can` each render, which would otherwise
+  // change `allowedGroups`'s identity and re-trigger fetches in a loop).
+  const allowedKey = allowedGroups.map((g) => g.key).join(",");
+
   // Debounced search
   useEffect(() => {
     const term = q.trim();
@@ -88,7 +93,8 @@ export function GlobalSearch({ variant = "desktop", onClose }: Props) {
       setLoading(false);
     }, DEBOUNCE_MS);
     return () => { cancelled = true; clearTimeout(handle); };
-  }, [q, minLen, currentBranchId, lang, allowedGroups]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, minLen, currentBranchId, lang, allowedKey]);
 
   const groupLabel = (k: SearchGroupKey): string => allowedGroups.find((g) => g.key === k)?.label ?? k;
 

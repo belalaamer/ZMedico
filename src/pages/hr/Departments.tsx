@@ -17,7 +17,7 @@ type Dept = any;
 
 export default function Departments() {
   const { t, lang } = useI18n();
-  const { branches } = useBranch();
+  const { branches, currentBranchId } = useBranch();
   const [items, setItems] = useState<Dept[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});

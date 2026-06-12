@@ -5352,6 +5352,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _get_cron_secret: { Args: never; Returns: string }
       _set_cron_secret: { Args: { p_secret: string }; Returns: undefined }
       add_treasury_tx:
         | {

@@ -5352,6 +5352,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _audit_write: {
+        Args: {
+          p_action: string
+          p_branch_id: string
+          p_entity_id: string
+          p_entity_type: string
+          p_fallback?: string
+          p_new: Json
+          p_old: Json
+        }
+        Returns: undefined
+      }
       _get_cron_secret: { Args: never; Returns: string }
       _set_cron_secret: { Args: { p_secret: string }; Returns: undefined }
       add_treasury_tx:

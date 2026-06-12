@@ -82,6 +82,17 @@ const DEFAULT_DAY_START_HOUR = 0;
 const DEFAULT_DAY_END_HOUR = 24; // exclusive
 const HOUR_HEIGHT = 56; // px
 
+// Parse "HH:MM[:SS]" → total minutes since midnight. Returns null on bad input.
+function parseMinutes(s: string | null | undefined): number | null {
+  if (!s) return null;
+  const m = /^(\d{1,2}):(\d{2})/.exec(s);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const mm = Number(m[2]);
+  if (Number.isNaN(h) || Number.isNaN(mm)) return null;
+  return Math.max(0, Math.min(24 * 60, h * 60 + mm));
+}
+
 // Parse "HH:MM[:SS]" → hour number (0..24). Returns null on bad input.
 function parseHour(s: string | null | undefined, mode: "floor" | "ceil"): number | null {
   if (!s) return null;

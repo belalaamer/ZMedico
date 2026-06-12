@@ -417,6 +417,8 @@ export default function Dashboard() {
         </Card>
       ) : (
         <>
+          <section>
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">{lang === "ar" ? "اليوم" : "Today"}</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
             <StatCard
               label={t("todayAppointments")} value={todayAppts}
@@ -445,6 +447,28 @@ export default function Dashboard() {
               icon={FileText} tone="from-warning to-warning" to="/medical/records"
             />
           </div>
+          {/* Treasury at-a-glance */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mt-3">
+            <StatCard
+              label={lang === "ar" ? "آخر إقفال يومي" : "Last daily close"}
+              value={lastClose ? formatMoney(lastClose.counted_cash, lang) : (lang === "ar" ? "—" : "—")}
+              sub={lastClose
+                ? `${formatDate(lastClose.business_date, lang)} · ${lang === "ar" ? "فرق" : "variance"}: ${formatMoney(lastClose.variance, lang)}`
+                : (lang === "ar" ? "لا يوجد إقفال بعد" : "No close yet")}
+              icon={Landmark}
+              tone={lastClose && Math.abs(lastClose.variance) > 0.01 ? "from-warning to-warning" : "from-success to-success"}
+              to="/treasury/daily-close"
+            />
+            <StatCard
+              label={lang === "ar" ? "حركات الخزينة اليوم" : "Treasury movements today"}
+              value={formatMoney(todayTreasuryIn - todayTreasuryOut, lang)}
+              sub={`${lang === "ar" ? "داخل" : "In"}: ${formatMoney(todayTreasuryIn, lang)} · ${lang === "ar" ? "خارج" : "Out"}: ${formatMoney(todayTreasuryOut, lang)}`}
+              icon={ArrowDownUp} tone="from-info to-info" to="/treasury"
+            />
+          </div>
+          </section>
+
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{lang === "ar" ? "هذا الأسبوع" : "This week"}</h2>
 
           <div className="grid lg:grid-cols-3 gap-4">
             <Card className="p-5 shadow-card border-border/60 lg:col-span-2">

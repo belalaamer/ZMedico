@@ -961,12 +961,12 @@ export default function CalendarPage() {
               <div className="p-12 text-center">
                 <Clock className="size-10 mx-auto text-muted-foreground mb-3" />
                 <div className="text-base font-medium">
-                  {lang === "ar" ? "العيادة مغلقة في هذا اليوم" : "Clinic is closed on this day"}
+                  {lang === "ar" ? "لا توجد ساعات عمل محددة لهذا الفرع" : "No working hours configured for this branch"}
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
                   {lang === "ar"
-                    ? "لم يتم ضبط ساعات العمل لهذا الفرع"
-                    : "No working hours configured for this branch"}
+                    ? "قم بتحديد ساعات عمل الفرع من الإعدادات لعرض التقويم هنا."
+                    : "Set branch working hours in Settings to show the calendar here."}
                 </div>
               </div>
             ) : (

@@ -23,6 +23,7 @@ import PatientQuickActions from "./PatientQuickActions";
 import PatientDocumentsTab from "./PatientDocumentsTab";
 import { RecordPaymentDialog } from "../payments/RecordPaymentDialog";
 import { usePermissions } from "@/hooks/usePermissions";
+import PatientOverviewSnapshot from "./PatientOverviewSnapshot";
 
 const statusClass: Record<string, string> = {
   draft: "status-cancelled", pending: "status-review", paid: "status-completed", partial: "status-progress", cancelled: "status-departed",
@@ -203,7 +204,24 @@ export default function PatientProfile() {
         </TabsList>
 
         <TabsContent value="overview" className="mt-4">
-          <Card className="p-6 shadow-card">
+          <PatientOverviewSnapshot
+            patientId={patient.id}
+            invoices={invoices}
+            payments={payments}
+            canViewBilling={can("invoices", "view")}
+            canPay={can("invoices", "create")}
+            canTopup={can("invoices", "create")}
+            reloadKey={reloadKey}
+            onRecordPayment={() => setPayOpen(true)}
+            onTopupWallet={() => setTab("financial")}
+            onOpenFinancial={() => setTab("financial")}
+            onUploadDocument={() => {
+              const p = new URLSearchParams(searchParams);
+              p.set("tab", "documents"); p.set("upload", "1");
+              setSearchParams(p, { replace: true });
+            }}
+          />
+          <Card className="p-6 shadow-card mt-4">
             <div className="grid sm:grid-cols-2 gap-4 text-sm">
               <div><div className="text-muted-foreground text-xs">{t("gender")}</div><div>{patient.gender ? t(patient.gender as any) : "—"}</div></div>
               <div><div className="text-muted-foreground text-xs">{t("nationality")}</div><div>{patient.nationality ?? "—"}</div></div>

@@ -545,7 +545,12 @@ export default function CalendarPage() {
 
   const sidebarContent = (
     <div className="space-y-4">
-      <Card className="p-4 shadow-card">
+      <Card className={`p-4 shadow-card ${workStartMin == null || workEndMin == null ? "border-dashed bg-muted/40" : ""}`}>
+        {(workStartMin == null || workEndMin == null) && (
+          <div className="mb-3 text-[11px] text-muted-foreground text-center leading-snug">
+            {lang === "ar" ? "لا توجد ساعات عمل محددة لهذا الفرع" : "No working hours for this branch"}
+          </div>
+        )}
         <div className="flex items-center justify-between mb-3">
           <button onClick={() => setMonthCursor(new Date(monthCursor.getFullYear(), monthCursor.getMonth() - 1, 1))}
             className="size-7 inline-flex items-center justify-center rounded hover:bg-muted">

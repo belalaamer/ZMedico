@@ -84,9 +84,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (role === "manager" && !branch_id) {
+    const rolesRequiringBranch = ["manager", "doctor", "nurse", "receptionist", "accountant", "staff"];
+    if (rolesRequiringBranch.includes(role) && !branch_id) {
       return new Response(
-        JSON.stringify({ error: "Branch is required for manager role" }),
+        JSON.stringify({ error: `Branch is required for role: ${role}` }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },

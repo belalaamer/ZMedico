@@ -17,7 +17,7 @@ type Dept = any;
 
 export default function Departments() {
   const { t, lang } = useI18n();
-  const { branches } = useBranch();
+  const { branches, currentBranchId } = useBranch();
   const [items, setItems] = useState<Dept[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -42,7 +42,12 @@ export default function Departments() {
   const save = async () => {
     const name = form.name.trim();
     if (!name) { toast.error("Name required"); return; }
-    const payload: any = { name_en: name, name_ar: name, description: form.description || null, branch_id: form.branch_id || null, manager_id: form.manager_id || null };
+    const effectiveBranchId = form.branch_id || currentBranchId;
+    if (!effectiveBranchId) {
+      toast.error(lang === "ar" ? "اختر الفرع أولاً" : "Select a branch first");
+      return;
+    }
+    const payload: any = { name_en: name, name_ar: name, description: form.description || null, branch_id: effectiveBranchId, manager_id: form.manager_id || null };
     const { error } = edit
       ? await supabase.from("departments").update(payload).eq("id", edit.id)
       : await supabase.from("departments").insert(payload);

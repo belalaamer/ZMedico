@@ -68,6 +68,12 @@ export default function Staff() {
   const save = async () => {
     let profileId = form.profile_id;
 
+    const effectiveBranchId = form.branch_id || currentBranchId;
+    if (!effectiveBranchId) {
+      toast.error("Select a branch before saving");
+      return;
+    }
+
     if (mode === "new") {
       if (!newUser.email || !newUser.full_name) { toast.error(t("fullName") + " / Email"); return; }
       setCreatingUser(true);
@@ -76,7 +82,7 @@ export default function Staff() {
           email: newUser.email.trim().toLowerCase(),
           full_name: newUser.full_name.trim(),
           role: newUser.role,
-          branch_id: form.branch_id || currentBranchId || null,
+          branch_id: effectiveBranchId,
           password: newUser.password || undefined,
         },
       });
@@ -95,7 +101,7 @@ export default function Staff() {
       id: profileId,
       position_id: form.position_id || null,
       department_id: form.department_id || null,
-      branch_id: form.branch_id || currentBranchId || null,
+      branch_id: effectiveBranchId,
       hire_date: form.hire_date,
       contract_type: form.contract_type,
       salary: Number(form.salary || 0),

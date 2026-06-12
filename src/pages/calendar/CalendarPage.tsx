@@ -82,6 +82,17 @@ const DEFAULT_DAY_START_HOUR = 0;
 const DEFAULT_DAY_END_HOUR = 24; // exclusive
 const HOUR_HEIGHT = 56; // px
 
+// Parse "HH:MM[:SS]" → total minutes since midnight. Returns null on bad input.
+function parseMinutes(s: string | null | undefined): number | null {
+  if (!s) return null;
+  const m = /^(\d{1,2}):(\d{2})/.exec(s);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const mm = Number(m[2]);
+  if (Number.isNaN(h) || Number.isNaN(mm)) return null;
+  return Math.max(0, Math.min(24 * 60, h * 60 + mm));
+}
+
 // Parse "HH:MM[:SS]" → hour number (0..24). Returns null on bad input.
 function parseHour(s: string | null | undefined, mode: "floor" | "ceil"): number | null {
   if (!s) return null;
@@ -128,6 +139,9 @@ export default function CalendarPage() {
   // Per-branch working hours window (source of truth: branches.working_hours_start/end).
   const [dayStartHour, setDayStartHour] = useState<number>(DEFAULT_DAY_START_HOUR);
   const [dayEndHour, setDayEndHour] = useState<number>(DEFAULT_DAY_END_HOUR);
+  // Exact minutes-since-midnight for the working band (null if branch has no config).
+  const [workStartMin, setWorkStartMin] = useState<number | null>(null);
+  const [workEndMin, setWorkEndMin] = useState<number | null>(null);
 
   const loadBranchHours = async () => {
     if (!currentBranchId) {
@@ -142,12 +156,21 @@ export default function CalendarPage() {
       .maybeSingle();
     const start = parseHour((data as any)?.working_hours_start, "floor");
     const end = parseHour((data as any)?.working_hours_end, "ceil");
+    const sMin = parseMinutes((data as any)?.working_hours_start);
+    const eMin = parseMinutes((data as any)?.working_hours_end);
     if (start != null && end != null && end > start) {
       setDayStartHour(start);
       setDayEndHour(end);
     } else {
       setDayStartHour(DEFAULT_DAY_START_HOUR);
       setDayEndHour(DEFAULT_DAY_END_HOUR);
+    }
+    if (sMin != null && eMin != null && eMin > sMin) {
+      setWorkStartMin(sMin);
+      setWorkEndMin(eMin);
+    } else {
+      setWorkStartMin(null);
+      setWorkEndMin(null);
     }
   };
   useEffect(() => { loadBranchHours(); /* eslint-disable-next-line */ }, [currentBranchId]);
@@ -934,6 +957,19 @@ export default function CalendarPage() {
           )}
 
           <div className="overflow-auto" style={{ maxHeight: "70vh" }}>
+            {workStartMin == null || workEndMin == null ? (
+              <div className="p-12 text-center">
+                <Clock className="size-10 mx-auto text-muted-foreground mb-3" />
+                <div className="text-base font-medium">
+                  {lang === "ar" ? "العيادة مغلقة في هذا اليوم" : "Clinic is closed on this day"}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {lang === "ar"
+                    ? "لم يتم ضبط ساعات العمل لهذا الفرع"
+                    : "No working hours configured for this branch"}
+                </div>
+              </div>
+            ) : (
             <div
               className="grid relative"
               style={{
@@ -957,8 +993,19 @@ export default function CalendarPage() {
                 const dayKey = d.toDateString();
                 const dayItems = itemsByDay[dayKey] ?? [];
                 const isToday = sameDay(d, new Date());
+                const hasHours = workStartMin != null && workEndMin != null;
+                const bandTop = hasHours ? ((workStartMin! - dayStartHour * 60) / 60) * HOUR_HEIGHT : 0;
+                const bandHeight = hasHours ? ((workEndMin! - workStartMin!) / 60) * HOUR_HEIGHT : 0;
                 return (
                   <div key={dayKey} className="relative border-e border-border last:border-e-0">
+                    {/* Working-hours highlight band (behind everything, non-interactive) */}
+                    {hasHours && (
+                      <div
+                        aria-hidden
+                        className="absolute inset-x-0 bg-primary/5 pointer-events-none"
+                        style={{ top: bandTop, height: bandHeight }}
+                      />
+                    )}
                     {/* Hour rows (clickable to create) */}
                     {hours.map((h) => (
                       <button
@@ -985,6 +1032,7 @@ export default function CalendarPage() {
                 );
               })}
             </div>
+            )}
           </div>
 
           {filteredItems.length === 0 && (

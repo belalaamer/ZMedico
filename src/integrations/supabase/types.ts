@@ -4030,6 +4030,35 @@ export type Database = {
         }
         Relationships: []
       }
+      staff_branches: {
+        Row: {
+          branch_id: string
+          created_at: string
+          created_by: string | null
+          user_id: string
+        }
+        Insert: {
+          branch_id: string
+          created_at?: string
+          created_by?: string | null
+          user_id: string
+        }
+        Update: {
+          branch_id?: string
+          created_at?: string
+          created_by?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_branches_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staff_positions: {
         Row: {
           created_at: string
@@ -5518,6 +5547,31 @@ export type Database = {
       renumber_active_invoices: { Args: never; Returns: undefined }
       renumber_active_patient_codes: { Args: never; Returns: undefined }
       staff_target_actual: { Args: { _target_id: string }; Returns: number }
+      user_has_branch_access: { Args: { _branch: string }; Returns: boolean }
+      user_has_branch_access_via_invoice: {
+        Args: { _invoice: string }
+        Returns: boolean
+      }
+      user_has_branch_access_via_medical_record: {
+        Args: { _rec: string }
+        Returns: boolean
+      }
+      user_has_branch_access_via_patient: {
+        Args: { _patient: string }
+        Returns: boolean
+      }
+      user_has_branch_access_via_prescription: {
+        Args: { _rx: string }
+        Returns: boolean
+      }
+      user_has_branch_access_via_treasury: {
+        Args: { _treasury: string }
+        Returns: boolean
+      }
+      user_has_branch_access_via_treatment_plan: {
+        Args: { _plan: string }
+        Returns: boolean
+      }
     }
     Enums: {
       addon_status: "active" | "cancelled"

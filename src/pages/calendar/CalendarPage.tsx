@@ -107,6 +107,29 @@ export default function CalendarPage() {
     patient_id: "", doctor_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "",
     status: "scheduled" as Appt["status"],
   });
+  const [patientCtx, setPatientCtx] = useState<{ wallet: number; outstanding: number; lastVisit: string | null } | null>(null);
+  const [patientCtxLoading, setPatientCtxLoading] = useState(false);
+
+  // Load patient financial context whenever a patient is picked in the booking dialog
+  useEffect(() => {
+    if (!open || !form.patient_id) { setPatientCtx(null); return; }
+    let cancelled = false;
+    setPatientCtxLoading(true);
+    (async () => {
+      const [walletRes, invRes, lastApptRes] = await Promise.all([
+        (supabase as any).from("patient_wallets").select("balance").eq("patient_id", form.patient_id).maybeSingle(),
+        supabase.from("invoices").select("total,paid_amount").eq("patient_id", form.patient_id).is("deleted_at", null).in("status", ["pending", "partial"]),
+        supabase.from("appointments").select("scheduled_at").eq("patient_id", form.patient_id).is("deleted_at", null).in("status", ["completed", "departed"]).order("scheduled_at", { ascending: false }).limit(1).maybeSingle(),
+      ]);
+      if (cancelled) return;
+      const wallet = Number(walletRes?.data?.balance ?? 0);
+      const outstanding = ((invRes.data ?? []) as any[]).reduce((s, r) => s + (Number(r.total || 0) - Number(r.paid_amount || 0)), 0);
+      const lastVisit = (lastApptRes.data as any)?.scheduled_at ?? null;
+      setPatientCtx({ wallet, outstanding, lastVisit });
+      setPatientCtxLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [form.patient_id, open]);
 
   // Force day view on mobile when user lands on week (too cramped). Month is fine.
   useEffect(() => {

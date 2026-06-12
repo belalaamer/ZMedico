@@ -618,6 +618,31 @@ export default function CalendarPage() {
                       </Command>
                     </PopoverContent>
                   </Popover>
+                  {form.patient_id && (
+                    <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs flex flex-wrap items-center gap-x-4 gap-y-1">
+                      {patientCtxLoading || !patientCtx ? (
+                        <span className="text-muted-foreground">{lang === "ar" ? "جارٍ تحميل بيانات المريض..." : "Loading patient context..."}</span>
+                      ) : (
+                        <>
+                          <span className="inline-flex items-center gap-1">
+                            <WalletIcon className="size-3.5 text-muted-foreground" />
+                            <span className="text-muted-foreground">{lang === "ar" ? "المحفظة:" : "Wallet:"}</span>
+                            <span className={`font-medium tabular-nums ${patientCtx.wallet > 0 ? "text-emerald-600" : ""}`}>{formatMoney(patientCtx.wallet, lang)}</span>
+                          </span>
+                          <span className="inline-flex items-center gap-1">
+                            <AlertCircle className={`size-3.5 ${patientCtx.outstanding > 0 ? "text-destructive" : "text-muted-foreground"}`} />
+                            <span className="text-muted-foreground">{lang === "ar" ? "متبقي:" : "Outstanding:"}</span>
+                            <span className={`font-medium tabular-nums ${patientCtx.outstanding > 0 ? "text-destructive" : ""}`}>{formatMoney(patientCtx.outstanding, lang)}</span>
+                          </span>
+                          <span className="inline-flex items-center gap-1">
+                            <History className="size-3.5 text-muted-foreground" />
+                            <span className="text-muted-foreground">{lang === "ar" ? "آخر زيارة:" : "Last visit:"}</span>
+                            <span className="font-medium">{patientCtx.lastVisit ? formatDate(patientCtx.lastVisit, lang) : (lang === "ar" ? "—" : "—")}</span>
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>{lang === "ar" ? "الطبيب" : "Doctor"}</Label>

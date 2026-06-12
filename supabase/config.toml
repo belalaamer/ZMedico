@@ -1,4 +1,1 @@
 project_id = "mmlnvypctowdlbvbesui"
-
-[functions.bootstrap-cron-secret]
-verify_jwt = false

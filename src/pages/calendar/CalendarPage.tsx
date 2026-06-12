@@ -980,8 +980,19 @@ export default function CalendarPage() {
                 const dayKey = d.toDateString();
                 const dayItems = itemsByDay[dayKey] ?? [];
                 const isToday = sameDay(d, new Date());
+                const hasHours = workStartMin != null && workEndMin != null;
+                const bandTop = hasHours ? ((workStartMin! - dayStartHour * 60) / 60) * HOUR_HEIGHT : 0;
+                const bandHeight = hasHours ? ((workEndMin! - workStartMin!) / 60) * HOUR_HEIGHT : 0;
                 return (
                   <div key={dayKey} className="relative border-e border-border last:border-e-0">
+                    {/* Working-hours highlight band (behind everything, non-interactive) */}
+                    {hasHours && (
+                      <div
+                        aria-hidden
+                        className="absolute inset-x-0 bg-primary/5 pointer-events-none"
+                        style={{ top: bandTop, height: bandHeight }}
+                      />
+                    )}
                     {/* Hour rows (clickable to create) */}
                     {hours.map((h) => (
                       <button

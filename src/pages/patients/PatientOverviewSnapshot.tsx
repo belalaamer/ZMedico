@@ -11,7 +11,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
-import PatientFinancialCard from "./PatientFinancialCard";
 
 type Props = {
   patientId: string;

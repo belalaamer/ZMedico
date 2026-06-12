@@ -270,7 +270,7 @@ export default function PatientProfile() {
 
         <TabsContent value="financial" className="mt-4 space-y-6">
           <Can module="invoices" action="view" fallback={<div className="text-center text-muted-foreground py-10">{lang === "ar" ? "لا تملك صلاحية الوصول" : "Access denied"}</div>}>
-            <PatientWalletTab patientId={patient.id} />
+            <PatientWalletTab key={reloadKey} patientId={patient.id} />
 
             <section className="space-y-2">
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{t("invoices")}</h3>

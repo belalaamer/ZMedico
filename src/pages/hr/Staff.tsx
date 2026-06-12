@@ -70,7 +70,7 @@ export default function Staff() {
 
     const effectiveBranchId = form.branch_id || currentBranchId;
     if (!effectiveBranchId) {
-      toast.error("Select a branch before saving");
+      toast.error(t("errSelectBranchFirst"));
       return;
     }
 

@@ -927,39 +927,30 @@ export default function QueuePage() {
             <DialogTitle>{t("queueSettings")}</DialogTitle>
             <DialogDescription>{t("queueSettingsDesc")}</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>{t("longWaitThresholdMin")}</Label>
-              <Input
-                type="number"
-                min={5}
-                max={240}
-                value={settings.longWaitMinutes}
-                onChange={(e) => setSettings({ ...settings, longWaitMinutes: Math.max(5, Math.min(240, Number(e.target.value) || 30)) })}
-              />
+          <div className="space-y-3 text-sm">
+            <div className="flex items-center justify-between gap-3 rounded-md border p-2.5">
+              <span className="text-muted-foreground">{t("longWaitThresholdMin")}</span>
+              <span className="font-medium tabular-nums">{settings.longWaitMinutes} min</span>
             </div>
-            <div className="flex items-center justify-between gap-3">
-              <Label className="font-normal">{t("defaultMyQueueLabel")}</Label>
-              <Switch checked={settings.defaultMyQueue} onCheckedChange={(v) => setSettings({ ...settings, defaultMyQueue: v })} />
+            <div className="flex items-center justify-between gap-3 rounded-md border p-2.5">
+              <span className="text-muted-foreground">{t("defaultMyQueueLabel")}</span>
+              <span className="font-medium">{settings.defaultMyQueue ? "On" : "Off"}</span>
             </div>
-            <div className="flex items-center justify-between gap-3">
-              <Label className="font-normal">{t("showNoShowsInDefaultLabel")}</Label>
-              <Switch checked={settings.showNoShowsInDefault} onCheckedChange={(v) => setSettings({ ...settings, showNoShowsInDefault: v })} />
+            <div className="flex items-center justify-between gap-3 rounded-md border p-2.5">
+              <span className="text-muted-foreground">{t("showNoShowsInDefaultLabel")}</span>
+              <span className="font-medium">{settings.showNoShowsInDefault ? "On" : "Off"}</span>
             </div>
+            <p className="text-xs text-muted-foreground">
+              {lang === "ar"
+                ? "يتم تعديل هذه الإعدادات من إدارة الفروع."
+                : "These settings are now edited in Branch administration."}
+            </p>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setSettingsOpen(false)}>{t("cancel")}</Button>
-            <Button
-              type="button"
-              disabled={savingSettings}
-              onClick={async () => {
-                setSavingSettings(true);
-                const res = await saveQueueSettings(currentBranchId, settings);
-                setSavingSettings(false);
-                if (!res.ok) toast.error(res.error ?? "Save failed");
-                else { toast.success(t("saved")); setSettingsOpen(false); }
-              }}
-            >{t("save")}</Button>
+            <Button type="button" variant="outline" onClick={() => setSettingsOpen(false)}>{t("close") ?? "Close"}</Button>
+            <Button type="button" asChild>
+              <a href="/branches">{lang === "ar" ? "افتح إدارة الفروع" : "Open Branches"}</a>
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

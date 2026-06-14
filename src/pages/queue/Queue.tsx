@@ -124,7 +124,14 @@ export default function QueuePage() {
   const [settings, setSettings] = useState<QueueSettings>(() => getQueueSettings(currentBranchId));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const LONG_WAIT_MS = settings.longWaitMinutes * 60 * 1000;
-  useEffect(() => { setSettings(getQueueSettings(currentBranchId)); }, [currentBranchId]);
+  // On branch change: paint from local cache instantly, then hydrate from server.
+  useEffect(() => {
+    setSettings(getQueueSettings(currentBranchId));
+    let active = true;
+    void fetchQueueSettings(currentBranchId).then((s) => { if (active) setSettings(s); });
+    return () => { active = false; };
+  }, [currentBranchId]);
+  const [savingSettings, setSavingSettings] = useState(false);
 
   // 30s tick so waiting/in-session timers re-render without per-row intervals.
   useEffect(() => {

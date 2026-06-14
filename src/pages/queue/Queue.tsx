@@ -463,6 +463,15 @@ export default function QueuePage() {
         <StatCard icon={<Timer className="size-4" />}      label={t("queueAvgWait")}        value={analytics.avgWaitMs == null ? "—" : formatDur(analytics.avgWaitMs)} />
       </div>
 
+      {analytics.longestRow && (
+        <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+          <Clock className="size-3.5" />
+          <span>{t("queueLongestWait")}:</span>
+          <span className="font-medium text-foreground">{patientName(analytics.longestRow)}</span>
+          <span className="tabular-nums">· {formatDur(analytics.longestMs)}</span>
+        </div>
+      )}
+
       {/* Sticky filter bar */}
       <Card className="p-3 sticky top-0 z-10 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
         <div className="flex flex-wrap items-center gap-2">
@@ -488,12 +497,29 @@ export default function QueuePage() {
               <SelectTrigger className="h-9 w-[180px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("allDoctors")}</SelectItem>
+                {isDoctorUser && user?.id && (
+                  <SelectItem value={user.id}>{t("queueViewMine")}</SelectItem>
+                )}
                 {doctors.map((d) => (
                   <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
+          {roomOptions.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">{t("roomFilter")}</span>
+              <Select value={roomFilter} onValueChange={setRoomFilter}>
+                <SelectTrigger className="h-9 w-[140px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("allRooms")}</SelectItem>
+                  {roomOptions.map((rm) => (
+                    <SelectItem key={rm} value={rm}>{rm}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <Button
             type="button"
             variant={urgentOnly ? "default" : "outline"}
@@ -502,6 +528,18 @@ export default function QueuePage() {
             className="h-9"
           >
             <Flag className="size-4 me-1" /> {t("onlyUrgent")}
+          </Button>
+          <Button
+            type="button"
+            variant={statusFilter === "no_show" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStatusFilter((s) => (s === "no_show" ? "active" : "no_show"))}
+            className="h-9"
+          >
+            <UserX className="size-4 me-1" /> {t("noShowsTodayChip")}
+            {analytics.noShow > 0 && (
+              <Badge variant="destructive" className="ms-1.5 h-4 text-[10px] px-1.5">{analytics.noShow}</Badge>
+            )}
           </Button>
           <div className="ms-auto text-xs text-muted-foreground">
             {filtered.length}

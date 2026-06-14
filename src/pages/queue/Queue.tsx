@@ -20,7 +20,7 @@ import { toast } from "sonner";
 import { usePermissions } from "@/hooks/usePermissions";
 import { buildStatusPatch, type ApptStatus } from "@/lib/appointmentStatus";
 import { logQueueAudit } from "@/lib/queueAudit";
-import { getQueueSettings, setQueueSettings, type QueueSettings } from "@/lib/queueSettings";
+import { getQueueSettings, fetchQueueSettings, saveQueueSettings, type QueueSettings } from "@/lib/queueSettings";
 import { Switch } from "@/components/ui/switch";
 
 type QueueRow = {
@@ -124,7 +124,14 @@ export default function QueuePage() {
   const [settings, setSettings] = useState<QueueSettings>(() => getQueueSettings(currentBranchId));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const LONG_WAIT_MS = settings.longWaitMinutes * 60 * 1000;
-  useEffect(() => { setSettings(getQueueSettings(currentBranchId)); }, [currentBranchId]);
+  // On branch change: paint from local cache instantly, then hydrate from server.
+  useEffect(() => {
+    setSettings(getQueueSettings(currentBranchId));
+    let active = true;
+    void fetchQueueSettings(currentBranchId).then((s) => { if (active) setSettings(s); });
+    return () => { active = false; };
+  }, [currentBranchId]);
+  const [savingSettings, setSavingSettings] = useState(false);
 
   // 30s tick so waiting/in-session timers re-render without per-row intervals.
   useEffect(() => {
@@ -942,7 +949,17 @@ export default function QueuePage() {
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setSettingsOpen(false)}>{t("cancel")}</Button>
-            <Button type="button" onClick={() => { setQueueSettings(currentBranchId, settings); toast.success(t("saved")); setSettingsOpen(false); }}>{t("save")}</Button>
+            <Button
+              type="button"
+              disabled={savingSettings}
+              onClick={async () => {
+                setSavingSettings(true);
+                const res = await saveQueueSettings(currentBranchId, settings);
+                setSavingSettings(false);
+                if (!res.ok) toast.error(res.error ?? "Save failed");
+                else { toast.success(t("saved")); setSettingsOpen(false); }
+              }}
+            >{t("save")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

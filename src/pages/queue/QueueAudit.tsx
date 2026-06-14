@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,62 +65,101 @@ function summarizeDiff(oldV: any, newV: any) {
 export default function QueueAuditPage() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
+  const [searchParams] = useSearchParams();
   const [rows, setRows] = useState<LogRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const [actionFilter, setActionFilter] = useState<"all" | QAction>("all");
   const [userFilter, setUserFilter] = useState<string>("all");
-  const [refFilter, setRefFilter] = useState<string>("");
+  const [refFilter, setRefFilter] = useState<string>(() => searchParams.get("appointment") ?? "");
   const [fromDate, setFromDate] = useState<string>(defaultFrom());
   const [toDate, setToDate] = useState<string>(todayStr());
   const [scopeBranch, setScopeBranch] = useState(true);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [patients, setPatients] = useState<Record<string, { name: string; code: number }>>({});
 
-  const load = async () => {
-    setLoading(true);
+  const PAGE_SIZE = 200;
+
+  // Cursor-based pagination: each query asks for PAGE_SIZE rows older than
+  // `beforeIso` (or unbounded for the first page). Server-side filters cover
+  // action, user, branch, date, and an exact-appointment-id ref match so that
+  // "load more" can never miss matches that local-only filtering would.
+  const buildQuery = (beforeIso?: string) => {
     let q: any = supabase
       .from("audit_logs")
       .select("id,action,entity_type,entity_id,user_id,branch_id,created_at,old_values,new_values")
       .eq("entity_type", "appointment")
-      .in("action", QUEUE_ACTIONS as unknown as string[])
       .gte("created_at", isoDay(fromDate))
       .lte("created_at", isoEndDay(toDate))
       .order("created_at", { ascending: false })
-      .limit(500);
+      .limit(PAGE_SIZE);
+    if (actionFilter === "all") q = q.in("action", QUEUE_ACTIONS as unknown as string[]);
+    else q = q.eq("action", actionFilter);
+    if (userFilter !== "all") q = q.eq("user_id", userFilter);
     if (scopeBranch && currentBranchId) q = q.eq("branch_id", currentBranchId);
-    const { data, error } = await q;
-    if (error) { toast.error(error.message); setRows([]); setLoading(false); return; }
-    const list = (data ?? []) as LogRow[];
-    setRows(list);
-    // Hydrate user + appointment→patient labels (best-effort, single batch each).
+    // If the ref filter looks like a UUID, treat it as exact appointment id (server-side).
+    const trimmed = refFilter.trim();
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)) {
+      q = q.eq("entity_id", trimmed);
+    }
+    if (beforeIso) q = q.lt("created_at", beforeIso);
+    return q;
+  };
+
+  const hydrate = async (list: LogRow[]) => {
     const userIds = Array.from(new Set(list.map((r) => r.user_id).filter(Boolean))) as string[];
     if (userIds.length) {
       const { data: pr } = await supabase.from("profiles").select("id,full_name").in("id", userIds);
-      const map: Record<string, string> = {};
+      const map = { ...profiles };
       (pr ?? []).forEach((p: any) => { map[p.id] = p.full_name ?? p.id.slice(0, 8); });
       setProfiles(map);
-    } else setProfiles({});
+    }
     const apptIds = Array.from(new Set(list.map((r) => r.entity_id).filter(Boolean))) as string[];
     if (apptIds.length) {
       const { data: ap } = await supabase
         .from("appointments")
         .select("id,patient_id,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)")
         .in("id", apptIds);
-      const map: Record<string, { name: string; code: number }> = {};
+      const map = { ...patients };
       (ap ?? []).forEach((a: any) => {
-        const p = a.patients;
-        if (!p) return;
+        const p = a.patients; if (!p) return;
         const name = lang === "ar"
           ? `${p.first_name_ar ?? p.first_name_en} ${p.last_name_ar ?? p.last_name_en ?? ""}`.trim()
           : `${p.first_name_en} ${p.last_name_en ?? ""}`.trim();
         map[a.id] = { name, code: p.patient_code };
       });
       setPatients(map);
-    } else setPatients({});
+    }
+  };
+
+  const load = async () => {
+    setLoading(true);
+    const { data, error } = await buildQuery();
+    if (error) { toast.error(error.message); setRows([]); setHasMore(false); setLoading(false); return; }
+    const list = (data ?? []) as LogRow[];
+    setRows(list);
+    setHasMore(list.length === PAGE_SIZE);
+    setProfiles({}); setPatients({});
+    await hydrate(list);
     setLoading(false);
   };
 
-  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [scopeBranch, currentBranchId, fromDate, toDate]);
+  const loadMore = async () => {
+    if (loadingMore || !hasMore || rows.length === 0) return;
+    setLoadingMore(true);
+    const cursor = rows[rows.length - 1].created_at;
+    const { data, error } = await buildQuery(cursor);
+    if (error) { toast.error(error.message); setLoadingMore(false); return; }
+    const next = (data ?? []) as LogRow[];
+    setRows((prev) => [...prev, ...next]);
+    setHasMore(next.length === PAGE_SIZE);
+    await hydrate(next);
+    setLoadingMore(false);
+  };
+
+  // Reload on filter changes that affect the server query.
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [scopeBranch, currentBranchId, fromDate, toDate, actionFilter, userFilter, refFilter]);
 
   const userOptions = useMemo(() => {
     const ids = Array.from(new Set(rows.map((r) => r.user_id).filter(Boolean))) as string[];
@@ -261,7 +300,7 @@ export default function QueueAuditPage() {
                     <td className="px-3 py-2 text-xs text-muted-foreground truncate max-w-[360px]">{summarizeDiff(r.old_values, r.new_values) || "—"}</td>
                     <td className="px-3 py-2 text-end">
                       {r.entity_id && (
-                        <Link to={`/calendar?appointment=${r.entity_id}`} className="text-primary inline-flex items-center gap-1 text-xs hover:underline">
+                        <Link to={`/appointments/${r.entity_id}`} className="text-primary inline-flex items-center gap-1 text-xs hover:underline">
                           <ExternalLink className="size-3.5" />
                         </Link>
                       )}
@@ -273,6 +312,13 @@ export default function QueueAuditPage() {
           </table>
         </div>
       </Card>
+      {hasMore && (
+        <div className="flex justify-center">
+          <Button type="button" variant="outline" size="sm" onClick={() => void loadMore()} disabled={loadingMore}>
+            {loadingMore ? "…" : t("loadMore")}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

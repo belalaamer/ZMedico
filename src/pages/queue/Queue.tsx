@@ -947,7 +947,7 @@ export default function QueuePage() {
             </p>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setSettingsOpen(false)}>{t("close") ?? "Close"}</Button>
+            <Button type="button" variant="outline" onClick={() => setSettingsOpen(false)}>{t("cancel")}</Button>
             <Button type="button" asChild>
               <a href="/branches">{lang === "ar" ? "افتح إدارة الفروع" : "Open Branches"}</a>
             </Button>

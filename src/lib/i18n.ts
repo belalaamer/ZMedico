@@ -977,6 +977,17 @@ export const dict = {
     queueNoShowToday: "No-shows",
     queueAvgWait: "Avg wait",
     walkInCreated: "Walk-in added to queue",
+    // Phase 3
+    queueViewLabel: "View",
+    queueViewMine: "My queue",
+    roomFilter: "Room",
+    allRooms: "All rooms",
+    noShowsTodayChip: "No-shows today",
+    recallPatient: "Recall patient",
+    moveBackToWaiting: "Move back to waiting",
+    openConsultation: "Open consultation",
+    queueLongestWait: "Longest wait",
+    none: "—",
   },
   ar: {
     appName: "ZMedico",

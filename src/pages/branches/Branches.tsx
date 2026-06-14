@@ -370,6 +370,47 @@ export default function Branches() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!qsBranch} onOpenChange={(o) => !o && setQsBranch(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ListChecks className="size-5 text-primary" />
+              {t("queueSettings")} — {qsBranch ? (lang === "ar" ? qsBranch.name_ar : qsBranch.name_en) : ""}
+            </DialogTitle>
+          </DialogHeader>
+          {qsLoading ? (
+            <div className="py-6 text-center text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin inline me-2" />…</div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label>{t("longWaitThresholdMin")}</Label>
+                <Input
+                  type="number"
+                  min={5}
+                  max={240}
+                  value={qsValue.longWaitMinutes}
+                  onChange={(e) => setQsValue({ ...qsValue, longWaitMinutes: Math.max(5, Math.min(240, Number(e.target.value) || 30)) })}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-md border p-3">
+                <Label className="font-normal">{t("defaultMyQueueLabel")}</Label>
+                <Switch checked={qsValue.defaultMyQueue} onCheckedChange={(v) => setQsValue({ ...qsValue, defaultMyQueue: v })} />
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-md border p-3">
+                <Label className="font-normal">{t("showNoShowsInDefaultLabel")}</Label>
+                <Switch checked={qsValue.showNoShowsInDefault} onCheckedChange={(v) => setQsValue({ ...qsValue, showNoShowsInDefault: v })} />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQsBranch(null)}>{t("cancel")}</Button>
+            <Button onClick={saveQueueSettingsClick} disabled={qsSaving || qsLoading}>
+              {qsSaving ? <Loader2 className="size-4 animate-spin me-1" /> : null}{t("save")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

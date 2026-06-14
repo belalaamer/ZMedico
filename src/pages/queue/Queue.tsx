@@ -20,7 +20,7 @@ import { toast } from "sonner";
 import { usePermissions } from "@/hooks/usePermissions";
 import { buildStatusPatch, type ApptStatus } from "@/lib/appointmentStatus";
 import { logQueueAudit } from "@/lib/queueAudit";
-import { getQueueSettings, setQueueSettings, type QueueSettings } from "@/lib/queueSettings";
+import { getQueueSettings, fetchQueueSettings, saveQueueSettings, type QueueSettings } from "@/lib/queueSettings";
 import { Switch } from "@/components/ui/switch";
 
 type QueueRow = {

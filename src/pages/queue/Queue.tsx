@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 import { RowActions } from "@/components/RowActions";
 import { ListSkeleton } from "@/components/ListSkeleton";
-import { AlertTriangle, CheckCircle2, Clock, Flag, ListChecks, Play, UserPlus, X, ExternalLink, RotateCcw, Plus, Stethoscope, Users, Activity, CheckCheck, UserX, Timer, UserCog, DoorOpen } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, Flag, ListChecks, Play, UserPlus, X, ExternalLink, RotateCcw, Plus, Stethoscope, Users, Activity, CheckCheck, UserX, Timer, UserCog, DoorOpen, Settings as SettingsIcon, ScrollText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
@@ -20,6 +20,8 @@ import { toast } from "sonner";
 import { usePermissions } from "@/hooks/usePermissions";
 import { buildStatusPatch, type ApptStatus } from "@/lib/appointmentStatus";
 import { logQueueAudit } from "@/lib/queueAudit";
+import { getQueueSettings, setQueueSettings, type QueueSettings } from "@/lib/queueSettings";
+import { Switch } from "@/components/ui/switch";
 
 type QueueRow = {
   id: string;
@@ -43,7 +45,6 @@ type QueueRow = {
   } | null;
 };
 
-const LONG_WAIT_MS = 30 * 60 * 1000;
 
 function startOfDay(d: Date) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
 function endOfDay(d: Date) { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; }
@@ -119,6 +120,11 @@ export default function QueuePage() {
   const [roomRow, setRoomRow] = useState<QueueRow | null>(null);
   const [roomValue, setRoomValue] = useState<string>("");
   const [roomSaving, setRoomSaving] = useState(false);
+  // Per-branch policy settings (localStorage). Re-loaded on branch switch.
+  const [settings, setSettings] = useState<QueueSettings>(() => getQueueSettings(currentBranchId));
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const LONG_WAIT_MS = settings.longWaitMinutes * 60 * 1000;
+  useEffect(() => { setSettings(getQueueSettings(currentBranchId)); }, [currentBranchId]);
 
   // 30s tick so waiting/in-session timers re-render without per-row intervals.
   useEffect(() => {
@@ -183,11 +189,12 @@ export default function QueuePage() {
   // on first load. They can switch to All freely afterwards (we don't re-apply).
   useEffect(() => {
     if (doctorDefaultApplied || !user?.id || doctors.length === 0) return;
+    if (!settings.defaultMyQueue) { setDoctorDefaultApplied(true); return; }
     if (doctors.some((d) => d.id === user.id)) {
       setDoctorFilter(user.id);
     }
     setDoctorDefaultApplied(true);
-  }, [user?.id, doctors, doctorDefaultApplied]);
+  }, [user?.id, doctors, doctorDefaultApplied, settings.defaultMyQueue]);
 
   const isDoctorUser = !!user?.id && doctors.some((d) => d.id === user.id);
 
@@ -227,7 +234,9 @@ export default function QueuePage() {
       : `${p.first_name_en} ${p.last_name_en ?? ""}`.trim();
 
   const filtered = useMemo(() => {
-    const ACTIVE: ApptStatus[] = ["scheduled", "confirmed", "in_progress"];
+    const ACTIVE: ApptStatus[] = settings.showNoShowsInDefault
+      ? ["scheduled", "confirmed", "in_progress", "no_show"]
+      : ["scheduled", "confirmed", "in_progress"];
     let list = rows.filter((r) => {
       if (statusFilter === "active") return ACTIVE.includes(r.status);
       if (statusFilter === "all") return true;
@@ -247,7 +256,7 @@ export default function QueuePage() {
       return new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime();
     });
     return list;
-  }, [rows, statusFilter, doctorFilter, urgentOnly]);
+  }, [rows, statusFilter, doctorFilter, urgentOnly, roomFilter, settings.showNoShowsInDefault]);
 
   const longWaitCount = useMemo(() => {
     const now = Date.now();
@@ -549,11 +558,19 @@ export default function QueuePage() {
             <p className="text-xs sm:text-sm text-muted-foreground">{t("queueSubtitle")}</p>
           </div>
         </div>
-        {canMutate && (
-          <Button type="button" onClick={() => setWalkInOpen(true)} size="sm" className="h-9">
-            <Plus className="size-4 me-1" /> {t("addWalkIn")}
+        <div className="flex items-center gap-2">
+          <Button asChild type="button" variant="outline" size="sm" className="h-9">
+            <Link to="/queue/audit"><ScrollText className="size-4 me-1" />{t("queueAuditLink")}</Link>
           </Button>
-        )}
+          <Button type="button" variant="outline" size="sm" className="h-9" onClick={() => setSettingsOpen(true)}>
+            <SettingsIcon className="size-4" />
+          </Button>
+          {canMutate && (
+            <Button type="button" onClick={() => setWalkInOpen(true)} size="sm" className="h-9">
+              <Plus className="size-4 me-1" /> {t("addWalkIn")}
+            </Button>
+          )}
+        </div>
       </header>
 
       {/* Mini analytics strip — today, current branch */}
@@ -892,6 +909,40 @@ export default function QueuePage() {
             <Button type="button" variant="ghost" onClick={() => setRoomValue("")}>{t("clearRoom")}</Button>
             <Button type="button" variant="outline" onClick={() => setRoomRow(null)}>{t("cancel")}</Button>
             <Button type="button" onClick={submitRoom} disabled={roomSaving}>{t("save")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Queue settings dialog (localStorage, per-branch) */}
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("queueSettings")}</DialogTitle>
+            <DialogDescription>{t("queueSettingsDesc")}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>{t("longWaitThresholdMin")}</Label>
+              <Input
+                type="number"
+                min={5}
+                max={240}
+                value={settings.longWaitMinutes}
+                onChange={(e) => setSettings({ ...settings, longWaitMinutes: Math.max(5, Math.min(240, Number(e.target.value) || 30)) })}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <Label className="font-normal">{t("defaultMyQueueLabel")}</Label>
+              <Switch checked={settings.defaultMyQueue} onCheckedChange={(v) => setSettings({ ...settings, defaultMyQueue: v })} />
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <Label className="font-normal">{t("showNoShowsInDefaultLabel")}</Label>
+              <Switch checked={settings.showNoShowsInDefault} onCheckedChange={(v) => setSettings({ ...settings, showNoShowsInDefault: v })} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setSettingsOpen(false)}>{t("cancel")}</Button>
+            <Button type="button" onClick={() => { setQueueSettings(currentBranchId, settings); toast.success(t("saved")); setSettingsOpen(false); }}>{t("save")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

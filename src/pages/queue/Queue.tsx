@@ -949,7 +949,17 @@ export default function QueuePage() {
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setSettingsOpen(false)}>{t("cancel")}</Button>
-            <Button type="button" onClick={() => { setQueueSettings(currentBranchId, settings); toast.success(t("saved")); setSettingsOpen(false); }}>{t("save")}</Button>
+            <Button
+              type="button"
+              disabled={savingSettings}
+              onClick={async () => {
+                setSavingSettings(true);
+                const res = await saveQueueSettings(currentBranchId, settings);
+                setSavingSettings(false);
+                if (!res.ok) toast.error(res.error ?? "Save failed");
+                else { toast.success(t("saved")); setSettingsOpen(false); }
+              }}
+            >{t("save")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -2038,6 +2038,11 @@ export const dict = {
     referenceFilter: "المريض / الموعد",
     referenceFilterPh: "ابحث بالاسم أو الكود أو المعرّف",
     scopeToCurrentBranch: "الفرع الحالي فقط",
+    // Phase 6
+    appointmentDetailTitle: "تفاصيل الموعد",
+    queueActionsHistory: "سجل عمليات الطابور",
+    openInAudit: "افتح في السجل",
+    loadMore: "تحميل المزيد",
   },
 } as const;
 

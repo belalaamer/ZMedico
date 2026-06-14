@@ -115,6 +115,20 @@ export function Topbar() {
   const time = now.toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US", { hour12: true });
   const initials = (user?.email ?? "U").slice(0, 2).toUpperCase();
 
+  // Defensive: Radix Select throws if any SelectItem has an empty-string value,
+  // and the controlled `value` must either be undefined or match an existing
+  // item. Filter out malformed branches and only feed Select a value we can
+  // resolve to a rendered item.
+  const safeBranches = (branches ?? []).filter(
+    (b): b is typeof b => !!b && typeof b.id === "string" && b.id.length > 0,
+  );
+  const branchValue =
+    currentBranchId && safeBranches.some((b) => b.id === currentBranchId)
+      ? currentBranchId
+      : undefined;
+  const branchLabel = (b: { name_en?: string | null; name_ar?: string | null }) =>
+    (lang === "ar" ? b.name_ar || b.name_en : b.name_en || b.name_ar) || "—";
+
   return (
     <header className="h-16 shrink-0 flex items-center gap-3 px-4 md:px-6 border-b border-border bg-card">
       <Button variant="ghost" size="icon" type="button" className="md:hidden" aria-label="Menu" onClick={() => setMobileOpen(true)}>
@@ -186,16 +200,27 @@ export function Topbar() {
         {time}
       </div>
 
-      <Select value={currentBranchId ?? undefined} onValueChange={setCurrentBranchId}>
-        <SelectTrigger className="w-[160px] hidden sm:flex">
-          <SelectValue placeholder={t("branch")} />
-        </SelectTrigger>
-        <SelectContent>
-          {branches.map((b) => (
-            <SelectItem key={b.id} value={b.id}>{lang === "ar" ? b.name_ar : b.name_en}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {safeBranches.length > 0 ? (
+        <Select value={branchValue} onValueChange={setCurrentBranchId}>
+          <SelectTrigger className="w-[160px] hidden sm:flex">
+            <SelectValue placeholder={t("branch")} />
+          </SelectTrigger>
+          <SelectContent>
+            {safeBranches.map((b) => (
+              <SelectItem key={b.id} value={b.id}>
+                {branchLabel(b)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : (
+        <div
+          className="w-[160px] hidden sm:flex items-center h-9 px-3 rounded-md border border-input bg-muted/40 text-sm text-muted-foreground truncate"
+          aria-label={t("branch")}
+        >
+          {t("branch")}
+        </div>
+      )}
 
       <Button variant="ghost" size="icon" type="button" onClick={() => setLang(lang === "ar" ? "en" : "ar")} title="Language">
         <Globe className="size-5" />

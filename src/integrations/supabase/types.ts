@@ -103,6 +103,7 @@ export type Database = {
       appointments: {
         Row: {
           branch_id: string | null
+          checked_in_at: string | null
           created_at: string
           deleted_at: string | null
           doctor_id: string | null
@@ -110,14 +111,17 @@ export type Database = {
           id: string
           notes: string | null
           patient_id: string
+          priority: number
           procedure: string | null
           room: string | null
           scheduled_at: string
+          started_at: string | null
           status: Database["public"]["Enums"]["appointment_status"]
           updated_at: string
         }
         Insert: {
           branch_id?: string | null
+          checked_in_at?: string | null
           created_at?: string
           deleted_at?: string | null
           doctor_id?: string | null
@@ -125,14 +129,17 @@ export type Database = {
           id?: string
           notes?: string | null
           patient_id: string
+          priority?: number
           procedure?: string | null
           room?: string | null
           scheduled_at: string
+          started_at?: string | null
           status?: Database["public"]["Enums"]["appointment_status"]
           updated_at?: string
         }
         Update: {
           branch_id?: string | null
+          checked_in_at?: string | null
           created_at?: string
           deleted_at?: string | null
           doctor_id?: string | null
@@ -140,9 +147,11 @@ export type Database = {
           id?: string
           notes?: string | null
           patient_id?: string
+          priority?: number
           procedure?: string | null
           room?: string | null
           scheduled_at?: string
+          started_at?: string | null
           status?: Database["public"]["Enums"]["appointment_status"]
           updated_at?: string
         }

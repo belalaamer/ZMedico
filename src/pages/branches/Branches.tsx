@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDataSync } from "@/lib/dataSync";
-import { Plus, Search, Pencil, Trash2, Building2, Star, MapPin } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Building2, Star, MapPin, ListChecks } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +19,7 @@ import LocationMap from "@/components/LocationMap";
 import { Slider } from "@/components/ui/slider";
 import { getCurrentLocation } from "@/lib/geo";
 import { Loader2 } from "lucide-react";
+import { fetchQueueSettings, saveQueueSettings, DEFAULT_QUEUE_SETTINGS, type QueueSettings } from "@/lib/queueSettings";
 
 type Branch = {
   id: string; name_ar: string; name_en: string; code: string | null;
@@ -51,6 +52,33 @@ export default function Branches() {
   const [locCenter, setLocCenter] = useState<{ lat: number; lon: number } | null>(null);
   const [locRadius, setLocRadius] = useState(100);
   const [locLoading, setLocLoading] = useState(false);
+  // Queue settings editor (Phase 8)
+  const [qsBranch, setQsBranch] = useState<Branch | null>(null);
+  const [qsValue, setQsValue] = useState<QueueSettings>(DEFAULT_QUEUE_SETTINGS);
+  const [qsLoading, setQsLoading] = useState(false);
+  const [qsSaving, setQsSaving] = useState(false);
+
+  const openQueueSettings = async (b: Branch) => {
+    setQsBranch(b);
+    setQsLoading(true);
+    setQsValue(DEFAULT_QUEUE_SETTINGS);
+    try {
+      const v = await fetchQueueSettings(b.id);
+      setQsValue(v);
+    } finally {
+      setQsLoading(false);
+    }
+  };
+
+  const saveQueueSettingsClick = async () => {
+    if (!qsBranch) return;
+    setQsSaving(true);
+    const res = await saveQueueSettings(qsBranch.id, qsValue);
+    setQsSaving(false);
+    if (!res.ok) { toast({ title: res.error ?? "Save failed", variant: "destructive" }); return; }
+    toast({ title: t("saved") });
+    setQsBranch(null);
+  };
 
   const load = async () => {
     const { data } = await supabase.from("branches").select("*").order("created_at");

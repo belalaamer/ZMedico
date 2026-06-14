@@ -1016,6 +1016,11 @@ export const dict = {
     referenceFilter: "Patient / appointment",
     referenceFilterPh: "Search by name, code, or ID",
     scopeToCurrentBranch: "Current branch only",
+    // Phase 6
+    appointmentDetailTitle: "Appointment",
+    queueActionsHistory: "Queue actions history",
+    openInAudit: "Open in audit",
+    loadMore: "Load more",
   },
   ar: {
     appName: "ZMedico",

@@ -388,6 +388,22 @@ export default function QueueAuditPage() {
             <input type="checkbox" checked={scopeBranch} onChange={(e) => setScopeBranch(e.target.checked)} />
             {t("scopeToCurrentBranch")}
           </label>
+          <div className="ms-3 flex items-center gap-1.5 flex-wrap">
+            <Bookmark className="size-3.5" />
+            <span>{lang === "ar" ? "إعدادات مسبقة:" : "Presets:"}</span>
+            {presets.length === 0 && <span className="opacity-60">—</span>}
+            {presets.map((p) => (
+              <span key={p.id} className="inline-flex items-center gap-0.5 rounded-full border bg-background ps-2 pe-0.5 py-0.5">
+                <button type="button" onClick={() => applyPreset(p.id)} className="hover:underline">{p.name}</button>
+                <button type="button" onClick={() => deletePreset(p.id)} className="text-muted-foreground hover:text-destructive p-0.5" aria-label="Delete preset">
+                  <X className="size-3" />
+                </button>
+              </span>
+            ))}
+            <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={savePresetPrompt}>
+              <BookmarkPlus className="size-3.5 me-1" />{lang === "ar" ? "حفظ" : "Save current"}
+            </Button>
+          </div>
           <span className="ms-auto">{filtered.length}</span>
         </div>
       </Card>

@@ -300,7 +300,7 @@ export default function QueueAuditPage() {
                     <td className="px-3 py-2 text-xs text-muted-foreground truncate max-w-[360px]">{summarizeDiff(r.old_values, r.new_values) || "—"}</td>
                     <td className="px-3 py-2 text-end">
                       {r.entity_id && (
-                        <Link to={`/calendar?appointment=${r.entity_id}`} className="text-primary inline-flex items-center gap-1 text-xs hover:underline">
+                        <Link to={`/appointments/${r.entity_id}`} className="text-primary inline-flex items-center gap-1 text-xs hover:underline">
                           <ExternalLink className="size-3.5" />
                         </Link>
                       )}
@@ -312,6 +312,13 @@ export default function QueueAuditPage() {
           </table>
         </div>
       </Card>
+      {hasMore && (
+        <div className="flex justify-center">
+          <Button type="button" variant="outline" size="sm" onClick={() => void loadMore()} disabled={loadingMore}>
+            {loadingMore ? "…" : t("loadMore")}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

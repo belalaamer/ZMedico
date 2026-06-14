@@ -120,6 +120,11 @@ export default function QueuePage() {
   const [roomRow, setRoomRow] = useState<QueueRow | null>(null);
   const [roomValue, setRoomValue] = useState<string>("");
   const [roomSaving, setRoomSaving] = useState(false);
+  // Per-branch policy settings (localStorage). Re-loaded on branch switch.
+  const [settings, setSettings] = useState<QueueSettings>(() => getQueueSettings(currentBranchId));
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const LONG_WAIT_MS = settings.longWaitMinutes * 60 * 1000;
+  useEffect(() => { setSettings(getQueueSettings(currentBranchId)); }, [currentBranchId]);
 
   // 30s tick so waiting/in-session timers re-render without per-row intervals.
   useEffect(() => {

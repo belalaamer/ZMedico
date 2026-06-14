@@ -1125,7 +1125,13 @@ export default function CalendarPage() {
                             </SelectContent>
                           </Select>
                         </div>
-                        <div className="text-sm font-medium break-words leading-snug mt-0.5">{fullName(p)}</div>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/appointments/${a.id}`)}
+                          className="text-sm font-medium break-words leading-snug mt-0.5 text-start hover:underline"
+                        >
+                          {fullName(p)}
+                        </button>
                         <div className="text-[11px] text-muted-foreground truncate">{a.procedure || "—"}</div>
                         <div className="flex items-center gap-1 mt-1 -ms-1">
                           {nextStatus(a.status) && (

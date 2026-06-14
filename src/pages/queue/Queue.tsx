@@ -344,10 +344,24 @@ export default function QueuePage() {
       is_walk_in: true,
       ...patch,
     };
-    const { error } = await supabase.from("appointments").insert(payload);
+    const { data: ins, error } = await supabase.from("appointments").insert(payload).select("id").single();
     setWalkInSaving(false);
     if (error) { toast.error(error.message); return; }
     toast.success(t("walkInCreated"));
+    if (ins?.id) {
+      void logQueueAudit({
+        action: "walk_in_created",
+        appointmentId: ins.id,
+        branchId: currentBranchId ?? null,
+        newValues: {
+          status: payload.status,
+          doctor_id: payload.doctor_id,
+          room: payload.room,
+          is_walk_in: true,
+          checked_in_at: payload.checked_in_at,
+        },
+      });
+    }
     setWalkInOpen(false);
     setWalkInPatient(""); setWalkInDoctor(""); setWalkInRoom(""); setWalkInProcedure("");
     load();
@@ -400,6 +414,12 @@ export default function QueuePage() {
     }
     if (recordId) navigate(`/medical/consultation/${recordId}`);
     else navigate(`/patients/${r.patient_id}?tab=clinical`);
+    void logQueueAudit({
+      action: "consultation_opened",
+      appointmentId: r.id,
+      branchId: r.branch_id,
+      newValues: { status: "in_progress" },
+    });
   };
 
   // No-show follow-up helpers
@@ -408,6 +428,61 @@ export default function QueuePage() {
     updateRow(r.id, buildStatusPatch("confirmed", { checked_in_at: null, started_at: null }));
   const moveBackToWaiting = (r: QueueRow) =>
     updateRow(r.id, buildStatusPatch("scheduled", { checked_in_at: r.checked_in_at, started_at: r.started_at }));
+
+  // ---- Reassign doctor
+  const openReassign = (r: QueueRow) => {
+    setReassignRow(r);
+    setReassignDoctor(r.doctor_id ?? "");
+  };
+  const submitReassign = async () => {
+    if (!reassignRow) return;
+    if (!canMutate) { toast.error(lang === "ar" ? "غير مسموح" : "Not allowed"); return; }
+    const r = reassignRow;
+    const next = reassignDoctor || null;
+    if (next === (r.doctor_id ?? null)) { setReassignRow(null); return; }
+    setReassignSaving(true);
+    // Status + timestamps intentionally untouched — only the assignee changes.
+    const { error } = await supabase.from("appointments").update({ doctor_id: next } as any).eq("id", r.id);
+    setReassignSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("saved"));
+    void logQueueAudit({
+      action: "doctor_reassigned",
+      appointmentId: r.id,
+      branchId: r.branch_id,
+      oldValues: { doctor_id: r.doctor_id },
+      newValues: { doctor_id: next },
+    });
+    setReassignRow(null);
+    load();
+  };
+
+  // ---- Assign / change room
+  const openRoom = (r: QueueRow) => {
+    setRoomRow(r);
+    setRoomValue(r.room ?? "");
+  };
+  const submitRoom = async () => {
+    if (!roomRow) return;
+    if (!canMutate) { toast.error(lang === "ar" ? "غير مسموح" : "Not allowed"); return; }
+    const r = roomRow;
+    const next = roomValue.trim() ? roomValue.trim() : null;
+    if (next === (r.room ?? null)) { setRoomRow(null); return; }
+    setRoomSaving(true);
+    const { error } = await supabase.from("appointments").update({ room: next } as any).eq("id", r.id);
+    setRoomSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("saved"));
+    void logQueueAudit({
+      action: "room_assigned",
+      appointmentId: r.id,
+      branchId: r.branch_id,
+      oldValues: { room: r.room },
+      newValues: { room: next },
+    });
+    setRoomRow(null);
+    load();
+  };
 
   const renderActions = (r: QueueRow) => {
     const items: { label: string; icon?: React.ReactNode; onClick: () => void }[] = [];

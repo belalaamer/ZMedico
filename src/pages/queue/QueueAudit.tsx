@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ListSkeleton } from "@/components/ListSkeleton";
-import { ArrowLeft, Download, ScrollText, ExternalLink } from "lucide-react";
+import { ArrowLeft, Download, ScrollText, ExternalLink, BookmarkPlus, Bookmark, X } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,6 +23,30 @@ const QUEUE_ACTIONS = [
 type QAction = typeof QUEUE_ACTIONS[number];
 
 const SAFE_KEYS = ["status", "doctor_id", "room", "priority", "is_walk_in", "checked_in_at", "started_at"];
+
+// --- Audit filter presets (Phase 8) -------------------------------------------
+// Persist common filter combinations per branch in localStorage so frontdesk
+// staff can recall the same export shape (e.g. "Today's no-shows by Dr. X")
+// without re-typing filters every time. Branch / dates intentionally excluded
+// from the saved shape — branch comes from the active context, dates are
+// usually "now"-relative and would be misleading if restored verbatim.
+type AuditPreset = {
+  id: string;
+  name: string;
+  action: "all" | string;
+  userId: string; // "all" or uuid
+  ref: string;
+  scopeBranch: boolean;
+};
+const PRESETS_KEY = (branchId?: string | null) => `zmedico.auditPresets.${branchId ?? "global"}`;
+function loadPresets(branchId?: string | null): AuditPreset[] {
+  if (typeof window === "undefined") return [];
+  try { return JSON.parse(window.localStorage.getItem(PRESETS_KEY(branchId)) || "[]"); } catch { return []; }
+}
+function savePresets(branchId: string | null | undefined, list: AuditPreset[]) {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.setItem(PRESETS_KEY(branchId), JSON.stringify(list.slice(0, 20))); } catch { /* ignore */ }
+}
 
 type LogRow = {
   id: string;
@@ -79,6 +103,32 @@ export default function QueueAuditPage() {
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [patients, setPatients] = useState<Record<string, { name: string; code: number }>>({});
   const [exportingAll, setExportingAll] = useState(false);
+  const [presets, setPresets] = useState<AuditPreset[]>(() => loadPresets(currentBranchId));
+  useEffect(() => { setPresets(loadPresets(currentBranchId)); }, [currentBranchId]);
+
+  const applyPreset = (id: string) => {
+    const p = presets.find((x) => x.id === id);
+    if (!p) return;
+    setActionFilter(p.action as any);
+    setUserFilter(p.userId);
+    setRefFilter(p.ref);
+    setScopeBranch(p.scopeBranch);
+  };
+  const savePresetPrompt = () => {
+    const name = window.prompt(lang === "ar" ? "اسم الإعداد المسبق" : "Preset name");
+    if (!name || !name.trim()) return;
+    const next: AuditPreset[] = [
+      ...presets,
+      { id: crypto.randomUUID(), name: name.trim(), action: actionFilter, userId: userFilter, ref: refFilter, scopeBranch },
+    ];
+    setPresets(next);
+    savePresets(currentBranchId, next);
+  };
+  const deletePreset = (id: string) => {
+    const next = presets.filter((p) => p.id !== id);
+    setPresets(next);
+    savePresets(currentBranchId, next);
+  };
 
   const PAGE_SIZE = 200;
 
@@ -338,6 +388,22 @@ export default function QueueAuditPage() {
             <input type="checkbox" checked={scopeBranch} onChange={(e) => setScopeBranch(e.target.checked)} />
             {t("scopeToCurrentBranch")}
           </label>
+          <div className="ms-3 flex items-center gap-1.5 flex-wrap">
+            <Bookmark className="size-3.5" />
+            <span>{lang === "ar" ? "إعدادات مسبقة:" : "Presets:"}</span>
+            {presets.length === 0 && <span className="opacity-60">—</span>}
+            {presets.map((p) => (
+              <span key={p.id} className="inline-flex items-center gap-0.5 rounded-full border bg-background ps-2 pe-0.5 py-0.5">
+                <button type="button" onClick={() => applyPreset(p.id)} className="hover:underline">{p.name}</button>
+                <button type="button" onClick={() => deletePreset(p.id)} className="text-muted-foreground hover:text-destructive p-0.5" aria-label="Delete preset">
+                  <X className="size-3" />
+                </button>
+              </span>
+            ))}
+            <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={savePresetPrompt}>
+              <BookmarkPlus className="size-3.5 me-1" />{lang === "ar" ? "حفظ" : "Save current"}
+            </Button>
+          </div>
           <span className="ms-auto">{filtered.length}</span>
         </div>
       </Card>

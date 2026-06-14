@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDataSync } from "@/lib/dataSync";
-import { Plus, Search, Pencil, Trash2, Building2, Star, MapPin } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Building2, Star, MapPin, ListChecks } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +19,7 @@ import LocationMap from "@/components/LocationMap";
 import { Slider } from "@/components/ui/slider";
 import { getCurrentLocation } from "@/lib/geo";
 import { Loader2 } from "lucide-react";
+import { fetchQueueSettings, saveQueueSettings, DEFAULT_QUEUE_SETTINGS, type QueueSettings } from "@/lib/queueSettings";
 
 type Branch = {
   id: string; name_ar: string; name_en: string; code: string | null;
@@ -51,6 +52,33 @@ export default function Branches() {
   const [locCenter, setLocCenter] = useState<{ lat: number; lon: number } | null>(null);
   const [locRadius, setLocRadius] = useState(100);
   const [locLoading, setLocLoading] = useState(false);
+  // Queue settings editor (Phase 8)
+  const [qsBranch, setQsBranch] = useState<Branch | null>(null);
+  const [qsValue, setQsValue] = useState<QueueSettings>(DEFAULT_QUEUE_SETTINGS);
+  const [qsLoading, setQsLoading] = useState(false);
+  const [qsSaving, setQsSaving] = useState(false);
+
+  const openQueueSettings = async (b: Branch) => {
+    setQsBranch(b);
+    setQsLoading(true);
+    setQsValue(DEFAULT_QUEUE_SETTINGS);
+    try {
+      const v = await fetchQueueSettings(b.id);
+      setQsValue(v);
+    } finally {
+      setQsLoading(false);
+    }
+  };
+
+  const saveQueueSettingsClick = async () => {
+    if (!qsBranch) return;
+    setQsSaving(true);
+    const res = await saveQueueSettings(qsBranch.id, qsValue);
+    setQsSaving(false);
+    if (!res.ok) { toast({ title: res.error ?? "Save failed", variant: "destructive" }); return; }
+    toast({ title: t("saved") });
+    setQsBranch(null);
+  };
 
   const load = async () => {
     const { data } = await supabase.from("branches").select("*").order("created_at");
@@ -278,6 +306,9 @@ export default function Branches() {
                       <Button size="icon" variant="ghost" onClick={() => openLocation(b)} title={t("setLocation")}>
                         <MapPin className={`size-4 ${b.allowed_latitude ? "text-emerald-600" : "text-muted-foreground"}`} />
                       </Button>
+                      <Button size="icon" variant="ghost" onClick={() => openQueueSettings(b)} title={t("queueSettings")}>
+                        <ListChecks className="size-4" />
+                      </Button>
                       <Button size="icon" variant="ghost" onClick={() => openEdit(b)}><Pencil className="size-4" /></Button>
                       <Button size="icon" variant="ghost" onClick={() => setDelId(b.id)}><Trash2 className="size-4 text-destructive" /></Button>
                     </div>
@@ -336,6 +367,47 @@ export default function Branches() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setLocBranch(null)}>{t("cancel")}</Button>
             <Button onClick={saveLocation}>{t("save")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!qsBranch} onOpenChange={(o) => !o && setQsBranch(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ListChecks className="size-5 text-primary" />
+              {t("queueSettings")} — {qsBranch ? (lang === "ar" ? qsBranch.name_ar : qsBranch.name_en) : ""}
+            </DialogTitle>
+          </DialogHeader>
+          {qsLoading ? (
+            <div className="py-6 text-center text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin inline me-2" />…</div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label>{t("longWaitThresholdMin")}</Label>
+                <Input
+                  type="number"
+                  min={5}
+                  max={240}
+                  value={qsValue.longWaitMinutes}
+                  onChange={(e) => setQsValue({ ...qsValue, longWaitMinutes: Math.max(5, Math.min(240, Number(e.target.value) || 30)) })}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-md border p-3">
+                <Label className="font-normal">{t("defaultMyQueueLabel")}</Label>
+                <Switch checked={qsValue.defaultMyQueue} onCheckedChange={(v) => setQsValue({ ...qsValue, defaultMyQueue: v })} />
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-md border p-3">
+                <Label className="font-normal">{t("showNoShowsInDefaultLabel")}</Label>
+                <Switch checked={qsValue.showNoShowsInDefault} onCheckedChange={(v) => setQsValue({ ...qsValue, showNoShowsInDefault: v })} />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQsBranch(null)}>{t("cancel")}</Button>
+            <Button onClick={saveQueueSettingsClick} disabled={qsSaving || qsLoading}>
+              {qsSaving ? <Loader2 className="size-4 animate-spin me-1" /> : null}{t("save")}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

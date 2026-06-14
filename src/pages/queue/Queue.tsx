@@ -547,6 +547,78 @@ export default function QueuePage() {
           })
         )}
       </div>
+
+      {/* Walk-in dialog */}
+      <Dialog open={walkInOpen} onOpenChange={setWalkInOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("newWalkInTitle")}</DialogTitle>
+            <DialogDescription>{t("newWalkInDesc")}</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={submitWalkIn} className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>{t("selectPatient")}</Label>
+              <Combobox
+                options={patientOptions.map((p) => ({
+                  value: p.id,
+                  label: `${patientDisplay(p)} · #${p.patient_code}`,
+                  keywords: `${p.first_name_en} ${p.last_name_en ?? ""} ${p.first_name_ar ?? ""} ${p.last_name_ar ?? ""} ${p.phone ?? ""} ${p.patient_code}`,
+                }))}
+                value={walkInPatient}
+                onChange={setWalkInPatient}
+                placeholder={t("selectPatient")}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>{t("selectDoctorOptional")}</Label>
+              <Combobox
+                options={[{ value: "", label: "—" }, ...doctors.map((d) => ({ value: d.id, label: d.full_name }))]}
+                value={walkInDoctor}
+                onChange={setWalkInDoctor}
+                placeholder={t("selectDoctorOptional")}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1.5">
+                <Label>{t("roomOptional")}</Label>
+                <Input value={walkInRoom} onChange={(e) => setWalkInRoom(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t("procedureOptional")}</Label>
+                <Input value={walkInProcedure} onChange={(e) => setWalkInProcedure(e.target.value)} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setWalkInOpen(false)}>{t("cancel")}</Button>
+              <Button type="submit" disabled={walkInSaving || !walkInPatient}>{t("save")}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+function StatCard({
+  icon, label, value, tone,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number | string;
+  tone?: "primary" | "emerald" | "amber" | "destructive";
+}) {
+  const toneCls =
+    tone === "primary"     ? "text-primary"
+  : tone === "emerald"     ? "text-emerald-600 dark:text-emerald-400"
+  : tone === "amber"       ? "text-amber-600 dark:text-amber-400"
+  : tone === "destructive" ? "text-destructive"
+  : "text-foreground";
+  return (
+    <Card className="p-3">
+      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+        {icon}<span className="truncate">{label}</span>
+      </div>
+      <div className={cn("mt-1 text-xl font-semibold tabular-nums", toneCls)}>{value}</div>
+    </Card>
   );
 }

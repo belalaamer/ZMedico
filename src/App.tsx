@@ -21,6 +21,7 @@ const Dashboard = lazy(() => import("@/pages/dashboard/Dashboard"));
 const PatientsPage = lazy(() => import("@/pages/patients/Patients"));
 const PatientProfile = lazy(() => import("@/pages/patients/PatientProfile"));
 const CalendarPage = lazy(() => import("@/pages/calendar/CalendarPage"));
+const QueuePage = lazy(() => import("@/pages/queue/Queue"));
 const Invoices = lazy(() => import("@/pages/invoices/Invoices"));
 const InvoiceDetail = lazy(() => import("@/pages/invoices/InvoiceDetail"));
 const OutstandingDebts = lazy(() => import("@/pages/invoices/OutstandingDebts"));
@@ -133,6 +134,7 @@ function AppContent() {
               <Route path="/patients" element={<PermissionRoute><PatientsPage /></PermissionRoute>} />
               <Route path="/patients/:id" element={<PermissionRoute><PatientProfile /></PermissionRoute>} />
               <Route path="/calendar" element={<PermissionRoute><CalendarPage /></PermissionRoute>} />
+              <Route path="/queue" element={<PermissionRoute><QueuePage /></PermissionRoute>} />
               <Route path="/invoices" element={<PermissionRoute><Invoices /></PermissionRoute>} />
               <Route path="/invoices/outstanding" element={<PermissionRoute><OutstandingDebts /></PermissionRoute>} />
               <Route path="/invoices/:id" element={<PermissionRoute><InvoiceDetail /></PermissionRoute>} />

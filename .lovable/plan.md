@@ -1,142 +1,123 @@
+# Queue / Front Desk Workflow — Phase 1
 
-# Global Search 2.0 — v1 Analysis & Plan (no code yet)
+## Current state
 
-## 1. Current state
+- No dedicated Queue page exists. Day-to-day appointment work happens in `src/pages/calendar/CalendarPage.tsx`.
+- `appointments.status` already has the right enum: `scheduled`, `confirmed`, `in_progress`, `completed`, `cancelled`, `no_show`, `departed`. We will **reuse it**, no enum change.
+- `appointments` has `scheduled_at`, `duration_minutes`, `doctor_id`, `branch_id`, `room`, but **no `checked_in_at`, no `started_at`, no priority**.
+- Accurate "waiting time since check-in" and "in-session time since start" cannot be derived from existing columns (`updated_at` changes on any edit and is not reliable). The user said schema changes are allowed only if absolutely necessary — they are necessary here, but the change is minimal and additive.
 
-### Search entry point
-- `src/components/layout/Topbar.tsx` already renders a search `Input` (desktop, line 159) and a mobile sheet variant (lines 161-183). **Both are visually present but wired to nothing** — no state, no handler, no results dropdown. This is the natural mounting point for v1.
+## Proposed scope
 
-### How each module currently "searches"
-All list pages load up to N rows from Supabase, then filter **client-side** by `.toLowerCase().includes(query)`. There is no server-side text search and no shared search service.
+### 1) Minimal additive schema (one migration)
 
-| Module | File | Loaded fields used for matching | Notes |
-|---|---|---|---|
-| Patients | `src/pages/patients/Patients.tsx` (line 126) | `first_name_en`, `last_name_en`, `first_name_ar`, `last_name_ar`, `phone`, `email` | Also displays `patient_code` (numeric, not matched) |
-| Invoices | `src/pages/invoices/Invoices.tsx` (line 75) | `invoice_number` + joined patient name | `patient_code` shown but not matched |
-| Payments | `src/pages/payments/Payments.tsx` | joined patient + invoice number for display | No text filter input today |
-| Appointments / Calendar | `src/pages/calendar/CalendarPage.tsx` | filters by doctor / room / status only | No free-text search |
-| Medical records | `src/pages/medical/MedicalRecords.tsx` | patient name + `patient_code` | Client-side |
-| Prescriptions | `src/pages/medical/Prescriptions.tsx` (line 40) | patient name + `patient_code` | Client-side |
-| Staff | `src/pages/hr/Staff.tsx` | (no search currently) | Profiles + staff_profiles |
+Add to `public.appointments`:
+- `checked_in_at timestamptz NULL`
+- `started_at timestamptz NULL`
+- `priority smallint NOT NULL DEFAULT 0` (`0` normal, `1` urgent)
 
-### Best search keys per entity (v1 target)
-- **patients**: `first_name_en/ar`, `last_name_en/ar`, `phone`, `phone2`, `email`, `patient_code` (numeric exact)
-- **invoices**: `invoice_number`, joined `patients` name + `patient_code`
-- **payments**: joined `invoices.invoice_number`, joined `patients` name/code, `amount` (NICE)
-- **appointments**: joined `patients` name/code, `procedure`, `room`
-- **medical records**: joined `patients` name/code, `visit_date` (NICE)
-- **prescriptions**: joined `patients` name/code, `prescription_number` if present
-- **staff**: `profiles.full_name`, `staff_profiles.employee_id`, `staff_profiles.phone`
+No enum change, no RLS change, no rename, no drop. Existing rows unaffected (NULL / 0 defaults).
 
-## 2. Gaps / UX issues
-- The Topbar search box is **decorative only**.
-- Even the per-page filters only see the locally-loaded page of rows (typically 50–200), so users cannot find older records by name without paginating manually.
-- Arabic users can search Arabic names on Patients/Invoices but not on Payments/Appointments/Records consistently.
-- No way to jump straight from anywhere in the app to a specific patient or invoice by typing `#1234` or part of a phone.
+Status → timestamp mapping handled in the app layer:
+- transition to `confirmed` ("Checked in") → stamp `checked_in_at = now()` if NULL
+- transition to `in_progress` ("With doctor") → stamp `started_at = now()` if NULL
+- backward transitions never clear stamps
 
-## 3. Proposed Global Search v1
+### 2) New page: `/queue` (Front Desk)
 
-A single command-palette-style popover anchored to the Topbar input, querying Supabase per entity with `.or(... ilike ...)` filters, capped at small limits, grouped by entity, keyboard-navigable, click-to-navigate.
+File: `src/pages/queue/Queue.tsx`, route added in `src/App.tsx`, sidebar link in `src/components/layout/Sidebar.tsx` (Arabic: "الطابور" / English: "Queue").
 
-### UX
-```text
-┌──────── Topbar search ───────────────────────────────┐
-│ 🔎  ahmad                                   ⌘K       │
-└──────────────────────────────────────────────────────┘
-  ┌─ Popover (max-h-[70vh], scroll) ───────────────────┐
-  │ Patients (3)                                       │
-  │   • Ahmad Ali   #1024   +20 100 …                  │
-  │   • Ahmad Hassan #1156  +20 122 …                  │
-  │ Invoices (2)                                       │
-  │   • INV-2026-0312  Ahmad Ali   1,200 EGP  pending  │
-  │ Appointments today/upcoming (1)                    │
-  │   • Tue 16 Jun · 10:30 · Ahmad Ali · Dr. Hany      │
-  │ Medical records (1) · Prescriptions (0)            │
-  │ Staff (0)                                          │
-  │ ──                                                 │
-  │ Press ↵ to open · Esc to close                     │
-  └────────────────────────────────────────────────────┘
-```
+**Status mapping (no new enum):**
 
-### Behavior
-- Trigger: typing in the existing Topbar input opens the popover; `⌘K` / `Ctrl+K` focuses it; `Esc` closes; `↑/↓/Enter` navigate results.
-- Debounce 250 ms, min query length **2** (or **1** when input is purely digits — to support `#1024` patient/invoice codes).
-- Parallel queries with `Promise.all`, each capped at `limit(5)` per entity, total ≤ ~35 rows.
-- Branch scope: respect `currentBranchId` from `BranchContext` (same convention as list pages); fall back to all branches when none selected (matches existing pattern).
-- Empty groups hidden; "No results" state when all groups empty.
-- Permission filter: hide a group entirely if `usePermissions()` says the current user lacks `view` on that module (e.g. hide Payments group for non-finance users).
+| UI label    | DB status      |
+|-------------|----------------|
+| Waiting     | `scheduled`    |
+| Checked in  | `confirmed`    |
+| With doctor | `in_progress`  |
+| Completed   | `completed`    |
+| Cancelled   | `cancelled`    |
+| No-show     | `no_show`      |
 
-### Per-entity Supabase query shape (no schema changes)
-- patients
-  ```ts
-  .from("patients")
-    .select("id,patient_code,first_name_en,last_name_en,first_name_ar,last_name_ar,phone,phone2,email")
-    .is("deleted_at", null)
-    .or([
-      `first_name_en.ilike.%${q}%`,
-      `last_name_en.ilike.%${q}%`,
-      `first_name_ar.ilike.%${q}%`,
-      `last_name_ar.ilike.%${q}%`,
-      `phone.ilike.%${q}%`,
-      `phone2.ilike.%${q}%`,
-      `email.ilike.%${q}%`,
-      ...(digitsOnly ? [`patient_code.eq.${q}`] : []),
-    ].join(","))
-    .limit(5)
-  ```
-- invoices: `.or("invoice_number.ilike.%q%")` + a name-based sub-query via embedded patient (or two parallel queries unioned client-side: one on `invoice_number`, one on joined patient name through a server-side view IS NOT needed — use PostgREST's `.or(...)` with `patients!inner(...)` filter via `patients.first_name_en.ilike.*` syntax).
-- payments: by joined `patients` name/code and joined `invoices.invoice_number`.
-- appointments: scope to `scheduled_at >= today - 7d` to keep it relevant; match joined patient.
-- medical_records, prescriptions, staff: analogous joined-patient/profile filters.
-- All reads rely on **existing RLS** — no policy changes.
+`departed` is treated as "Completed" for queue purposes (filtered out of the active queue by default).
 
-### Navigation targets
-- Patient → `/patients/:id`
-- Invoice → `/invoices/:id`
-- Payment → `/payments?focus=:id` (or `/invoices/:invoice_id`)
-- Appointment → `/calendar?date=YYYY-MM-DD&appt=:id` (already supported by `CalendarPage` per existing `?appt=` handler)
-- Medical record → `/medical/records/:id`
-- Prescription → `/medical/prescriptions/:id`
-- Staff → `/hr/staff/:id`
+**Default scope:** today's appointments for `currentBranchId`, active statuses (`scheduled`, `confirmed`, `in_progress`) shown by default; `completed`, `cancelled`, `no_show` available via status filter.
 
-## 4. Files to touch
+**Columns (desktop table) / fields (mobile card):**
+- Patient (name + code, click → `/patients/:id`)
+- Appointment time (`scheduled_at`)
+- Check-in time (`checked_in_at` or `—`)
+- Doctor + room
+- Status badge (semantic colors already in `index.css` via `status-*` classes)
+- Priority badge if `priority = 1`
+- Waiting time (live, see §3)
+- In-session time (live, see §3)
+- Row actions (see §4)
 
-| File | Change | MUST/NICE |
-|---|---|---|
-| `src/components/layout/Topbar.tsx` | Replace inert search `Input` with a `<GlobalSearch />` trigger that opens the popover; wire `⌘K` shortcut. | MUST |
-| `src/components/search/GlobalSearch.tsx` *(new)* | Popover + debounced state + result groups + keyboard nav + navigate-on-select. Reuses shadcn `Command` primitives already in `src/components/ui/command.tsx`. | MUST |
-| `src/lib/globalSearch.ts` *(new)* | Pure functions: one per entity returning `{ id, label, sub, to }[]` from Supabase; honours `branchId`. No new state library, no React in this file. | MUST |
-| `src/lib/i18n.ts` | Add a handful of keys: `searchPlaceholder`, `noResults`, group labels (`resultsPatients`, etc.). | MUST |
-| `src/components/layout/Topbar.tsx` (mobile sheet) | Mobile variant: same component opened full-width. | MUST |
+**Filters (sticky header):**
+- Status (multi or single select)
+- Doctor (reuse existing doctor list pattern from CalendarPage)
+- Priority (all / urgent only)
+- Default sort: `checked_in_at` ascending, then `scheduled_at` ascending; urgent items pinned to top within their group.
 
-No edits to: schema, RLS, migrations, sidebar, wallet, treasury, audit, automated comm, inventory, HR business logic, insurance.
+**Empty / overload states:**
+- Empty: "لا يوجد مرضى في الطابور" / "No patients in the queue".
+- Overload hint: small inline banner above the list when ≥1 waiting > 30 min: "X مرضى ينتظرون أكثر من 30 دقيقة" / "X patients waiting > 30 min".
 
-## 5. MUST vs NICE
+### 3) Time computations (client-side, 30 s tick)
 
-### MUST (v1)
-- Functional Topbar search box opening a grouped popover.
-- Live server-side search across: patients, invoices, payments, appointments (last 7 + future), medical records, prescriptions, staff.
-- Bilingual (EN + AR) matching for entities that store both name variants.
-- Branch scope respected; permission-based group hiding.
-- Click result → navigate to the right page; Enter on highlighted row works.
-- `Esc` to close, debounce 250 ms, per-entity `limit(5)`.
+- `waitingMs = now − checked_in_at` while status ∈ {`confirmed`}
+- `inSessionMs = now − started_at` while status = `in_progress`
+- Long-wait highlight: subtle amber row tint when `waitingMs > 30 min`.
+- A single `useEffect` interval (30 s) drives a `tick` state so all rows re-render without per-row timers.
 
-### NICE (later)
-- `⌘K` global keyboard shortcut and `↑/↓/Enter` navigation polish.
-- Recent searches (localStorage, last 5).
-- Fuzzy ranking / typo tolerance (would need Postgres `pg_trgm` extension and a SECURITY DEFINER RPC).
-- "Search in this module" scoped mode.
-- Inline status/amount badges (pending invoice in red, etc.).
-- Full-page `/search?q=` results view when popover is too narrow.
-- Phone number normalization (strip spaces/dashes before `ilike`).
-- Caching of frequent searches in React Query.
+### 4) Row actions (uses existing `RowActions` component)
 
-## 6. Verification checklist (after build, when approved)
-- Typing `ahm` shows matching patients across Arabic and English names within 300 ms.
-- Typing `#1024` or `1024` jumps straight to patient code `1024` (when digits-only mode activates).
-- Typing an invoice number returns the invoice and clicking it opens `/invoices/:id`.
-- Branch switch re-scopes results.
-- A non-finance user does not see the Payments group.
-- `Esc` closes; clicking outside closes; selecting a result navigates and closes.
+Available actions depend on current status:
 
-Awaiting approval to implement v1.
+| From         | Actions shown                                        |
+|--------------|------------------------------------------------------|
+| scheduled    | Check in · Start visit · Mark no-show · Cancel · Open patient · Toggle urgent |
+| confirmed    | Start visit · Cancel · Mark no-show · Open patient · Toggle urgent           |
+| in_progress  | Complete · Open patient · Toggle urgent                                       |
+| completed    | Open patient                                                                  |
+| cancelled / no_show | Open patient · Reopen (→ `scheduled`)                                 |
+
+All actions are single Supabase updates on `appointments`; "Check in" and "Start visit" also stamp the corresponding timestamp when null. Toasts use existing `sonner` pattern.
+
+### 5) Realtime + sync
+
+Subscribe to `appointments` `postgres_changes` for the current branch (same pattern as `Sidebar.tsx`'s alerts channel, with a unique channel name per mount: `queue-${random}`) to keep the list live across reception devices. Listeners attached **before** `.subscribe()`.
+
+### 6) i18n
+
+Add the small set of new keys to `src/lib/i18n.ts` (`queue`, `waitingTime`, `inSessionTime`, `checkIn`, `startVisit`, `markNoShow`, `cancelVisit`, `togglePriority`, `urgent`, `noPatientsInQueue`, `longWaitBanner`). All other labels reuse existing status keys already present in `CalendarPage`.
+
+### 7) Constraints respected
+
+- `CalendarPage.tsx` is **not modified** in Phase 1 — appointments flow untouched.
+- No RLS, no policy, no enum, no rename.
+- Desktop-first table, collapses to stacked cards on `sm:` and below.
+- Uses existing design tokens (`status-*`, `bg-card`, `text-muted-foreground`, etc.) — no hard-coded colors.
+
+## Files
+
+**New**
+- `src/pages/queue/Queue.tsx` — page
+- `supabase/migrations/<ts>_queue_workflow.sql` — adds 3 columns
+
+**Edited**
+- `src/App.tsx` — `/queue` route under `ProtectedRoute` + `PermissionRoute` (reusing `appointments` permission key)
+- `src/components/layout/Sidebar.tsx` — nav entry
+- `src/lib/i18n.ts` — new keys (EN + AR)
+
+## Out of scope (Phase 2)
+
+- Linking queue row to "Start consultation" screen / medical record editor.
+- Auto-creating queue entries for walk-ins without an appointment.
+- Per-doctor waiting analytics / dashboard widgets.
+- Push/SMS notifications when patient is called.
+
+## Deliverables on completion
+
+- Working `/queue` screen with all six statuses, fast row actions, live waiting/in-session timers, sticky filters, mobile cards, empty + overload states.
+- Implementation note: status mapping table, timer formula, the 3 added columns and why they were necessary.

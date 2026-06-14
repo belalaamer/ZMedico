@@ -1965,6 +1965,16 @@ export const dict = {
     queueNoShowToday: "تغيّبوا",
     queueAvgWait: "متوسط الانتظار",
     walkInCreated: "تمت إضافة المراجع",
+    // Phase 3
+    queueViewLabel: "العرض",
+    queueViewMine: "طابوري",
+    roomFilter: "الغرفة",
+    allRooms: "كل الغرف",
+    noShowsTodayChip: "تغيّبات اليوم",
+    recallPatient: "استدعاء المريض",
+    moveBackToWaiting: "إعادة للانتظار",
+    openConsultation: "فتح الكشف",
+    queueLongestWait: "أطول انتظار",
   },
 } as const;
 

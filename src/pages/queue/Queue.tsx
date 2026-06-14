@@ -189,11 +189,12 @@ export default function QueuePage() {
   // on first load. They can switch to All freely afterwards (we don't re-apply).
   useEffect(() => {
     if (doctorDefaultApplied || !user?.id || doctors.length === 0) return;
+    if (!settings.defaultMyQueue) { setDoctorDefaultApplied(true); return; }
     if (doctors.some((d) => d.id === user.id)) {
       setDoctorFilter(user.id);
     }
     setDoctorDefaultApplied(true);
-  }, [user?.id, doctors, doctorDefaultApplied]);
+  }, [user?.id, doctors, doctorDefaultApplied, settings.defaultMyQueue]);
 
   const isDoctorUser = !!user?.id && doctors.some((d) => d.id === user.id);
 
@@ -233,7 +234,9 @@ export default function QueuePage() {
       : `${p.first_name_en} ${p.last_name_en ?? ""}`.trim();
 
   const filtered = useMemo(() => {
-    const ACTIVE: ApptStatus[] = ["scheduled", "confirmed", "in_progress"];
+    const ACTIVE: ApptStatus[] = settings.showNoShowsInDefault
+      ? ["scheduled", "confirmed", "in_progress", "no_show"]
+      : ["scheduled", "confirmed", "in_progress"];
     let list = rows.filter((r) => {
       if (statusFilter === "active") return ACTIVE.includes(r.status);
       if (statusFilter === "all") return true;
@@ -253,7 +256,7 @@ export default function QueuePage() {
       return new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime();
     });
     return list;
-  }, [rows, statusFilter, doctorFilter, urgentOnly]);
+  }, [rows, statusFilter, doctorFilter, urgentOnly, roomFilter, settings.showNoShowsInDefault]);
 
   const longWaitCount = useMemo(() => {
     const now = Date.now();

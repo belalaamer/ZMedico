@@ -14,6 +14,7 @@ import { AlertTriangle, CheckCircle2, Clock, Flag, ListChecks, Play, UserPlus, X
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -85,6 +86,7 @@ function uiStatusLabel(s: ApptStatus, t: (k: any) => string) {
 export default function QueuePage() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { can } = usePermissions();
   // Queue mutations are gated behind appointments:update. Users without it
@@ -95,6 +97,9 @@ export default function QueuePage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<"active" | "all" | ApptStatus>("active");
   const [doctorFilter, setDoctorFilter] = useState<string>("all");
+  const [roomFilter, setRoomFilter] = useState<string>("all");
+  // remembers whether we've auto-defaulted the view for this doctor session
+  const [doctorDefaultApplied, setDoctorDefaultApplied] = useState(false);
   const [urgentOnly, setUrgentOnly] = useState(false);
   const [tick, setTick] = useState(0);
   // walk-in dialog state
@@ -165,6 +170,25 @@ export default function QueuePage() {
       });
   }, []);
 
+  // If the signed-in user IS one of the doctors, default the view to "My queue"
+  // on first load. They can switch to All freely afterwards (we don't re-apply).
+  useEffect(() => {
+    if (doctorDefaultApplied || !user?.id || doctors.length === 0) return;
+    if (doctors.some((d) => d.id === user.id)) {
+      setDoctorFilter(user.id);
+    }
+    setDoctorDefaultApplied(true);
+  }, [user?.id, doctors, doctorDefaultApplied]);
+
+  const isDoctorUser = !!user?.id && doctors.some((d) => d.id === user.id);
+
+  // Unique rooms present in today's loaded rows, for the room filter.
+  const roomOptions = useMemo(() => {
+    const set = new Set<string>();
+    rows.forEach((r) => { if (r.room && r.room.trim()) set.add(r.room.trim()); });
+    return Array.from(set).sort();
+  }, [rows]);
+
   // lightweight patient list for walk-in picker (loaded on dialog open)
   useEffect(() => {
     if (!walkInOpen || patientOptions.length > 0) return;
@@ -201,6 +225,7 @@ export default function QueuePage() {
       return r.status === statusFilter;
     });
     if (doctorFilter !== "all") list = list.filter((r) => r.doctor_id === doctorFilter);
+    if (roomFilter !== "all") list = list.filter((r) => (r.room ?? "") === roomFilter);
     if (urgentOnly) list = list.filter((r) => (r.priority ?? 0) > 0);
     // Sort: urgent first, then by check-in time asc (nulls last), then scheduled_at asc.
     list.sort((a, b) => {

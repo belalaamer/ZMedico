@@ -580,7 +580,11 @@ export default function QueuePage() {
                   const sessMs = rowSessionMs(r);
                   const longWait = waitMs > LONG_WAIT_MS;
                   return (
-                    <tr key={r.id} className={cn("border-t border-border hover:bg-muted/30", longWait && "bg-amber-500/5")}>
+                    <tr key={r.id} className={cn(
+                      "border-t border-border hover:bg-muted/30",
+                      longWait && "bg-amber-500/5",
+                      r.status === "no_show" && "bg-destructive/5",
+                    )}>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-2">
                           <Link to={`/patients/${r.patient_id}`} className="font-medium hover:underline">{patientName(r)}</Link>
@@ -636,7 +640,11 @@ export default function QueuePage() {
             const sessMs = rowSessionMs(r);
             const longWait = waitMs > LONG_WAIT_MS;
             return (
-              <Card key={r.id} className={cn("p-3", longWait && "bg-amber-500/5")}>
+              <Card key={r.id} className={cn(
+                "p-3",
+                longWait && "bg-amber-500/5",
+                r.status === "no_show" && "bg-destructive/5 border-destructive/30",
+              )}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <Link to={`/patients/${r.patient_id}`} className="font-semibold hover:underline">{patientName(r)}</Link>

@@ -469,6 +469,9 @@ export default function QueuePage() {
                           {(r.priority ?? 0) > 0 && (
                             <Badge variant="destructive" className="text-[10px] h-5">{t("urgent")}</Badge>
                           )}
+                          {r.is_walk_in && (
+                            <Badge variant="secondary" className="text-[10px] h-5">{t("walkIn")}</Badge>
+                          )}
                         </div>
                         {r.room && <div className="text-[11px] text-muted-foreground">{t("room")}: {r.room}</div>}
                       </td>
@@ -527,6 +530,9 @@ export default function QueuePage() {
                       </span>
                       {(r.priority ?? 0) > 0 && (
                         <Badge variant="destructive" className="text-[10px] h-5">{t("urgent")}</Badge>
+                      )}
+                      {r.is_walk_in && (
+                        <Badge variant="secondary" className="text-[10px] h-5">{t("walkIn")}</Badge>
                       )}
                       {r.status === "confirmed" && (
                         <span className={cn("text-[11px] inline-flex items-center gap-1", longWait && "text-amber-700 dark:text-amber-300 font-medium")}>

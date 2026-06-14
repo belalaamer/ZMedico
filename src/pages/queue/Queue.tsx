@@ -1,18 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RowActions } from "@/components/RowActions";
+import { ListSkeleton } from "@/components/ListSkeleton";
 import { AlertTriangle, CheckCircle2, Clock, Flag, ListChecks, Play, UserPlus, X, ExternalLink, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-
-type ApptStatus = "scheduled" | "confirmed" | "in_progress" | "completed" | "cancelled" | "no_show" | "departed";
+import { usePermissions } from "@/hooks/usePermissions";
+import { buildStatusPatch, type ApptStatus } from "@/lib/appointmentStatus";
 
 type QueueRow = {
   id: string;
@@ -79,6 +80,11 @@ function uiStatusLabel(s: ApptStatus, t: (k: any) => string) {
 export default function QueuePage() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
+  const navigate = useNavigate();
+  const { can } = usePermissions();
+  // Queue mutations are gated behind appointments:update. Users without it
+  // see read-only rows; route-level guard handles view permission.
+  const canMutate = can("appointments", "update") || can("appointments", "manage");
   const [rows, setRows] = useState<QueueRow[]>([]);
   const [doctors, setDoctors] = useState<{ id: string; full_name: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -116,11 +122,17 @@ export default function QueuePage() {
 
   useEffect(() => {
     load();
-    // realtime live sync
+    // realtime live sync — scoped to current branch when possible to avoid
+    // clinic-wide refetches from unrelated appointment changes.
     const topic = `queue-${Math.random().toString(36).slice(2, 10)}`;
+    const filter = currentBranchId ? `branch_id=eq.${currentBranchId}` : undefined;
     const ch = supabase
       .channel(topic)
-      .on("postgres_changes", { event: "*", schema: "public", table: "appointments" }, () => { load(); });
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "appointments", ...(filter ? { filter } : {}) } as any,
+        () => { load(); }
+      );
     ch.subscribe();
     return () => { supabase.removeChannel(ch); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -181,25 +193,23 @@ export default function QueuePage() {
   }, [filtered, tick]);
 
   const updateRow = async (id: string, patch: Record<string, any>) => {
+    if (!canMutate) { toast.error(t("noPermission") ?? "Not allowed"); return; }
     const { error } = await supabase.from("appointments").update(patch as any).eq("id", id);
     if (error) { toast.error(error.message); return; }
     toast.success(t("saved"));
     load();
   };
 
-  const doCheckIn = (r: QueueRow) => updateRow(r.id, {
-    status: "confirmed",
-    checked_in_at: r.checked_in_at ?? new Date().toISOString(),
-  });
-  const doStart = (r: QueueRow) => updateRow(r.id, {
-    status: "in_progress",
-    checked_in_at: r.checked_in_at ?? new Date().toISOString(),
-    started_at: r.started_at ?? new Date().toISOString(),
-  });
-  const doComplete = (r: QueueRow) => updateRow(r.id, { status: "completed" });
-  const doNoShow   = (r: QueueRow) => updateRow(r.id, { status: "no_show" });
-  const doCancel   = (r: QueueRow) => updateRow(r.id, { status: "cancelled" });
-  const doReopen   = (r: QueueRow) => updateRow(r.id, { status: "scheduled" });
+  const transition = (r: QueueRow, next: ApptStatus) =>
+    updateRow(r.id, buildStatusPatch(next, { checked_in_at: r.checked_in_at, started_at: r.started_at }));
+
+  const doCheckIn  = (r: QueueRow) => transition(r, "confirmed");
+  const doStart    = (r: QueueRow) => transition(r, "in_progress");
+  const doComplete = (r: QueueRow) => transition(r, "completed");
+  const doNoShow   = (r: QueueRow) => transition(r, "no_show");
+  const doCancel   = (r: QueueRow) => transition(r, "cancelled");
+  const doReopen   = (r: QueueRow) => transition(r, "scheduled");
+  // priority is binary today (0 / 1); column kept numeric for future tiers.
   const togglePriority = (r: QueueRow) => updateRow(r.id, { priority: (r.priority ?? 0) > 0 ? 0 : 1 });
 
   const rowWaitingMs = (r: QueueRow) => {
@@ -213,29 +223,31 @@ export default function QueuePage() {
 
   const renderActions = (r: QueueRow) => {
     const items: { label: string; icon?: React.ReactNode; onClick: () => void }[] = [];
-    if (r.status === "scheduled") {
+    if (canMutate && r.status === "scheduled") {
       items.push({ label: t("checkIn"), icon: <UserPlus className="size-4" />, onClick: () => doCheckIn(r) });
       items.push({ label: t("startVisit"), icon: <Play className="size-4" />, onClick: () => doStart(r) });
       items.push({ label: t("markNoShow"), icon: <X className="size-4" />, onClick: () => doNoShow(r) });
       items.push({ label: t("cancelVisit"), icon: <X className="size-4" />, onClick: () => doCancel(r) });
-    } else if (r.status === "confirmed") {
+    } else if (canMutate && r.status === "confirmed") {
       items.push({ label: t("startVisit"), icon: <Play className="size-4" />, onClick: () => doStart(r) });
       items.push({ label: t("markNoShow"), icon: <X className="size-4" />, onClick: () => doNoShow(r) });
       items.push({ label: t("cancelVisit"), icon: <X className="size-4" />, onClick: () => doCancel(r) });
-    } else if (r.status === "in_progress") {
+    } else if (canMutate && r.status === "in_progress") {
       items.push({ label: t("completeVisit"), icon: <CheckCircle2 className="size-4" />, onClick: () => doComplete(r) });
-    } else if (r.status === "cancelled" || r.status === "no_show") {
+    } else if (canMutate && (r.status === "cancelled" || r.status === "no_show")) {
       items.push({ label: t("reopen"), icon: <RotateCcw className="size-4" />, onClick: () => doReopen(r) });
     }
-    items.push({
-      label: (r.priority ?? 0) > 0 ? t("unmarkUrgent") : t("markUrgent"),
-      icon: <Flag className="size-4" />,
-      onClick: () => togglePriority(r),
-    });
+    if (canMutate) {
+      items.push({
+        label: (r.priority ?? 0) > 0 ? t("unmarkUrgent") : t("markUrgent"),
+        icon: <Flag className="size-4" />,
+        onClick: () => togglePriority(r),
+      });
+    }
     items.push({
       label: t("openPatient"),
       icon: <ExternalLink className="size-4" />,
-      onClick: () => { window.location.href = `/patients/${r.patient_id}`; },
+      onClick: () => navigate(`/patients/${r.patient_id}`),
     });
     return <RowActions extraItems={items} canEdit={false} canDelete={false} />;
   };
@@ -324,7 +336,7 @@ export default function QueuePage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={8} className="text-center text-muted-foreground py-10">…</td></tr>
+                <tr><td colSpan={8} className="p-0"><ListSkeleton rows={6} /></td></tr>
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={8} className="text-center text-muted-foreground py-10">{t("noPatientsInQueue")}</td></tr>
               ) : (
@@ -377,7 +389,7 @@ export default function QueuePage() {
       {/* Mobile cards */}
       <div className="md:hidden space-y-2">
         {loading ? (
-          <div className="text-center text-muted-foreground py-10">…</div>
+          <Card className="p-0 overflow-hidden"><ListSkeleton rows={5} /></Card>
         ) : filtered.length === 0 ? (
           <Card className="py-10 text-center text-muted-foreground">{t("noPatientsInQueue")}</Card>
         ) : (

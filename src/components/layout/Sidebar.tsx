@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap, FolderOpen, Briefcase, UserCog, Clock, CalendarDays, DollarSign, Star, PieChart, Award, Target, Ticket } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap, FolderOpen, Briefcase, UserCog, Clock, CalendarDays, DollarSign, Star, PieChart, Award, Target, Ticket, ListChecks } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useBranch } from "@/contexts/BranchContext";
@@ -37,6 +37,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
   const allItems = [
     { to: "/", icon: LayoutDashboard, label: t("dashboard"), end: true, show: true },
     { to: "/calendar", icon: Calendar, label: t("calendar"), show: can("appointments") },
+    { to: "/queue", icon: ListChecks, label: t("queue"), show: can("appointments") },
     { to: "/patients", icon: Users, label: t("patients"), show: can("patients") },
     { to: "/invoices", icon: FileText, label: t("invoices"), show: can("invoices") },
     { to: "/payments", icon: CreditCard, label: t("payments"), show: can("invoices") },

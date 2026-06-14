@@ -78,6 +78,7 @@ export function defaultActionsFor(role: string, module: string): string[] {
 // Map route path prefixes to permission modules. Used by PermissionRoute.
 export function moduleForPath(path: string): string | null {
   if (path.startsWith("/calendar") || path.startsWith("/reminders")) return "appointments";
+  if (path.startsWith("/queue")) return "appointments";
   if (path.startsWith("/patients")) return "patients";
   if (path.startsWith("/invoices") || path.startsWith("/payments")) return "invoices";
   if (path.startsWith("/treasury") || path.startsWith("/expenses")) return "treasury";

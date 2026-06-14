@@ -131,7 +131,6 @@ export default function QueuePage() {
     void fetchQueueSettings(currentBranchId).then((s) => { if (active) setSettings(s); });
     return () => { active = false; };
   }, [currentBranchId]);
-  const [savingSettings, setSavingSettings] = useState(false);
 
   // 30s tick so waiting/in-session timers re-render without per-row intervals.
   useEffect(() => {

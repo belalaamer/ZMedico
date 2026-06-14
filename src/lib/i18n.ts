@@ -977,6 +977,16 @@ export const dict = {
     queueNoShowToday: "No-shows",
     queueAvgWait: "Avg wait",
     walkInCreated: "Walk-in added to queue",
+    // Phase 3
+    queueViewLabel: "View",
+    queueViewMine: "My queue",
+    roomFilter: "Room",
+    allRooms: "All rooms",
+    noShowsTodayChip: "No-shows today",
+    recallPatient: "Recall patient",
+    moveBackToWaiting: "Move back to waiting",
+    openConsultation: "Open consultation",
+    queueLongestWait: "Longest wait",
   },
   ar: {
     appName: "ZMedico",
@@ -1955,6 +1965,16 @@ export const dict = {
     queueNoShowToday: "تغيّبوا",
     queueAvgWait: "متوسط الانتظار",
     walkInCreated: "تمت إضافة المراجع",
+    // Phase 3
+    queueViewLabel: "العرض",
+    queueViewMine: "طابوري",
+    roomFilter: "الغرفة",
+    allRooms: "كل الغرف",
+    noShowsTodayChip: "تغيّبات اليوم",
+    recallPatient: "استدعاء المريض",
+    moveBackToWaiting: "إعادة للانتظار",
+    openConsultation: "فتح الكشف",
+    queueLongestWait: "أطول انتظار",
   },
 } as const;
 

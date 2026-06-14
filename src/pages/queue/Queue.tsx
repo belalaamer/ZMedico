@@ -14,6 +14,7 @@ import { AlertTriangle, CheckCircle2, Clock, Flag, ListChecks, Play, UserPlus, X
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -85,6 +86,7 @@ function uiStatusLabel(s: ApptStatus, t: (k: any) => string) {
 export default function QueuePage() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { can } = usePermissions();
   // Queue mutations are gated behind appointments:update. Users without it
@@ -95,6 +97,9 @@ export default function QueuePage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<"active" | "all" | ApptStatus>("active");
   const [doctorFilter, setDoctorFilter] = useState<string>("all");
+  const [roomFilter, setRoomFilter] = useState<string>("all");
+  // remembers whether we've auto-defaulted the view for this doctor session
+  const [doctorDefaultApplied, setDoctorDefaultApplied] = useState(false);
   const [urgentOnly, setUrgentOnly] = useState(false);
   const [tick, setTick] = useState(0);
   // walk-in dialog state
@@ -165,6 +170,25 @@ export default function QueuePage() {
       });
   }, []);
 
+  // If the signed-in user IS one of the doctors, default the view to "My queue"
+  // on first load. They can switch to All freely afterwards (we don't re-apply).
+  useEffect(() => {
+    if (doctorDefaultApplied || !user?.id || doctors.length === 0) return;
+    if (doctors.some((d) => d.id === user.id)) {
+      setDoctorFilter(user.id);
+    }
+    setDoctorDefaultApplied(true);
+  }, [user?.id, doctors, doctorDefaultApplied]);
+
+  const isDoctorUser = !!user?.id && doctors.some((d) => d.id === user.id);
+
+  // Unique rooms present in today's loaded rows, for the room filter.
+  const roomOptions = useMemo(() => {
+    const set = new Set<string>();
+    rows.forEach((r) => { if (r.room && r.room.trim()) set.add(r.room.trim()); });
+    return Array.from(set).sort();
+  }, [rows]);
+
   // lightweight patient list for walk-in picker (loaded on dialog open)
   useEffect(() => {
     if (!walkInOpen || patientOptions.length > 0) return;
@@ -201,6 +225,7 @@ export default function QueuePage() {
       return r.status === statusFilter;
     });
     if (doctorFilter !== "all") list = list.filter((r) => r.doctor_id === doctorFilter);
+    if (roomFilter !== "all") list = list.filter((r) => (r.room ?? "") === roomFilter);
     if (urgentOnly) list = list.filter((r) => (r.priority ?? 0) > 0);
     // Sort: urgent first, then by check-in time asc (nulls last), then scheduled_at asc.
     list.sort((a, b) => {
@@ -264,7 +289,17 @@ export default function QueuePage() {
       .map((r) => new Date(r.started_at!).getTime() - new Date(r.checked_in_at!).getTime())
       .filter((ms) => ms > 0);
     const avgWaitMs = waited.length ? Math.round(waited.reduce((a, b) => a + b, 0) / waited.length) : null;
-    return { total, waiting, inSession, completed, noShow, avgWaitMs };
+    // Longest currently-waiting patient (status=confirmed with check-in stamp).
+    const nowMs = Date.now();
+    let longestMs = 0;
+    let longestRow: QueueRow | null = null;
+    rows.forEach((r) => {
+      if (r.status === "confirmed" && r.checked_in_at) {
+        const ms = nowMs - new Date(r.checked_in_at).getTime();
+        if (ms > longestMs) { longestMs = ms; longestRow = r; }
+      }
+    });
+    return { total, waiting, inSession, completed, noShow, avgWaitMs, longestMs, longestRow };
     // tick: recompute live for waiting counts visible in the strip
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, tick]);
@@ -300,26 +335,70 @@ export default function QueuePage() {
     load();
   };
 
-  const startConsultation = (r: QueueRow) => {
-    // Fast path: if not yet in session, stamp started_at first so the timer + analytics stay correct.
+  // Real consultation handoff:
+  //   1. Stamp in_progress on the appointment (preserves existing started_at).
+  //   2. Reuse an existing medical_records row tied to this appointment if any,
+  //      otherwise create a draft one so the chart/encounter screen has a target.
+  //   3. Navigate to the consultation editor; on failure, fall back to the
+  //      patient profile's clinical tab so the action is never a dead end.
+  const openConsultation = async (r: QueueRow) => {
     if (canMutate && r.status !== "in_progress" && r.status !== "completed") {
       const patch = buildStatusPatch("in_progress", { checked_in_at: r.checked_in_at, started_at: r.started_at });
-      supabase.from("appointments").update(patch as any).eq("id", r.id).then(({ error }) => {
-        if (error) toast.error(error.message);
-      });
+      const { error } = await supabase.from("appointments").update(patch as any).eq("id", r.id);
+      if (error) {
+        toast.error(error.message);
+        navigate(`/patients/${r.patient_id}?tab=clinical`);
+        return;
+      }
     }
-    // Deep-link to the patient profile's clinical tab — closest existing flow today.
-    navigate(`/patients/${r.patient_id}?tab=clinical`);
+    // Look for an existing encounter (most-recent draft preferred).
+    const { data: existing } = await supabase
+      .from("medical_records")
+      .select("id,status,created_at")
+      .eq("appointment_id", r.id)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    let recordId = existing?.[0]?.id as string | undefined;
+    if (!recordId && canMutate) {
+      const { data: created, error: insErr } = await supabase
+        .from("medical_records")
+        .insert({
+          patient_id: r.patient_id,
+          branch_id: r.branch_id ?? currentBranchId ?? null,
+          doctor_id: r.doctor_id ?? user?.id ?? null,
+          appointment_id: r.id,
+          visit_type: "consultation",
+          status: "draft",
+        } as any)
+        .select("id")
+        .single();
+      if (insErr) {
+        // No encounter and no permission/ability to create — fall back gracefully.
+        navigate(`/patients/${r.patient_id}?tab=clinical`);
+        return;
+      }
+      recordId = created?.id;
+    }
+    if (recordId) navigate(`/medical/consultation/${recordId}`);
+    else navigate(`/patients/${r.patient_id}?tab=clinical`);
   };
+
+  // No-show follow-up helpers
+  const recallNoShow = (r: QueueRow) =>
+    // Re-arrive the patient: clear stamps and stamp checked_in_at = now.
+    updateRow(r.id, buildStatusPatch("confirmed", { checked_in_at: null, started_at: null }));
+  const moveBackToWaiting = (r: QueueRow) =>
+    updateRow(r.id, buildStatusPatch("scheduled", { checked_in_at: r.checked_in_at, started_at: r.started_at }));
 
   const renderActions = (r: QueueRow) => {
     const items: { label: string; icon?: React.ReactNode; onClick: () => void }[] = [];
     // Fast path to consultation/chart — shown for any active row.
     if (r.status !== "cancelled" && r.status !== "no_show") {
       items.push({
-        label: t("startConsultation"),
+        label: t("openConsultation"),
         icon: <Stethoscope className="size-4" />,
-        onClick: () => startConsultation(r),
+        onClick: () => { void openConsultation(r); },
       });
     }
     if (canMutate && r.status === "scheduled") {
@@ -334,6 +413,10 @@ export default function QueuePage() {
     } else if (canMutate && r.status === "in_progress") {
       items.push({ label: t("completeVisit"), icon: <CheckCircle2 className="size-4" />, onClick: () => doComplete(r) });
     } else if (canMutate && (r.status === "cancelled" || r.status === "no_show")) {
+      if (r.status === "no_show") {
+        items.push({ label: t("recallPatient"), icon: <UserPlus className="size-4" />, onClick: () => recallNoShow(r) });
+        items.push({ label: t("moveBackToWaiting"), icon: <RotateCcw className="size-4" />, onClick: () => moveBackToWaiting(r) });
+      }
       items.push({ label: t("reopen"), icon: <RotateCcw className="size-4" />, onClick: () => doReopen(r) });
     }
     if (canMutate) {
@@ -380,6 +463,15 @@ export default function QueuePage() {
         <StatCard icon={<Timer className="size-4" />}      label={t("queueAvgWait")}        value={analytics.avgWaitMs == null ? "—" : formatDur(analytics.avgWaitMs)} />
       </div>
 
+      {analytics.longestRow && (
+        <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+          <Clock className="size-3.5" />
+          <span>{t("queueLongestWait")}:</span>
+          <span className="font-medium text-foreground">{patientName(analytics.longestRow)}</span>
+          <span className="tabular-nums">· {formatDur(analytics.longestMs)}</span>
+        </div>
+      )}
+
       {/* Sticky filter bar */}
       <Card className="p-3 sticky top-0 z-10 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
         <div className="flex flex-wrap items-center gap-2">
@@ -405,12 +497,29 @@ export default function QueuePage() {
               <SelectTrigger className="h-9 w-[180px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("allDoctors")}</SelectItem>
+                {isDoctorUser && user?.id && (
+                  <SelectItem value={user.id}>{t("queueViewMine")}</SelectItem>
+                )}
                 {doctors.map((d) => (
                   <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
+          {roomOptions.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">{t("roomFilter")}</span>
+              <Select value={roomFilter} onValueChange={setRoomFilter}>
+                <SelectTrigger className="h-9 w-[140px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("allRooms")}</SelectItem>
+                  {roomOptions.map((rm) => (
+                    <SelectItem key={rm} value={rm}>{rm}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <Button
             type="button"
             variant={urgentOnly ? "default" : "outline"}
@@ -419,6 +528,18 @@ export default function QueuePage() {
             className="h-9"
           >
             <Flag className="size-4 me-1" /> {t("onlyUrgent")}
+          </Button>
+          <Button
+            type="button"
+            variant={statusFilter === "no_show" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStatusFilter((s) => (s === "no_show" ? "active" : "no_show"))}
+            className="h-9"
+          >
+            <UserX className="size-4 me-1" /> {t("noShowsTodayChip")}
+            {analytics.noShow > 0 && (
+              <Badge variant="destructive" className="ms-1.5 h-4 text-[10px] px-1.5">{analytics.noShow}</Badge>
+            )}
           </Button>
           <div className="ms-auto text-xs text-muted-foreground">
             {filtered.length}
@@ -459,7 +580,11 @@ export default function QueuePage() {
                   const sessMs = rowSessionMs(r);
                   const longWait = waitMs > LONG_WAIT_MS;
                   return (
-                    <tr key={r.id} className={cn("border-t border-border hover:bg-muted/30", longWait && "bg-amber-500/5")}>
+                    <tr key={r.id} className={cn(
+                      "border-t border-border hover:bg-muted/30",
+                      longWait && "bg-amber-500/5",
+                      r.status === "no_show" && "bg-destructive/5",
+                    )}>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-2">
                           <Link to={`/patients/${r.patient_id}`} className="font-medium hover:underline">{patientName(r)}</Link>
@@ -515,7 +640,11 @@ export default function QueuePage() {
             const sessMs = rowSessionMs(r);
             const longWait = waitMs > LONG_WAIT_MS;
             return (
-              <Card key={r.id} className={cn("p-3", longWait && "bg-amber-500/5")}>
+              <Card key={r.id} className={cn(
+                "p-3",
+                longWait && "bg-amber-500/5",
+                r.status === "no_show" && "bg-destructive/5 border-destructive/30",
+              )}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <Link to={`/patients/${r.patient_id}`} className="font-semibold hover:underline">{patientName(r)}</Link>

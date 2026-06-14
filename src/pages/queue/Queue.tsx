@@ -111,6 +111,14 @@ export default function QueuePage() {
   const [walkInProcedure, setWalkInProcedure] = useState("");
   const [walkInSaving, setWalkInSaving] = useState(false);
   const [patientOptions, setPatientOptions] = useState<{ id: string; first_name_en: string; last_name_en: string | null; first_name_ar: string | null; last_name_ar: string | null; patient_code: number; phone: string | null }[]>([]);
+  // Reassign doctor dialog state
+  const [reassignRow, setReassignRow] = useState<QueueRow | null>(null);
+  const [reassignDoctor, setReassignDoctor] = useState<string>("");
+  const [reassignSaving, setReassignSaving] = useState(false);
+  // Assign room dialog state
+  const [roomRow, setRoomRow] = useState<QueueRow | null>(null);
+  const [roomValue, setRoomValue] = useState<string>("");
+  const [roomSaving, setRoomSaving] = useState(false);
 
   // 30s tick so waiting/in-session timers re-render without per-row intervals.
   useEffect(() => {

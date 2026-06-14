@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useDataSync } from "@/lib/dataSync";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -113,6 +113,7 @@ export default function CalendarPage() {
   const { currentBranchId } = useBranch();
   const isMobile = useIsMobile();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [date, setDate] = useState<Date>(startOfDay(new Date()));
   const [view, setView] = useState<"day" | "week" | "month">("day");
   const [patientPickerOpen, setPatientPickerOpen] = useState(false);
@@ -520,7 +521,7 @@ export default function CalendarPage() {
     <button
       key={a.id}
       id={`appt-${a.id}`}
-      onClick={() => openEdit(a)}
+      onClick={() => navigate(`/appointments/${a.id}`)}
       className={`absolute inset-x-1 rounded-md border text-start px-2 py-1 overflow-hidden hover:shadow-md transition-all ${statusBlock[a.status]} ${highlightId === a.id ? "ring-2 ring-primary shadow-lg z-10" : ""}`}
       style={blockStyle(a)}
       title={`${fullName(a.patients!)} · ${timeStr(new Date(a.scheduled_at))}`}
@@ -1124,7 +1125,13 @@ export default function CalendarPage() {
                             </SelectContent>
                           </Select>
                         </div>
-                        <div className="text-sm font-medium break-words leading-snug mt-0.5">{fullName(p)}</div>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/appointments/${a.id}`)}
+                          className="text-sm font-medium break-words leading-snug mt-0.5 text-start hover:underline"
+                        >
+                          {fullName(p)}
+                        </button>
                         <div className="text-[11px] text-muted-foreground truncate">{a.procedure || "—"}</div>
                         <div className="flex items-center gap-1 mt-1 -ms-1">
                           {nextStatus(a.status) && (

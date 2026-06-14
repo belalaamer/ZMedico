@@ -78,6 +78,7 @@ export default function QueueAuditPage() {
   const [scopeBranch, setScopeBranch] = useState(true);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [patients, setPatients] = useState<Record<string, { name: string; code: number }>>({});
+  const [exportingAll, setExportingAll] = useState(false);
 
   const PAGE_SIZE = 200;
 
@@ -203,6 +204,75 @@ export default function QueueAuditPage() {
     URL.revokeObjectURL(url);
   };
 
+  // Stream every row that matches the current server-side filters, batched
+  // through buildQuery's cursor pattern. Hydration is batched per page so
+  // nothing larger than PAGE_SIZE is ever materialized at once.
+  const exportAll = async () => {
+    if (exportingAll) return;
+    setExportingAll(true);
+    try {
+      const header = ["timestamp", "action", "user", "appointment_id", "patient", "diff"];
+      const lines = [header.join(",")];
+      const profileMap: Record<string, string> = {};
+      const patientMap: Record<string, { name: string; code: number }> = {};
+      let cursor: string | undefined;
+      let total = 0;
+      const HARD_CAP = 20000; // safety guard
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { data, error } = await buildQuery(cursor);
+        if (error) { toast.error(error.message); break; }
+        const batch = (data ?? []) as LogRow[];
+        if (batch.length === 0) break;
+        // hydrate this batch
+        const uIds = Array.from(new Set(batch.map((r) => r.user_id).filter((id): id is string => !!id && !profileMap[id])));
+        if (uIds.length) {
+          const { data: pr } = await supabase.from("profiles").select("id,full_name").in("id", uIds);
+          (pr ?? []).forEach((p: any) => { profileMap[p.id] = p.full_name ?? p.id.slice(0, 8); });
+        }
+        const aIds = Array.from(new Set(batch.map((r) => r.entity_id).filter((id): id is string => !!id && !patientMap[id])));
+        if (aIds.length) {
+          const { data: ap } = await supabase
+            .from("appointments")
+            .select("id,patient_id,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)")
+            .in("id", aIds);
+          (ap ?? []).forEach((a: any) => {
+            const p = a.patients; if (!p) return;
+            const name = lang === "ar"
+              ? `${p.first_name_ar ?? p.first_name_en} ${p.last_name_ar ?? p.last_name_en ?? ""}`.trim()
+              : `${p.first_name_en} ${p.last_name_en ?? ""}`.trim();
+            patientMap[a.id] = { name, code: p.patient_code };
+          });
+        }
+        batch.forEach((r) => {
+          const p = r.entity_id ? patientMap[r.entity_id] : null;
+          const cells = [
+            new Date(r.created_at).toISOString(),
+            r.action,
+            profileMap[r.user_id ?? ""] ?? r.user_id ?? "",
+            r.entity_id ?? "",
+            p ? `${p.name} (#${p.code})` : "",
+            summarizeDiff(r.old_values, r.new_values),
+          ].map((v) => `"${String(v).replace(/"/g, '""')}"`);
+          lines.push(cells.join(","));
+        });
+        total += batch.length;
+        if (batch.length < PAGE_SIZE) break;
+        if (total >= HARD_CAP) { toast.warning(`Export capped at ${HARD_CAP} rows`); break; }
+        cursor = batch[batch.length - 1].created_at;
+      }
+      const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `queue-audit-all-${todayStr()}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`${total} rows exported`);
+    } finally {
+      setExportingAll(false);
+    }
+  };
+
   return (
     <div className="p-4 sm:p-6 space-y-4">
       <header className="flex items-center justify-between flex-wrap gap-3">
@@ -218,9 +288,14 @@ export default function QueueAuditPage() {
             <p className="text-xs sm:text-sm text-muted-foreground">{t("queueAuditSubtitle")}</p>
           </div>
         </div>
-        <Button type="button" size="sm" variant="outline" onClick={exportCsv} disabled={filtered.length === 0}>
-          <Download className="size-4 me-1" /> {t("exportCsv")}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button type="button" size="sm" variant="outline" onClick={exportCsv} disabled={filtered.length === 0 || exportingAll}>
+            <Download className="size-4 me-1" /> {t("exportCsv")}
+          </Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => void exportAll()} disabled={exportingAll}>
+            <Download className="size-4 me-1" /> {exportingAll ? "…" : (lang === "ar" ? "تصدير الكل" : "Export all")}
+          </Button>
+        </div>
       </header>
 
       <Card className="p-3">

@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 import { RowActions } from "@/components/RowActions";
 import { ListSkeleton } from "@/components/ListSkeleton";
-import { AlertTriangle, CheckCircle2, Clock, Flag, ListChecks, Play, UserPlus, X, ExternalLink, RotateCcw, Plus, Stethoscope, Users, Activity, CheckCheck, UserX, Timer } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, Flag, ListChecks, Play, UserPlus, X, ExternalLink, RotateCcw, Plus, Stethoscope, Users, Activity, CheckCheck, UserX, Timer, UserCog, DoorOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
@@ -19,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/usePermissions";
 import { buildStatusPatch, type ApptStatus } from "@/lib/appointmentStatus";
+import { logQueueAudit } from "@/lib/queueAudit";
 
 type QueueRow = {
   id: string;
@@ -110,6 +111,14 @@ export default function QueuePage() {
   const [walkInProcedure, setWalkInProcedure] = useState("");
   const [walkInSaving, setWalkInSaving] = useState(false);
   const [patientOptions, setPatientOptions] = useState<{ id: string; first_name_en: string; last_name_en: string | null; first_name_ar: string | null; last_name_ar: string | null; patient_code: number; phone: string | null }[]>([]);
+  // Reassign doctor dialog state
+  const [reassignRow, setReassignRow] = useState<QueueRow | null>(null);
+  const [reassignDoctor, setReassignDoctor] = useState<string>("");
+  const [reassignSaving, setReassignSaving] = useState(false);
+  // Assign room dialog state
+  const [roomRow, setRoomRow] = useState<QueueRow | null>(null);
+  const [roomValue, setRoomValue] = useState<string>("");
+  const [roomSaving, setRoomSaving] = useState(false);
 
   // 30s tick so waiting/in-session timers re-render without per-row intervals.
   useEffect(() => {
@@ -255,8 +264,17 @@ export default function QueuePage() {
     load();
   };
 
-  const transition = (r: QueueRow, next: ApptStatus) =>
-    updateRow(r.id, buildStatusPatch(next, { checked_in_at: r.checked_in_at, started_at: r.started_at }));
+  const transition = async (r: QueueRow, next: ApptStatus) => {
+    const patch = buildStatusPatch(next, { checked_in_at: r.checked_in_at, started_at: r.started_at });
+    await updateRow(r.id, patch);
+    void logQueueAudit({
+      action: "status_change",
+      appointmentId: r.id,
+      branchId: r.branch_id,
+      oldValues: { status: r.status, checked_in_at: r.checked_in_at, started_at: r.started_at },
+      newValues: { status: next, ...patch },
+    });
+  };
 
   const doCheckIn  = (r: QueueRow) => transition(r, "confirmed");
   const doStart    = (r: QueueRow) => transition(r, "in_progress");
@@ -326,10 +344,24 @@ export default function QueuePage() {
       is_walk_in: true,
       ...patch,
     };
-    const { error } = await supabase.from("appointments").insert(payload);
+    const { data: ins, error } = await supabase.from("appointments").insert(payload).select("id").single();
     setWalkInSaving(false);
     if (error) { toast.error(error.message); return; }
     toast.success(t("walkInCreated"));
+    if (ins?.id) {
+      void logQueueAudit({
+        action: "walk_in_created",
+        appointmentId: ins.id,
+        branchId: currentBranchId ?? null,
+        newValues: {
+          status: payload.status,
+          doctor_id: payload.doctor_id,
+          room: payload.room,
+          is_walk_in: true,
+          checked_in_at: payload.checked_in_at,
+        },
+      });
+    }
     setWalkInOpen(false);
     setWalkInPatient(""); setWalkInDoctor(""); setWalkInRoom(""); setWalkInProcedure("");
     load();
@@ -382,6 +414,12 @@ export default function QueuePage() {
     }
     if (recordId) navigate(`/medical/consultation/${recordId}`);
     else navigate(`/patients/${r.patient_id}?tab=clinical`);
+    void logQueueAudit({
+      action: "consultation_opened",
+      appointmentId: r.id,
+      branchId: r.branch_id,
+      newValues: { status: "in_progress" },
+    });
   };
 
   // No-show follow-up helpers
@@ -390,6 +428,61 @@ export default function QueuePage() {
     updateRow(r.id, buildStatusPatch("confirmed", { checked_in_at: null, started_at: null }));
   const moveBackToWaiting = (r: QueueRow) =>
     updateRow(r.id, buildStatusPatch("scheduled", { checked_in_at: r.checked_in_at, started_at: r.started_at }));
+
+  // ---- Reassign doctor
+  const openReassign = (r: QueueRow) => {
+    setReassignRow(r);
+    setReassignDoctor(r.doctor_id ?? "");
+  };
+  const submitReassign = async () => {
+    if (!reassignRow) return;
+    if (!canMutate) { toast.error(lang === "ar" ? "غير مسموح" : "Not allowed"); return; }
+    const r = reassignRow;
+    const next = reassignDoctor || null;
+    if (next === (r.doctor_id ?? null)) { setReassignRow(null); return; }
+    setReassignSaving(true);
+    // Status + timestamps intentionally untouched — only the assignee changes.
+    const { error } = await supabase.from("appointments").update({ doctor_id: next } as any).eq("id", r.id);
+    setReassignSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("saved"));
+    void logQueueAudit({
+      action: "doctor_reassigned",
+      appointmentId: r.id,
+      branchId: r.branch_id,
+      oldValues: { doctor_id: r.doctor_id },
+      newValues: { doctor_id: next },
+    });
+    setReassignRow(null);
+    load();
+  };
+
+  // ---- Assign / change room
+  const openRoom = (r: QueueRow) => {
+    setRoomRow(r);
+    setRoomValue(r.room ?? "");
+  };
+  const submitRoom = async () => {
+    if (!roomRow) return;
+    if (!canMutate) { toast.error(lang === "ar" ? "غير مسموح" : "Not allowed"); return; }
+    const r = roomRow;
+    const next = roomValue.trim() ? roomValue.trim() : null;
+    if (next === (r.room ?? null)) { setRoomRow(null); return; }
+    setRoomSaving(true);
+    const { error } = await supabase.from("appointments").update({ room: next } as any).eq("id", r.id);
+    setRoomSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("saved"));
+    void logQueueAudit({
+      action: "room_assigned",
+      appointmentId: r.id,
+      branchId: r.branch_id,
+      oldValues: { room: r.room },
+      newValues: { room: next },
+    });
+    setRoomRow(null);
+    load();
+  };
 
   const renderActions = (r: QueueRow) => {
     const items: { label: string; icon?: React.ReactNode; onClick: () => void }[] = [];
@@ -424,6 +517,16 @@ export default function QueuePage() {
         label: (r.priority ?? 0) > 0 ? t("unmarkUrgent") : t("markUrgent"),
         icon: <Flag className="size-4" />,
         onClick: () => togglePriority(r),
+      });
+      items.push({
+        label: t("reassignDoctor"),
+        icon: <UserCog className="size-4" />,
+        onClick: () => openReassign(r),
+      });
+      items.push({
+        label: r.room ? t("changeRoom") : t("assignRoom"),
+        icon: <DoorOpen className="size-4" />,
+        onClick: () => openRoom(r),
       });
     }
     items.push({
@@ -728,6 +831,68 @@ export default function QueuePage() {
               <Button type="submit" disabled={walkInSaving || !walkInPatient}>{t("save")}</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reassign doctor dialog */}
+      <Dialog open={!!reassignRow} onOpenChange={(o) => !o && setReassignRow(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("reassignDoctorTitle")}</DialogTitle>
+            <DialogDescription>{t("reassignDoctorDesc")}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>{t("doctor")}</Label>
+              <Combobox
+                options={[{ value: "", label: `— ${t("unassigned")} —` }, ...doctors.map((d) => ({ value: d.id, label: d.full_name }))]}
+                value={reassignDoctor}
+                onChange={setReassignDoctor}
+                placeholder={t("selectDoctorOptional")}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setReassignRow(null)}>{t("cancel")}</Button>
+            <Button type="button" onClick={submitReassign} disabled={reassignSaving}>{t("save")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign room dialog */}
+      <Dialog open={!!roomRow} onOpenChange={(o) => !o && setRoomRow(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("assignRoomTitle")}</DialogTitle>
+            <DialogDescription>{t("assignRoomDesc")}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {roomOptions.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {roomOptions.map((rm) => (
+                  <Button
+                    key={rm}
+                    type="button"
+                    size="sm"
+                    variant={roomValue === rm ? "default" : "outline"}
+                    onClick={() => setRoomValue(rm)}
+                    className="h-8"
+                  >
+                    {rm}
+                  </Button>
+                ))}
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label>{t("room")}</Label>
+              <Input value={roomValue} onChange={(e) => setRoomValue(e.target.value)} placeholder={t("roomOptional")} />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="ghost" onClick={() => setRoomValue("")}>{t("clearRoom")}</Button>
+            <Button type="button" variant="outline" onClick={() => setRoomRow(null)}>{t("cancel")}</Button>
+            <Button type="button" onClick={submitRoom} disabled={roomSaving}>{t("save")}</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

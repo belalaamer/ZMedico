@@ -518,6 +518,16 @@ export default function QueuePage() {
         icon: <Flag className="size-4" />,
         onClick: () => togglePriority(r),
       });
+      items.push({
+        label: t("reassignDoctor"),
+        icon: <UserCog className="size-4" />,
+        onClick: () => openReassign(r),
+      });
+      items.push({
+        label: r.room ? t("changeRoom") : t("assignRoom"),
+        icon: <DoorOpen className="size-4" />,
+        onClick: () => openRoom(r),
+      });
     }
     items.push({
       label: t("openChart"),

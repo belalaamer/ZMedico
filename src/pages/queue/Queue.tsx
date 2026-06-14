@@ -264,8 +264,17 @@ export default function QueuePage() {
     load();
   };
 
-  const transition = (r: QueueRow, next: ApptStatus) =>
-    updateRow(r.id, buildStatusPatch(next, { checked_in_at: r.checked_in_at, started_at: r.started_at }));
+  const transition = async (r: QueueRow, next: ApptStatus) => {
+    const patch = buildStatusPatch(next, { checked_in_at: r.checked_in_at, started_at: r.started_at });
+    await updateRow(r.id, patch);
+    void logQueueAudit({
+      action: "status_change",
+      appointmentId: r.id,
+      branchId: r.branch_id,
+      oldValues: { status: r.status, checked_in_at: r.checked_in_at, started_at: r.started_at },
+      newValues: { status: next, ...patch },
+    });
+  };
 
   const doCheckIn  = (r: QueueRow) => transition(r, "confirmed");
   const doStart    = (r: QueueRow) => transition(r, "in_progress");

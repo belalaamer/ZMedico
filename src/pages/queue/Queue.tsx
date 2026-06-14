@@ -193,7 +193,7 @@ export default function QueuePage() {
   }, [filtered, tick]);
 
   const updateRow = async (id: string, patch: Record<string, any>) => {
-    if (!canMutate) { toast.error(t("noPermission") ?? "Not allowed"); return; }
+    if (!canMutate) { toast.error(lang === "ar" ? "غير مسموح" : "Not allowed"); return; }
     const { error } = await supabase.from("appointments").update(patch as any).eq("id", id);
     if (error) { toast.error(error.message); return; }
     toast.success(t("saved"));

@@ -10,6 +10,7 @@ import { BranchProvider } from "@/contexts/BranchContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { PermissionRoute } from "@/components/PermissionRoute";
 import { attachGlobalRefreshListeners } from "@/lib/dataSync";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 const AppShell = lazy(() => import("@/components/layout/AppShell"));
@@ -217,15 +218,17 @@ function AppContent() {
 }
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <I18nProvider>
-      <AuthProvider>
-        <BranchProvider>
-          <AppContent />
-        </BranchProvider>
-      </AuthProvider>
-    </I18nProvider>
-  </QueryClientProvider>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <I18nProvider>
+        <AuthProvider>
+          <BranchProvider>
+            <AppContent />
+          </BranchProvider>
+        </AuthProvider>
+      </I18nProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;

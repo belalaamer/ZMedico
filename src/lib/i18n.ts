@@ -987,7 +987,6 @@ export const dict = {
     moveBackToWaiting: "Move back to waiting",
     openConsultation: "Open consultation",
     queueLongestWait: "Longest wait",
-    none: "—",
   },
   ar: {
     appName: "ZMedico",

@@ -289,7 +289,17 @@ export default function QueuePage() {
       .map((r) => new Date(r.started_at!).getTime() - new Date(r.checked_in_at!).getTime())
       .filter((ms) => ms > 0);
     const avgWaitMs = waited.length ? Math.round(waited.reduce((a, b) => a + b, 0) / waited.length) : null;
-    return { total, waiting, inSession, completed, noShow, avgWaitMs };
+    // Longest currently-waiting patient (status=confirmed with check-in stamp).
+    const nowMs = Date.now();
+    let longestMs = 0;
+    let longestRow: QueueRow | null = null;
+    rows.forEach((r) => {
+      if (r.status === "confirmed" && r.checked_in_at) {
+        const ms = nowMs - new Date(r.checked_in_at).getTime();
+        if (ms > longestMs) { longestMs = ms; longestRow = r; }
+      }
+    });
+    return { total, waiting, inSession, completed, noShow, avgWaitMs, longestMs, longestRow };
     // tick: recompute live for waiting counts visible in the strip
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, tick]);
@@ -325,26 +335,70 @@ export default function QueuePage() {
     load();
   };
 
-  const startConsultation = (r: QueueRow) => {
-    // Fast path: if not yet in session, stamp started_at first so the timer + analytics stay correct.
+  // Real consultation handoff:
+  //   1. Stamp in_progress on the appointment (preserves existing started_at).
+  //   2. Reuse an existing medical_records row tied to this appointment if any,
+  //      otherwise create a draft one so the chart/encounter screen has a target.
+  //   3. Navigate to the consultation editor; on failure, fall back to the
+  //      patient profile's clinical tab so the action is never a dead end.
+  const openConsultation = async (r: QueueRow) => {
     if (canMutate && r.status !== "in_progress" && r.status !== "completed") {
       const patch = buildStatusPatch("in_progress", { checked_in_at: r.checked_in_at, started_at: r.started_at });
-      supabase.from("appointments").update(patch as any).eq("id", r.id).then(({ error }) => {
-        if (error) toast.error(error.message);
-      });
+      const { error } = await supabase.from("appointments").update(patch as any).eq("id", r.id);
+      if (error) {
+        toast.error(error.message);
+        navigate(`/patients/${r.patient_id}?tab=clinical`);
+        return;
+      }
     }
-    // Deep-link to the patient profile's clinical tab — closest existing flow today.
-    navigate(`/patients/${r.patient_id}?tab=clinical`);
+    // Look for an existing encounter (most-recent draft preferred).
+    const { data: existing } = await supabase
+      .from("medical_records")
+      .select("id,status,created_at")
+      .eq("appointment_id", r.id)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    let recordId = existing?.[0]?.id as string | undefined;
+    if (!recordId && canMutate) {
+      const { data: created, error: insErr } = await supabase
+        .from("medical_records")
+        .insert({
+          patient_id: r.patient_id,
+          branch_id: r.branch_id ?? currentBranchId ?? null,
+          doctor_id: r.doctor_id ?? user?.id ?? null,
+          appointment_id: r.id,
+          visit_type: "consultation",
+          status: "draft",
+        } as any)
+        .select("id")
+        .single();
+      if (insErr) {
+        // No encounter and no permission/ability to create — fall back gracefully.
+        navigate(`/patients/${r.patient_id}?tab=clinical`);
+        return;
+      }
+      recordId = created?.id;
+    }
+    if (recordId) navigate(`/medical/consultation/${recordId}`);
+    else navigate(`/patients/${r.patient_id}?tab=clinical`);
   };
+
+  // No-show follow-up helpers
+  const recallNoShow = (r: QueueRow) =>
+    // Re-arrive the patient: clear stamps and stamp checked_in_at = now.
+    updateRow(r.id, buildStatusPatch("confirmed", { checked_in_at: null, started_at: null }));
+  const moveBackToWaiting = (r: QueueRow) =>
+    updateRow(r.id, buildStatusPatch("scheduled", { checked_in_at: r.checked_in_at, started_at: r.started_at }));
 
   const renderActions = (r: QueueRow) => {
     const items: { label: string; icon?: React.ReactNode; onClick: () => void }[] = [];
     // Fast path to consultation/chart — shown for any active row.
     if (r.status !== "cancelled" && r.status !== "no_show") {
       items.push({
-        label: t("startConsultation"),
+        label: t("openConsultation"),
         icon: <Stethoscope className="size-4" />,
-        onClick: () => startConsultation(r),
+        onClick: () => { void openConsultation(r); },
       });
     }
     if (canMutate && r.status === "scheduled") {
@@ -359,6 +413,10 @@ export default function QueuePage() {
     } else if (canMutate && r.status === "in_progress") {
       items.push({ label: t("completeVisit"), icon: <CheckCircle2 className="size-4" />, onClick: () => doComplete(r) });
     } else if (canMutate && (r.status === "cancelled" || r.status === "no_show")) {
+      if (r.status === "no_show") {
+        items.push({ label: t("recallPatient"), icon: <UserPlus className="size-4" />, onClick: () => recallNoShow(r) });
+        items.push({ label: t("moveBackToWaiting"), icon: <RotateCcw className="size-4" />, onClick: () => moveBackToWaiting(r) });
+      }
       items.push({ label: t("reopen"), icon: <RotateCcw className="size-4" />, onClick: () => doReopen(r) });
     }
     if (canMutate) {

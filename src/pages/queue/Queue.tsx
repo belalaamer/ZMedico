@@ -558,11 +558,19 @@ export default function QueuePage() {
             <p className="text-xs sm:text-sm text-muted-foreground">{t("queueSubtitle")}</p>
           </div>
         </div>
-        {canMutate && (
-          <Button type="button" onClick={() => setWalkInOpen(true)} size="sm" className="h-9">
-            <Plus className="size-4 me-1" /> {t("addWalkIn")}
+        <div className="flex items-center gap-2">
+          <Button asChild type="button" variant="outline" size="sm" className="h-9">
+            <Link to="/queue/audit"><ScrollText className="size-4 me-1" />{t("queueAuditLink")}</Link>
           </Button>
-        )}
+          <Button type="button" variant="outline" size="sm" className="h-9" onClick={() => setSettingsOpen(true)}>
+            <SettingsIcon className="size-4" />
+          </Button>
+          {canMutate && (
+            <Button type="button" onClick={() => setWalkInOpen(true)} size="sm" className="h-9">
+              <Plus className="size-4 me-1" /> {t("addWalkIn")}
+            </Button>
+          )}
+        </div>
       </header>
 
       {/* Mini analytics strip — today, current branch */}

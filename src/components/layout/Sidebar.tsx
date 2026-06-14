@@ -22,12 +22,15 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
     let q = supabase.from("stock_alerts").select("*", { count: "exact", head: true }).eq("is_resolved", false);
     if (currentBranchId) q = q.eq("branch_id", currentBranchId);
     q.then(({ count }) => setAlertCount(count ?? 0));
-    const ch = supabase.channel("inv-alerts")
+    const topic = `inv-alerts-${Math.random().toString(36).slice(2, 10)}`;
+    const ch = supabase
+      .channel(topic)
       .on("postgres_changes", { event: "*", schema: "public", table: "stock_alerts" }, () => {
         let q2 = supabase.from("stock_alerts").select("*", { count: "exact", head: true }).eq("is_resolved", false);
         if (currentBranchId) q2 = q2.eq("branch_id", currentBranchId);
         q2.then(({ count }) => setAlertCount(count ?? 0));
-      }).subscribe();
+      });
+    ch.subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [currentBranchId]);
 

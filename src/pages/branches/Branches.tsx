@@ -306,6 +306,9 @@ export default function Branches() {
                       <Button size="icon" variant="ghost" onClick={() => openLocation(b)} title={t("setLocation")}>
                         <MapPin className={`size-4 ${b.allowed_latitude ? "text-emerald-600" : "text-muted-foreground"}`} />
                       </Button>
+                      <Button size="icon" variant="ghost" onClick={() => openQueueSettings(b)} title={t("queueSettings")}>
+                        <ListChecks className="size-4" />
+                      </Button>
                       <Button size="icon" variant="ghost" onClick={() => openEdit(b)}><Pencil className="size-4" /></Button>
                       <Button size="icon" variant="ghost" onClick={() => setDelId(b.id)}><Trash2 className="size-4 text-destructive" /></Button>
                     </div>

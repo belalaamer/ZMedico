@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export default function AppShell() {
   const { pathname } = useLocation();
@@ -16,7 +17,9 @@ export default function AppShell() {
       <div className="flex-1 flex flex-col min-w-0">
         <Topbar />
         <main ref={mainRef} className="flex-1 overflow-y-auto p-4 md:p-6">
-          <Outlet />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
     </div>

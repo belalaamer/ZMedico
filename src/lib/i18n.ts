@@ -1008,8 +1008,6 @@ export const dict = {
     exportCsv: "Export CSV",
     from: "From",
     to: "To",
-    action: "Action",
-    user: "User",
     patient: "Patient",
     change: "Change",
     timestamp: "Time",

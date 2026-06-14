@@ -1984,6 +1984,15 @@ export const dict = {
     moveBackToWaiting: "إعادة للانتظار",
     openConsultation: "فتح الكشف",
     queueLongestWait: "أطول انتظار",
+    reassignDoctor: "تغيير الطبيب",
+    assignRoom: "تعيين غرفة",
+    changeRoom: "تغيير الغرفة",
+    reassignDoctorTitle: "تحويل إلى طبيب آخر",
+    reassignDoctorDesc: "نقل المريض إلى طبيب آخر مع الحفاظ على الحالة والتوقيتات.",
+    assignRoomTitle: "تعيين غرفة",
+    assignRoomDesc: "اختر من غرف اليوم أو أدخل غرفة جديدة.",
+    clearRoom: "إزالة الغرفة",
+    unassigned: "غير محدد",
   },
 } as const;
 

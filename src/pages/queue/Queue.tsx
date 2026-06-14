@@ -4,9 +4,13 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Combobox } from "@/components/ui/combobox";
 import { RowActions } from "@/components/RowActions";
 import { ListSkeleton } from "@/components/ListSkeleton";
-import { AlertTriangle, CheckCircle2, Clock, Flag, ListChecks, Play, UserPlus, X, ExternalLink, RotateCcw } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, Flag, ListChecks, Play, UserPlus, X, ExternalLink, RotateCcw, Plus, Stethoscope, Users, Activity, CheckCheck, UserX, Timer } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
@@ -27,6 +31,7 @@ type QueueRow = {
   priority: number | null;
   checked_in_at: string | null;
   started_at: string | null;
+  is_walk_in?: boolean | null;
   patients?: {
     first_name_en: string;
     last_name_en: string | null;
@@ -92,6 +97,14 @@ export default function QueuePage() {
   const [doctorFilter, setDoctorFilter] = useState<string>("all");
   const [urgentOnly, setUrgentOnly] = useState(false);
   const [tick, setTick] = useState(0);
+  // walk-in dialog state
+  const [walkInOpen, setWalkInOpen] = useState(false);
+  const [walkInPatient, setWalkInPatient] = useState("");
+  const [walkInDoctor, setWalkInDoctor] = useState("");
+  const [walkInRoom, setWalkInRoom] = useState("");
+  const [walkInProcedure, setWalkInProcedure] = useState("");
+  const [walkInSaving, setWalkInSaving] = useState(false);
+  const [patientOptions, setPatientOptions] = useState<{ id: string; first_name_en: string; last_name_en: string | null; first_name_ar: string | null; last_name_ar: string | null; patient_code: number; phone: string | null }[]>([]);
 
   // 30s tick so waiting/in-session timers re-render without per-row intervals.
   useEffect(() => {
@@ -105,7 +118,7 @@ export default function QueuePage() {
     const to = endOfDay(new Date()).toISOString();
     let q: any = supabase
       .from("appointments")
-      .select("id,patient_id,doctor_id,branch_id,room,scheduled_at,status,procedure,priority,checked_in_at,started_at,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)")
+      .select("id,patient_id,doctor_id,branch_id,room,scheduled_at,status,procedure,priority,checked_in_at,started_at,is_walk_in,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)")
       .is("deleted_at", null)
       .gte("scheduled_at", from)
       .lte("scheduled_at", to);
@@ -152,6 +165,18 @@ export default function QueuePage() {
       });
   }, []);
 
+  // lightweight patient list for walk-in picker (loaded on dialog open)
+  useEffect(() => {
+    if (!walkInOpen || patientOptions.length > 0) return;
+    supabase
+      .from("patients")
+      .select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code,phone")
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(500)
+      .then(({ data }) => setPatientOptions((data ?? []) as any));
+  }, [walkInOpen, patientOptions.length]);
+
   const patientName = (r: QueueRow) => {
     const p = r.patients;
     if (!p) return "—";
@@ -162,6 +187,11 @@ export default function QueuePage() {
   };
 
   const doctorName = (id: string | null) => doctors.find((d) => d.id === id)?.full_name ?? "—";
+
+  const patientDisplay = (p: { first_name_en: string; last_name_en: string | null; first_name_ar: string | null; last_name_ar: string | null }) =>
+    lang === "ar"
+      ? `${p.first_name_ar ?? p.first_name_en} ${p.last_name_ar ?? p.last_name_en ?? ""}`.trim()
+      : `${p.first_name_en} ${p.last_name_en ?? ""}`.trim();
 
   const filtered = useMemo(() => {
     const ACTIVE: ApptStatus[] = ["scheduled", "confirmed", "in_progress"];
@@ -221,8 +251,77 @@ export default function QueuePage() {
     return Date.now() - new Date(r.started_at).getTime();
   };
 
+  // ---- Today's analytics (computed from already-loaded rows; same branch + day window)
+  const analytics = useMemo(() => {
+    const total = rows.length;
+    const waiting = rows.filter((r) => r.status === "scheduled" || r.status === "confirmed").length;
+    const inSession = rows.filter((r) => r.status === "in_progress").length;
+    const completed = rows.filter((r) => r.status === "completed").length;
+    const noShow = rows.filter((r) => r.status === "no_show").length;
+    // Average wait = avg of (started_at - checked_in_at) across rows that have both stamps today.
+    const waited = rows
+      .filter((r) => r.checked_in_at && r.started_at)
+      .map((r) => new Date(r.started_at!).getTime() - new Date(r.checked_in_at!).getTime())
+      .filter((ms) => ms > 0);
+    const avgWaitMs = waited.length ? Math.round(waited.reduce((a, b) => a + b, 0) / waited.length) : null;
+    return { total, waiting, inSession, completed, noShow, avgWaitMs };
+    // tick: recompute live for waiting counts visible in the strip
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, tick]);
+
+  // ---- Walk-in creation
+  const submitWalkIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canMutate) { toast.error(lang === "ar" ? "غير مسموح" : "Not allowed"); return; }
+    if (!walkInPatient) { toast.error(t("selectPatient")); return; }
+    setWalkInSaving(true);
+    const nowIso = new Date().toISOString();
+    // Walk-in = a brand-new appointment scheduled "now", immediately checked-in.
+    // Reuses the same appointments row shape so it flows through every existing
+    // queue/calendar/permissions path without a parallel system.
+    const patch = buildStatusPatch("confirmed", { checked_in_at: nowIso, started_at: null }, nowIso);
+    const payload: any = {
+      patient_id: walkInPatient,
+      doctor_id: walkInDoctor || null,
+      branch_id: currentBranchId ?? null,
+      scheduled_at: nowIso,
+      duration_minutes: 30,
+      room: walkInRoom || null,
+      procedure: walkInProcedure || null,
+      is_walk_in: true,
+      ...patch,
+    };
+    const { error } = await supabase.from("appointments").insert(payload);
+    setWalkInSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("walkInCreated"));
+    setWalkInOpen(false);
+    setWalkInPatient(""); setWalkInDoctor(""); setWalkInRoom(""); setWalkInProcedure("");
+    load();
+  };
+
+  const startConsultation = (r: QueueRow) => {
+    // Fast path: if not yet in session, stamp started_at first so the timer + analytics stay correct.
+    if (canMutate && r.status !== "in_progress" && r.status !== "completed") {
+      const patch = buildStatusPatch("in_progress", { checked_in_at: r.checked_in_at, started_at: r.started_at });
+      supabase.from("appointments").update(patch as any).eq("id", r.id).then(({ error }) => {
+        if (error) toast.error(error.message);
+      });
+    }
+    // Deep-link to the patient profile's clinical tab — closest existing flow today.
+    navigate(`/patients/${r.patient_id}?tab=clinical`);
+  };
+
   const renderActions = (r: QueueRow) => {
     const items: { label: string; icon?: React.ReactNode; onClick: () => void }[] = [];
+    // Fast path to consultation/chart — shown for any active row.
+    if (r.status !== "cancelled" && r.status !== "no_show") {
+      items.push({
+        label: t("startConsultation"),
+        icon: <Stethoscope className="size-4" />,
+        onClick: () => startConsultation(r),
+      });
+    }
     if (canMutate && r.status === "scheduled") {
       items.push({ label: t("checkIn"), icon: <UserPlus className="size-4" />, onClick: () => doCheckIn(r) });
       items.push({ label: t("startVisit"), icon: <Play className="size-4" />, onClick: () => doStart(r) });
@@ -245,7 +344,7 @@ export default function QueuePage() {
       });
     }
     items.push({
-      label: t("openPatient"),
+      label: t("openChart"),
       icon: <ExternalLink className="size-4" />,
       onClick: () => navigate(`/patients/${r.patient_id}`),
     });
@@ -264,7 +363,22 @@ export default function QueuePage() {
             <p className="text-xs sm:text-sm text-muted-foreground">{t("queueSubtitle")}</p>
           </div>
         </div>
+        {canMutate && (
+          <Button type="button" onClick={() => setWalkInOpen(true)} size="sm" className="h-9">
+            <Plus className="size-4 me-1" /> {t("addWalkIn")}
+          </Button>
+        )}
       </header>
+
+      {/* Mini analytics strip — today, current branch */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+        <StatCard icon={<Users className="size-4" />}      label={t("queueTotalToday")}     value={analytics.total} />
+        <StatCard icon={<Clock className="size-4" />}      label={t("queueWaitingNow")}     value={analytics.waiting} tone="primary" />
+        <StatCard icon={<Activity className="size-4" />}   label={t("queueInSessionNow")}   value={analytics.inSession} tone="amber" />
+        <StatCard icon={<CheckCheck className="size-4" />} label={t("queueCompletedToday")} value={analytics.completed} tone="emerald" />
+        <StatCard icon={<UserX className="size-4" />}      label={t("queueNoShowToday")}    value={analytics.noShow} tone="destructive" />
+        <StatCard icon={<Timer className="size-4" />}      label={t("queueAvgWait")}        value={analytics.avgWaitMs == null ? "—" : formatDur(analytics.avgWaitMs)} />
+      </div>
 
       {/* Sticky filter bar */}
       <Card className="p-3 sticky top-0 z-10 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">

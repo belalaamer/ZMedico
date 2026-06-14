@@ -103,6 +103,32 @@ export default function QueueAuditPage() {
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [patients, setPatients] = useState<Record<string, { name: string; code: number }>>({});
   const [exportingAll, setExportingAll] = useState(false);
+  const [presets, setPresets] = useState<AuditPreset[]>(() => loadPresets(currentBranchId));
+  useEffect(() => { setPresets(loadPresets(currentBranchId)); }, [currentBranchId]);
+
+  const applyPreset = (id: string) => {
+    const p = presets.find((x) => x.id === id);
+    if (!p) return;
+    setActionFilter(p.action as any);
+    setUserFilter(p.userId);
+    setRefFilter(p.ref);
+    setScopeBranch(p.scopeBranch);
+  };
+  const savePresetPrompt = () => {
+    const name = window.prompt(lang === "ar" ? "اسم الإعداد المسبق" : "Preset name");
+    if (!name || !name.trim()) return;
+    const next: AuditPreset[] = [
+      ...presets,
+      { id: crypto.randomUUID(), name: name.trim(), action: actionFilter, userId: userFilter, ref: refFilter, scopeBranch },
+    ];
+    setPresets(next);
+    savePresets(currentBranchId, next);
+  };
+  const deletePreset = (id: string) => {
+    const next = presets.filter((p) => p.id !== id);
+    setPresets(next);
+    savePresets(currentBranchId, next);
+  };
 
   const PAGE_SIZE = 200;
 

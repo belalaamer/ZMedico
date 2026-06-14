@@ -267,7 +267,7 @@ export default function QueueAuditPage() {
       a.href = url; a.download = `queue-audit-all-${todayStr()}.csv`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success(`${total} ${t("rowsExported") || "rows exported"}`);
+      toast.success(`${total} rows exported`);
     } finally {
       setExportingAll(false);
     }
@@ -293,7 +293,7 @@ export default function QueueAuditPage() {
             <Download className="size-4 me-1" /> {t("exportCsv")}
           </Button>
           <Button type="button" size="sm" variant="outline" onClick={() => void exportAll()} disabled={exportingAll}>
-            <Download className="size-4 me-1" /> {exportingAll ? "…" : (t("exportAll") || "Export all")}
+            <Download className="size-4 me-1" /> {exportingAll ? "…" : (lang === "ar" ? "تصدير الكل" : "Export all")}
           </Button>
         </div>
       </header>

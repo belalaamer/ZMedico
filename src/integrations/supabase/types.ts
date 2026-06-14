@@ -109,6 +109,7 @@ export type Database = {
           doctor_id: string | null
           duration_minutes: number
           id: string
+          is_walk_in: boolean
           notes: string | null
           patient_id: string
           priority: number
@@ -127,6 +128,7 @@ export type Database = {
           doctor_id?: string | null
           duration_minutes?: number
           id?: string
+          is_walk_in?: boolean
           notes?: string | null
           patient_id: string
           priority?: number
@@ -145,6 +147,7 @@ export type Database = {
           doctor_id?: string | null
           duration_minutes?: number
           id?: string
+          is_walk_in?: boolean
           notes?: string | null
           patient_id?: string
           priority?: number

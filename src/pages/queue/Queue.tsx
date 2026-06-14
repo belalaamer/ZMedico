@@ -912,6 +912,40 @@ export default function QueuePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Queue settings dialog (localStorage, per-branch) */}
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("queueSettings")}</DialogTitle>
+            <DialogDescription>{t("queueSettingsDesc")}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>{t("longWaitThresholdMin")}</Label>
+              <Input
+                type="number"
+                min={5}
+                max={240}
+                value={settings.longWaitMinutes}
+                onChange={(e) => setSettings({ ...settings, longWaitMinutes: Math.max(5, Math.min(240, Number(e.target.value) || 30)) })}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <Label className="font-normal">{t("defaultMyQueueLabel")}</Label>
+              <Switch checked={settings.defaultMyQueue} onCheckedChange={(v) => setSettings({ ...settings, defaultMyQueue: v })} />
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <Label className="font-normal">{t("showNoShowsInDefaultLabel")}</Label>
+              <Switch checked={settings.showNoShowsInDefault} onCheckedChange={(v) => setSettings({ ...settings, showNoShowsInDefault: v })} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setSettingsOpen(false)}>{t("cancel")}</Button>
+            <Button type="button" onClick={() => { setQueueSettings(currentBranchId, settings); toast.success(t("saved")); setSettingsOpen(false); }}>{t("save")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

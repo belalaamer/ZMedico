@@ -833,6 +833,68 @@ export default function QueuePage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Reassign doctor dialog */}
+      <Dialog open={!!reassignRow} onOpenChange={(o) => !o && setReassignRow(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("reassignDoctorTitle")}</DialogTitle>
+            <DialogDescription>{t("reassignDoctorDesc")}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>{t("doctor")}</Label>
+              <Combobox
+                options={[{ value: "", label: `— ${t("unassigned")} —` }, ...doctors.map((d) => ({ value: d.id, label: d.full_name }))]}
+                value={reassignDoctor}
+                onChange={setReassignDoctor}
+                placeholder={t("selectDoctorOptional")}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setReassignRow(null)}>{t("cancel")}</Button>
+            <Button type="button" onClick={submitReassign} disabled={reassignSaving}>{t("save")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign room dialog */}
+      <Dialog open={!!roomRow} onOpenChange={(o) => !o && setRoomRow(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("assignRoomTitle")}</DialogTitle>
+            <DialogDescription>{t("assignRoomDesc")}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {roomOptions.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {roomOptions.map((rm) => (
+                  <Button
+                    key={rm}
+                    type="button"
+                    size="sm"
+                    variant={roomValue === rm ? "default" : "outline"}
+                    onClick={() => setRoomValue(rm)}
+                    className="h-8"
+                  >
+                    {rm}
+                  </Button>
+                ))}
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label>{t("room")}</Label>
+              <Input value={roomValue} onChange={(e) => setRoomValue(e.target.value)} placeholder={t("roomOptional")} />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="ghost" onClick={() => setRoomValue("")}>{t("clearRoom")}</Button>
+            <Button type="button" variant="outline" onClick={() => setRoomRow(null)}>{t("cancel")}</Button>
+            <Button type="button" onClick={submitRoom} disabled={roomSaving}>{t("save")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

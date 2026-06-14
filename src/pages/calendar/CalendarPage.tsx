@@ -23,6 +23,7 @@ import { formatMoney, formatDate } from "@/lib/format";
 import { toast } from "sonner";
 import { RowActions } from "@/components/RowActions";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { buildStatusPatch } from "@/lib/appointmentStatus";
 
 function statusLabel(s: Appt["status"], t: (k: any) => string) {
   const map: Record<Appt["status"], string> = {
@@ -385,7 +386,12 @@ export default function CalendarPage() {
   };
 
   const changeStatus = async (a: Appt, status: Appt["status"]): Promise<void> => {
-    const { error } = await supabase.from("appointments").update({ status } as any).eq("id", a.id);
+    // Use shared helper so checked_in_at / started_at stay consistent with Queue.
+    const patch = buildStatusPatch(status, {
+      checked_in_at: (a as any).checked_in_at ?? null,
+      started_at: (a as any).started_at ?? null,
+    });
+    const { error } = await supabase.from("appointments").update(patch as any).eq("id", a.id);
     if (error) { toast.error(error.message); return; }
     toast.success(t("saved"));
     load();

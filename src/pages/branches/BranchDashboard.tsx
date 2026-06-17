@@ -11,7 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useDataSync } from "@/lib/dataSync";
 import { fetchQueueSettings, type QueueSettings } from "@/lib/queueSettings";
 import {
-  syncBranchAlerts, listRecentAlerts, snoozeAlert, acknowledgeAlert, unsnoozeAlert,
+  listOpenAlerts, listRecentAlerts, snoozeAlert, acknowledgeAlert, unsnoozeAlert,
   effectiveState, snoozePresets,
   type QueueAlert, type AlertType,
 } from "@/lib/queueAlerts";
@@ -122,6 +122,7 @@ export default function BranchDashboard() {
   const [settings, setSettings] = useState<QueueSettings | null>(null);
   const [openAlerts, setOpenAlerts] = useState<QueueAlert[]>([]);
   const [alertHistory, setAlertHistory] = useState<QueueAlert[]>([]);
+  const [detectorRun, setDetectorRun] = useState<{ last_run_at: string; last_status: string; last_error: string | null } | null>(null);
   const [loading, setLoading] = useState(true);
   const [tick, setTick] = useState(0);
 
@@ -202,19 +203,29 @@ export default function BranchDashboard() {
     return isAr ? `الطابور مزدحم (${w} / ${th})` : `Queue is busy (${w} / ${th})`;
   };
 
-  // Persist alert lifecycle in the background whenever conditions change.
+  // Phase 15: the dashboard is now a consumer only — alert rows are produced
+  // by the background detector edge function. We just refresh the lists.
   useEffect(() => {
-    if (!currentBranchId || loading) return;
+    if (!currentBranchId) { setOpenAlerts([]); setAlertHistory([]); setDetectorRun(null); return; }
     let cancelled = false;
-    (async () => {
-      const open = await syncBranchAlerts(currentBranchId, conditions);
+    const refresh = async () => {
+      const [open, hist, runRes] = await Promise.all([
+        listOpenAlerts(currentBranchId),
+        listRecentAlerts(currentBranchId, 15),
+        (supabase as any)
+          .from("queue_alert_runs")
+          .select("last_run_at,last_status,last_error")
+          .eq("branch_id", currentBranchId)
+          .maybeSingle(),
+      ]);
       if (cancelled) return;
       setOpenAlerts(open);
-      const hist = await listRecentAlerts(currentBranchId, 15);
-      if (!cancelled) setAlertHistory(hist);
-    })();
+      setAlertHistory(hist);
+      setDetectorRun((runRes?.data ?? null) as any);
+    };
+    void refresh();
     return () => { cancelled = true; };
-  }, [currentBranchId, loading, conditions]);
+  }, [currentBranchId, tick]);
 
   // Phase 14: realtime — refresh alert lists whenever any queue_alerts row
   // for this branch changes. Polling/tick remains as a fallback.
@@ -247,8 +258,7 @@ export default function BranchDashboard() {
 
   const refreshAlerts = async () => {
     if (!currentBranchId) return;
-    const open = await syncBranchAlerts(currentBranchId, conditions);
-    setOpenAlerts(open);
+    setOpenAlerts(await listOpenAlerts(currentBranchId));
     setAlertHistory(await listRecentAlerts(currentBranchId, 15));
   };
 

@@ -179,22 +179,68 @@ export default function BranchDashboard() {
   const noShowAlertAt = settings?.noShowRateThreshold ?? 25;
   const busyAt = settings?.busyQueueThreshold ?? 8;
   const alertsEnabled = settings ? settings.alertsOnDashboard : true;
-  const alerts: string[] = [];
-  if (longestWaitMin >= longWaitMin) {
-    alerts.push(isAr
-      ? `مريض ينتظر منذ ${longestWaitMin} دقيقة (الحد ${longWaitMin})`
-      : `Patient waiting ${longestWaitMin}m (threshold ${longWaitMin}m)`);
-  }
-  if (noShowRate >= noShowAlertAt && m.total >= 4) {
-    alerts.push(isAr
-      ? `نسبة عدم الحضور مرتفعة (${noShowRate}% / ${noShowAlertAt}%)`
-      : `High no-show rate (${noShowRate}% / ${noShowAlertAt}%)`);
-  }
-  if (m.waiting >= busyAt) {
-    alerts.push(isAr
-      ? `الطابور مزدحم (${m.waiting} / ${busyAt})`
-      : `Queue is busy (${m.waiting} / ${busyAt})`);
-  }
+  // Current condition set, used both for the inline banner and persistence.
+  const conditions = useMemo(() => ([
+    { type: "long_wait" as AlertType, active: longestWaitMin >= longWaitMin, detail: { longestWaitMin, threshold: longWaitMin, patient: m.longestName } },
+    { type: "no_show_rate" as AlertType, active: noShowRate >= noShowAlertAt && m.total >= 4, detail: { noShowRate, threshold: noShowAlertAt, total: m.total } },
+    { type: "busy_queue" as AlertType, active: m.waiting >= busyAt, detail: { waiting: m.waiting, threshold: busyAt } },
+  ]), [longestWaitMin, longWaitMin, noShowRate, noShowAlertAt, m.total, m.waiting, busyAt, m.longestName]);
+
+  const alertLabel = (type: AlertType, detail: Record<string, any>): string => {
+    if (type === "long_wait") {
+      const mins = detail?.longestWaitMin ?? longestWaitMin;
+      const th = detail?.threshold ?? longWaitMin;
+      return isAr ? `مريض ينتظر منذ ${mins} دقيقة (الحد ${th})` : `Patient waiting ${mins}m (threshold ${th}m)`;
+    }
+    if (type === "no_show_rate") {
+      const rate = detail?.noShowRate ?? noShowRate;
+      const th = detail?.threshold ?? noShowAlertAt;
+      return isAr ? `نسبة عدم الحضور مرتفعة (${rate}% / ${th}%)` : `High no-show rate (${rate}% / ${th}%)`;
+    }
+    const w = detail?.waiting ?? m.waiting;
+    const th = detail?.threshold ?? busyAt;
+    return isAr ? `الطابور مزدحم (${w} / ${th})` : `Queue is busy (${w} / ${th})`;
+  };
+
+  // Persist alert lifecycle in the background whenever conditions change.
+  useEffect(() => {
+    if (!currentBranchId || loading) return;
+    let cancelled = false;
+    (async () => {
+      const open = await syncBranchAlerts(currentBranchId, conditions);
+      if (cancelled) return;
+      setOpenAlerts(open);
+      const hist = await listRecentAlerts(currentBranchId, 15);
+      if (!cancelled) setAlertHistory(hist);
+    })();
+    return () => { cancelled = true; };
+  }, [currentBranchId, loading, conditions]);
+
+  const nowMs = now;
+  // Banners only show for currently-active rows (i.e. not snoozed / not acknowledged).
+  const bannerAlerts = openAlerts.filter((a) => effectiveState(a, nowMs) === "active");
+  const snoozedCount = openAlerts.filter((a) => effectiveState(a, nowMs) === "snoozed").length;
+  const ackCount = openAlerts.filter((a) => effectiveState(a, nowMs) === "acknowledged").length;
+
+  const refreshAlerts = async () => {
+    if (!currentBranchId) return;
+    const open = await syncBranchAlerts(currentBranchId, conditions);
+    setOpenAlerts(open);
+    setAlertHistory(await listRecentAlerts(currentBranchId, 15));
+  };
+
+  const doSnooze = async (id: string, iso: string) => {
+    await snoozeAlert(id, iso, user?.id ?? null);
+    await refreshAlerts();
+  };
+  const doAck = async (id: string) => {
+    await acknowledgeAlert(id, user?.id ?? null);
+    await refreshAlerts();
+  };
+  const doUnsnooze = async (id: string) => {
+    await unsnoozeAlert(id);
+    await refreshAlerts();
+  };
 
   // Optional cheap time-of-day breakdown for today's appointments
   const dayParts = useMemo(() => {

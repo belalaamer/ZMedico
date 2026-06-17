@@ -671,10 +671,16 @@ export default function QueuePage() {
             {filtered.length}
           </div>
         </div>
-        {longWaitCount > 0 && (
+        {settings.alertsOnQueue && longWaitCount > 0 && (
           <div className="mt-2 flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-md px-2 py-1.5">
             <AlertTriangle className="size-4" />
             <span>{t("longWaitBanner").replace("{n}", String(longWaitCount))}</span>
+          </div>
+        )}
+        {settings.alertsOnQueue && filtered.filter((r) => r.status === "scheduled" || r.status === "confirmed").length >= settings.busyQueueThreshold && (
+          <div className="mt-2 flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-md px-2 py-1.5">
+            <AlertTriangle className="size-4" />
+            <span>{lang === "ar" ? `الطابور مزدحم (${filtered.filter((r) => r.status === "scheduled" || r.status === "confirmed").length} / ${settings.busyQueueThreshold})` : `Queue is busy (${filtered.filter((r) => r.status === "scheduled" || r.status === "confirmed").length} / ${settings.busyQueueThreshold})`}</span>
           </div>
         )}
       </Card>

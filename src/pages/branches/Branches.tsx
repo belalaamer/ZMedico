@@ -463,6 +463,46 @@ export default function Branches() {
                 <Label className="font-normal">{t("showNoShowsInDefaultLabel")}</Label>
                 <Switch checked={qsValue.showNoShowsInDefault} onCheckedChange={(v) => setQsValue({ ...qsValue, showNoShowsInDefault: v })} />
               </div>
+              <div className="pt-2 border-t">
+                <div className="text-xs font-medium text-muted-foreground mb-2">
+                  {lang === "ar" ? "حدود التنبيهات" : "Alert thresholds"}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">{lang === "ar" ? "نسبة عدم الحضور %" : "No-show rate %"}</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={qsValue.noShowRateThreshold}
+                      onChange={(e) => setQsValue({ ...qsValue, noShowRateThreshold: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">{lang === "ar" ? "حد ازدحام الطابور" : "Busy queue (waiting)"}</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={200}
+                      value={qsValue.busyQueueThreshold}
+                      onChange={(e) => setQsValue({ ...qsValue, busyQueueThreshold: Math.max(1, Math.min(200, Number(e.target.value) || 1)) })}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="pt-2 border-t">
+                <div className="text-xs font-medium text-muted-foreground mb-2">
+                  {lang === "ar" ? "عرض التنبيهات" : "Show alerts on"}
+                </div>
+                <div className="flex items-center justify-between gap-3 rounded-md border p-3">
+                  <Label className="font-normal">{lang === "ar" ? "لوحة الفرع" : "Branch Dashboard"}</Label>
+                  <Switch checked={qsValue.alertsOnDashboard} onCheckedChange={(v) => setQsValue({ ...qsValue, alertsOnDashboard: v })} />
+                </div>
+                <div className="flex items-center justify-between gap-3 rounded-md border p-3 mt-2">
+                  <Label className="font-normal">{lang === "ar" ? "صفحة الطابور" : "Queue page"}</Label>
+                  <Switch checked={qsValue.alertsOnQueue} onCheckedChange={(v) => setQsValue({ ...qsValue, alertsOnQueue: v })} />
+                </div>
+              </div>
             </div>
           )}
           <DialogFooter>

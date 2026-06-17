@@ -3379,29 +3379,41 @@ export type Database = {
       }
       queue_settings: {
         Row: {
+          alerts_on_dashboard: boolean
+          alerts_on_queue: boolean
           branch_id: string | null
+          busy_queue_threshold: number
           created_at: string
           default_my_queue: boolean
           id: string
           long_wait_minutes: number
+          no_show_rate_threshold: number
           show_no_shows_in_default: boolean
           updated_at: string
         }
         Insert: {
+          alerts_on_dashboard?: boolean
+          alerts_on_queue?: boolean
           branch_id?: string | null
+          busy_queue_threshold?: number
           created_at?: string
           default_my_queue?: boolean
           id?: string
           long_wait_minutes?: number
+          no_show_rate_threshold?: number
           show_no_shows_in_default?: boolean
           updated_at?: string
         }
         Update: {
+          alerts_on_dashboard?: boolean
+          alerts_on_queue?: boolean
           branch_id?: string | null
+          busy_queue_threshold?: number
           created_at?: string
           default_my_queue?: boolean
           id?: string
           long_wait_minutes?: number
+          no_show_rate_threshold?: number
           show_no_shows_in_default?: boolean
           updated_at?: string
         }

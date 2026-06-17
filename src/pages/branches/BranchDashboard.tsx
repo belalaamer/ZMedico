@@ -166,22 +166,37 @@ export default function BranchDashboard() {
   // Alerts
   const longWaitMin = settings?.longWaitMinutes ?? 20;
   const longestWaitMin = Math.floor(m.longestWaitMs / 60000);
+  const noShowAlertAt = settings?.noShowRateThreshold ?? 25;
+  const busyAt = settings?.busyQueueThreshold ?? 8;
+  const alertsEnabled = settings ? settings.alertsOnDashboard : true;
   const alerts: string[] = [];
   if (longestWaitMin >= longWaitMin) {
     alerts.push(isAr
       ? `مريض ينتظر منذ ${longestWaitMin} دقيقة (الحد ${longWaitMin})`
       : `Patient waiting ${longestWaitMin}m (threshold ${longWaitMin}m)`);
   }
-  if (noShowRate >= 25 && m.total >= 4) {
+  if (noShowRate >= noShowAlertAt && m.total >= 4) {
     alerts.push(isAr
-      ? `نسبة عدم الحضور مرتفعة (${noShowRate}%)`
-      : `High no-show rate (${noShowRate}%)`);
+      ? `نسبة عدم الحضور مرتفعة (${noShowRate}% / ${noShowAlertAt}%)`
+      : `High no-show rate (${noShowRate}% / ${noShowAlertAt}%)`);
   }
-  if (m.waiting >= 8) {
+  if (m.waiting >= busyAt) {
     alerts.push(isAr
-      ? `الطابور مزدحم (${m.waiting} في الانتظار)`
-      : `Queue is busy (${m.waiting} waiting)`);
+      ? `الطابور مزدحم (${m.waiting} / ${busyAt})`
+      : `Queue is busy (${m.waiting} / ${busyAt})`);
   }
+
+  // Optional cheap time-of-day breakdown for today's appointments
+  const dayParts = useMemo(() => {
+    const buckets = { morning: 0, afternoon: 0, evening: 0 };
+    for (const r of today) {
+      const h = new Date(r.scheduled_at).getHours();
+      if (h < 12) buckets.morning++;
+      else if (h < 17) buckets.afternoon++;
+      else buckets.evening++;
+    }
+    return buckets;
+  }, [today]);
 
   const printedAt = new Date().toLocaleString(isAr ? "ar" : "en");
 
@@ -251,7 +266,7 @@ export default function BranchDashboard() {
                   <div className="text-xl font-semibold">{loading ? "—" : m.noShow} <span className="text-xs text-muted-foreground">({noShowRate}%)</span></div>
                 </div>
               </div>
-              {alerts.length > 0 && (
+              {alertsEnabled && alerts.length > 0 && (
                 <div className="space-y-1">
                   {alerts.map((a, i) => (
                     <div key={i} className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-300 rounded px-2 py-1.5">
@@ -261,6 +276,32 @@ export default function BranchDashboard() {
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Time-of-day breakdown */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Activity className="size-4 text-primary" />
+                {isAr ? "توزيع اليوم" : "Time of day"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-3 text-sm">
+                <div className="rounded-md border p-3">
+                  <div className="text-xs text-muted-foreground">{isAr ? "صباحًا (قبل 12)" : "Morning (<12)"}</div>
+                  <div className="text-xl font-semibold">{dayParts.morning}</div>
+                </div>
+                <div className="rounded-md border p-3">
+                  <div className="text-xs text-muted-foreground">{isAr ? "ظهرًا (12–17)" : "Afternoon (12–17)"}</div>
+                  <div className="text-xl font-semibold">{dayParts.afternoon}</div>
+                </div>
+                <div className="rounded-md border p-3">
+                  <div className="text-xs text-muted-foreground">{isAr ? "مساءً (17+)" : "Evening (17+)"}</div>
+                  <div className="text-xl font-semibold">{dayParts.evening}</div>
+                </div>
+              </div>
             </CardContent>
           </Card>
 

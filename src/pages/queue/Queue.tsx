@@ -124,6 +124,7 @@ export default function QueuePage() {
   // Per-branch policy settings (localStorage). Re-loaded on branch switch.
   const [settings, setSettings] = useState<QueueSettings>(() => getQueueSettings(currentBranchId));
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [openAlerts, setOpenAlerts] = useState<QueueAlert[]>([]);
   const LONG_WAIT_MS = settings.longWaitMinutes * 60 * 1000;
   // On branch change: paint from local cache instantly, then hydrate from server.
   useEffect(() => {

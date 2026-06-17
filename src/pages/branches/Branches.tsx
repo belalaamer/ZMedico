@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDataSync } from "@/lib/dataSync";
-import { Plus, Search, Pencil, Trash2, Building2, Star, MapPin, ListChecks, Users, ScrollText, CalendarDays, Clock } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Building2, Star, MapPin, ListChecks, Users, ScrollText, CalendarDays, Clock, LayoutDashboard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -320,6 +320,7 @@ export default function Branches() {
               <Button asChild size="sm" variant="outline"><Link to="/queue"><Users className="size-3.5 me-1" />{t("queue") ?? "Queue"}</Link></Button>
               <Button asChild size="sm" variant="outline"><Link to="/queue/audit"><ScrollText className="size-3.5 me-1" />{t("queueAuditTitle") ?? "Audit"}</Link></Button>
               <Button asChild size="sm" variant="outline"><Link to="/calendar"><CalendarDays className="size-3.5 me-1" />{t("appointments") ?? "Appointments"}</Link></Button>
+              <Button asChild size="sm" variant="outline"><Link to="/branches/dashboard"><LayoutDashboard className="size-3.5 me-1" />{lang === "ar" ? "لوحة الفرع" : "Branch dashboard"}</Link></Button>
               <Button size="sm" variant="ghost" onClick={() => openQueueSettings(currentBranch)}>
                 <ListChecks className="size-3.5 me-1" />{t("queueSettings")}
               </Button>

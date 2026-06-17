@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDataSync } from "@/lib/dataSync";
-import { Plus, Search, Pencil, Trash2, Building2, Star, MapPin, ListChecks } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Building2, Star, MapPin, ListChecks, Users, ScrollText, CalendarDays, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
+import { useBranch } from "@/contexts/BranchContext";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -41,6 +43,7 @@ export default function Branches() {
   const { t, lang } = useI18n();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { currentBranchId } = useBranch();
   const [items, setItems] = useState<Branch[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [search, setSearch] = useState("");
@@ -57,6 +60,19 @@ export default function Branches() {
   const [qsValue, setQsValue] = useState<QueueSettings>(DEFAULT_QUEUE_SETTINGS);
   const [qsLoading, setQsLoading] = useState(false);
   const [qsSaving, setQsSaving] = useState(false);
+  // Branch summary panel (Phase 9): show active queue settings for the
+  // currently-selected branch + quick links to operational pages.
+  const [summary, setSummary] = useState<QueueSettings | null>(null);
+  const currentBranch = useMemo(
+    () => items.find((b) => b.id === currentBranchId) ?? null,
+    [items, currentBranchId]
+  );
+  useEffect(() => {
+    let cancelled = false;
+    if (!currentBranchId) { setSummary(null); return; }
+    fetchQueueSettings(currentBranchId).then((v) => { if (!cancelled) setSummary(v); });
+    return () => { cancelled = true; };
+  }, [currentBranchId, qsBranch]);
 
   const openQueueSettings = async (b: Branch) => {
     setQsBranch(b);
@@ -266,6 +282,51 @@ export default function Branches() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {currentBranch && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Building2 className="size-4 text-primary" />
+              {lang === "ar" ? currentBranch.name_ar : currentBranch.name_en}
+              <Badge variant="outline" className="ms-1 text-[10px] font-normal">{lang === "ar" ? "الفرع الحالي" : "Current branch"}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+              <div className="rounded-md border p-2 flex items-center gap-2">
+                <Clock className="size-3.5 text-muted-foreground" />
+                <div>
+                  <div className="text-muted-foreground">{t("longWaitThresholdMin")}</div>
+                  <div className="font-medium">{summary ? `${summary.longWaitMinutes} min` : "—"}</div>
+                </div>
+              </div>
+              <div className="rounded-md border p-2 flex items-center gap-2">
+                <Users className="size-3.5 text-muted-foreground" />
+                <div>
+                  <div className="text-muted-foreground">{t("defaultMyQueueLabel")}</div>
+                  <div className="font-medium">{summary?.defaultMyQueue ? (lang === "ar" ? "مفعل" : "On") : (lang === "ar" ? "متوقف" : "Off")}</div>
+                </div>
+              </div>
+              <div className="rounded-md border p-2 flex items-center gap-2">
+                <ListChecks className="size-3.5 text-muted-foreground" />
+                <div>
+                  <div className="text-muted-foreground">{t("showNoShowsInDefaultLabel")}</div>
+                  <div className="font-medium">{summary?.showNoShowsInDefault ? (lang === "ar" ? "نعم" : "Yes") : (lang === "ar" ? "لا" : "No")}</div>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm" variant="outline"><Link to="/queue"><Users className="size-3.5 me-1" />{t("queue") ?? "Queue"}</Link></Button>
+              <Button asChild size="sm" variant="outline"><Link to="/queue/audit"><ScrollText className="size-3.5 me-1" />{t("queueAuditTitle") ?? "Audit"}</Link></Button>
+              <Button asChild size="sm" variant="outline"><Link to="/calendar"><CalendarDays className="size-3.5 me-1" />{t("appointments") ?? "Appointments"}</Link></Button>
+              <Button size="sm" variant="ghost" onClick={() => openQueueSettings(currentBranch)}>
+                <ListChecks className="size-3.5 me-1" />{t("queueSettings")}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

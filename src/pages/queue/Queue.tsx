@@ -134,6 +134,14 @@ export default function QueuePage() {
     return () => { active = false; };
   }, [currentBranchId]);
 
+  // Refresh open-alerts on branch change + tick so snooze expiry is reflected.
+  useEffect(() => {
+    if (!currentBranchId) { setOpenAlerts([]); return; }
+    let active = true;
+    void listOpenAlerts(currentBranchId).then((rows) => { if (active) setOpenAlerts(rows); });
+    return () => { active = false; };
+  }, [currentBranchId, tick]);
+
   // 30s tick so waiting/in-session timers re-render without per-row intervals.
   useEffect(() => {
     const id = setInterval(() => setTick((x) => x + 1), 30_000);

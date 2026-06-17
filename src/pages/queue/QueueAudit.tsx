@@ -12,6 +12,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 const QUEUE_ACTIONS = [
   "status_change",
@@ -24,12 +25,13 @@ type QAction = typeof QUEUE_ACTIONS[number];
 
 const SAFE_KEYS = ["status", "doctor_id", "room", "priority", "is_walk_in", "checked_in_at", "started_at"];
 
-// --- Audit filter presets (Phase 8) -------------------------------------------
-// Persist common filter combinations per branch in localStorage so frontdesk
-// staff can recall the same export shape (e.g. "Today's no-shows by Dr. X")
-// without re-typing filters every time. Branch / dates intentionally excluded
-// from the saved shape — branch comes from the active context, dates are
-// usually "now"-relative and would be misleading if restored verbatim.
+// --- Audit filter presets (Phase 9) -------------------------------------------
+// Now persisted server-side in public.audit_export_presets, scoped per branch
+// AND per user, so frontdesk staff can recall the same export shape across
+// devices. Branch / dates intentionally excluded from the saved shape —
+// branch comes from the active context, dates are usually "now"-relative and
+// would be misleading if restored verbatim. localStorage is used only as a
+// transient fallback cache if the server round-trip fails.
 type AuditPreset = {
   id: string;
   name: string;
@@ -38,14 +40,14 @@ type AuditPreset = {
   ref: string;
   scopeBranch: boolean;
 };
-const PRESETS_KEY = (branchId?: string | null) => `zmedico.auditPresets.${branchId ?? "global"}`;
-function loadPresets(branchId?: string | null): AuditPreset[] {
+const PRESETS_CACHE_KEY = (branchId?: string | null) => `zmedico.auditPresets.${branchId ?? "global"}`;
+function loadCachedPresets(branchId?: string | null): AuditPreset[] {
   if (typeof window === "undefined") return [];
-  try { return JSON.parse(window.localStorage.getItem(PRESETS_KEY(branchId)) || "[]"); } catch { return []; }
+  try { return JSON.parse(window.localStorage.getItem(PRESETS_CACHE_KEY(branchId)) || "[]"); } catch { return []; }
 }
-function savePresets(branchId: string | null | undefined, list: AuditPreset[]) {
+function cachePresets(branchId: string | null | undefined, list: AuditPreset[]) {
   if (typeof window === "undefined") return;
-  try { window.localStorage.setItem(PRESETS_KEY(branchId), JSON.stringify(list.slice(0, 20))); } catch { /* ignore */ }
+  try { window.localStorage.setItem(PRESETS_CACHE_KEY(branchId), JSON.stringify(list.slice(0, 50))); } catch { /* ignore */ }
 }
 
 type LogRow = {
@@ -89,6 +91,7 @@ function summarizeDiff(oldV: any, newV: any) {
 export default function QueueAuditPage() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const [rows, setRows] = useState<LogRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,8 +106,30 @@ export default function QueueAuditPage() {
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [patients, setPatients] = useState<Record<string, { name: string; code: number }>>({});
   const [exportingAll, setExportingAll] = useState(false);
-  const [presets, setPresets] = useState<AuditPreset[]>(() => loadPresets(currentBranchId));
-  useEffect(() => { setPresets(loadPresets(currentBranchId)); }, [currentBranchId]);
+  const [presets, setPresets] = useState<AuditPreset[]>(() => loadCachedPresets(currentBranchId));
+
+  // Hydrate presets from the server when branch changes. Falls back to the
+  // local cache so the UI is never empty while the request is in flight.
+  useEffect(() => {
+    let cancelled = false;
+    setPresets(loadCachedPresets(currentBranchId));
+    if (!currentBranchId) return;
+    (async () => {
+      const { data, error } = await (supabase as any)
+        .from("audit_export_presets")
+        .select("id,name,action,user_filter,ref,scope_branch")
+        .eq("branch_id", currentBranchId)
+        .order("created_at", { ascending: true });
+      if (cancelled || error || !data) return;
+      const list: AuditPreset[] = data.map((r: any) => ({
+        id: r.id, name: r.name, action: r.action,
+        userId: r.user_filter, ref: r.ref, scopeBranch: r.scope_branch,
+      }));
+      setPresets(list);
+      cachePresets(currentBranchId, list);
+    })();
+    return () => { cancelled = true; };
+  }, [currentBranchId]);
 
   const applyPreset = (id: string) => {
     const p = presets.find((x) => x.id === id);
@@ -114,20 +139,47 @@ export default function QueueAuditPage() {
     setRefFilter(p.ref);
     setScopeBranch(p.scopeBranch);
   };
-  const savePresetPrompt = () => {
+  const savePresetPrompt = async () => {
     const name = window.prompt(lang === "ar" ? "اسم الإعداد المسبق" : "Preset name");
     if (!name || !name.trim()) return;
-    const next: AuditPreset[] = [
-      ...presets,
-      { id: crypto.randomUUID(), name: name.trim(), action: actionFilter, userId: userFilter, ref: refFilter, scopeBranch },
-    ];
+    if (!currentBranchId || !user) {
+      // No branch / not signed in → local-only fallback so UI keeps working.
+      const next: AuditPreset[] = [
+        ...presets,
+        { id: crypto.randomUUID(), name: name.trim(), action: actionFilter, userId: userFilter, ref: refFilter, scopeBranch },
+      ];
+      setPresets(next);
+      cachePresets(currentBranchId, next);
+      return;
+    }
+    const { data, error } = await (supabase as any)
+      .from("audit_export_presets")
+      .insert({
+        branch_id: currentBranchId,
+        user_id: user.id,
+        name: name.trim(),
+        action: actionFilter,
+        user_filter: userFilter,
+        ref: refFilter,
+        scope_branch: scopeBranch,
+      })
+      .select("id,name,action,user_filter,ref,scope_branch")
+      .single();
+    if (error || !data) { toast.error(error?.message ?? "Save failed"); return; }
+    const next = [...presets, {
+      id: data.id, name: data.name, action: data.action,
+      userId: data.user_filter, ref: data.ref, scopeBranch: data.scope_branch,
+    }];
     setPresets(next);
-    savePresets(currentBranchId, next);
+    cachePresets(currentBranchId, next);
   };
-  const deletePreset = (id: string) => {
+  const deletePreset = async (id: string) => {
     const next = presets.filter((p) => p.id !== id);
     setPresets(next);
-    savePresets(currentBranchId, next);
+    cachePresets(currentBranchId, next);
+    // Best-effort server delete; RLS will block deletes for presets the
+    // user does not own, which is fine — local list still updates.
+    await (supabase as any).from("audit_export_presets").delete().eq("id", id);
   };
 
   const PAGE_SIZE = 200;

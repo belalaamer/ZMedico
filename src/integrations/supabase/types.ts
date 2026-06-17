@@ -3377,6 +3377,44 @@ export type Database = {
           },
         ]
       }
+      queue_alert_runs: {
+        Row: {
+          alerts_opened: number
+          alerts_resolved: number
+          branch_id: string
+          last_error: string | null
+          last_run_at: string
+          last_status: string
+          updated_at: string
+        }
+        Insert: {
+          alerts_opened?: number
+          alerts_resolved?: number
+          branch_id: string
+          last_error?: string | null
+          last_run_at?: string
+          last_status?: string
+          updated_at?: string
+        }
+        Update: {
+          alerts_opened?: number
+          alerts_resolved?: number
+          branch_id?: string
+          last_error?: string | null
+          last_run_at?: string
+          last_status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "queue_alert_runs_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: true
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       queue_alerts: {
         Row: {
           acknowledged_at: string | null

@@ -142,6 +142,24 @@ export default function QueuePage() {
     return () => { active = false; };
   }, [currentBranchId, tick]);
 
+  // Phase 14: realtime — push alert state changes (snooze/ack/resolve) into
+  // the queue page without waiting for the next tick.
+  useEffect(() => {
+    if (!currentBranchId) return;
+    const channel = supabase
+      .channel(`queue_alerts_queue:${currentBranchId}`)
+      .on(
+        "postgres_changes" as any,
+        { event: "*", schema: "public", table: "queue_alerts", filter: `branch_id=eq.${currentBranchId}` },
+        async () => {
+          const rows = await listOpenAlerts(currentBranchId);
+          setOpenAlerts(rows);
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [currentBranchId]);
+
   // 30s tick so waiting/in-session timers re-render without per-row intervals.
   useEffect(() => {
     const id = setInterval(() => setTick((x) => x + 1), 30_000);

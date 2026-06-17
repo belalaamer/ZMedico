@@ -322,12 +322,37 @@ export default function BranchDashboard() {
                   <div className="text-xl font-semibold">{loading ? "—" : m.noShow} <span className="text-xs text-muted-foreground">({noShowRate}%)</span></div>
                 </div>
               </div>
-              {alertsEnabled && alerts.length > 0 && (
+              {alertsEnabled && (bannerAlerts.length > 0 || snoozedCount > 0 || ackCount > 0) && (
                 <div className="space-y-1">
-                  {alerts.map((a, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-300 rounded px-2 py-1.5">
+                  {(snoozedCount > 0 || ackCount > 0) && (
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <Badge variant="outline" className="gap-1"><AlertTriangle className="size-3" />{bannerAlerts.length} {isAr ? "نشط" : "active"}</Badge>
+                      {snoozedCount > 0 && <Badge variant="outline" className="gap-1"><BellOff className="size-3" />{snoozedCount} {isAr ? "مؤجل" : "snoozed"}</Badge>}
+                      {ackCount > 0 && <Badge variant="outline" className="gap-1"><Check className="size-3" />{ackCount} {isAr ? "مؤكد" : "ack"}</Badge>}
+                    </div>
+                  )}
+                  {bannerAlerts.map((a) => (
+                    <div key={a.id} className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-300 rounded px-2 py-1.5">
                       <AlertTriangle className="size-3.5 shrink-0" />
-                      <span>{a}</span>
+                      <span className="flex-1">{alertLabel(a.alert_type, a.detail)}</span>
+                      <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]" onClick={() => doAck(a.id)}>
+                        <Check className="size-3 me-1" />{isAr ? "تأكيد" : "Ack"}
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]"><BellOff className="size-3 me-1" />{isAr ? "تأجيل" : "Snooze"}</Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {snoozePresets().map((p) => (
+                            <DropdownMenuItem key={p.key} onClick={() => doSnooze(a.id, p.iso)}>
+                              {isAr ? p.labelAr : p.labelEn}
+                            </DropdownMenuItem>
+                          ))}
+                          <DropdownMenuItem onClick={() => doAck(a.id)}>
+                            {isAr ? "حتى الحل" : "Until resolved"}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   ))}
                 </div>

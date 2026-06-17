@@ -21,6 +21,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { buildStatusPatch, type ApptStatus } from "@/lib/appointmentStatus";
 import { logQueueAudit } from "@/lib/queueAudit";
 import { getQueueSettings, fetchQueueSettings, type QueueSettings } from "@/lib/queueSettings";
+import { listOpenAlerts, effectiveState, type QueueAlert } from "@/lib/queueAlerts";
 import { Switch } from "@/components/ui/switch";
 
 type QueueRow = {

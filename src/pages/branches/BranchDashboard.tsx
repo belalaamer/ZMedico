@@ -216,6 +216,29 @@ export default function BranchDashboard() {
     return () => { cancelled = true; };
   }, [currentBranchId, loading, conditions]);
 
+  // Phase 14: realtime — refresh alert lists whenever any queue_alerts row
+  // for this branch changes. Polling/tick remains as a fallback.
+  useEffect(() => {
+    if (!currentBranchId) return;
+    const channel = supabase
+      .channel(`queue_alerts:${currentBranchId}`)
+      .on(
+        "postgres_changes" as any,
+        { event: "*", schema: "public", table: "queue_alerts", filter: `branch_id=eq.${currentBranchId}` },
+        async () => {
+          const mod = await import("@/lib/queueAlerts");
+          const [open, hist] = await Promise.all([
+            mod.listOpenAlerts(currentBranchId),
+            listRecentAlerts(currentBranchId, 15),
+          ]);
+          setOpenAlerts(open);
+          setAlertHistory(hist);
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [currentBranchId]);
+
   const nowMs = now;
   // Banners only show for currently-active rows (i.e. not snoozed / not acknowledged).
   const bannerAlerts = openAlerts.filter((a) => effectiveState(a, nowMs) === "active");

@@ -390,6 +390,31 @@ export default function BranchDashboard() {
                   ))}
                 </div>
               )}
+              {(() => {
+                if (!detectorRun) {
+                  return (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground rounded px-2 py-1.5 bg-muted/40">
+                      <AlertTriangle className="size-3.5" />
+                      <span>{isAr ? "كاشف التنبيهات في الخلفية لم يُسجَّل بعد لهذا الفرع." : "Background alert detector has not reported a run for this branch yet."}</span>
+                    </div>
+                  );
+                }
+                const ageMs = Date.now() - new Date(detectorRun.last_run_at).getTime();
+                const stale = ageMs > 15 * 60 * 1000; // 15 min
+                const isErr = detectorRun.last_status !== "ok";
+                if (!stale && !isErr) return null;
+                const mins = Math.floor(ageMs / 60000);
+                return (
+                  <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-300 rounded px-2 py-1.5">
+                    <AlertTriangle className="size-3.5 shrink-0" />
+                    <span className="flex-1">
+                      {isErr
+                        ? (isAr ? `فشل آخر تشغيل لكاشف التنبيهات: ${detectorRun.last_error ?? ""}` : `Alert detector last run failed: ${detectorRun.last_error ?? ""}`)
+                        : (isAr ? `كاشف التنبيهات لم يعمل منذ ${mins} دقيقة.` : `Alert detector hasn't run in ${mins}m.`)}
+                    </span>
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
 

@@ -180,13 +180,6 @@ export default function BranchDashboard() {
   const noShowAlertAt = settings?.noShowRateThreshold ?? 25;
   const busyAt = settings?.busyQueueThreshold ?? 8;
   const alertsEnabled = settings ? settings.alertsOnDashboard : true;
-  // Current condition set, used both for the inline banner and persistence.
-  const conditions = useMemo(() => ([
-    { type: "long_wait" as AlertType, active: longestWaitMin >= longWaitMin, detail: { longestWaitMin, threshold: longWaitMin, patient: m.longestName } },
-    { type: "no_show_rate" as AlertType, active: noShowRate >= noShowAlertAt && m.total >= 4, detail: { noShowRate, threshold: noShowAlertAt, total: m.total } },
-    { type: "busy_queue" as AlertType, active: m.waiting >= busyAt, detail: { waiting: m.waiting, threshold: busyAt } },
-  ]), [longestWaitMin, longWaitMin, noShowRate, noShowAlertAt, m.total, m.waiting, busyAt, m.longestName]);
-
   const alertLabel = (type: AlertType, detail: Record<string, any>): string => {
     if (type === "long_wait") {
       const mins = detail?.longestWaitMin ?? longestWaitMin;

@@ -3,11 +3,12 @@ import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Activity, Users, CheckCheck, UserX, Timer, ArrowUp, ArrowDown, Minus, CalendarDays, ScrollText, ListChecks, Building2, Play } from "lucide-react";
+import { Activity, Users, CheckCheck, UserX, Timer, ArrowUp, ArrowDown, Minus, CalendarDays, ScrollText, ListChecks, Building2, Play, Printer, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useBranch } from "@/contexts/BranchContext";
 import { useI18n } from "@/contexts/I18nContext";
 import { useDataSync } from "@/lib/dataSync";
+import { fetchQueueSettings, type QueueSettings } from "@/lib/queueSettings";
 import type { ApptStatus } from "@/lib/appointmentStatus";
 
 type Row = {
@@ -109,6 +110,8 @@ export default function BranchDashboard() {
   const [branchName, setBranchName] = useState<string>("");
   const [today, setToday] = useState<Row[]>([]);
   const [yesterday, setYesterday] = useState<Row[]>([]);
+  const [week, setWeek] = useState<Row[]>([]);
+  const [settings, setSettings] = useState<QueueSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [tick, setTick] = useState(0);
 
@@ -122,14 +125,22 @@ export default function BranchDashboard() {
     const tEnd = endOfDay(now).toISOString();
     const yStart = startOfDay(addDays(now, -1)).toISOString();
     const yEnd = endOfDay(addDays(now, -1)).toISOString();
+    // 7-day window covers the 7 days preceding today (yesterday back 7 days),
+    // used as the baseline to compare against today.
+    const wStart = startOfDay(addDays(now, -7)).toISOString();
+    const wEnd = endOfDay(addDays(now, -1)).toISOString();
     const sel = "id, status, scheduled_at, checked_in_at, started_at, patients(first_name_en, last_name_en, first_name_ar, last_name_ar)";
-    const [{ data: tData }, { data: yData }, { data: br }] = await Promise.all([
+    const [{ data: tData }, { data: yData }, { data: wData }, { data: br }, qs] = await Promise.all([
       supabase.from("appointments").select(sel).eq("branch_id", currentBranchId).gte("scheduled_at", tStart).lte("scheduled_at", tEnd),
       supabase.from("appointments").select(sel).eq("branch_id", currentBranchId).gte("scheduled_at", yStart).lte("scheduled_at", yEnd),
+      supabase.from("appointments").select(sel).eq("branch_id", currentBranchId).gte("scheduled_at", wStart).lte("scheduled_at", wEnd),
       supabase.from("branches").select("name_en, name_ar").eq("id", currentBranchId).maybeSingle(),
+      fetchQueueSettings(currentBranchId).catch(() => null),
     ]);
     setToday((tData ?? []) as any);
     setYesterday((yData ?? []) as any);
+    setWeek((wData ?? []) as any);
+    setSettings(qs as QueueSettings | null);
     setBranchName((br as any) ? (lang === "ar" ? (br as any).name_ar : (br as any).name_en) : "");
     setLoading(false);
   };
@@ -139,13 +150,53 @@ export default function BranchDashboard() {
   const now = Date.now();
   const m = useMemo(() => computeMetrics(today, lang, now), [today, lang, tick]);
   const p = useMemo(() => computeMetrics(yesterday, lang, now), [yesterday, lang]);
+  const w = useMemo(() => computeMetrics(week, lang, now), [week, lang]);
   const isAr = lang === "ar";
 
   const noShowRate = m.total ? Math.round((m.noShow / m.total) * 100) : 0;
   const prevNoShowRate = p.total ? Math.round((p.noShow / p.total) * 100) : 0;
+  // 7-day daily averages (baseline to compare today against)
+  const wAvgTotal = Math.round(w.total / 7);
+  const wAvgWaiting = Math.round(w.waiting / 7);
+  const wAvgInSession = Math.round(w.inSession / 7);
+  const wAvgCompleted = Math.round(w.completed / 7);
+  const wNoShowRate = w.total ? Math.round((w.noShow / w.total) * 100) : 0;
+  const wAvgWaitMs = w.avgWaitMs; // already an average across the window
+
+  // Alerts
+  const longWaitMin = settings?.longWaitMinutes ?? 20;
+  const longestWaitMin = Math.floor(m.longestWaitMs / 60000);
+  const alerts: string[] = [];
+  if (longestWaitMin >= longWaitMin) {
+    alerts.push(isAr
+      ? `مريض ينتظر منذ ${longestWaitMin} دقيقة (الحد ${longWaitMin})`
+      : `Patient waiting ${longestWaitMin}m (threshold ${longWaitMin}m)`);
+  }
+  if (noShowRate >= 25 && m.total >= 4) {
+    alerts.push(isAr
+      ? `نسبة عدم الحضور مرتفعة (${noShowRate}%)`
+      : `High no-show rate (${noShowRate}%)`);
+  }
+  if (m.waiting >= 8) {
+    alerts.push(isAr
+      ? `الطابور مزدحم (${m.waiting} في الانتظار)`
+      : `Queue is busy (${m.waiting} waiting)`);
+  }
+
+  const printedAt = new Date().toLocaleString(isAr ? "ar" : "en");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 print:space-y-3">
+      <style>{`
+        @media print {
+          @page { margin: 12mm; }
+          body { background: #fff !important; }
+          .no-print { display: none !important; }
+          aside, nav, header[role="banner"] { display: none !important; }
+          .print-only { display: block !important; }
+        }
+        .print-only { display: none; }
+      `}</style>
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -156,12 +207,14 @@ export default function BranchDashboard() {
             {branchName ? `${branchName} · ` : ""}
             {isAr ? "نشاط العيادة اليوم" : "Today's clinic activity"}
           </p>
+          <p className="print-only text-xs text-muted-foreground">{isAr ? "طُبع في" : "Printed"}: {printedAt}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 no-print">
           <Button asChild size="sm" variant="outline"><Link to="/queue"><Users className="size-3.5 me-1" />{isAr ? "الطابور" : "Queue"}</Link></Button>
           <Button asChild size="sm" variant="outline"><Link to="/queue/audit"><ScrollText className="size-3.5 me-1" />{isAr ? "السجل" : "Audit"}</Link></Button>
           <Button asChild size="sm" variant="outline"><Link to="/calendar"><CalendarDays className="size-3.5 me-1" />{isAr ? "المواعيد" : "Appointments"}</Link></Button>
           <Button asChild size="sm" variant="outline"><Link to="/branches"><ListChecks className="size-3.5 me-1" />{isAr ? "إعدادات الفرع" : "Branch settings"}</Link></Button>
+          <Button size="sm" variant="outline" onClick={() => window.print()}><Printer className="size-3.5 me-1" />{isAr ? "طباعة" : "Print"}</Button>
         </div>
       </div>
 
@@ -171,6 +224,46 @@ export default function BranchDashboard() {
 
       {currentBranchId && (
         <>
+          {/* Daily operational summary card */}
+          <Card className="border-primary/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Activity className="size-4 text-primary" />
+                {isAr ? "ملخص اليوم" : "Today at a glance"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                <div>
+                  <div className="text-xs text-muted-foreground">{isAr ? "مواعيد اليوم" : "Appointments"}</div>
+                  <div className="text-xl font-semibold">{loading ? "—" : m.total}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">{isAr ? "في الانتظار الآن" : "Waiting now"}</div>
+                  <div className="text-xl font-semibold">{loading ? "—" : m.waiting}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">{isAr ? "أطول انتظار" : "Longest wait"}</div>
+                  <div className="text-xl font-semibold">{m.longestWaitMs ? fmtDur(m.longestWaitMs) : "—"}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">{isAr ? "لم يحضر" : "No-shows"}</div>
+                  <div className="text-xl font-semibold">{loading ? "—" : m.noShow} <span className="text-xs text-muted-foreground">({noShowRate}%)</span></div>
+                </div>
+              </div>
+              {alerts.length > 0 && (
+                <div className="space-y-1">
+                  {alerts.map((a, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-300 rounded px-2 py-1.5">
+                      <AlertTriangle className="size-3.5 shrink-0" />
+                      <span>{a}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
             <Stat
               icon={<Activity className="size-3.5" />}
@@ -202,6 +295,29 @@ export default function BranchDashboard() {
               sub={<>vs {isAr ? "أمس" : "yesterday"}: <Delta today={noShowRate} prev={prevNoShowRate} invert suffix="%" /></>}
             />
           </div>
+
+          {/* 7-day trend rollup */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Activity className="size-4 text-primary" />
+                {isAr ? "اتجاه آخر 7 أيام" : "7-day trend"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-xs text-muted-foreground mb-2">
+                {isAr ? "اليوم مقابل متوسط الأيام السبعة السابقة" : "Today vs. average of the previous 7 days"}
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-x-4 gap-y-2 text-sm">
+                <TrendRow label={isAr ? "الإجمالي" : "Total"} today={m.total} avg={wAvgTotal} />
+                <TrendRow label={isAr ? "الانتظار" : "Waiting"} today={m.waiting} avg={wAvgWaiting} />
+                <TrendRow label={isAr ? "الجلسة" : "In session"} today={m.inSession} avg={wAvgInSession} />
+                <TrendRow label={isAr ? "مكتمل" : "Completed"} today={m.completed} avg={wAvgCompleted} />
+                <TrendRow label={isAr ? "لم يحضر%" : "No-show %"} today={noShowRate} avg={wNoShowRate} invert suffix="%" />
+                <TrendRow label={isAr ? "متوسط الانتظار" : "Avg wait"} today={Math.round(m.avgWaitMs / 60000)} avg={Math.round(wAvgWaitMs / 60000)} invert suffix="m" />
+              </div>
+            </CardContent>
+          </Card>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Card>
@@ -238,6 +354,18 @@ export default function BranchDashboard() {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function TrendRow({ label, today, avg, invert = false, suffix = "" }: { label: string; today: number; avg: number; invert?: boolean; suffix?: string }) {
+  return (
+    <div className="flex items-center justify-between gap-2 border-b border-border/40 py-1 last:border-0">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-sm font-medium tabular-nums">
+        {today}{suffix} <span className="text-xs text-muted-foreground">/ {avg}{suffix}</span>{" "}
+        <Delta today={today} prev={avg} invert={invert} suffix={suffix} />
+      </span>
     </div>
   );
 }

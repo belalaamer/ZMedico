@@ -474,6 +474,74 @@ export default function BranchDashboard() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Alert history */}
+          <Card className="no-print">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <History className="size-4 text-primary" />
+                {isAr ? "سجل التنبيهات" : "Alert history"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {alertHistory.length === 0 ? (
+                <div className="text-sm text-muted-foreground">{isAr ? "لا توجد تنبيهات حديثة." : "No recent alerts."}</div>
+              ) : (
+                <ul className="divide-y divide-border/60">
+                  {alertHistory.map((a) => {
+                    const eff = effectiveState(a, nowMs);
+                    const tone =
+                      eff === "active" ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                      : eff === "snoozed" ? "bg-muted text-muted-foreground border-border"
+                      : eff === "acknowledged" ? "bg-primary/10 text-primary border-primary/30"
+                      : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30";
+                    const stateLabel =
+                      eff === "active" ? (isAr ? "نشط" : "Active")
+                      : eff === "snoozed" ? (isAr ? "مؤجل" : "Snoozed")
+                      : eff === "acknowledged" ? (isAr ? "مؤكد" : "Acknowledged")
+                      : (isAr ? "محلول" : "Resolved");
+                    return (
+                      <li key={a.id} className="py-2 flex flex-wrap items-center gap-2 text-xs">
+                        <Badge variant="outline" className={tone}>{stateLabel}</Badge>
+                        <span className="font-medium">{alertLabel(a.alert_type, a.detail)}</span>
+                        <span className="text-muted-foreground ms-auto">
+                          {new Date(a.created_at).toLocaleString(isAr ? "ar" : "en", { hour: "2-digit", minute: "2-digit", month: "short", day: "numeric" })}
+                        </span>
+                        {a.snoozed_until && eff === "snoozed" && (
+                          <span className="text-muted-foreground">
+                            · {isAr ? "حتى" : "until"} {new Date(a.snoozed_until).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        )}
+                        {a.acknowledged_at && (
+                          <span className="text-muted-foreground">· {isAr ? "تم التأكيد" : "ack'd"} {new Date(a.acknowledged_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                        )}
+                        {eff === "snoozed" && (
+                          <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]" onClick={() => doUnsnooze(a.id)}>{isAr ? "إلغاء التأجيل" : "Unsnooze"}</Button>
+                        )}
+                        {eff === "active" && (
+                          <>
+                            <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]" onClick={() => doAck(a.id)}><Check className="size-3 me-1" />{isAr ? "تأكيد" : "Ack"}</Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]"><BellOff className="size-3 me-1" />{isAr ? "تأجيل" : "Snooze"}</Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {snoozePresets().map((p) => (
+                                  <DropdownMenuItem key={p.key} onClick={() => doSnooze(a.id, p.iso)}>
+                                    {isAr ? p.labelAr : p.labelEn}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
         </>
       )}
     </div>

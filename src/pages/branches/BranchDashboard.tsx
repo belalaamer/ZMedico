@@ -3,12 +3,19 @@ import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Activity, Users, CheckCheck, UserX, Timer, ArrowUp, ArrowDown, Minus, CalendarDays, ScrollText, ListChecks, Building2, Play, Printer, AlertTriangle } from "lucide-react";
+import { Activity, Users, CheckCheck, UserX, Timer, ArrowUp, ArrowDown, Minus, CalendarDays, ScrollText, ListChecks, Building2, Play, Printer, AlertTriangle, BellOff, Check, History } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useBranch } from "@/contexts/BranchContext";
 import { useI18n } from "@/contexts/I18nContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { useDataSync } from "@/lib/dataSync";
 import { fetchQueueSettings, type QueueSettings } from "@/lib/queueSettings";
+import {
+  syncBranchAlerts, listRecentAlerts, snoozeAlert, acknowledgeAlert, unsnoozeAlert,
+  effectiveState, snoozePresets,
+  type QueueAlert, type AlertType,
+} from "@/lib/queueAlerts";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { ApptStatus } from "@/lib/appointmentStatus";
 
 type Row = {
@@ -106,12 +113,15 @@ function Stat({ icon, label, value, sub }: { icon: React.ReactNode; label: strin
 
 export default function BranchDashboard() {
   const { lang } = useI18n();
+  const { user } = useAuth();
   const { currentBranchId } = useBranch();
   const [branchName, setBranchName] = useState<string>("");
   const [today, setToday] = useState<Row[]>([]);
   const [yesterday, setYesterday] = useState<Row[]>([]);
   const [week, setWeek] = useState<Row[]>([]);
   const [settings, setSettings] = useState<QueueSettings | null>(null);
+  const [openAlerts, setOpenAlerts] = useState<QueueAlert[]>([]);
+  const [alertHistory, setAlertHistory] = useState<QueueAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [tick, setTick] = useState(0);
 
@@ -169,22 +179,68 @@ export default function BranchDashboard() {
   const noShowAlertAt = settings?.noShowRateThreshold ?? 25;
   const busyAt = settings?.busyQueueThreshold ?? 8;
   const alertsEnabled = settings ? settings.alertsOnDashboard : true;
-  const alerts: string[] = [];
-  if (longestWaitMin >= longWaitMin) {
-    alerts.push(isAr
-      ? `مريض ينتظر منذ ${longestWaitMin} دقيقة (الحد ${longWaitMin})`
-      : `Patient waiting ${longestWaitMin}m (threshold ${longWaitMin}m)`);
-  }
-  if (noShowRate >= noShowAlertAt && m.total >= 4) {
-    alerts.push(isAr
-      ? `نسبة عدم الحضور مرتفعة (${noShowRate}% / ${noShowAlertAt}%)`
-      : `High no-show rate (${noShowRate}% / ${noShowAlertAt}%)`);
-  }
-  if (m.waiting >= busyAt) {
-    alerts.push(isAr
-      ? `الطابور مزدحم (${m.waiting} / ${busyAt})`
-      : `Queue is busy (${m.waiting} / ${busyAt})`);
-  }
+  // Current condition set, used both for the inline banner and persistence.
+  const conditions = useMemo(() => ([
+    { type: "long_wait" as AlertType, active: longestWaitMin >= longWaitMin, detail: { longestWaitMin, threshold: longWaitMin, patient: m.longestName } },
+    { type: "no_show_rate" as AlertType, active: noShowRate >= noShowAlertAt && m.total >= 4, detail: { noShowRate, threshold: noShowAlertAt, total: m.total } },
+    { type: "busy_queue" as AlertType, active: m.waiting >= busyAt, detail: { waiting: m.waiting, threshold: busyAt } },
+  ]), [longestWaitMin, longWaitMin, noShowRate, noShowAlertAt, m.total, m.waiting, busyAt, m.longestName]);
+
+  const alertLabel = (type: AlertType, detail: Record<string, any>): string => {
+    if (type === "long_wait") {
+      const mins = detail?.longestWaitMin ?? longestWaitMin;
+      const th = detail?.threshold ?? longWaitMin;
+      return isAr ? `مريض ينتظر منذ ${mins} دقيقة (الحد ${th})` : `Patient waiting ${mins}m (threshold ${th}m)`;
+    }
+    if (type === "no_show_rate") {
+      const rate = detail?.noShowRate ?? noShowRate;
+      const th = detail?.threshold ?? noShowAlertAt;
+      return isAr ? `نسبة عدم الحضور مرتفعة (${rate}% / ${th}%)` : `High no-show rate (${rate}% / ${th}%)`;
+    }
+    const w = detail?.waiting ?? m.waiting;
+    const th = detail?.threshold ?? busyAt;
+    return isAr ? `الطابور مزدحم (${w} / ${th})` : `Queue is busy (${w} / ${th})`;
+  };
+
+  // Persist alert lifecycle in the background whenever conditions change.
+  useEffect(() => {
+    if (!currentBranchId || loading) return;
+    let cancelled = false;
+    (async () => {
+      const open = await syncBranchAlerts(currentBranchId, conditions);
+      if (cancelled) return;
+      setOpenAlerts(open);
+      const hist = await listRecentAlerts(currentBranchId, 15);
+      if (!cancelled) setAlertHistory(hist);
+    })();
+    return () => { cancelled = true; };
+  }, [currentBranchId, loading, conditions]);
+
+  const nowMs = now;
+  // Banners only show for currently-active rows (i.e. not snoozed / not acknowledged).
+  const bannerAlerts = openAlerts.filter((a) => effectiveState(a, nowMs) === "active");
+  const snoozedCount = openAlerts.filter((a) => effectiveState(a, nowMs) === "snoozed").length;
+  const ackCount = openAlerts.filter((a) => effectiveState(a, nowMs) === "acknowledged").length;
+
+  const refreshAlerts = async () => {
+    if (!currentBranchId) return;
+    const open = await syncBranchAlerts(currentBranchId, conditions);
+    setOpenAlerts(open);
+    setAlertHistory(await listRecentAlerts(currentBranchId, 15));
+  };
+
+  const doSnooze = async (id: string, iso: string) => {
+    await snoozeAlert(id, iso, user?.id ?? null);
+    await refreshAlerts();
+  };
+  const doAck = async (id: string) => {
+    await acknowledgeAlert(id, user?.id ?? null);
+    await refreshAlerts();
+  };
+  const doUnsnooze = async (id: string) => {
+    await unsnoozeAlert(id);
+    await refreshAlerts();
+  };
 
   // Optional cheap time-of-day breakdown for today's appointments
   const dayParts = useMemo(() => {
@@ -266,12 +322,37 @@ export default function BranchDashboard() {
                   <div className="text-xl font-semibold">{loading ? "—" : m.noShow} <span className="text-xs text-muted-foreground">({noShowRate}%)</span></div>
                 </div>
               </div>
-              {alertsEnabled && alerts.length > 0 && (
+              {alertsEnabled && (bannerAlerts.length > 0 || snoozedCount > 0 || ackCount > 0) && (
                 <div className="space-y-1">
-                  {alerts.map((a, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-300 rounded px-2 py-1.5">
+                  {(snoozedCount > 0 || ackCount > 0) && (
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <Badge variant="outline" className="gap-1"><AlertTriangle className="size-3" />{bannerAlerts.length} {isAr ? "نشط" : "active"}</Badge>
+                      {snoozedCount > 0 && <Badge variant="outline" className="gap-1"><BellOff className="size-3" />{snoozedCount} {isAr ? "مؤجل" : "snoozed"}</Badge>}
+                      {ackCount > 0 && <Badge variant="outline" className="gap-1"><Check className="size-3" />{ackCount} {isAr ? "مؤكد" : "ack"}</Badge>}
+                    </div>
+                  )}
+                  {bannerAlerts.map((a) => (
+                    <div key={a.id} className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-300 rounded px-2 py-1.5">
                       <AlertTriangle className="size-3.5 shrink-0" />
-                      <span>{a}</span>
+                      <span className="flex-1">{alertLabel(a.alert_type, a.detail)}</span>
+                      <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]" onClick={() => doAck(a.id)}>
+                        <Check className="size-3 me-1" />{isAr ? "تأكيد" : "Ack"}
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]"><BellOff className="size-3 me-1" />{isAr ? "تأجيل" : "Snooze"}</Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {snoozePresets().map((p) => (
+                            <DropdownMenuItem key={p.key} onClick={() => doSnooze(a.id, p.iso)}>
+                              {isAr ? p.labelAr : p.labelEn}
+                            </DropdownMenuItem>
+                          ))}
+                          <DropdownMenuItem onClick={() => doAck(a.id)}>
+                            {isAr ? "حتى الحل" : "Until resolved"}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   ))}
                 </div>
@@ -393,6 +474,74 @@ export default function BranchDashboard() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Alert history */}
+          <Card className="no-print">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <History className="size-4 text-primary" />
+                {isAr ? "سجل التنبيهات" : "Alert history"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {alertHistory.length === 0 ? (
+                <div className="text-sm text-muted-foreground">{isAr ? "لا توجد تنبيهات حديثة." : "No recent alerts."}</div>
+              ) : (
+                <ul className="divide-y divide-border/60">
+                  {alertHistory.map((a) => {
+                    const eff = effectiveState(a, nowMs);
+                    const tone =
+                      eff === "active" ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                      : eff === "snoozed" ? "bg-muted text-muted-foreground border-border"
+                      : eff === "acknowledged" ? "bg-primary/10 text-primary border-primary/30"
+                      : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30";
+                    const stateLabel =
+                      eff === "active" ? (isAr ? "نشط" : "Active")
+                      : eff === "snoozed" ? (isAr ? "مؤجل" : "Snoozed")
+                      : eff === "acknowledged" ? (isAr ? "مؤكد" : "Acknowledged")
+                      : (isAr ? "محلول" : "Resolved");
+                    return (
+                      <li key={a.id} className="py-2 flex flex-wrap items-center gap-2 text-xs">
+                        <Badge variant="outline" className={tone}>{stateLabel}</Badge>
+                        <span className="font-medium">{alertLabel(a.alert_type, a.detail)}</span>
+                        <span className="text-muted-foreground ms-auto">
+                          {new Date(a.created_at).toLocaleString(isAr ? "ar" : "en", { hour: "2-digit", minute: "2-digit", month: "short", day: "numeric" })}
+                        </span>
+                        {a.snoozed_until && eff === "snoozed" && (
+                          <span className="text-muted-foreground">
+                            · {isAr ? "حتى" : "until"} {new Date(a.snoozed_until).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        )}
+                        {a.acknowledged_at && (
+                          <span className="text-muted-foreground">· {isAr ? "تم التأكيد" : "ack'd"} {new Date(a.acknowledged_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                        )}
+                        {eff === "snoozed" && (
+                          <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]" onClick={() => doUnsnooze(a.id)}>{isAr ? "إلغاء التأجيل" : "Unsnooze"}</Button>
+                        )}
+                        {eff === "active" && (
+                          <>
+                            <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]" onClick={() => doAck(a.id)}><Check className="size-3 me-1" />{isAr ? "تأكيد" : "Ack"}</Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]"><BellOff className="size-3 me-1" />{isAr ? "تأجيل" : "Snooze"}</Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {snoozePresets().map((p) => (
+                                  <DropdownMenuItem key={p.key} onClick={() => doSnooze(a.id, p.iso)}>
+                                    {isAr ? p.labelAr : p.labelEn}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
         </>
       )}
     </div>

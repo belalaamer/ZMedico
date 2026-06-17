@@ -3377,6 +3377,59 @@ export type Database = {
           },
         ]
       }
+      queue_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          alert_type: string
+          branch_id: string
+          created_at: string
+          detail: Json
+          id: string
+          resolved_at: string | null
+          snoozed_by: string | null
+          snoozed_until: string | null
+          state: string
+          updated_at: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          alert_type: string
+          branch_id: string
+          created_at?: string
+          detail?: Json
+          id?: string
+          resolved_at?: string | null
+          snoozed_by?: string | null
+          snoozed_until?: string | null
+          state?: string
+          updated_at?: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          alert_type?: string
+          branch_id?: string
+          created_at?: string
+          detail?: Json
+          id?: string
+          resolved_at?: string | null
+          snoozed_by?: string | null
+          snoozed_until?: string | null
+          state?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "queue_alerts_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       queue_settings: {
         Row: {
           alerts_on_dashboard: boolean

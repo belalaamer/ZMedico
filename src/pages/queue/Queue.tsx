@@ -21,6 +21,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { buildStatusPatch, type ApptStatus } from "@/lib/appointmentStatus";
 import { logQueueAudit } from "@/lib/queueAudit";
 import { getQueueSettings, fetchQueueSettings, type QueueSettings } from "@/lib/queueSettings";
+import { listOpenAlerts, effectiveState, type QueueAlert } from "@/lib/queueAlerts";
 import { Switch } from "@/components/ui/switch";
 
 type QueueRow = {
@@ -123,6 +124,7 @@ export default function QueuePage() {
   // Per-branch policy settings (localStorage). Re-loaded on branch switch.
   const [settings, setSettings] = useState<QueueSettings>(() => getQueueSettings(currentBranchId));
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [openAlerts, setOpenAlerts] = useState<QueueAlert[]>([]);
   const LONG_WAIT_MS = settings.longWaitMinutes * 60 * 1000;
   // On branch change: paint from local cache instantly, then hydrate from server.
   useEffect(() => {
@@ -131,6 +133,14 @@ export default function QueuePage() {
     void fetchQueueSettings(currentBranchId).then((s) => { if (active) setSettings(s); });
     return () => { active = false; };
   }, [currentBranchId]);
+
+  // Refresh open-alerts on branch change + tick so snooze expiry is reflected.
+  useEffect(() => {
+    if (!currentBranchId) { setOpenAlerts([]); return; }
+    let active = true;
+    void listOpenAlerts(currentBranchId).then((rows) => { if (active) setOpenAlerts(rows); });
+    return () => { active = false; };
+  }, [currentBranchId, tick]);
 
   // 30s tick so waiting/in-session timers re-render without per-row intervals.
   useEffect(() => {
@@ -671,13 +681,36 @@ export default function QueuePage() {
             {filtered.length}
           </div>
         </div>
-        {settings.alertsOnQueue && longWaitCount > 0 && (
+        {(() => {
+          const nowMs = Date.now();
+          const activeCount = openAlerts.filter((a) => effectiveState(a, nowMs) === "active").length;
+          const snoozedCount = openAlerts.filter((a) => effectiveState(a, nowMs) === "snoozed").length;
+          const ackCount = openAlerts.filter((a) => effectiveState(a, nowMs) === "acknowledged").length;
+          if (activeCount + snoozedCount + ackCount === 0) return null;
+          return (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+              {activeCount > 0 && <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30 gap-1"><AlertTriangle className="size-3" />{activeCount} {lang === "ar" ? "نشط" : "active"}</Badge>}
+              {snoozedCount > 0 && <Badge variant="outline" className="gap-1">{snoozedCount} {lang === "ar" ? "مؤجل" : "snoozed"}</Badge>}
+              {ackCount > 0 && <Badge variant="outline" className="gap-1">{ackCount} {lang === "ar" ? "مؤكد" : "ack"}</Badge>}
+              <Link to="/branches/dashboard" className="text-muted-foreground hover:underline">{lang === "ar" ? "إدارة" : "Manage"}</Link>
+            </div>
+          );
+        })()}
+        {(() => {
+          const nowMs = Date.now();
+          const muted = openAlerts.some((a) => a.alert_type === "long_wait" && effectiveState(a, nowMs) !== "active");
+          return settings.alertsOnQueue && longWaitCount > 0 && !muted;
+        })() && (
           <div className="mt-2 flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-md px-2 py-1.5">
             <AlertTriangle className="size-4" />
             <span>{t("longWaitBanner").replace("{n}", String(longWaitCount))}</span>
           </div>
         )}
-        {settings.alertsOnQueue && filtered.filter((r) => r.status === "scheduled" || r.status === "confirmed").length >= settings.busyQueueThreshold && (
+        {(() => {
+          const nowMs = Date.now();
+          const muted = openAlerts.some((a) => a.alert_type === "busy_queue" && effectiveState(a, nowMs) !== "active");
+          return settings.alertsOnQueue && filtered.filter((r) => r.status === "scheduled" || r.status === "confirmed").length >= settings.busyQueueThreshold && !muted;
+        })() && (
           <div className="mt-2 flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-md px-2 py-1.5">
             <AlertTriangle className="size-4" />
             <span>{lang === "ar" ? `الطابور مزدحم (${filtered.filter((r) => r.status === "scheduled" || r.status === "confirmed").length} / ${settings.busyQueueThreshold})` : `Queue is busy (${filtered.filter((r) => r.status === "scheduled" || r.status === "confirmed").length} / ${settings.busyQueueThreshold})`}</span>

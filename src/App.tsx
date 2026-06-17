@@ -90,6 +90,7 @@ const BackupExport = lazy(() => import("@/pages/settings/BackupExport"));
 const AuditLogs = lazy(() => import("@/pages/settings/AuditLogs"));
 const SystemInfo = lazy(() => import("@/pages/settings/SystemInfo"));
 const Branches = lazy(() => import("@/pages/branches/Branches"));
+const BranchDashboard = lazy(() => import("@/pages/branches/BranchDashboard"));
 const Reminders = lazy(() => import("@/pages/reminders/Reminders"));
 const ScheduledReminders = lazy(() => import("@/pages/reminders/ScheduledReminders"));
 
@@ -193,6 +194,7 @@ function AppContent() {
               <Route path="/reports/commissions" element={<PermissionRoute><DoctorCommissions /></PermissionRoute>} />
               <Route path="/reports/doctor-performance" element={<PermissionRoute><DoctorPerformance /></PermissionRoute>} />
               <Route path="/branches" element={<PermissionRoute><Branches /></PermissionRoute>} />
+              <Route path="/branches/dashboard" element={<PermissionRoute><BranchDashboard /></PermissionRoute>} />
               <Route path="/settings/branches" element={<PermissionRoute><Branches /></PermissionRoute>} />
               <Route path="/settings" element={<PermissionRoute><GeneralSettings /></PermissionRoute>} />
               <Route path="/settings/general" element={<PermissionRoute><GeneralSettings /></PermissionRoute>} />

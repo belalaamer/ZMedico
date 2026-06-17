@@ -277,6 +277,53 @@ export type Database = {
           },
         ]
       }
+      audit_export_presets: {
+        Row: {
+          action: string
+          branch_id: string
+          created_at: string
+          id: string
+          name: string
+          ref: string
+          scope_branch: boolean
+          updated_at: string
+          user_filter: string
+          user_id: string
+        }
+        Insert: {
+          action?: string
+          branch_id: string
+          created_at?: string
+          id?: string
+          name: string
+          ref?: string
+          scope_branch?: boolean
+          updated_at?: string
+          user_filter?: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          branch_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          ref?: string
+          scope_branch?: boolean
+          updated_at?: string
+          user_filter?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_export_presets_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string

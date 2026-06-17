@@ -113,12 +113,15 @@ function Stat({ icon, label, value, sub }: { icon: React.ReactNode; label: strin
 
 export default function BranchDashboard() {
   const { lang } = useI18n();
+  const { user } = useAuth();
   const { currentBranchId } = useBranch();
   const [branchName, setBranchName] = useState<string>("");
   const [today, setToday] = useState<Row[]>([]);
   const [yesterday, setYesterday] = useState<Row[]>([]);
   const [week, setWeek] = useState<Row[]>([]);
   const [settings, setSettings] = useState<QueueSettings | null>(null);
+  const [openAlerts, setOpenAlerts] = useState<QueueAlert[]>([]);
+  const [alertHistory, setAlertHistory] = useState<QueueAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [tick, setTick] = useState(0);
 

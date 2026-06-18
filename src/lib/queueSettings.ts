@@ -18,6 +18,10 @@ export type QueueSettings = {
   busyQueueThreshold: number;       // waiting count (1-200); alert when waiting >= this
   alertsOnDashboard: boolean;       // show alert banner on Branch Dashboard
   alertsOnQueue: boolean;           // show alert banner on Queue page
+  // Phase 16: business hours + quiet hours (HH:MM 24h, branch-local).
+  businessHoursStart: string;       // e.g. "08:00"
+  businessHoursEnd: string;         // e.g. "18:00"
+  quietHoursEnabled: boolean;       // suppress non-critical alerts outside business hours
 };
 
 export const DEFAULT_QUEUE_SETTINGS: QueueSettings = {
@@ -28,12 +32,17 @@ export const DEFAULT_QUEUE_SETTINGS: QueueSettings = {
   busyQueueThreshold: 8,
   alertsOnDashboard: true,
   alertsOnQueue: true,
+  businessHoursStart: "08:00",
+  businessHoursEnd: "18:00",
+  quietHoursEnabled: true,
 };
 
 const keyFor = (branchId: string | null | undefined) =>
   `zmedico.queueSettings.${branchId ?? "global"}`;
 
 function normalize(parsed: any): QueueSettings {
+  const hh = (v: any, def: string) =>
+    typeof v === "string" && /^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(v) ? v : def;
   return {
     longWaitMinutes: Number.isFinite(parsed?.longWaitMinutes) && parsed.longWaitMinutes > 0
       ? Math.min(240, Math.max(5, Math.floor(parsed.longWaitMinutes)))
@@ -48,6 +57,9 @@ function normalize(parsed: any): QueueSettings {
       : DEFAULT_QUEUE_SETTINGS.busyQueueThreshold,
     alertsOnDashboard: typeof parsed?.alertsOnDashboard === "boolean" ? parsed.alertsOnDashboard : DEFAULT_QUEUE_SETTINGS.alertsOnDashboard,
     alertsOnQueue: typeof parsed?.alertsOnQueue === "boolean" ? parsed.alertsOnQueue : DEFAULT_QUEUE_SETTINGS.alertsOnQueue,
+    businessHoursStart: hh(parsed?.businessHoursStart, DEFAULT_QUEUE_SETTINGS.businessHoursStart),
+    businessHoursEnd: hh(parsed?.businessHoursEnd, DEFAULT_QUEUE_SETTINGS.businessHoursEnd),
+    quietHoursEnabled: typeof parsed?.quietHoursEnabled === "boolean" ? parsed.quietHoursEnabled : DEFAULT_QUEUE_SETTINGS.quietHoursEnabled,
   };
 }
 
@@ -78,7 +90,7 @@ export async function fetchQueueSettings(branchId: string | null | undefined): P
   try {
     const { data, error } = await (supabase as any)
       .from("queue_settings")
-      .select("long_wait_minutes,default_my_queue,show_no_shows_in_default,no_show_rate_threshold,busy_queue_threshold,alerts_on_dashboard,alerts_on_queue")
+      .select("long_wait_minutes,default_my_queue,show_no_shows_in_default,no_show_rate_threshold,busy_queue_threshold,alerts_on_dashboard,alerts_on_queue,business_hours_start,business_hours_end,quiet_hours_enabled")
       .eq("branch_id", branchId)
       .maybeSingle();
     if (error) throw error;
@@ -91,6 +103,9 @@ export async function fetchQueueSettings(branchId: string | null | undefined): P
       busyQueueThreshold: data.busy_queue_threshold,
       alertsOnDashboard: data.alerts_on_dashboard,
       alertsOnQueue: data.alerts_on_queue,
+      businessHoursStart: data.business_hours_start,
+      businessHoursEnd: data.business_hours_end,
+      quietHoursEnabled: data.quiet_hours_enabled,
     });
     cacheQueueSettings(branchId, value);
     return value;
@@ -112,6 +127,9 @@ export async function saveQueueSettings(branchId: string | null | undefined, val
     busy_queue_threshold: value.busyQueueThreshold,
     alerts_on_dashboard: value.alertsOnDashboard,
     alerts_on_queue: value.alertsOnQueue,
+    business_hours_start: value.businessHoursStart,
+    business_hours_end: value.businessHoursEnd,
+    quiet_hours_enabled: value.quietHoursEnabled,
   };
   const { error } = await (supabase as any)
     .from("queue_settings")

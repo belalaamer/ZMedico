@@ -94,15 +94,8 @@ export default function InvoiceDetail() {
   };
 
   const loadClinicLogo = async (): Promise<string | null> => {
-    let url: string | undefined;
-    if (inv.branch_id) {
-      const { data } = await supabase.from("clinic_profile").select("logo_url").eq("branch_id", inv.branch_id).maybeSingle();
-      url = (data as any)?.logo_url;
-    }
-    if (!url) {
-      const { data } = await supabase.from("clinic_profile").select("logo_url").limit(1).maybeSingle();
-      url = (data as any)?.logo_url;
-    }
+    const { data } = await (supabase as any).rpc("get_clinic_logo", { _branch_id: inv.branch_id ?? null });
+    const url: string | undefined = (data as string | null) ?? undefined;
     if (!url) return null;
     if (url.startsWith("data:")) return url;
     try {

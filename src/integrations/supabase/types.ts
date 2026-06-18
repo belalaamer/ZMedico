@@ -5704,6 +5704,7 @@ export type Database = {
       generate_po_number: { Args: never; Returns: string }
       generate_product_sku: { Args: never; Returns: string }
       generate_saas_invoice_number: { Args: never; Returns: string }
+      get_clinic_logo: { Args: { _branch_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -5746,6 +5747,10 @@ export type Database = {
       renumber_active_invoices: { Args: never; Returns: undefined }
       renumber_active_patient_codes: { Args: never; Returns: undefined }
       staff_target_actual: { Args: { _target_id: string }; Returns: number }
+      storage_patient_docs_branch_allowed: {
+        Args: { _name: string }
+        Returns: boolean
+      }
       user_has_branch_access: { Args: { _branch: string }; Returns: boolean }
       user_has_branch_access_via_invoice: {
         Args: { _invoice: string }

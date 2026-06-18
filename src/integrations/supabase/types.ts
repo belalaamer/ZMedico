@@ -5673,6 +5673,18 @@ export type Database = {
         Args: { p_appointment_id: string }
         Returns: undefined
       }
+      expense_treasury_self_audit: {
+        Args: { _branch_id?: string }
+        Returns: {
+          action: string
+          category: string
+          id: string
+          reason: string
+          severity: string
+          status: string
+          title: string
+        }[]
+      }
       fn_consume_for_invoice: {
         Args: { _invoice_id: string }
         Returns: undefined

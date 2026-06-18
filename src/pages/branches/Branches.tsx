@@ -503,6 +503,40 @@ export default function Branches() {
                   <Switch checked={qsValue.alertsOnQueue} onCheckedChange={(v) => setQsValue({ ...qsValue, alertsOnQueue: v })} />
                 </div>
               </div>
+              <div className="pt-2 border-t">
+                <div className="text-xs font-medium text-muted-foreground mb-2">
+                  {lang === "ar" ? "ساعات العمل والصمت" : "Business & quiet hours"}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">{lang === "ar" ? "بداية العمل" : "Opens at"}</Label>
+                    <Input
+                      type="time"
+                      value={qsValue.businessHoursStart}
+                      onChange={(e) => setQsValue({ ...qsValue, businessHoursStart: e.target.value || "08:00" })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">{lang === "ar" ? "نهاية العمل" : "Closes at"}</Label>
+                    <Input
+                      type="time"
+                      value={qsValue.businessHoursEnd}
+                      onChange={(e) => setQsValue({ ...qsValue, businessHoursEnd: e.target.value || "18:00" })}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-3 rounded-md border p-3 mt-2">
+                  <div>
+                    <Label className="font-normal">{lang === "ar" ? "ساعات الصمت" : "Quiet hours"}</Label>
+                    <p className="text-[11px] text-muted-foreground">
+                      {lang === "ar"
+                        ? "خارج ساعات العمل، يتم كتم تنبيهات الازدحام ونسبة عدم الحضور."
+                        : "Outside business hours, busy-queue and no-show alerts are suppressed."}
+                    </p>
+                  </div>
+                  <Switch checked={qsValue.quietHoursEnabled} onCheckedChange={(v) => setQsValue({ ...qsValue, quietHoursEnabled: v })} />
+                </div>
+              </div>
             </div>
           )}
           <DialogFooter>

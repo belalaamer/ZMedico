@@ -5615,34 +5615,20 @@ export type Database = {
         }
         Returns: undefined
       }
-      add_treasury_tx:
-        | {
-            Args: {
-              _amount: number
-              _by: string
-              _desc_ar: string
-              _desc_en: string
-              _ref_id: string
-              _ref_type: string
-              _treasury_id: string
-              _type: Database["public"]["Enums"]["treasury_tx_type"]
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              _amount: number
-              _by: string
-              _desc_ar: string
-              _desc_en: string
-              _is_cash?: boolean
-              _ref_id: string
-              _ref_type: string
-              _treasury_id: string
-              _type: Database["public"]["Enums"]["treasury_tx_type"]
-            }
-            Returns: string
-          }
+      add_treasury_tx: {
+        Args: {
+          _amount: number
+          _by: string
+          _desc_ar: string
+          _desc_en: string
+          _is_cash?: boolean
+          _ref_id: string
+          _ref_type: string
+          _treasury_id: string
+          _type: Database["public"]["Enums"]["treasury_tx_type"]
+        }
+        Returns: string
+      }
       apply_coupon_code: {
         Args: { _code: string; _subtotal: number }
         Returns: Json

@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.add_treasury_tx(uuid, public.treasury_tx_type, numeric, text, uuid, text, text, uuid);

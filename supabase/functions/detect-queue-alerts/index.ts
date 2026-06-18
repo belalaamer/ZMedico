@@ -21,10 +21,31 @@ const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 function startOfDay(d: Date) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
 function endOfDay(d: Date)   { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; }
 
+function withinBusinessHours(hhmmStart: string, hhmmEnd: string, now = new Date()): boolean {
+  const parse = (s: string): number | null => {
+    const m = /^([01][0-9]|2[0-3]):([0-5][0-9])$/.exec(s ?? "");
+    return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+  };
+  const start = parse(hhmmStart);
+  const end = parse(hhmmEnd);
+  if (start == null || end == null) return true; // safe default
+  const cur = now.getHours() * 60 + now.getMinutes();
+  // Handle overnight windows (e.g. 22:00 → 06:00)
+  return start <= end ? (cur >= start && cur < end) : (cur >= start || cur < end);
+}
+
 function computeConditions(rows: any[], settings: any): Condition[] {
   const longWaitMin = Number(settings?.long_wait_minutes ?? 30);
   const noShowAt    = Number(settings?.no_show_rate_threshold ?? 25);
   const busyAt      = Number(settings?.busy_queue_threshold ?? 8);
+  const quietHours  = settings?.quiet_hours_enabled !== false; // default on
+  const bhStart     = settings?.business_hours_start ?? "08:00";
+  const bhEnd       = settings?.business_hours_end ?? "18:00";
+  const inHours     = withinBusinessHours(bhStart, bhEnd);
+  // Quiet hours suppress non-actionable alerts (busy queue, no-show rate).
+  // long_wait stays on always because a patient already waiting in the lobby
+  // is actionable regardless of clock time.
+  const suppressNonCritical = quietHours && !inHours;
   const now = Date.now();
 
   let waiting = 0, noShow = 0;
@@ -52,17 +73,17 @@ function computeConditions(rows: any[], settings: any): Condition[] {
     {
       type: "long_wait",
       active: longestWaitMinutes >= longWaitMin && longestWaitMs > 0,
-      detail: { longestWaitMin: longestWaitMinutes, threshold: longWaitMin, patient: longestName },
+      detail: { longestWaitMin: longestWaitMinutes, threshold: longWaitMin, patient: longestName, inHours },
     },
     {
       type: "no_show_rate",
-      active: noShowRate >= noShowAt && total >= 4,
-      detail: { noShowRate, threshold: noShowAt, total },
+      active: !suppressNonCritical && noShowRate >= noShowAt && total >= 4,
+      detail: { noShowRate, threshold: noShowAt, total, inHours },
     },
     {
       type: "busy_queue",
-      active: waiting >= busyAt,
-      detail: { waiting, threshold: busyAt },
+      active: !suppressNonCritical && waiting >= busyAt,
+      detail: { waiting, threshold: busyAt, inHours },
     },
   ];
 }
@@ -80,7 +101,7 @@ async function processBranch(admin: any, branchId: string) {
       .lte("scheduled_at", tEnd),
     admin
       .from("queue_settings")
-      .select("long_wait_minutes,no_show_rate_threshold,busy_queue_threshold")
+      .select("long_wait_minutes,no_show_rate_threshold,busy_queue_threshold,business_hours_start,business_hours_end,quiet_hours_enabled")
       .eq("branch_id", branchId)
       .maybeSingle(),
   ]);

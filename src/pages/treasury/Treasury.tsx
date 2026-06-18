@@ -38,12 +38,33 @@ export default function Treasury() {
     const ids = (trs ?? []).map((t: any) => t.id);
     if (ids.length) {
       const { data: tx } = await supabase.from("treasury_transactions").select("*").in("treasury_id", ids).order("created_at", { ascending: false }).limit(100);
-      setTxs(tx ?? []);
+      // Hide expense rows that have been reversed, and hide the reversal rows themselves
+      const reversedIds = new Set(
+        (tx ?? [])
+          .filter((r: any) => r.reference_type === "expense_reversal" && r.reference_id)
+          .map((r: any) => r.reference_id as string)
+      );
+      const visible = (tx ?? []).filter((r: any) => {
+        if (r.reference_type === "expense_reversal") return false;
+        if (r.reference_type === "expense" && r.reference_id && reversedIds.has(r.reference_id)) return false;
+        return true;
+      });
+      setTxs(visible);
 
       const startISO = new Date(new Date().setHours(0,0,0,0)).toISOString();
-      const { data: tt } = await supabase.from("treasury_transactions").select("transaction_type,amount").in("treasury_id", ids).gte("created_at", startISO);
-      const inc = (tt ?? []).filter((r: any) => r.transaction_type === "income").reduce((s: number, r: any) => s + Number(r.amount), 0);
-      const exp = (tt ?? []).filter((r: any) => r.transaction_type === "expense").reduce((s: number, r: any) => s + Number(r.amount), 0);
+      const { data: tt } = await supabase.from("treasury_transactions").select("transaction_type,amount,reference_type,reference_id,created_at").in("treasury_id", ids).gte("created_at", startISO);
+      const reversedToday = new Set(
+        (tt ?? [])
+          .filter((r: any) => r.reference_type === "expense_reversal" && r.reference_id)
+          .map((r: any) => r.reference_id as string)
+      );
+      const ttVisible = (tt ?? []).filter((r: any) => {
+        if (r.reference_type === "expense_reversal") return false;
+        if (r.reference_type === "expense" && r.reference_id && reversedToday.has(r.reference_id)) return false;
+        return true;
+      });
+      const inc = ttVisible.filter((r: any) => r.transaction_type === "income").reduce((s: number, r: any) => s + Number(r.amount), 0);
+      const exp = ttVisible.filter((r: any) => r.transaction_type === "expense").reduce((s: number, r: any) => s + Number(r.amount), 0);
       setToday({ income: inc, expense: exp });
     } else {
       setTxs([]); setToday({ income: 0, expense: 0 });

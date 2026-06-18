@@ -5726,6 +5726,10 @@ export type Database = {
         Returns: boolean
       }
       is_tenant_owner: { Args: { _tenant_id: string }; Returns: boolean }
+      realtime_topic_branch_allowed: {
+        Args: { _topic: string }
+        Returns: boolean
+      }
       recalc_commissions_for_invoice: {
         Args: { _invoice_id: string }
         Returns: undefined

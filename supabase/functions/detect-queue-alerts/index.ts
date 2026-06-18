@@ -149,6 +149,21 @@ async function processBranch(admin: any, branchId: string) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  // Auth guard: only the scheduled cron job (or a service-role caller) may
+  // invoke this function. It writes to queue_alerts using the service role
+  // key and would otherwise be callable anonymously.
+  const CRON_SECRET = Deno.env.get("DETECT_QUEUE_ALERTS_CRON_SECRET");
+  const auth = req.headers.get("Authorization") ?? "";
+  const isCron =
+    (!!CRON_SECRET && auth === `Bearer ${CRON_SECRET}`) ||
+    (!!SERVICE_ROLE && auth === `Bearer ${SERVICE_ROLE}`);
+  if (!isCron) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 
   try {

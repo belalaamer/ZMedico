@@ -17,6 +17,7 @@ const AppShell = lazy(() => import("@/components/layout/AppShell"));
 const AuthPage = lazy(() => import("@/pages/auth/Auth"));
 const ResetPassword = lazy(() => import("@/pages/auth/ResetPassword"));
 const Pricing = lazy(() => import("@/pages/pricing/Pricing"));
+const Trust = lazy(() => import("@/pages/Trust"));
 const Dashboard = lazy(() => import("@/pages/dashboard/Dashboard"));
 const PatientsPage = lazy(() => import("@/pages/patients/Patients"));
 const PatientProfile = lazy(() => import("@/pages/patients/PatientProfile"));
@@ -127,6 +128,7 @@ function AppContent() {
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/pricing" element={<Pricing />} />
+            <Route path="/trust" element={<Trust />} />
             <Route
               element={
                 <ProtectedRoute>

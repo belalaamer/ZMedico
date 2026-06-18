@@ -3473,12 +3473,15 @@ export type Database = {
           alerts_on_dashboard: boolean
           alerts_on_queue: boolean
           branch_id: string | null
+          business_hours_end: string
+          business_hours_start: string
           busy_queue_threshold: number
           created_at: string
           default_my_queue: boolean
           id: string
           long_wait_minutes: number
           no_show_rate_threshold: number
+          quiet_hours_enabled: boolean
           show_no_shows_in_default: boolean
           updated_at: string
         }
@@ -3486,12 +3489,15 @@ export type Database = {
           alerts_on_dashboard?: boolean
           alerts_on_queue?: boolean
           branch_id?: string | null
+          business_hours_end?: string
+          business_hours_start?: string
           busy_queue_threshold?: number
           created_at?: string
           default_my_queue?: boolean
           id?: string
           long_wait_minutes?: number
           no_show_rate_threshold?: number
+          quiet_hours_enabled?: boolean
           show_no_shows_in_default?: boolean
           updated_at?: string
         }
@@ -3499,12 +3505,15 @@ export type Database = {
           alerts_on_dashboard?: boolean
           alerts_on_queue?: boolean
           branch_id?: string | null
+          business_hours_end?: string
+          business_hours_start?: string
           busy_queue_threshold?: number
           created_at?: string
           default_my_queue?: boolean
           id?: string
           long_wait_minutes?: number
           no_show_rate_threshold?: number
+          quiet_hours_enabled?: boolean
           show_no_shows_in_default?: boolean
           updated_at?: string
         }

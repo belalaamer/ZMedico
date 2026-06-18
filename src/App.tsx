@@ -23,6 +23,7 @@ const PatientProfile = lazy(() => import("@/pages/patients/PatientProfile"));
 const CalendarPage = lazy(() => import("@/pages/calendar/CalendarPage"));
 const QueuePage = lazy(() => import("@/pages/queue/Queue"));
 const QueueAuditPage = lazy(() => import("@/pages/queue/QueueAudit"));
+const QueueSelfAuditPage = lazy(() => import("@/pages/queue/QueueSelfAudit"));
 const AppointmentDetailPage = lazy(() => import("@/pages/appointments/AppointmentDetail"));
 const Invoices = lazy(() => import("@/pages/invoices/Invoices"));
 const InvoiceDetail = lazy(() => import("@/pages/invoices/InvoiceDetail"));
@@ -139,6 +140,7 @@ function AppContent() {
               <Route path="/calendar" element={<PermissionRoute><CalendarPage /></PermissionRoute>} />
               <Route path="/queue" element={<PermissionRoute><QueuePage /></PermissionRoute>} />
               <Route path="/queue/audit" element={<PermissionRoute><QueueAuditPage /></PermissionRoute>} />
+              <Route path="/queue/self-audit" element={<PermissionRoute><QueueSelfAuditPage /></PermissionRoute>} />
               <Route path="/appointments/:appointmentId" element={<PermissionRoute><AppointmentDetailPage /></PermissionRoute>} />
               <Route path="/invoices" element={<PermissionRoute><Invoices /></PermissionRoute>} />
               <Route path="/invoices/outstanding" element={<PermissionRoute><OutstandingDebts /></PermissionRoute>} />

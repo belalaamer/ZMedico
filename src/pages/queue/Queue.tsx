@@ -16,6 +16,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { subscribeResilient } from "@/lib/realtime";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/usePermissions";
 import { buildStatusPatch, type ApptStatus } from "@/lib/appointmentStatus";

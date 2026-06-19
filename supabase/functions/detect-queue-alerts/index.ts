@@ -152,7 +152,9 @@ Deno.serve(async (req) => {
   // Auth guard: only the scheduled cron job (or a service-role caller) may
   // invoke this function. It writes to queue_alerts using the service role
   // key and would otherwise be callable anonymously.
-  const CRON_SECRET = Deno.env.get("DETECT_QUEUE_ALERTS_CRON_SECRET");
+  const CRON_SECRET =
+    Deno.env.get("DETECT_QUEUE_ALERTS_CRON_SECRET") ??
+    Deno.env.get("SEND_REMINDER_CRON_SECRET");
   const auth = req.headers.get("Authorization") ?? "";
   const isCron =
     (!!CRON_SECRET && auth === `Bearer ${CRON_SECRET}`) ||

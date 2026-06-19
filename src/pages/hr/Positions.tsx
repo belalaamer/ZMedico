@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Edit3, Briefcase } from "lucide-react";
+import { Plus, Edit3, Briefcase, GitMerge } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,18 +19,22 @@ export default function Positions() {
   const [filterDept, setFilterDept] = useState<string>("all");
   const [open, setOpen] = useState(false);
   const [edit, setE] = useState<any>(null);
-  const [form, setForm] = useState({ title: "", department_id: "", description: "", salary_range_min: "", salary_range_max: "" });
+  const [form, setForm] = useState({ title: "", department_id: "", description: "", salary_range_min: "", salary_range_max: "", group_key: "", sort_order: "" });
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const [mergeSrc, setMergeSrc] = useState<string>("");
+  const [mergeTgt, setMergeTgt] = useState<string>("");
+  const [merging, setMerging] = useState(false);
 
   const load = async () => {
-    const { data } = await supabase.from("staff_positions").select("*").is("deleted_at", null).order("title_en");
+    const { data } = await supabase.from("staff_positions").select("*").is("deleted_at", null);
     setItems(data ?? []);
     const { data: d } = await supabase.from("departments").select("id,name_en,name_ar");
     setDepts(d ?? []);
   };
   useEffect(() => { load(); }, []);
 
-  const openNew = () => { setE(null); setForm({ title: "", department_id: "", description: "", salary_range_min: "", salary_range_max: "" }); setOpen(true); };
-  const openEdit = (p: any) => { setE(p); setForm({ title: p.title_en || p.title_ar || "", department_id: p.department_id ?? "", description: p.description_en || p.description_ar || "", salary_range_min: p.salary_range_min?.toString() ?? "", salary_range_max: p.salary_range_max?.toString() ?? "" }); setOpen(true); };
+  const openNew = () => { setE(null); setForm({ title: "", department_id: "", description: "", salary_range_min: "", salary_range_max: "", group_key: "", sort_order: "" }); setOpen(true); };
+  const openEdit = (p: any) => { setE(p); setForm({ title: p.title_en || p.title_ar || "", department_id: p.department_id ?? "", description: p.description_en || p.description_ar || "", salary_range_min: p.salary_range_min?.toString() ?? "", salary_range_max: p.salary_range_max?.toString() ?? "", group_key: p.group_key ?? "", sort_order: p.sort_order != null ? String(p.sort_order) : "" }); setOpen(true); };
   const save = async () => {
     const title = form.title.trim();
     const desc = form.description.trim();
@@ -41,6 +45,8 @@ export default function Positions() {
       description_en: desc || null, description_ar: desc || null,
       salary_range_min: form.salary_range_min ? Number(form.salary_range_min) : null,
       salary_range_max: form.salary_range_max ? Number(form.salary_range_max) : null,
+      group_key: form.group_key.trim() ? form.group_key.trim().toLowerCase() : null,
+      sort_order: form.sort_order !== "" ? Number(form.sort_order) : 0,
     };
     const { error } = edit
       ? await supabase.from("staff_positions").update(payload).eq("id", edit.id)
@@ -60,18 +66,50 @@ export default function Positions() {
   };
   const filtered = filterDept === "all" ? items : items.filter((p) => p.department_id === filterDept);
 
+  const label = (p: any) => (lang === "ar" ? p.title_ar : p.title_en) || p.title_en || p.title_ar || "";
+  const sortedFiltered = [...filtered].sort((a, b) => {
+    const ga = (a.group_key || "zzz").toLowerCase();
+    const gb = (b.group_key || "zzz").toLowerCase();
+    if (ga !== gb) return ga.localeCompare(gb);
+    const oa = a.sort_order ?? 0; const ob = b.sort_order ?? 0;
+    if (oa !== ob) return oa - ob;
+    return label(a).localeCompare(label(b), lang === "ar" ? "ar" : "en");
+  });
+  const groups: Array<[string, any[]]> = [];
+  for (const p of sortedFiltered) {
+    const k = (p.group_key || "general").toLowerCase();
+    const last = groups[groups.length - 1];
+    if (last && last[0] === k) last[1].push(p);
+    else groups.push([k, [p]]);
+  }
+
+  const doMerge = async () => {
+    if (!mergeSrc || !mergeTgt) { toast.error(lang === "ar" ? "اختر الموضعين" : "Select both positions"); return; }
+    if (mergeSrc === mergeTgt) { toast.error(lang === "ar" ? "لا يمكن الدمج مع نفسه" : "Cannot merge into itself"); return; }
+    if (!confirm(lang === "ar" ? "تأكيد دمج هذا المنصب؟ سيتم نقل الموظفين وحذف المصدر." : "Confirm merge? Staff will be re-pointed and the source position soft-deleted.")) return;
+    setMerging(true);
+    const { error } = await supabase.rpc("merge_staff_position" as any, { source_id: mergeSrc, target_id: mergeTgt });
+    setMerging(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(lang === "ar" ? "تم الدمج" : "Merged");
+    setMergeOpen(false); setMergeSrc(""); setMergeTgt(""); load();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("positions")}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{filtered.length}</p>
+          <p className="text-sm text-muted-foreground mt-1">{sortedFiltered.length}</p>
         </div>
         <div className="flex items-center gap-2">
           <Select value={filterDept} onValueChange={setFilterDept}>
             <SelectTrigger className="w-48"><SelectValue placeholder={t("department")} /></SelectTrigger>
             <SelectContent><SelectItem value="all">{t("filterAll") || "All"}</SelectItem>{depts.map((d) => <SelectItem key={d.id} value={d.id}>{lang === "ar" ? d.name_ar : d.name_en}</SelectItem>)}</SelectContent>
           </Select>
+          <Button variant="outline" onClick={() => { setMergeSrc(""); setMergeTgt(""); setMergeOpen(true); }}>
+            <GitMerge className="me-2 size-4" />{lang === "ar" ? "دمج" : "Merge"}
+          </Button>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground" onClick={openNew}><Plus className="me-2 size-4" />{t("addPosition")}</Button></DialogTrigger>
             <DialogContent className="max-w-2xl">
@@ -84,6 +122,8 @@ export default function Positions() {
                     <SelectContent><SelectItem value="none">— {t("none")} —</SelectItem>{depts.map((d) => <SelectItem key={d.id} value={d.id}>{lang === "ar" ? d.name_ar : d.name_en}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-2"><Label>{lang === "ar" ? "المجموعة" : "Group"}</Label><Input value={form.group_key} placeholder="e.g. medical, admin, support" onChange={(e) => setForm({ ...form, group_key: e.target.value })} maxLength={60} /></div>
+                <div className="space-y-2"><Label>{lang === "ar" ? "الترتيب" : "Sort order"}</Label><Input type="number" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: e.target.value })} /></div>
                 <div className="space-y-2"><Label>{t("salaryMin")}</Label><Input type="number" value={form.salary_range_min} onChange={(e) => setForm({ ...form, salary_range_min: e.target.value })} /></div>
                 <div className="space-y-2"><Label>{t("salaryMax")}</Label><Input type="number" value={form.salary_range_max} onChange={(e) => setForm({ ...form, salary_range_max: e.target.value })} /></div>
                 <div className="space-y-2 sm:col-span-2"><Label>{t("description")}</Label><Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} maxLength={300} /></div>
@@ -94,21 +134,56 @@ export default function Positions() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          <Dialog open={mergeOpen} onOpenChange={setMergeOpen}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader><DialogTitle>{lang === "ar" ? "دمج المناصب" : "Merge positions"}</DialogTitle></DialogHeader>
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label>{lang === "ar" ? "المصدر (سيتم حذفه)" : "Source (will be soft-deleted)"}</Label>
+                  <Select value={mergeSrc} onValueChange={setMergeSrc}>
+                    <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                    <SelectContent>{sortedFiltered.map((p) => <SelectItem key={p.id} value={p.id}>{label(p)}{p.group_key ? ` · ${p.group_key}` : ""}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>{lang === "ar" ? "الهدف (الأساسي)" : "Target (canonical)"}</Label>
+                  <Select value={mergeTgt} onValueChange={setMergeTgt}>
+                    <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                    <SelectContent>{sortedFiltered.filter((p) => p.id !== mergeSrc).map((p) => <SelectItem key={p.id} value={p.id}>{label(p)}{p.group_key ? ` · ${p.group_key}` : ""}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <p className="text-xs text-muted-foreground">{lang === "ar" ? "سيتم نقل الموظفين من المصدر إلى الهدف." : "Staff assigned to the source will be re-pointed to the target."}</p>
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setMergeOpen(false)}>{t("cancel")}</Button>
+                <Button className="gradient-primary text-primary-foreground" onClick={doMerge} disabled={merging || !mergeSrc || !mergeTgt || mergeSrc === mergeTgt}>
+                  <GitMerge className="me-2 size-4" />{lang === "ar" ? "دمج" : "Merge"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
       <Card className="shadow-card overflow-hidden">
-        {filtered.length === 0 ? <div className="p-10 text-center text-muted-foreground">{t("noPositions")}</div> : (
-          <div className="divide-y divide-border">
-            {filtered.map((p) => (
-              <div key={p.id} className="flex items-center gap-4 p-4">
-                <div className="size-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center"><Briefcase className="size-5" /></div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{lang === "ar" ? p.title_ar : p.title_en}</div>
-                  <div className="text-xs text-muted-foreground">{deptName(p.department_id)}</div>
+        {sortedFiltered.length === 0 ? <div className="p-10 text-center text-muted-foreground">{t("noPositions")}</div> : (
+          <div>
+            {groups.map(([group, list]) => (
+              <div key={group}>
+                <div className="px-4 py-2 bg-muted/50 text-xs font-semibold uppercase tracking-wide text-muted-foreground sticky top-0">{group}</div>
+                <div className="divide-y divide-border">
+                  {list.map((p) => (
+                    <div key={p.id} className="flex items-center gap-4 p-4">
+                      <div className="size-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center"><Briefcase className="size-5" /></div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{lang === "ar" ? p.title_ar : p.title_en}</div>
+                        <div className="text-xs text-muted-foreground">{deptName(p.department_id)} · #{p.sort_order ?? 0}</div>
+                      </div>
+                      {(p.salary_range_min || p.salary_range_max) && <Badge variant="outline">{p.salary_range_min ?? "—"} – {p.salary_range_max ?? "—"}</Badge>}
+                      <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Edit3 className="size-4" /></Button>
+                      <RowActions onEdit={() => openEdit(p)} onDelete={() => softDelete(p)} />
+                    </div>
+                  ))}
                 </div>
-                {(p.salary_range_min || p.salary_range_max) && <Badge variant="outline">{p.salary_range_min ?? "—"} – {p.salary_range_max ?? "—"}</Badge>}
-                <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Edit3 className="size-4" /></Button>
-                <RowActions onEdit={() => openEdit(p)} onDelete={() => softDelete(p)} />
               </div>
             ))}
           </div>

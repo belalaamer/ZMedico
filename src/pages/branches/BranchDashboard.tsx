@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Activity, Users, CheckCheck, UserX, Timer, ArrowUp, ArrowDown, Minus, CalendarDays, ScrollText, ListChecks, Building2, Play, Printer, AlertTriangle, BellOff, Check, History } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { subscribeResilient } from "@/lib/realtime";
 import { useBranch } from "@/contexts/BranchContext";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -224,23 +225,24 @@ export default function BranchDashboard() {
   // for this branch changes. Polling/tick remains as a fallback.
   useEffect(() => {
     if (!currentBranchId) return;
-    const channel = supabase
-      .channel(`queue_alerts:${currentBranchId}`)
-      .on(
+    const refresh = async () => {
+      const mod = await import("@/lib/queueAlerts");
+      const [open, hist] = await Promise.all([
+        mod.listOpenAlerts(currentBranchId),
+        listRecentAlerts(currentBranchId, 15),
+      ]);
+      setOpenAlerts(open);
+      setAlertHistory(hist);
+    };
+    return subscribeResilient({
+      name: `queue_alerts:${currentBranchId}`,
+      bind: (ch) => ch.on(
         "postgres_changes" as any,
         { event: "*", schema: "public", table: "queue_alerts", filter: `branch_id=eq.${currentBranchId}` },
-        async () => {
-          const mod = await import("@/lib/queueAlerts");
-          const [open, hist] = await Promise.all([
-            mod.listOpenAlerts(currentBranchId),
-            listRecentAlerts(currentBranchId, 15),
-          ]);
-          setOpenAlerts(open);
-          setAlertHistory(hist);
-        }
-      )
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+        () => { void refresh(); }
+      ),
+      onReconnect: () => { void refresh(); },
+    });
   }, [currentBranchId]);
 
   const nowMs = now;

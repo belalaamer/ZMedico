@@ -16,6 +16,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { subscribeResilient } from "@/lib/realtime";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/usePermissions";
 import { buildStatusPatch, type ApptStatus } from "@/lib/appointmentStatus";
@@ -146,18 +147,19 @@ export default function QueuePage() {
   // the queue page without waiting for the next tick.
   useEffect(() => {
     if (!currentBranchId) return;
-    const channel = supabase
-      .channel(`queue_alerts_queue:${currentBranchId}`)
-      .on(
+    const refresh = async () => {
+      const rows = await listOpenAlerts(currentBranchId);
+      setOpenAlerts(rows);
+    };
+    return subscribeResilient({
+      name: `queue_alerts_queue:${currentBranchId}`,
+      bind: (ch) => ch.on(
         "postgres_changes" as any,
         { event: "*", schema: "public", table: "queue_alerts", filter: `branch_id=eq.${currentBranchId}` },
-        async () => {
-          const rows = await listOpenAlerts(currentBranchId);
-          setOpenAlerts(rows);
-        }
-      )
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+        () => { void refresh(); }
+      ),
+      onReconnect: () => { void refresh(); },
+    });
   }, [currentBranchId]);
 
   // 30s tick so waiting/in-session timers re-render without per-row intervals.
@@ -191,17 +193,16 @@ export default function QueuePage() {
     load();
     // realtime live sync — scoped to current branch when possible to avoid
     // clinic-wide refetches from unrelated appointment changes.
-    const topic = `queue-${Math.random().toString(36).slice(2, 10)}`;
     const filter = currentBranchId ? `branch_id=eq.${currentBranchId}` : undefined;
-    const ch = supabase
-      .channel(topic)
-      .on(
+    return subscribeResilient({
+      name: `queue-appts:${currentBranchId ?? "all"}`,
+      bind: (ch) => ch.on(
         "postgres_changes",
         { event: "*", schema: "public", table: "appointments", ...(filter ? { filter } : {}) } as any,
         () => { load(); }
-      );
-    ch.subscribe();
-    return () => { supabase.removeChannel(ch); };
+      ),
+      onReconnect: () => { load(); },
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentBranchId]);
 

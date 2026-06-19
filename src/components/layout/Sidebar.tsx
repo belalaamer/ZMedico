@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap, FolderOpen, Briefcase, UserCog, Clock, CalendarDays, DollarSign, Star, PieChart, Award, Target, Ticket, ListChecks } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
+import { subscribeResilient } from "@/lib/realtime";
 import { useBranch } from "@/contexts/BranchContext";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -19,19 +20,21 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
   const hrOpen = pathname.startsWith("/hr");
 
   useEffect(() => {
-    let q = supabase.from("stock_alerts").select("*", { count: "exact", head: true }).eq("is_resolved", false);
-    if (currentBranchId) q = q.eq("branch_id", currentBranchId);
-    q.then(({ count }) => setAlertCount(count ?? 0));
-    const topic = `inv-alerts-${Math.random().toString(36).slice(2, 10)}`;
-    const ch = supabase
-      .channel(topic)
-      .on("postgres_changes", { event: "*", schema: "public", table: "stock_alerts" }, () => {
-        let q2 = supabase.from("stock_alerts").select("*", { count: "exact", head: true }).eq("is_resolved", false);
-        if (currentBranchId) q2 = q2.eq("branch_id", currentBranchId);
-        q2.then(({ count }) => setAlertCount(count ?? 0));
-      });
-    ch.subscribe();
-    return () => { supabase.removeChannel(ch); };
+    const refresh = () => {
+      let q2 = supabase.from("stock_alerts").select("*", { count: "exact", head: true }).eq("is_resolved", false);
+      if (currentBranchId) q2 = q2.eq("branch_id", currentBranchId);
+      q2.then(({ count }) => setAlertCount(count ?? 0));
+    };
+    refresh();
+    return subscribeResilient({
+      name: `inv-alerts:${currentBranchId ?? "all"}`,
+      bind: (ch) => ch.on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "stock_alerts" },
+        () => refresh()
+      ),
+      onReconnect: () => refresh(),
+    });
   }, [currentBranchId]);
 
   const allItems = [

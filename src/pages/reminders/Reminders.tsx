@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { Bell, Check, Trash2, Inbox, Clock, AlertTriangle, Calendar as CalIcon, CreditCard, RefreshCw, Settings as SettingsIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { subscribeResilient } from "@/lib/realtime";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -69,10 +70,15 @@ export default function Reminders() {
   useEffect(() => {
     load();
     if (!user) return;
-    const ch = supabase.channel("notif-" + user.id)
-      .on("postgres_changes", { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, () => load())
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    return subscribeResilient({
+      name: `notif:${user.id}`,
+      bind: (ch) => ch.on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+        () => load()
+      ),
+      onReconnect: () => load(),
+    });
     // eslint-disable-next-line
   }, [user?.id]);
 

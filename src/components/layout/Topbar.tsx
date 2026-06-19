@@ -15,6 +15,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SidebarContent } from "./Sidebar";
 import { supabase } from "@/integrations/supabase/client";
+import { subscribeResilient } from "@/lib/realtime";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
 
 export function Topbar() {
@@ -74,11 +75,15 @@ export function Topbar() {
   useEffect(() => {
     loadNotifs();
     if (!user?.id) return;
-    const ch = supabase
-      .channel("topbar-notifications")
-      .on("postgres_changes", { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, () => loadNotifs())
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    return subscribeResilient({
+      name: `topbar-notifications:${user.id}`,
+      bind: (ch) => ch.on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+        () => loadNotifs()
+      ),
+      onReconnect: () => loadNotifs(),
+    });
     // eslint-disable-next-line
   }, [user?.id]);
 

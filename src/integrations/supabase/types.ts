@@ -4268,10 +4268,12 @@ export type Database = {
           department_id: string | null
           description_ar: string | null
           description_en: string | null
+          group_key: string | null
           id: string
           is_active: boolean
           salary_range_max: number | null
           salary_range_min: number | null
+          sort_order: number
           title_ar: string
           title_en: string
         }
@@ -4281,10 +4283,12 @@ export type Database = {
           department_id?: string | null
           description_ar?: string | null
           description_en?: string | null
+          group_key?: string | null
           id?: string
           is_active?: boolean
           salary_range_max?: number | null
           salary_range_min?: number | null
+          sort_order?: number
           title_ar: string
           title_en: string
         }
@@ -4294,10 +4298,12 @@ export type Database = {
           department_id?: string | null
           description_ar?: string | null
           description_en?: string | null
+          group_key?: string | null
           id?: string
           is_active?: boolean
           salary_range_max?: number | null
           salary_range_min?: number | null
+          sort_order?: number
           title_ar?: string
           title_en?: string
         }
@@ -5718,6 +5724,10 @@ export type Database = {
         Returns: boolean
       }
       is_tenant_owner: { Args: { _tenant_id: string }; Returns: boolean }
+      merge_staff_position: {
+        Args: { source_id: string; target_id: string }
+        Returns: undefined
+      }
       realtime_topic_branch_allowed: {
         Args: { _topic: string }
         Returns: boolean

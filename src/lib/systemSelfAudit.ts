@@ -158,7 +158,10 @@ export async function runSystemSelfAudit(opts: {
 
   // Treasury balances reachable
   if (branchId) {
-    const tr = await (supabase as any).from("treasury").select("id,balance,payment_method_id").eq("branch_id", branchId);
+    const tr = await (supabase as any)
+      .from("treasury")
+      .select("id,current_balance,non_cash_balance,currency")
+      .eq("branch_id", branchId);
     if (tr.error) {
       checks.push(fail("fin_treasury_read", "finance", "Treasury buckets readable", tr.error.message, "Check RLS on treasury."));
     } else {

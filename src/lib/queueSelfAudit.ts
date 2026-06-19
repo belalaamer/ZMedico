@@ -257,10 +257,15 @@ export async function runQueueSelfAudit(branchId: string): Promise<AuditReport> 
 async function probeRealtime(branchId: string): Promise<{ ok: boolean; elapsedMs: number; reason?: string }> {
   const start = Date.now();
 
-  // Single attempt, ~4s budget. Transient CLOSED is retried once before
-  // declaring failure since the channel can briefly close during handoff.
-  const attempt = (): Promise<{ ok: boolean; reason?: string }> => new Promise((resolve) => {
+  // Each attempt waits up to ~5s for the channel to reach SUBSCRIBED.
+  // Transient CLOSED during startup/handoff is NOT treated as terminal —
+  // realtime-js may emit CLOSED briefly before reconnecting. We only bail
+  // early on CHANNEL_ERROR / TIMED_OUT, or when the overall budget expires.
+  // CLOSED is recorded as the "last seen" status in case we time out, so
+  // the audit can still report something useful.
+  const attempt = (budgetMs: number): Promise<{ ok: boolean; reason?: string }> => new Promise((resolve) => {
     let settled = false;
+    let lastStatus: string | null = null;
     const finish = (val: { ok: boolean; reason?: string }) => {
       if (settled) return;
       settled = true;
@@ -271,20 +276,24 @@ async function probeRealtime(branchId: string): Promise<{ ok: boolean; elapsedMs
       .channel(`audit_probe:${branchId}:${Date.now()}:${Math.random().toString(36).slice(2, 6)}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "queue_alerts", filter: `branch_id=eq.${branchId}` }, () => {})
       .subscribe((status: string) => {
+        lastStatus = status;
         if (status === "SUBSCRIBED") finish({ ok: true });
-        else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+        else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
           finish({ ok: false, reason: `Channel status: ${status}` });
         }
+        // CLOSED is intentionally ignored: the channel may reconnect and
+        // transition to SUBSCRIBED within the remaining budget.
       });
-    setTimeout(() => finish({ ok: false, reason: "Subscription timed out after 3s." }), 3000);
+    setTimeout(() => finish({ ok: false, reason: `Channel status: ${lastStatus ?? "no status"}` }), budgetMs);
   });
 
   try {
-    const first = await attempt();
+    const first = await attempt(5000);
     if (first.ok) return { ok: true, elapsedMs: Date.now() - start };
-    // One retry — covers transient CLOSED during initial handshake.
-    await new Promise((r) => setTimeout(r, 400));
-    const second = await attempt();
+    // Retry once with a fresh channel — covers transient CLOSED that did
+    // not recover within the first window.
+    await new Promise((r) => setTimeout(r, 500));
+    const second = await attempt(5000);
     if (second.ok) return { ok: true, elapsedMs: Date.now() - start };
     return { ok: false, elapsedMs: Date.now() - start, reason: second.reason ?? first.reason };
   } catch (e: any) {

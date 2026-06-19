@@ -70,10 +70,15 @@ export default function Reminders() {
   useEffect(() => {
     load();
     if (!user) return;
-    const ch = supabase.channel("notif-" + user.id)
-      .on("postgres_changes", { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, () => load())
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    return subscribeResilient({
+      name: `notif:${user.id}`,
+      bind: (ch) => ch.on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+        () => load()
+      ),
+      onReconnect: () => load(),
+    });
     // eslint-disable-next-line
   }, [user?.id]);
 

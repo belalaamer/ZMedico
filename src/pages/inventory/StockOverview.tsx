@@ -51,15 +51,17 @@ export default function StockOverview() {
     const onVisible = () => { if (document.visibilityState === "visible") load(); };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisible);
-    const channel = supabase
-      .channel("stock-overview-sync")
-      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => load())
-      .on("postgres_changes", { event: "*", schema: "public", table: "inventory" }, () => load())
-      .subscribe();
+    const stop = subscribeResilient({
+      name: "stock-overview-sync",
+      bind: (ch) => ch
+        .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => load())
+        .on("postgres_changes", { event: "*", schema: "public", table: "inventory" }, () => load()),
+      onReconnect: () => load(),
+    });
     return () => {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisible);
-      supabase.removeChannel(channel);
+      stop();
     };
     // eslint-disable-next-line
   }, [currentBranchId]);

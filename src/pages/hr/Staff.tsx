@@ -17,6 +17,7 @@ import { formatMoney } from "@/lib/format";
 import { RowActions } from "@/components/RowActions";
 import { useNavigate } from "react-router-dom";
 import { Copy } from "lucide-react";
+import JobRoleSelect from "@/components/JobRoleSelect";
 
 const ROLES = ["admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr", "staff"] as const;
 
@@ -214,10 +215,7 @@ export default function Staff() {
                   </>
                 )}
                 <div className="space-y-2"><Label>{t("position")}</Label>
-                  <Select value={form.position_id || "none"} onValueChange={(v) => setForm({ ...form, position_id: v === "none" ? "" : v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent><SelectItem value="none">— {t("none")} —</SelectItem>{positions.map((p) => <SelectItem key={p.id} value={p.id}>{lang === "ar" ? p.title_ar : p.title_en}</SelectItem>)}</SelectContent>
-                  </Select>
+                  <JobRoleSelect value={form.position_id} onChange={(v) => setForm({ ...form, position_id: v ?? "" })} />
                 </div>
                 <div className="space-y-2"><Label>{t("department")}</Label>
                   <Select value={form.department_id || "none"} onValueChange={(v) => setForm({ ...form, department_id: v === "none" ? "" : v })}>

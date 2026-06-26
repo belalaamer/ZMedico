@@ -70,6 +70,19 @@ export default function PhysioDashboard() {
   const byStatus: Record<string, number> = {};
   cases.forEach(c => { byStatus[c.status] = (byStatus[c.status] ?? 0) + 1; });
 
+  // Therapist workload (last 30d): active cases, sessions done, overdue follow-ups.
+  const caseTherapist: Record<string, string> = {};
+  cases.forEach(c => { caseTherapist[c.id] = c.therapist_id || "_none"; });
+  const workload: Record<string, { active: number; done: number; overdue: number }> = {};
+  const bump = (k: string) => (workload[k] ||= { active: 0, done: 0, overdue: 0 });
+  active.forEach(c => { bump(c.therapist_id || "_none").active += 1; });
+  sessions.filter(s => s.attendance === "done").forEach(s => {
+    const k = caseTherapist[s.case_id] || "_none";
+    bump(k).done += 1;
+  });
+  overdueFollowups.forEach(c => { bump(c.therapist_id || "_none").overdue += 1; });
+  const workloadRows = Object.entries(workload).sort((a, b) => b[1].active - a[1].active);
+
   const patientName = (p: any) => lang === "ar"
     ? `${p?.first_name_ar ?? p?.first_name_en ?? ""} ${p?.last_name_ar ?? p?.last_name_en ?? ""}`.trim()
     : `${p?.first_name_en ?? ""} ${p?.last_name_en ?? ""}`.trim();
@@ -123,6 +136,34 @@ export default function PhysioDashboard() {
           </div>
         </Card>
       </div>
+
+      <Card className="p-4">
+        <h3 className="text-sm font-semibold mb-3">{lang === "ar" ? "حمل العمل لكل معالج (30ي)" : "Therapist workload (30d)"}</h3>
+        {workloadRows.length === 0 ? <p className="text-sm text-muted-foreground">—</p> : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-xs text-muted-foreground">
+                <tr>
+                  <th className="text-start py-2">{lang === "ar" ? "المعالج" : "Therapist"}</th>
+                  <th className="text-end py-2">{lang === "ar" ? "نشطة" : "Active"}</th>
+                  <th className="text-end py-2">{lang === "ar" ? "جلسات تمت" : "Sessions done"}</th>
+                  <th className="text-end py-2">{lang === "ar" ? "متابعات متأخرة" : "Overdue follow-ups"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {workloadRows.map(([k, w]) => (
+                  <tr key={k} className="border-t border-border">
+                    <td className="py-2">{k === "_none" ? (lang === "ar" ? "غير محدد" : "Unassigned") : (therapistMap[k] || k.slice(0, 8))}</td>
+                    <td className="text-end">{w.active}</td>
+                    <td className="text-end">{w.done}</td>
+                    <td className={`text-end ${w.overdue > 0 ? "text-destructive font-semibold" : ""}`}>{w.overdue}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
 
       {overdueFollowups.length > 0 && (
         <Card className="p-4">

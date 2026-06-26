@@ -214,7 +214,7 @@ export default function PhysioCaseDetail() {
           <span>Follow-up overdue (due {formatDate(c.followup_due_date, lang)}). Consider a reassessment.</span>
         </Card>
       )}
-      {sessions.filter(s => s.attendance === "done").length >= (c.expected_sessions ?? 0) && c.status === "active" && (
+      {(c.expected_sessions ?? 0) > 0 && sessions.filter(s => s.attendance === "done").length >= (c.expected_sessions ?? 0) && c.status === "active" && (
         <Card className="p-3 border-primary/30 bg-primary/5 text-sm">
           Expected sessions reached. Consider a reassessment or marking the case as completed.
         </Card>

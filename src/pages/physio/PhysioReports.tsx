@@ -87,22 +87,31 @@ export default function PhysioReports() {
   const exportCsv = () => {
     const filterTag = `${from}_${to}_${therapistId}_${status}_${attendance}`;
     const pn = (p: any) => `${p?.first_name_en ?? ""} ${p?.last_name_en ?? ""}`.trim();
+    // Build case_id -> patient lookup so per-session/per-reassessment rows are human-readable.
+    const caseLookup: Record<string, { patient: string; diagnosis: string }> = {};
+    cases.forEach(c => { caseLookup[c.id] = { patient: pn(c.patients), diagnosis: c.diagnosis ?? "" }; });
+    const therapistName = therapistId === "_all"
+      ? "All"
+      : (therapists.find((t: any) => t.id === therapistId)
+          ? `${therapists.find((t: any) => t.id === therapistId)!.first_name_en ?? ""} ${therapists.find((t: any) => t.id === therapistId)!.last_name_en ?? ""}`.trim() || therapistId
+          : therapistId);
     downloadCsv(`physio_cases_${filterTag}.csv`, [
       ["case_id", "patient", "diagnosis", "status", "therapist_id", "start_date", "expected_sessions"],
       ...cases.map(c => [c.id, pn(c.patients), c.diagnosis ?? "", c.status, c.therapist_id ?? "", c.start_date ?? "", c.expected_sessions ?? ""]),
     ]);
     downloadCsv(`physio_sessions_${filterTag}.csv`, [
-      ["session_id", "case_id", "session_date", "attendance", "therapist_id"],
-      ...sessions.map(s => [s.id, s.case_id, s.session_date ?? "", s.attendance ?? "", s.therapist_id ?? ""]),
+      ["session_id", "case_id", "patient", "diagnosis", "session_date", "attendance", "therapist_id"],
+      ...sessions.map(s => [s.id, s.case_id, caseLookup[s.case_id]?.patient ?? "", caseLookup[s.case_id]?.diagnosis ?? "", s.session_date ?? "", s.attendance ?? "", s.therapist_id ?? ""]),
     ]);
     downloadCsv(`physio_reassessments_${filterTag}.csv`, [
-      ["reassessment_id", "case_id", "assessment_date", "trend", "therapist_id"],
-      ...reassess.map(r => [r.id, r.case_id, r.assessment_date ?? "", r.trend ?? "", r.therapist_id ?? ""]),
+      ["reassessment_id", "case_id", "patient", "diagnosis", "assessment_date", "trend", "therapist_id"],
+      ...reassess.map(r => [r.id, r.case_id, caseLookup[r.case_id]?.patient ?? "", caseLookup[r.case_id]?.diagnosis ?? "", r.assessment_date ?? "", r.trend ?? "", r.therapist_id ?? ""]),
     ]);
     downloadCsv(`physio_summary_${filterTag}.csv`, [
       ["metric", "value"],
       ["from", from], ["to", to],
-      ["therapist_filter", therapistId], ["status_filter", status], ["attendance_filter", attendance],
+      ["therapist_filter", therapistName], ["status_filter", status], ["attendance_filter", attendance],
+      ["cases_total", cases.length],
       ["sessions_done", summary.done], ["sessions_missed", summary.missed],
       ["active_cases_now", activeNow], ["reassessments_total", summary.reassessTotal],
       ["improving", summary.improving], ["worsening", summary.worsening],
@@ -168,7 +177,11 @@ export default function PhysioReports() {
         </div>
         <div className="flex items-end gap-2">
           <Button onClick={run} className="flex-1">{lang === "ar" ? "تشغيل" : "Run"}</Button>
-          <Button onClick={exportCsv} variant="outline" disabled={loading}><Download className="size-4" /></Button>
+          <Button onClick={exportCsv} variant="outline"
+            disabled={loading || (cases.length === 0 && sessions.length === 0 && reassess.length === 0)}
+            title={lang === "ar" ? "تصدير CSV" : "Export CSV"}>
+            <Download className="size-4" />
+          </Button>
         </div>
       </Card>
 

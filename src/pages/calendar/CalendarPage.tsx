@@ -379,10 +379,18 @@ export default function CalendarPage() {
     setOpen(true);
   };
 
-  const softDelete = async (a: Appt): Promise<void> => {
-    const { error } = await supabase.from("appointments").update({ deleted_at: new Date().toISOString() } as any).eq("id", a.id);
+  // Soft-cancel an appointment instead of hard-deleting it so the row stays
+  // available for queue history, reports, and audit. Hard delete is no longer
+  // exposed in the UI; admins can purge rows via the database directly.
+  const cancelAppointment = async (a: Appt): Promise<void> => {
+    if (a.status === "cancelled") { toast.message(lang === "ar" ? "الموعد ملغي بالفعل" : "Appointment already cancelled"); return; }
+    const patch = buildStatusPatch("cancelled", {
+      checked_in_at: (a as any).checked_in_at ?? null,
+      started_at: (a as any).started_at ?? null,
+    });
+    const { error } = await supabase.from("appointments").update(patch as any).eq("id", a.id);
     if (error) { toast.error(error.message); return; }
-    toast.success(t("delete"));
+    toast.success(lang === "ar" ? "تم إلغاء الموعد" : "Appointment cancelled");
     load();
   };
 
@@ -1149,7 +1157,17 @@ export default function CalendarPage() {
                           <Button variant="ghost" size="icon" className="size-7" title={t("sendReminder")} onClick={() => sendReminderNow(a)}>
                             <Send className="size-3.5" />
                           </Button>
-                          <RowActions onEdit={() => openEdit(a)} onDelete={() => softDelete(a)} />
+                          <RowActions
+                            onEdit={() => openEdit(a)}
+                            onDelete={() => cancelAppointment(a)}
+                            deleteAsCancel
+                            deleteLabel={lang === "ar" ? "إلغاء الموعد" : "Cancel appointment"}
+                            deleteTitle={lang === "ar" ? "إلغاء الموعد" : "Cancel appointment?"}
+                            deleteDescription={lang === "ar"
+                              ? "سيتم تعليم الموعد كملغي مع الاحتفاظ به في السجل والتقارير."
+                              : "The appointment will be marked as cancelled and kept for history and reports."}
+                            deleteConfirmLabel={lang === "ar" ? "إلغاء الموعد" : "Cancel appointment"}
+                          />
                         </div>
                       </div>
                     </div>

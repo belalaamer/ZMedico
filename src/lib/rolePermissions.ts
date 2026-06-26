@@ -83,11 +83,12 @@ export function moduleForPath(path: string): string | null {
   if (path.startsWith("/patients")) return "patients";
   if (path.startsWith("/invoices") || path.startsWith("/payments")) return "invoices";
   if (path.startsWith("/treasury") || path.startsWith("/expenses")) return "treasury";
-  if (path.startsWith("/coupons")) return "invoices";
+  if (path.startsWith("/coupons")) return "coupons";
   if (path.startsWith("/inventory")) return "inventory";
   if (path.startsWith("/medical")) return "medical_records";
   if (path.startsWith("/hr")) return "hr";
   if (path.startsWith("/reports")) return "reports";
   if (path.startsWith("/settings") || path.startsWith("/branches")) return "settings";
+  if (path.startsWith("/pricing")) return "settings";
   return null;
 }

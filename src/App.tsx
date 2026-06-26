@@ -38,6 +38,7 @@ const PhysioCases = lazy(() => import("@/pages/physio/PhysioCases"));
 const PhysioCaseDetail = lazy(() => import("@/pages/physio/PhysioCaseDetail"));
 const PhysioDashboard = lazy(() => import("@/pages/physio/PhysioDashboard"));
 const PhysioReports = lazy(() => import("@/pages/physio/PhysioReports"));
+const PhysioFollowups = lazy(() => import("@/pages/physio/PhysioFollowups"));
 const Products = lazy(() => import("@/pages/inventory/Products"));
 const ProductDetail = lazy(() => import("@/pages/inventory/ProductDetail"));
 const Categories = lazy(() => import("@/pages/inventory/Categories"));
@@ -161,6 +162,7 @@ function AppContent() {
               <Route path="/physio" element={<PermissionRoute><PhysioCases /></PermissionRoute>} />
               <Route path="/physio/dashboard" element={<PermissionRoute><PhysioDashboard /></PermissionRoute>} />
               <Route path="/physio/reports" element={<PermissionRoute><PhysioReports /></PermissionRoute>} />
+              <Route path="/physio/followups" element={<PermissionRoute><PhysioFollowups /></PermissionRoute>} />
               <Route path="/physio/:id" element={<PermissionRoute><PhysioCaseDetail /></PermissionRoute>} />
               <Route path="/coupons" element={<PermissionRoute><Coupons /></PermissionRoute>} />
               <Route path="/reminders" element={<PermissionRoute><Reminders /></PermissionRoute>} />

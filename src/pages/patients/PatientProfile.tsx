@@ -49,34 +49,50 @@ export default function PatientProfile() {
   const [clinicalView, setClinicalView] = useState<"medical" | "plans">("medical");
   const [reloadKey, setReloadKey] = useState(0);
   const [physioCases, setPhysioCases] = useState<any[]>([]);
-  const [physioStats, setPhysioStats] = useState<{ active: number; lastSession: string | null; lastReassessment: string | null; nextFollowup: string | null } | null>(null);
+  const [physioStats, setPhysioStats] = useState<{ active: number; lastSession: string | null; lastReassessment: string | null; nextFollowup: string | null; overdueFollowup: string | null } | null>(null);
 
   useEffect(() => {
     if (!id) return;
     if (!can("medical_records", "view")) { setPhysioCases([]); return; }
-    supabase.from("physio_cases" as any)
-      .select("id,diagnosis,status,start_date,expected_sessions,followup_enabled,followup_due_date")
-      .eq("patient_id", id).is("deleted_at", null)
-      .order("created_at", { ascending: false }).limit(5)
-      .then(async ({ data }) => {
-        const list = (data as any) ?? [];
-        setPhysioCases(list);
-        const caseIds = list.map((c: any) => c.id);
-        if (!caseIds.length) { setPhysioStats({ active: 0, lastSession: null, lastReassessment: null, nextFollowup: null }); return; }
-        const [{ data: ss }, { data: rs }] = await Promise.all([
-          supabase.from("physio_sessions" as any).select("session_date").in("case_id", caseIds).is("deleted_at", null).eq("attendance", "done").order("session_date", { ascending: false }).limit(1),
-          supabase.from("physio_reassessments" as any).select("assessment_date").in("case_id", caseIds).is("deleted_at", null).order("assessment_date", { ascending: false }).limit(1),
-        ]);
-        const upcoming = list.filter((c: any) => c.followup_enabled && c.followup_due_date).map((c: any) => c.followup_due_date).sort();
-        setPhysioStats({
-          active: list.filter((c: any) => c.status === "active").length,
-          lastSession: (ss as any)?.[0]?.session_date ?? null,
-          lastReassessment: (rs as any)?.[0]?.assessment_date ?? null,
-          nextFollowup: upcoming[0] ?? null,
-        });
+    (async () => {
+      // Full set (branch-scoped) for accurate stats.
+      let allQ = supabase.from("physio_cases" as any)
+        .select("id,status,followup_enabled,followup_due_date,branch_id")
+        .eq("patient_id", id).is("deleted_at", null);
+      if ((patient as any)?.branch_id) allQ = allQ.eq("branch_id", (patient as any).branch_id);
+      const { data: all } = await allQ;
+      const allList = (all as any) ?? [];
+      const allCaseIds = allList.map((c: any) => c.id);
+      // Preview list (5 most recent) for display.
+      let prevQ = supabase.from("physio_cases" as any)
+        .select("id,diagnosis,status,start_date,expected_sessions,followup_enabled,followup_due_date,branch_id")
+        .eq("patient_id", id).is("deleted_at", null)
+        .order("created_at", { ascending: false }).limit(5);
+      if ((patient as any)?.branch_id) prevQ = prevQ.eq("branch_id", (patient as any).branch_id);
+      const { data: preview } = await prevQ;
+      setPhysioCases((preview as any) ?? []);
+      if (!allCaseIds.length) { setPhysioStats({ active: 0, lastSession: null, lastReassessment: null, nextFollowup: null, overdueFollowup: null }); return; }
+      const [{ data: ss }, { data: rs }] = await Promise.all([
+        supabase.from("physio_sessions" as any).select("session_date").in("case_id", allCaseIds).is("deleted_at", null).eq("attendance", "done").order("session_date", { ascending: false }).limit(1),
+        supabase.from("physio_reassessments" as any).select("assessment_date").in("case_id", allCaseIds).is("deleted_at", null).order("assessment_date", { ascending: false }).limit(1),
+      ]);
+      const today = new Date().toISOString().slice(0, 10);
+      const activeFollowups = allList
+        .filter((c: any) => c.status === "active" && c.followup_enabled && c.followup_due_date)
+        .map((c: any) => c.followup_due_date)
+        .sort();
+      const overdue = activeFollowups.filter((d: string) => d < today);
+      const upcoming = activeFollowups.filter((d: string) => d >= today);
+      setPhysioStats({
+        active: allList.filter((c: any) => c.status === "active").length,
+        lastSession: (ss as any)?.[0]?.session_date ?? null,
+        lastReassessment: (rs as any)?.[0]?.assessment_date ?? null,
+        nextFollowup: upcoming[0] ?? null,
+        overdueFollowup: overdue[overdue.length - 1] ?? null,
       });
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, reloadKey, can("medical_records", "view")]);
+  }, [id, reloadKey, can("medical_records", "view"), patient?.branch_id]);
 
   const setTab = (next: string) => {
     const p = new URLSearchParams(searchParams);

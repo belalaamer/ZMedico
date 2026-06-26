@@ -296,6 +296,35 @@ export default function PatientProfile() {
               <PatientTreatmentPlans patientId={patient.id} />
             </Can>
           )}
+
+          <Can module="medical_records" action="view">
+            <section className="space-y-2 mt-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                  <Activity className="size-4" />{lang === "ar" ? "العلاج الطبيعي" : "Physiotherapy"}
+                </h3>
+                <Button asChild variant="ghost" size="sm">
+                  <Link to="/physio">{lang === "ar" ? "كل الحالات" : "All cases"}</Link>
+                </Button>
+              </div>
+              <Card className="shadow-card overflow-hidden">
+                {physioCases.length === 0 ? (
+                  <div className="p-6 text-center text-sm text-muted-foreground">{lang === "ar" ? "لا توجد حالات علاج طبيعي" : "No physiotherapy cases."}</div>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {physioCases.map((pc) => (
+                      <Link key={pc.id} to={`/physio/${pc.id}`} className="flex items-center gap-3 p-3 hover:bg-muted/40">
+                        <Activity className="size-4 text-muted-foreground" />
+                        <div className="flex-1 min-w-0 text-sm truncate">{pc.diagnosis || "—"}</div>
+                        <div className="text-xs text-muted-foreground">{formatDate(pc.start_date, lang)}</div>
+                        <Badge variant="outline" className="text-[10px]">{pc.status}</Badge>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            </section>
+          </Can>
         </TabsContent>
 
         <TabsContent value="financial" className="mt-4 space-y-6">

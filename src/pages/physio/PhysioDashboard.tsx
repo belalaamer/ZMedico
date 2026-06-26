@@ -54,15 +54,15 @@ export default function PhysioDashboard() {
   if (loading) return <div className="p-6"><ListSkeleton rows={6} /></div>;
 
   const today = new Date().toISOString().slice(0, 10);
-  const weekAgo = new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10);
+  const weekAgo = new Date(Date.now() - 6 * 86400_000).toISOString().slice(0, 10); // rolling 7 days incl. today
   const active = cases.filter(c => c.status === "active");
   const completed = cases.filter(c => c.status === "completed");
-  const sessionsToday = sessions.filter(s => s.session_date === today);
-  const sessionsWeek = sessions.filter(s => s.session_date >= weekAgo);
+  const sessionsToday = sessions.filter(s => s.session_date === today && s.attendance === "done");
+  const sessionsWeek = sessions.filter(s => s.session_date >= weekAgo && s.attendance === "done");
   const done = sessions.filter(s => s.attendance === "done").length;
   const missed = sessions.filter(s => s.attendance === "missed").length;
   const attendanceRate = (done + missed) > 0 ? Math.round((done * 100) / (done + missed)) : 0;
-  const avgPerActive = active.length ? (sessions.filter(s => active.some(a => a.id === s.case_id) && s.attendance === "done").length / active.length).toFixed(1) : "0";
+  const avgPerActive30d = active.length ? (sessions.filter(s => active.some(a => a.id === s.case_id) && s.attendance === "done").length / active.length).toFixed(1) : "0";
   const overdueFollowups = active.filter(c => c.followup_enabled && c.followup_due_date && c.followup_due_date < today);
 
   const byTherapist: Record<string, number> = {};
@@ -90,10 +90,10 @@ export default function PhysioDashboard() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Kpi icon={<Activity className="size-4" />} label={lang === "ar" ? "حالات نشطة" : "Active cases"} value={active.length} />
         <Kpi icon={<Users className="size-4" />} label={lang === "ar" ? "مكتملة" : "Completed"} value={completed.length} />
-        <Kpi icon={<Calendar className="size-4" />} label={lang === "ar" ? "جلسات اليوم" : "Sessions today"} value={sessionsToday.length} />
-        <Kpi icon={<Calendar className="size-4" />} label={lang === "ar" ? "جلسات الأسبوع" : "Sessions this week"} value={sessionsWeek.length} />
+        <Kpi icon={<Calendar className="size-4" />} label={lang === "ar" ? "جلسات اليوم (تمت)" : "Sessions done today"} value={sessionsToday.length} />
+        <Kpi icon={<Calendar className="size-4" />} label={lang === "ar" ? "جلسات الأسبوع (تمت، 7ي)" : "Sessions done (7d)"} value={sessionsWeek.length} />
         <Kpi icon={<TrendingUp className="size-4" />} label={lang === "ar" ? "نسبة الحضور" : "Attendance rate"} value={`${attendanceRate}%`} />
-        <Kpi icon={<Activity className="size-4" />} label={lang === "ar" ? "متوسط جلسات/حالة" : "Avg sessions / active"} value={avgPerActive} />
+        <Kpi icon={<Activity className="size-4" />} label={lang === "ar" ? "متوسط جلسات/حالة (30ي)" : "Avg done / active case (30d)"} value={avgPerActive30d} />
         <Kpi icon={<AlertCircle className="size-4" />} label={lang === "ar" ? "متابعات متأخرة" : "Overdue follow-ups"} value={overdueFollowups.length} accent={overdueFollowups.length > 0} />
         <Kpi icon={<TrendingUp className="size-4" />} label={lang === "ar" ? "إعادة تقييم (30ي)" : "Reassessments (30d)"} value={reassess.length} />
       </div>

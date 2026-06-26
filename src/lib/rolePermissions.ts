@@ -47,6 +47,7 @@ export const DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
     reports: [],
     hr: [],
     settings: [],
+    coupons: ["view"],
   },
   accountant: {
     // Invoices, payments, expenses. No medical records.
@@ -60,6 +61,7 @@ export const DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
     reports: ["view","export"],
     hr: [],
     settings: [],
+    coupons: ["view","create","edit","export"],
   },
   hr: {
     patients: [], appointments: [], medical_records: [], treatment_plans: [], invoices: [], treasury: [],

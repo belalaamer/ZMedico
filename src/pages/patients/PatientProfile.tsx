@@ -339,9 +339,21 @@ export default function PatientProfile() {
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
                   <Activity className="size-4" />{lang === "ar" ? "العلاج الطبيعي" : "Physiotherapy"}
                 </h3>
-                <Button asChild variant="ghost" size="sm">
-                  <Link to="/physio">{lang === "ar" ? "كل الحالات" : "All cases"}</Link>
-                </Button>
+                <div className="flex items-center gap-1">
+                  {activePhysioCaseId && (
+                    <Button asChild variant="ghost" size="sm">
+                      <Link to={`/physio/${activePhysioCaseId}`}>{lang === "ar" ? "افتح الحالة النشطة" : "Open active case"}</Link>
+                    </Button>
+                  )}
+                  <Can module="medical_records" action="create">
+                    <Button asChild variant="ghost" size="sm">
+                      <Link to={`/physio?patient=${patient.id}&new=1`}>{lang === "ar" ? "حالة جديدة" : "New case"}</Link>
+                    </Button>
+                  </Can>
+                  <Button asChild variant="ghost" size="sm">
+                    <Link to="/physio">{lang === "ar" ? "كل الحالات" : "All cases"}</Link>
+                  </Button>
+                </div>
               </div>
               <Card className="shadow-card overflow-hidden">
                 {physioStats && (physioStats.active > 0 || physioStats.lastSession || physioStats.nextFollowup || physioStats.overdueFollowup) && (

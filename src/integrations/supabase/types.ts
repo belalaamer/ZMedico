@@ -2884,6 +2884,7 @@ export type Database = {
           branch_id: string
           created_at: string
           created_by: string | null
+          deleted_at: string | null
           diagnosis: string | null
           expected_sessions: number
           id: string
@@ -2900,6 +2901,7 @@ export type Database = {
           branch_id: string
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           diagnosis?: string | null
           expected_sessions?: number
           id?: string
@@ -2916,6 +2918,7 @@ export type Database = {
           branch_id?: string
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           diagnosis?: string | null
           expected_sessions?: number
           id?: string
@@ -2959,6 +2962,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           current_condition: string | null
+          deleted_at: string | null
           id: string
           initial_condition: string | null
           notes: string | null
@@ -2973,6 +2977,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           current_condition?: string | null
+          deleted_at?: string | null
           id?: string
           initial_condition?: string | null
           notes?: string | null
@@ -2987,6 +2992,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           current_condition?: string | null
+          deleted_at?: string | null
           id?: string
           initial_condition?: string | null
           notes?: string | null
@@ -3019,6 +3025,7 @@ export type Database = {
           case_id: string
           created_at: string
           created_by: string | null
+          deleted_at: string | null
           home_exercise: string | null
           id: string
           interventions: string | null
@@ -3042,6 +3049,7 @@ export type Database = {
           case_id: string
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           home_exercise?: string | null
           id?: string
           interventions?: string | null
@@ -3065,6 +3073,7 @@ export type Database = {
           case_id?: string
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           home_exercise?: string | null
           id?: string
           interventions?: string | null

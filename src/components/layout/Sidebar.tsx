@@ -78,7 +78,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
         can("invoices") && { to: "/payments", icon: CreditCard, label: t("payments") },
         can("treasury") && { to: "/treasury", icon: Banknote, label: t("treasury") },
         can("treasury") && { to: "/expenses", icon: Receipt, label: t("expenses") },
-        can("invoices") && { to: "/coupons", icon: Ticket, label: lang === "ar" ? "الكوبونات" : "Coupons" },
+        can("coupons") && { to: "/coupons", icon: Ticket, label: lang === "ar" ? "الكوبونات" : "Coupons" },
         can("reports") && { to: "/reports", icon: PieChart, label: t("reports") },
         can("reports") && { to: "/reports/doctor-performance", icon: Award, label: t("doctorPerformance") },
       ].filter(Boolean) as NavItem[],

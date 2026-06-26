@@ -561,14 +561,14 @@ export default function CalendarPage() {
         <div className="flex items-center justify-between mb-3">
           <button onClick={() => setMonthCursor(new Date(monthCursor.getFullYear(), monthCursor.getMonth() - 1, 1))}
             className="size-7 inline-flex items-center justify-center rounded hover:bg-muted">
-            <ChevronLeft className="size-4" />
+            <ChevronLeft className="size-4 rtl:rotate-180" />
           </button>
           <div className="text-sm font-semibold">
             {monthCursor.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", { month: "long", year: "numeric" })}
           </div>
           <button onClick={() => setMonthCursor(new Date(monthCursor.getFullYear(), monthCursor.getMonth() + 1, 1))}
             className="size-7 inline-flex items-center justify-center rounded hover:bg-muted">
-            <ChevronRight className="size-4" />
+            <ChevronRight className="size-4 rtl:rotate-180" />
           </button>
         </div>
         <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-muted-foreground mb-1">
@@ -630,12 +630,12 @@ export default function CalendarPage() {
           <Button variant="outline" size="icon" onClick={() => {
             if (view === "month") setDate(new Date(date.getFullYear(), date.getMonth() - 1, 1));
             else setDate(addDays(date, view === "week" ? -7 : -1));
-          }}><ChevronLeft className="size-4" /></Button>
+          }}><ChevronLeft className="size-4 rtl:rotate-180" /></Button>
           <Button variant="outline" size="sm" onClick={() => setDate(startOfDay(new Date()))}>{t("today")}</Button>
           <Button variant="outline" size="icon" onClick={() => {
             if (view === "month") setDate(new Date(date.getFullYear(), date.getMonth() + 1, 1));
             else setDate(addDays(date, view === "week" ? 7 : 1));
-          }}><ChevronRight className="size-4" /></Button>
+          }}><ChevronRight className="size-4 rtl:rotate-180" /></Button>
           <Sheet open={miniOpen} onOpenChange={setMiniOpen}>
             <SheetTrigger asChild>
               <Button variant="outline" size="icon" className="lg:hidden" aria-label={lang === "ar" ? "التقويم" : "Calendar"}>
@@ -1061,14 +1061,14 @@ export default function CalendarPage() {
             <div className="flex items-center justify-between mb-3">
               <button onClick={() => setMonthCursor(new Date(monthCursor.getFullYear(), monthCursor.getMonth() - 1, 1))}
                 className="size-7 inline-flex items-center justify-center rounded hover:bg-muted">
-                <ChevronLeft className="size-4" />
+                <ChevronLeft className="size-4 rtl:rotate-180" />
               </button>
               <div className="text-sm font-semibold">
                 {monthCursor.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", { month: "long", year: "numeric" })}
               </div>
               <button onClick={() => setMonthCursor(new Date(monthCursor.getFullYear(), monthCursor.getMonth() + 1, 1))}
                 className="size-7 inline-flex items-center justify-center rounded hover:bg-muted">
-                <ChevronRight className="size-4" />
+                <ChevronRight className="size-4 rtl:rotate-180" />
               </button>
             </div>
             <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-muted-foreground mb-1">

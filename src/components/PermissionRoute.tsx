@@ -9,7 +9,7 @@ import { ShieldAlert } from "lucide-react";
  * Gates a route element based on the user's permission for the module
  * inferred from the current path. Admin always passes.
  */
-export function PermissionRoute({ children, module }: { children: ReactNode; module?: string }) {
+export function PermissionRoute({ children, module, adminOnly }: { children: ReactNode; module?: string; adminOnly?: boolean }) {
   const { pathname } = useLocation();
   const { can, isAdmin, loading } = usePermissions();
   const { lang } = useI18n();
@@ -23,7 +23,11 @@ export function PermissionRoute({ children, module }: { children: ReactNode; mod
     );
   }
 
-  if (isAdmin || !mod || can(mod, "view")) return <>{children}</>;
+  if (adminOnly) {
+    if (isAdmin) return <>{children}</>;
+  } else if (isAdmin || !mod || can(mod, "view")) {
+    return <>{children}</>;
+  }
 
   return (
     <div className="min-h-[60vh] flex items-center justify-center p-6">

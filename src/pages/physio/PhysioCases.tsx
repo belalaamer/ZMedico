@@ -117,8 +117,10 @@ export default function PhysioCases() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Physical Therapy</h1>
-          <p className="text-sm text-muted-foreground mt-1">{items.length} cases</p>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{lang === "ar" ? "العلاج الطبيعي" : "Physical Therapy"}</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {lang === "ar" ? `${items.length} حالة` : `${items.length} case${items.length === 1 ? "" : "s"}`}
+          </p>
         </div>
         <Can module="medical_records" action="create">
         <Dialog open={open} onOpenChange={setOpen}>

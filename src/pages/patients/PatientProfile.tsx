@@ -341,14 +341,17 @@ export default function PatientProfile() {
                 </Button>
               </div>
               <Card className="shadow-card overflow-hidden">
-                {physioStats && (physioStats.active > 0 || physioStats.lastSession || physioStats.nextFollowup) && (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 p-3 border-b border-border text-xs">
+                {physioStats && (physioStats.active > 0 || physioStats.lastSession || physioStats.nextFollowup || physioStats.overdueFollowup) && (
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-2 p-3 border-b border-border text-xs">
                     <div><div className="text-muted-foreground">{lang === "ar" ? "نشطة" : "Active"}</div><div className="font-semibold text-sm">{physioStats.active}</div></div>
                     <div><div className="text-muted-foreground">{lang === "ar" ? "آخر جلسة" : "Last session"}</div><div className="font-semibold text-sm">{physioStats.lastSession ? formatDate(physioStats.lastSession, lang) : "—"}</div></div>
                     <div><div className="text-muted-foreground">{lang === "ar" ? "آخر تقييم" : "Last reassessment"}</div><div className="font-semibold text-sm">{physioStats.lastReassessment ? formatDate(physioStats.lastReassessment, lang) : "—"}</div></div>
-                    <div><div className="text-muted-foreground">{lang === "ar" ? "متابعة" : "Next follow-up"}</div>
-                      <div className={`font-semibold text-sm ${physioStats.nextFollowup && physioStats.nextFollowup < new Date().toISOString().slice(0,10) ? "text-destructive" : ""}`}>
-                        {physioStats.nextFollowup ? formatDate(physioStats.nextFollowup, lang) : "—"}
+                    <div><div className="text-muted-foreground">{lang === "ar" ? "متابعة قادمة" : "Next follow-up"}</div>
+                      <div className="font-semibold text-sm">{physioStats.nextFollowup ? formatDate(physioStats.nextFollowup, lang) : "—"}</div>
+                    </div>
+                    <div><div className="text-muted-foreground">{lang === "ar" ? "متأخرة" : "Overdue"}</div>
+                      <div className={`font-semibold text-sm ${physioStats.overdueFollowup ? "text-destructive" : ""}`}>
+                        {physioStats.overdueFollowup ? formatDate(physioStats.overdueFollowup, lang) : "—"}
                       </div>
                     </div>
                   </div>

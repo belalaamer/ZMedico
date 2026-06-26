@@ -1634,6 +1634,7 @@ export type Database = {
           tax: number
           total: number
           updated_at: string
+          voided_at: string | null
         }
         Insert: {
           branch_id?: string | null
@@ -1660,6 +1661,7 @@ export type Database = {
           tax?: number
           total?: number
           updated_at?: string
+          voided_at?: string | null
         }
         Update: {
           branch_id?: string | null
@@ -1686,6 +1688,7 @@ export type Database = {
           tax?: number
           total?: number
           updated_at?: string
+          voided_at?: string | null
         }
         Relationships: [
           {

@@ -177,7 +177,11 @@ export default function PhysioReports() {
         </div>
         <div className="flex items-end gap-2">
           <Button onClick={run} className="flex-1">{lang === "ar" ? "تشغيل" : "Run"}</Button>
-          <Button onClick={exportCsv} variant="outline" disabled={loading}><Download className="size-4" /></Button>
+          <Button onClick={exportCsv} variant="outline"
+            disabled={loading || (cases.length === 0 && sessions.length === 0 && reassess.length === 0)}
+            title={lang === "ar" ? "تصدير CSV" : "Export CSV"}>
+            <Download className="size-4" />
+          </Button>
         </div>
       </Card>
 

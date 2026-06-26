@@ -26,7 +26,7 @@ export default function PhysioFollowups() {
     setLoading(true);
     (async () => {
       const { data } = await supabase.from("physio_cases" as any)
-        .select("id,diagnosis,status,therapist_id,followup_enabled,followup_due_date,followup_interval_days,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)")
+        .select("id,diagnosis,status,therapist_id,followup_enabled,followup_due_date,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)")
         .eq("branch_id", currentBranchId).is("deleted_at", null)
         .eq("status", "active").eq("followup_enabled", true)
         .not("followup_due_date", "is", null)

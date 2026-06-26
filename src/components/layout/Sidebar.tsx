@@ -123,13 +123,14 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
   const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
   useEffect(() => {
     setOpenMap(prev => {
+      let changed = false;
       const next = { ...prev };
       for (const g of groups) {
         if (g.items.some(it => pathname === it.to || pathname.startsWith(it.to + "/"))) {
-          next[g.key] = true;
+          if (!next[g.key]) { next[g.key] = true; changed = true; }
         }
       }
-      return next;
+      return changed ? next : prev;
     });
   }, [pathname, groups]);
   const toggle = (k: string) => setOpenMap(m => ({ ...m, [k]: !m[k] }));

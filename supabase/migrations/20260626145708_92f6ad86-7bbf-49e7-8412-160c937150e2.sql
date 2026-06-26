@@ -1,0 +1,2 @@
+REVOKE EXECUTE ON FUNCTION public.user_has_branch_access_via_physio_case(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.user_has_branch_access_via_physio_case(uuid) TO authenticated, service_role;

@@ -208,7 +208,7 @@ export default function PhysioCaseDetail() {
           <div className="whitespace-pre-wrap">{c.pause_reason || "—"}</div>
         </Card>
       )}
-      {c.followup_enabled && c.followup_due_date && c.followup_due_date < new Date().toISOString().slice(0,10) && (
+      {c.status === "active" && c.followup_enabled && c.followup_due_date && c.followup_due_date < new Date().toISOString().slice(0,10) && (
         <Card className="p-3 border-destructive/40 bg-destructive/5 text-sm flex items-center gap-2">
           <AlertCircle className="size-4 text-destructive" />
           <span>Follow-up overdue (due {formatDate(c.followup_due_date, lang)}). Consider a reassessment.</span>
@@ -263,11 +263,18 @@ export default function PhysioCaseDetail() {
                         s.attendance === "cancelled" ? "status-cancelled" : "status-pending"
                       }>{s.attendance}</Badge>
                     </div>
-                    {s.appointment_id && appointmentMap[s.appointment_id] ? (
-                      <div className="text-xs flex items-center gap-1 text-muted-foreground">
-                        <Calendar className="size-3" />
-                        Linked appointment · {new Date(appointmentMap[s.appointment_id].scheduled_at).toLocaleString()} · {appointmentMap[s.appointment_id].status}
-                      </div>
+                    {s.appointment_id ? (
+                      appointmentMap[s.appointment_id] ? (
+                        <div className="text-xs flex items-center gap-1 text-muted-foreground">
+                          <Calendar className="size-3" />
+                          Linked appointment · {new Date(appointmentMap[s.appointment_id].scheduled_at).toLocaleString()} · {appointmentMap[s.appointment_id].status}
+                        </div>
+                      ) : (
+                        <div className="text-xs flex items-center gap-1 text-muted-foreground">
+                          <Calendar className="size-3" />
+                          Linked appointment · <span className="font-mono">#{String(s.appointment_id).slice(0, 8)}</span>
+                        </div>
+                      )
                     ) : (
                       <div className="text-[11px] text-muted-foreground">Standalone (no appointment)</div>
                     )}

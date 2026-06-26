@@ -2882,14 +2882,20 @@ export type Database = {
       physio_cases: {
         Row: {
           branch_id: string
+          completed_at: string | null
+          completion_summary: string | null
           created_at: string
           created_by: string | null
           deleted_at: string | null
           diagnosis: string | null
           expected_sessions: number
+          followup_due_date: string | null
+          followup_enabled: boolean
+          followup_interval_days: number
           id: string
           notes: string | null
           patient_id: string
+          pause_reason: string | null
           start_date: string
           status: Database["public"]["Enums"]["physio_case_status"]
           therapist_id: string | null
@@ -2899,14 +2905,20 @@ export type Database = {
         }
         Insert: {
           branch_id: string
+          completed_at?: string | null
+          completion_summary?: string | null
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
           diagnosis?: string | null
           expected_sessions?: number
+          followup_due_date?: string | null
+          followup_enabled?: boolean
+          followup_interval_days?: number
           id?: string
           notes?: string | null
           patient_id: string
+          pause_reason?: string | null
           start_date?: string
           status?: Database["public"]["Enums"]["physio_case_status"]
           therapist_id?: string | null
@@ -2916,14 +2928,20 @@ export type Database = {
         }
         Update: {
           branch_id?: string
+          completed_at?: string | null
+          completion_summary?: string | null
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
           diagnosis?: string | null
           expected_sessions?: number
+          followup_due_date?: string | null
+          followup_enabled?: boolean
+          followup_interval_days?: number
           id?: string
           notes?: string | null
           patient_id?: string
+          pause_reason?: string | null
           start_date?: string
           status?: Database["public"]["Enums"]["physio_case_status"]
           therapist_id?: string | null
@@ -3021,6 +3039,7 @@ export type Database = {
       physio_sessions: {
         Row: {
           adherence: string | null
+          appointment_id: string | null
           attendance: Database["public"]["Enums"]["physio_attendance"]
           case_id: string
           created_at: string
@@ -3045,6 +3064,7 @@ export type Database = {
         }
         Insert: {
           adherence?: string | null
+          appointment_id?: string | null
           attendance?: Database["public"]["Enums"]["physio_attendance"]
           case_id: string
           created_at?: string
@@ -3069,6 +3089,7 @@ export type Database = {
         }
         Update: {
           adherence?: string | null
+          appointment_id?: string | null
           attendance?: Database["public"]["Enums"]["physio_attendance"]
           case_id?: string
           created_at?: string
@@ -3092,6 +3113,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "physio_sessions_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "physio_sessions_case_id_fkey"
             columns: ["case_id"]

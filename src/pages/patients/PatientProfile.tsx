@@ -50,6 +50,7 @@ export default function PatientProfile() {
   const [reloadKey, setReloadKey] = useState(0);
   const [physioCases, setPhysioCases] = useState<any[]>([]);
   const [physioStats, setPhysioStats] = useState<{ active: number; lastSession: string | null; lastReassessment: string | null; nextFollowup: string | null; overdueFollowup: string | null } | null>(null);
+  const [activePhysioCaseId, setActivePhysioCaseId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -63,6 +64,8 @@ export default function PatientProfile() {
       const { data: all } = await allQ;
       const allList = (all as any) ?? [];
       const allCaseIds = allList.map((c: any) => c.id);
+      const firstActive = allList.find((c: any) => c.status === "active");
+      setActivePhysioCaseId(firstActive?.id ?? null);
       // Preview list (5 most recent) for display.
       let prevQ = supabase.from("physio_cases" as any)
         .select("id,diagnosis,status,start_date,expected_sessions,followup_enabled,followup_due_date,branch_id")
@@ -336,9 +339,21 @@ export default function PatientProfile() {
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
                   <Activity className="size-4" />{lang === "ar" ? "العلاج الطبيعي" : "Physiotherapy"}
                 </h3>
-                <Button asChild variant="ghost" size="sm">
-                  <Link to="/physio">{lang === "ar" ? "كل الحالات" : "All cases"}</Link>
-                </Button>
+                <div className="flex items-center gap-1">
+                  {activePhysioCaseId && (
+                    <Button asChild variant="ghost" size="sm">
+                      <Link to={`/physio/${activePhysioCaseId}`}>{lang === "ar" ? "افتح الحالة النشطة" : "Open active case"}</Link>
+                    </Button>
+                  )}
+                  <Can module="medical_records" action="create">
+                    <Button asChild variant="ghost" size="sm">
+                      <Link to={`/physio?patient=${patient.id}&new=1`}>{lang === "ar" ? "حالة جديدة" : "New case"}</Link>
+                    </Button>
+                  </Can>
+                  <Button asChild variant="ghost" size="sm">
+                    <Link to="/physio">{lang === "ar" ? "كل الحالات" : "All cases"}</Link>
+                  </Button>
+                </div>
               </div>
               <Card className="shadow-card overflow-hidden">
                 {physioStats && (physioStats.active > 0 || physioStats.lastSession || physioStats.nextFollowup || physioStats.overdueFollowup) && (

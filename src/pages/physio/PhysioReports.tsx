@@ -10,6 +10,21 @@ import { useBranch } from "@/contexts/BranchContext";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate } from "@/lib/format";
+import { Download } from "lucide-react";
+
+function downloadCsv(filename: string, rows: any[][]) {
+  const esc = (v: any) => {
+    const s = v === null || v === undefined ? "" : String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const csv = rows.map(r => r.map(esc).join(",")).join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
 
 export default function PhysioReports() {
   const { currentBranchId } = useBranch();
@@ -69,6 +84,31 @@ export default function PhysioReports() {
 
   useEffect(() => { run(); /* eslint-disable-next-line */ }, [currentBranchId]);
 
+  const exportCsv = () => {
+    const filterTag = `${from}_${to}_${therapistId}_${status}_${attendance}`;
+    const pn = (p: any) => `${p?.first_name_en ?? ""} ${p?.last_name_en ?? ""}`.trim();
+    downloadCsv(`physio_cases_${filterTag}.csv`, [
+      ["case_id", "patient", "diagnosis", "status", "therapist_id", "start_date", "expected_sessions"],
+      ...cases.map(c => [c.id, pn(c.patients), c.diagnosis ?? "", c.status, c.therapist_id ?? "", c.start_date ?? "", c.expected_sessions ?? ""]),
+    ]);
+    downloadCsv(`physio_sessions_${filterTag}.csv`, [
+      ["session_id", "case_id", "session_date", "attendance", "therapist_id"],
+      ...sessions.map(s => [s.id, s.case_id, s.session_date ?? "", s.attendance ?? "", s.therapist_id ?? ""]),
+    ]);
+    downloadCsv(`physio_reassessments_${filterTag}.csv`, [
+      ["reassessment_id", "case_id", "assessment_date", "trend", "therapist_id"],
+      ...reassess.map(r => [r.id, r.case_id, r.assessment_date ?? "", r.trend ?? "", r.therapist_id ?? ""]),
+    ]);
+    downloadCsv(`physio_summary_${filterTag}.csv`, [
+      ["metric", "value"],
+      ["from", from], ["to", to],
+      ["therapist_filter", therapistId], ["status_filter", status], ["attendance_filter", attendance],
+      ["sessions_done", summary.done], ["sessions_missed", summary.missed],
+      ["active_cases_now", activeNow], ["reassessments_total", summary.reassessTotal],
+      ["improving", summary.improving], ["worsening", summary.worsening],
+    ]);
+  };
+
   const summary = useMemo(() => {
     const done = sessions.filter(s => s.attendance === "done").length;
     const missed = sessions.filter(s => s.attendance === "missed").length;
@@ -126,7 +166,10 @@ export default function PhysioReports() {
             </SelectContent>
           </Select>
         </div>
-        <div className="flex items-end"><Button onClick={run} className="w-full">{lang === "ar" ? "تشغيل" : "Run"}</Button></div>
+        <div className="flex items-end gap-2">
+          <Button onClick={run} className="flex-1">{lang === "ar" ? "تشغيل" : "Run"}</Button>
+          <Button onClick={exportCsv} variant="outline" disabled={loading}><Download className="size-4" /></Button>
+        </div>
       </Card>
 
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">

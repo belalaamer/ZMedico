@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Plus, Activity, AlertCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ export default function PhysioCases() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
   const { can } = usePermissions();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -70,6 +71,20 @@ export default function PhysioCases() {
       })();
     }
   }, [currentBranchId]);
+
+  // Open creation dialog pre-filled when navigated with ?patient=<id>&new=1
+  useEffect(() => {
+    const pid = searchParams.get("patient");
+    const isNew = searchParams.get("new") === "1";
+    if (pid && isNew && can("medical_records", "create")) {
+      setForm((f: any) => ({ ...f, patient_id: pid }));
+      setOpen(true);
+      const p = new URLSearchParams(searchParams);
+      p.delete("new");
+      setSearchParams(p, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const patientName = (p: any) =>
     lang === "ar"

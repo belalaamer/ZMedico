@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Plus, TrendingUp, TrendingDown, Minus, Trash2, AlertCircle } from "lucide-react";
+import { ArrowLeft, Plus, TrendingUp, TrendingDown, Minus, Trash2, AlertCircle, Calendar, BellRing } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import { Can } from "@/components/Can";
 import { usePermissions } from "@/hooks/usePermissions";
 import { ListSkeleton } from "@/components/ListSkeleton";
@@ -29,6 +30,8 @@ export default function PhysioCaseDetail() {
   const [sessions, setSessions] = useState<any[]>([]);
   const [reassessments, setReassessments] = useState<any[]>([]);
   const [therapists, setTherapists] = useState<any[]>([]);
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [appointmentMap, setAppointmentMap] = useState<Record<string, any>>({});
   const [sessOpen, setSessOpen] = useState(false);
   const [reOpen, setReOpen] = useState(false);
 
@@ -48,6 +51,19 @@ export default function PhysioCaseDetail() {
     setReassessments((rasRes.data as any) ?? []);
     setStatus("loaded");
     const branchId = (caseRes.data as any).branch_id;
+    const patientId = (caseRes.data as any).patient_id;
+    // Load patient's appointments at this branch for linking + display.
+    if (branchId && patientId) {
+      const { data: appts } = await supabase.from("appointments")
+        .select("id,scheduled_at,status,doctor_id,duration_minutes")
+        .eq("branch_id", branchId).eq("patient_id", patientId)
+        .is("deleted_at", null).order("scheduled_at", { ascending: false }).limit(100);
+      const list = (appts as any) ?? [];
+      setAppointments(list);
+      const map: Record<string, any> = {};
+      list.forEach((a: any) => { map[a.id] = a; });
+      setAppointmentMap(map);
+    }
     if (branchId) {
       const { data: rs } = await supabase.from("user_roles").select("user_id").in("role", ["doctor", "admin"] as any);
       const ids = Array.from(new Set((rs ?? []).map((r: any) => r.user_id))).filter(Boolean);
@@ -103,7 +119,24 @@ export default function PhysioCaseDetail() {
   }, [sessions]);
 
   const updateStatus = async (status: string) => {
-    const { error } = await supabase.from("physio_cases" as any).update({ status }).eq("id", id!);
+    const patch: any = { status };
+    if (status === "completed") {
+      const summary = prompt("Completion summary (optional)") ?? "";
+      patch.completion_summary = summary || c?.completion_summary || null;
+      patch.completed_at = new Date().toISOString();
+    } else if (status === "paused") {
+      const reason = prompt("Pause reason (optional)") ?? "";
+      patch.pause_reason = reason || c?.pause_reason || null;
+    } else if (status === "active") {
+      patch.completed_at = null;
+    }
+    const { error } = await supabase.from("physio_cases" as any).update(patch).eq("id", id!);
+    if (error) return toast.error(error.message);
+    toast.success("Updated"); loadAll();
+  };
+
+  const saveFollowup = async (patch: any) => {
+    const { error } = await supabase.from("physio_cases" as any).update(patch).eq("id", id!);
     if (error) return toast.error(error.message);
     toast.success("Updated"); loadAll();
   };
@@ -163,6 +196,30 @@ export default function PhysioCaseDetail() {
         </div>
       </div>
 
+      {c.status === "completed" && c.completion_summary && (
+        <Card className="p-3 border-success/30 bg-success/5 text-sm">
+          <div className="font-semibold mb-1">Completion summary</div>
+          <div className="whitespace-pre-wrap">{c.completion_summary}</div>
+        </Card>
+      )}
+      {c.status === "paused" && (
+        <Card className="p-3 border-warning/30 bg-warning/5 text-sm">
+          <div className="font-semibold mb-1">Paused</div>
+          <div className="whitespace-pre-wrap">{c.pause_reason || "—"}</div>
+        </Card>
+      )}
+      {c.followup_enabled && c.followup_due_date && c.followup_due_date < new Date().toISOString().slice(0,10) && (
+        <Card className="p-3 border-destructive/40 bg-destructive/5 text-sm flex items-center gap-2">
+          <AlertCircle className="size-4 text-destructive" />
+          <span>Follow-up overdue (due {formatDate(c.followup_due_date, lang)}). Consider a reassessment.</span>
+        </Card>
+      )}
+      {sessions.filter(s => s.attendance === "done").length >= (c.expected_sessions ?? 0) && c.status === "active" && (
+        <Card className="p-3 border-primary/30 bg-primary/5 text-sm">
+          Expected sessions reached. Consider a reassessment or marking the case as completed.
+        </Card>
+      )}
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="p-4"><div className="text-xs text-muted-foreground">Completed</div><div className="text-2xl font-bold">{done}</div></Card>
         <Card className="p-4"><div className="text-xs text-muted-foreground">Remaining</div><div className="text-2xl font-bold">{remaining}</div></Card>
@@ -175,6 +232,7 @@ export default function PhysioCaseDetail() {
           <TabsTrigger value="sessions">Sessions</TabsTrigger>
           <TabsTrigger value="reassessments">Reassessments</TabsTrigger>
           <TabsTrigger value="overview">Plan</TabsTrigger>
+          <TabsTrigger value="followup">Follow-up</TabsTrigger>
         </TabsList>
 
         <TabsContent value="sessions" className="space-y-3">
@@ -185,6 +243,7 @@ export default function PhysioCaseDetail() {
                 caseId={c.id} nextNumber={(sessions[sessions.length - 1]?.session_number ?? 0) + 1}
                 defaultTherapistId={c.therapist_id}
                 therapists={therapists}
+                appointments={appointments}
                 onSaved={loadAll}
               />
             </div>
@@ -204,6 +263,14 @@ export default function PhysioCaseDetail() {
                         s.attendance === "cancelled" ? "status-cancelled" : "status-pending"
                       }>{s.attendance}</Badge>
                     </div>
+                    {s.appointment_id && appointmentMap[s.appointment_id] ? (
+                      <div className="text-xs flex items-center gap-1 text-muted-foreground">
+                        <Calendar className="size-3" />
+                        Linked appointment · {new Date(appointmentMap[s.appointment_id].scheduled_at).toLocaleString()} · {appointmentMap[s.appointment_id].status}
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-muted-foreground">Standalone (no appointment)</div>
+                    )}
                     {(s.pain_level !== null && s.pain_level !== undefined) && <div className="text-xs text-muted-foreground">Pain: {s.pain_level}/10</div>}
                     {s.interventions && <div className="text-sm"><span className="text-muted-foreground">Interventions: </span>{s.interventions}</div>}
                     {s.progress_note && <div className="text-sm"><span className="text-muted-foreground">Progress: </span>{s.progress_note}</div>}
@@ -259,6 +326,46 @@ export default function PhysioCaseDetail() {
             <Field label="Expected sessions" value={String(c.expected_sessions ?? 0)} />
           </Card>
         </TabsContent>
+
+        <TabsContent value="followup">
+          <Card className="p-4 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="font-medium flex items-center gap-2"><BellRing className="size-4" />Follow-up reminders</div>
+                <div className="text-xs text-muted-foreground">Track when this case needs a reassessment or check-in.</div>
+              </div>
+              <Can module="medical_records" action="edit" fallback={<Badge variant="outline">{c.followup_enabled ? "On" : "Off"}</Badge>}>
+                <Switch checked={!!c.followup_enabled} onCheckedChange={(v) => saveFollowup({ followup_enabled: v })} />
+              </Can>
+            </div>
+            <Can module="medical_records" action="edit">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label>Interval (days)</Label>
+                  <Input type="number" min={1} defaultValue={c.followup_interval_days ?? 14}
+                    onBlur={(e) => saveFollowup({ followup_interval_days: Number(e.target.value) || 14 })} />
+                </div>
+                <div>
+                  <Label>Next follow-up due</Label>
+                  <Input type="date" defaultValue={c.followup_due_date ?? ""}
+                    onBlur={(e) => saveFollowup({ followup_due_date: e.target.value || null })} />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => {
+                  const d = new Date(); d.setDate(d.getDate() + (c.followup_interval_days ?? 14));
+                  saveFollowup({ followup_enabled: true, followup_due_date: d.toISOString().slice(0,10) });
+                }}>Suggest from interval</Button>
+                {reassessments[0]?.assessment_date && (
+                  <Button variant="outline" size="sm" onClick={() => {
+                    const d = new Date(reassessments[0].assessment_date); d.setDate(d.getDate() + (c.followup_interval_days ?? 14));
+                    saveFollowup({ followup_enabled: true, followup_due_date: d.toISOString().slice(0,10) });
+                  }}>From last reassessment</Button>
+                )}
+              </div>
+            </Can>
+          </Card>
+        </TabsContent>
       </Tabs>
     </div>
   );
@@ -273,13 +380,14 @@ function Field({ label, value }: { label: string; value?: string | null }) {
   );
 }
 
-function SessionDialog({ open, setOpen, caseId, nextNumber, defaultTherapistId, therapists, onSaved }: any) {
+function SessionDialog({ open, setOpen, caseId, nextNumber, defaultTherapistId, therapists, appointments, onSaved }: any) {
   const [form, setForm] = useState<any>({
     session_number: nextNumber, session_date: new Date().toISOString().slice(0, 10),
     therapist_id: defaultTherapistId ?? "", attendance: "done", pain_level: "",
     pain_note: "", interventions: "", progress_note: "", symptom_change: "",
     mobility_note: "", strength_note: "", adherence: "", home_exercise: "",
     therapist_assessment: "", next_recommendation: "", next_review_plan: "",
+    appointment_id: "",
   });
   useEffect(() => { setForm((f: any) => ({ ...f, session_number: nextNumber, therapist_id: defaultTherapistId ?? "" })); }, [nextNumber, defaultTherapistId]);
 
@@ -296,6 +404,7 @@ function SessionDialog({ open, setOpen, caseId, nextNumber, defaultTherapistId, 
       session_number: Math.max(desired, nextNum),
       pain_level: form.pain_level === "" ? null : Number(form.pain_level),
       therapist_id: form.therapist_id || null,
+      appointment_id: form.appointment_id || null,
       created_by: u.user?.id ?? null,
     };
     const { error } = await supabase.from("physio_sessions" as any).insert(payload);
@@ -311,6 +420,25 @@ function SessionDialog({ open, setOpen, caseId, nextNumber, defaultTherapistId, 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div><Label>Session #</Label><Input type="number" value={form.session_number} onChange={e => setForm({ ...form, session_number: e.target.value })} /></div>
           <div><Label>Date</Label><Input type="date" value={form.session_date} onChange={e => setForm({ ...form, session_date: e.target.value })} /></div>
+          <div className="md:col-span-2">
+            <Label>Link to appointment (optional)</Label>
+            <Select value={form.appointment_id || "_none"} onValueChange={v => {
+              const aid = v === "_none" ? "" : v;
+              const appt = (appointments ?? []).find((a: any) => a.id === aid);
+              setForm((f: any) => ({
+                ...f, appointment_id: aid,
+                session_date: appt ? new Date(appt.scheduled_at).toISOString().slice(0, 10) : f.session_date,
+              }));
+            }}>
+              <SelectTrigger><SelectValue placeholder="Standalone session" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_none">— Standalone —</SelectItem>
+                {(appointments ?? []).slice(0, 50).map((a: any) => (
+                  <SelectItem key={a.id} value={a.id}>{new Date(a.scheduled_at).toLocaleString()} · {a.status}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div>
             <Label>Therapist</Label>
             <Select value={form.therapist_id || "_none"} onValueChange={v => setForm({ ...form, therapist_id: v === "_none" ? "" : v })}>

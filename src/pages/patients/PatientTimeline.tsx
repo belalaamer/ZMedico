@@ -30,6 +30,7 @@ export default function PatientTimeline({ patientId }: { patientId: string }) {
           .from("medical_records")
           .select("id,visit_date,visit_type,chief_complaint_en,chief_complaint_ar,medical_specialties(name_en,name_ar),record_diagnoses(id,created_at,diagnoses(code,name_en,name_ar)),record_procedures(id,created_at,quantity,procedures(name_en,name_ar))")
           .eq("patient_id", patientId)
+          .is("deleted_at", null)
           .order("visit_date", { ascending: false })
           .limit(100),
         supabase

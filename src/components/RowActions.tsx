@@ -1,4 +1,4 @@
-import { MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { MoreVertical, Pencil, Trash2, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,12 +18,15 @@ type Props = {
   canDelete?: boolean;
   deleteTitle?: string;
   deleteDescription?: string;
+  deleteLabel?: string;
+  deleteConfirmLabel?: string;
+  deleteAsCancel?: boolean;
   extraItems?: { label: string; icon?: ReactNode; onClick: () => void }[];
 };
 
 export function RowActions({
   onEdit, onDelete, canEdit = true, canDelete = true,
-  deleteTitle, deleteDescription, extraItems,
+  deleteTitle, deleteDescription, deleteLabel, deleteConfirmLabel, deleteAsCancel, extraItems,
 }: Props) {
   const { t, lang } = useI18n();
   const [confirm, setConfirm] = useState(false);
@@ -58,7 +61,8 @@ export function RowActions({
           {canDelete && onDelete && (
             <DropdownMenuItem className="text-destructive focus:text-destructive"
               onClick={(e) => { e.stopPropagation(); setConfirm(true); }}>
-              <Trash2 className="me-2 size-4" />{t("delete")}
+              {deleteAsCancel ? <X className="me-2 size-4" /> : <Trash2 className="me-2 size-4" />}
+              {deleteLabel ?? t("delete")}
             </DropdownMenuItem>
           )}
         </DropdownMenuContent>
@@ -78,7 +82,7 @@ export function RowActions({
             <AlertDialogCancel disabled={busy}>{t("cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} disabled={busy}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              {t("delete")}
+              {deleteConfirmLabel ?? deleteLabel ?? t("delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

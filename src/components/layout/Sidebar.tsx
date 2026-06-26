@@ -121,18 +121,17 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
   ].filter(g => g.items.length > 0), [t, lang, can, isAdmin, alertCount]);
 
   const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
+  const activeGroupKey = useMemo(() => {
+    return groups.find(g => g.items.some(it => pathname === it.to || pathname.startsWith(it.to + "/")))?.key ?? null;
+  }, [groups, pathname]);
+
   useEffect(() => {
+    if (!activeGroupKey) return;
     setOpenMap(prev => {
-      let changed = false;
-      const next = { ...prev };
-      for (const g of groups) {
-        if (g.items.some(it => pathname === it.to || pathname.startsWith(it.to + "/"))) {
-          if (!next[g.key]) { next[g.key] = true; changed = true; }
-        }
-      }
-      return changed ? next : prev;
+      if (prev[activeGroupKey]) return prev;
+      return { ...prev, [activeGroupKey]: true };
     });
-  }, [pathname, groups]);
+  }, [pathname, activeGroupKey]);
   const toggle = (k: string) => setOpenMap(m => ({ ...m, [k]: !m[k] }));
 
   return (

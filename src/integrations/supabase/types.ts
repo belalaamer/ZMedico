@@ -2879,6 +2879,226 @@ export type Database = {
           },
         ]
       }
+      physio_cases: {
+        Row: {
+          branch_id: string
+          created_at: string
+          created_by: string | null
+          diagnosis: string | null
+          expected_sessions: number
+          id: string
+          notes: string | null
+          patient_id: string
+          start_date: string
+          status: Database["public"]["Enums"]["physio_case_status"]
+          therapist_id: string | null
+          treatment_goal: string | null
+          treatment_plan: string | null
+          updated_at: string
+        }
+        Insert: {
+          branch_id: string
+          created_at?: string
+          created_by?: string | null
+          diagnosis?: string | null
+          expected_sessions?: number
+          id?: string
+          notes?: string | null
+          patient_id: string
+          start_date?: string
+          status?: Database["public"]["Enums"]["physio_case_status"]
+          therapist_id?: string | null
+          treatment_goal?: string | null
+          treatment_plan?: string | null
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string
+          created_at?: string
+          created_by?: string | null
+          diagnosis?: string | null
+          expected_sessions?: number
+          id?: string
+          notes?: string | null
+          patient_id?: string
+          start_date?: string
+          status?: Database["public"]["Enums"]["physio_case_status"]
+          therapist_id?: string | null
+          treatment_goal?: string | null
+          treatment_plan?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "physio_cases_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_cases_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_cases_therapist_id_fkey"
+            columns: ["therapist_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      physio_reassessments: {
+        Row: {
+          assessment_date: string
+          case_id: string
+          created_at: string
+          created_by: string | null
+          current_condition: string | null
+          id: string
+          initial_condition: string | null
+          notes: string | null
+          plan_update: string | null
+          therapist_id: string | null
+          trend: Database["public"]["Enums"]["physio_trend"]
+          updated_at: string
+        }
+        Insert: {
+          assessment_date?: string
+          case_id: string
+          created_at?: string
+          created_by?: string | null
+          current_condition?: string | null
+          id?: string
+          initial_condition?: string | null
+          notes?: string | null
+          plan_update?: string | null
+          therapist_id?: string | null
+          trend?: Database["public"]["Enums"]["physio_trend"]
+          updated_at?: string
+        }
+        Update: {
+          assessment_date?: string
+          case_id?: string
+          created_at?: string
+          created_by?: string | null
+          current_condition?: string | null
+          id?: string
+          initial_condition?: string | null
+          notes?: string | null
+          plan_update?: string | null
+          therapist_id?: string | null
+          trend?: Database["public"]["Enums"]["physio_trend"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "physio_reassessments_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "physio_cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_reassessments_therapist_id_fkey"
+            columns: ["therapist_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      physio_sessions: {
+        Row: {
+          adherence: string | null
+          attendance: Database["public"]["Enums"]["physio_attendance"]
+          case_id: string
+          created_at: string
+          created_by: string | null
+          home_exercise: string | null
+          id: string
+          interventions: string | null
+          mobility_note: string | null
+          next_recommendation: string | null
+          next_review_plan: string | null
+          pain_level: number | null
+          pain_note: string | null
+          progress_note: string | null
+          session_date: string
+          session_number: number
+          strength_note: string | null
+          symptom_change: string | null
+          therapist_assessment: string | null
+          therapist_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          adherence?: string | null
+          attendance?: Database["public"]["Enums"]["physio_attendance"]
+          case_id: string
+          created_at?: string
+          created_by?: string | null
+          home_exercise?: string | null
+          id?: string
+          interventions?: string | null
+          mobility_note?: string | null
+          next_recommendation?: string | null
+          next_review_plan?: string | null
+          pain_level?: number | null
+          pain_note?: string | null
+          progress_note?: string | null
+          session_date?: string
+          session_number?: number
+          strength_note?: string | null
+          symptom_change?: string | null
+          therapist_assessment?: string | null
+          therapist_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          adherence?: string | null
+          attendance?: Database["public"]["Enums"]["physio_attendance"]
+          case_id?: string
+          created_at?: string
+          created_by?: string | null
+          home_exercise?: string | null
+          id?: string
+          interventions?: string | null
+          mobility_note?: string | null
+          next_recommendation?: string | null
+          next_review_plan?: string | null
+          pain_level?: number | null
+          pain_note?: string | null
+          progress_note?: string | null
+          session_date?: string
+          session_number?: number
+          strength_note?: string | null
+          symptom_change?: string | null
+          therapist_assessment?: string | null
+          therapist_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "physio_sessions_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "physio_cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_sessions_therapist_id_fkey"
+            columns: ["therapist_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       po_counters: {
         Row: {
           last_value: number
@@ -5779,6 +5999,10 @@ export type Database = {
         Args: { _patient: string }
         Returns: boolean
       }
+      user_has_branch_access_via_physio_case: {
+        Args: { _case: string }
+        Returns: boolean
+      }
       user_has_branch_access_via_prescription: {
         Args: { _rx: string }
         Returns: boolean
@@ -5872,6 +6096,9 @@ export type Database = {
         | "insurance"
         | "other"
       payroll_status: "draft" | "approved" | "paid"
+      physio_attendance: "scheduled" | "done" | "missed" | "cancelled"
+      physio_case_status: "active" | "paused" | "completed" | "cancelled"
+      physio_trend: "improving" | "unchanged" | "worsening"
       po_status: "draft" | "pending" | "partial" | "received" | "cancelled"
       prescription_status: "active" | "completed" | "cancelled"
       reminder_channel: "sms" | "email" | "whatsapp" | "push"
@@ -6132,6 +6359,9 @@ export const Constants = {
         "other",
       ],
       payroll_status: ["draft", "approved", "paid"],
+      physio_attendance: ["scheduled", "done", "missed", "cancelled"],
+      physio_case_status: ["active", "paused", "completed", "cancelled"],
+      physio_trend: ["improving", "unchanged", "worsening"],
       po_status: ["draft", "pending", "partial", "received", "cancelled"],
       prescription_status: ["active", "completed", "cancelled"],
       reminder_channel: ["sms", "email", "whatsapp", "push"],

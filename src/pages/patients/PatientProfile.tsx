@@ -50,6 +50,7 @@ export default function PatientProfile() {
   const [reloadKey, setReloadKey] = useState(0);
   const [physioCases, setPhysioCases] = useState<any[]>([]);
   const [physioStats, setPhysioStats] = useState<{ active: number; lastSession: string | null; lastReassessment: string | null; nextFollowup: string | null; overdueFollowup: string | null } | null>(null);
+  const [activePhysioCaseId, setActivePhysioCaseId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -63,6 +64,8 @@ export default function PatientProfile() {
       const { data: all } = await allQ;
       const allList = (all as any) ?? [];
       const allCaseIds = allList.map((c: any) => c.id);
+      const firstActive = allList.find((c: any) => c.status === "active");
+      setActivePhysioCaseId(firstActive?.id ?? null);
       // Preview list (5 most recent) for display.
       let prevQ = supabase.from("physio_cases" as any)
         .select("id,diagnosis,status,start_date,expected_sessions,followup_enabled,followup_due_date,branch_id")

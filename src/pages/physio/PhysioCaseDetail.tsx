@@ -285,9 +285,15 @@ function SessionDialog({ open, setOpen, caseId, nextNumber, defaultTherapistId, 
 
   const save = async () => {
     const { data: u } = await supabase.auth.getUser();
+    // Resolve session_number against the latest DB state to avoid races.
+    const { data: last } = await supabase.from("physio_sessions" as any)
+      .select("session_number").eq("case_id", caseId).is("deleted_at", null)
+      .order("session_number", { ascending: false }).limit(1).maybeSingle();
+    const nextNum = ((last as any)?.session_number ?? 0) + 1;
+    const desired = Number(form.session_number) || nextNum;
     const payload: any = {
       ...form, case_id: caseId,
-      session_number: Number(form.session_number) || 1,
+      session_number: Math.max(desired, nextNum),
       pain_level: form.pain_level === "" ? null : Number(form.pain_level),
       therapist_id: form.therapist_id || null,
       created_by: u.user?.id ?? null,

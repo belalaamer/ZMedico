@@ -49,15 +49,32 @@ export default function PatientProfile() {
   const [clinicalView, setClinicalView] = useState<"medical" | "plans">("medical");
   const [reloadKey, setReloadKey] = useState(0);
   const [physioCases, setPhysioCases] = useState<any[]>([]);
+  const [physioStats, setPhysioStats] = useState<{ active: number; lastSession: string | null; lastReassessment: string | null; nextFollowup: string | null } | null>(null);
 
   useEffect(() => {
     if (!id) return;
     if (!can("medical_records", "view")) { setPhysioCases([]); return; }
     supabase.from("physio_cases" as any)
-      .select("id,diagnosis,status,start_date,expected_sessions")
+      .select("id,diagnosis,status,start_date,expected_sessions,followup_enabled,followup_due_date")
       .eq("patient_id", id).is("deleted_at", null)
       .order("created_at", { ascending: false }).limit(5)
-      .then(({ data }) => setPhysioCases((data as any) ?? []));
+      .then(async ({ data }) => {
+        const list = (data as any) ?? [];
+        setPhysioCases(list);
+        const caseIds = list.map((c: any) => c.id);
+        if (!caseIds.length) { setPhysioStats({ active: 0, lastSession: null, lastReassessment: null, nextFollowup: null }); return; }
+        const [{ data: ss }, { data: rs }] = await Promise.all([
+          supabase.from("physio_sessions" as any).select("session_date").in("case_id", caseIds).is("deleted_at", null).eq("attendance", "done").order("session_date", { ascending: false }).limit(1),
+          supabase.from("physio_reassessments" as any).select("assessment_date").in("case_id", caseIds).is("deleted_at", null).order("assessment_date", { ascending: false }).limit(1),
+        ]);
+        const upcoming = list.filter((c: any) => c.followup_enabled && c.followup_due_date).map((c: any) => c.followup_due_date).sort();
+        setPhysioStats({
+          active: list.filter((c: any) => c.status === "active").length,
+          lastSession: (ss as any)?.[0]?.session_date ?? null,
+          lastReassessment: (rs as any)?.[0]?.assessment_date ?? null,
+          nextFollowup: upcoming[0] ?? null,
+        });
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, reloadKey, can("medical_records", "view")]);
 

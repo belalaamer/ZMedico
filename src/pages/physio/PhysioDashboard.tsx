@@ -39,7 +39,7 @@ export default function PhysioDashboard() {
     setCases((cs as any) ?? []);
     setSessions((ss as any) ?? []);
     setReassess((rs as any) ?? []);
-    const therapistIds = Array.from(new Set(((cs as any) ?? []).map((c: any) => c.therapist_id).filter(Boolean)));
+    const therapistIds: string[] = Array.from(new Set(((cs as any) ?? []).map((c: any) => c.therapist_id).filter(Boolean) as string[]));
     if (therapistIds.length) {
       const { data: tps } = await supabase.from("staff_profiles")
         .select("id,first_name_en,last_name_en").in("id", therapistIds);

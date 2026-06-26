@@ -190,8 +190,12 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
                 aria-expanded={isOpen}
                 aria-controls={`group-${g.key}`}
                 className={cn(
-                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors",
-                  hasActive ? "text-white bg-sidebar-accent/40" : "text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-white"
+                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ease-out",
+                  isOpen
+                    ? "text-white bg-sidebar-accent/60 ring-1 ring-inset ring-white/10 shadow-sm"
+                    : hasActive
+                      ? "text-white bg-sidebar-accent/30"
+                      : "text-sidebar-foreground/85 hover:bg-sidebar-accent/70 hover:text-white"
                 )}
               >
                 <g.icon className="size-[18px] shrink-0" />
@@ -199,25 +203,43 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
                 {g.badge && g.badge > 0 ? (
                   <span className="bg-destructive text-destructive-foreground text-[10px] rounded-full px-1.5 py-0.5 font-bold">{g.badge}</span>
                 ) : null}
-                <ChevronDown className={cn("size-4 shrink-0 transition-transform duration-200", isOpen ? "rotate-180" : "rotate-0")} />
+                <ChevronDown
+                  aria-hidden
+                  className={cn(
+                    "size-4 shrink-0 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                    isOpen ? "rotate-180 opacity-100" : "rotate-0 opacity-70"
+                  )}
+                />
               </button>
-              {isOpen && (
-                <div id={`group-${g.key}`} className="ms-3 ps-3 border-s border-sidebar-border/40 mt-1 mb-1 space-y-1">
-                  {g.items.map((it) => (
-                    <NavLink key={it.to} to={it.to} onClick={onNavigate}
-                      className={({ isActive }) => cn(
-                        "flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors",
-                        isActive ? "bg-white text-sidebar-primary-foreground shadow-card" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-white"
-                      )}>
-                      <it.icon className="size-4 shrink-0" />
-                      <span className="flex-1 truncate">{it.label}</span>
-                      {it.badge && it.badge > 0 ? (
-                        <span className="bg-destructive text-destructive-foreground text-[10px] rounded-full px-1.5 py-0.5 font-bold">{it.badge}</span>
-                      ) : null}
-                    </NavLink>
-                  ))}
+              <div
+                id={`group-${g.key}`}
+                role="region"
+                aria-hidden={!isOpen}
+                className={cn(
+                  "grid transition-[grid-template-rows,opacity] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                  isOpen
+                    ? "grid-rows-[1fr] opacity-100 duration-300"
+                    : "grid-rows-[0fr] opacity-0 duration-200"
+                )}
+              >
+                <div className="overflow-hidden min-h-0">
+                  <div className="ms-3 ps-3 border-s border-sidebar-border/40 mt-1 mb-1 space-y-1">
+                    {g.items.map((it) => (
+                      <NavLink key={it.to} to={it.to} onClick={onNavigate} tabIndex={isOpen ? 0 : -1}
+                        className={({ isActive }) => cn(
+                          "flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors duration-150",
+                          isActive ? "bg-white text-sidebar-primary-foreground shadow-card" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-white"
+                        )}>
+                        <it.icon className="size-4 shrink-0" />
+                        <span className="flex-1 truncate">{it.label}</span>
+                        {it.badge && it.badge > 0 ? (
+                          <span className="bg-destructive text-destructive-foreground text-[10px] rounded-full px-1.5 py-0.5 font-bold">{it.badge}</span>
+                        ) : null}
+                      </NavLink>
+                    ))}
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
           );
         })}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Activity } from "lucide-react";
+import { Plus, Activity, AlertCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ListSkeleton } from "@/components/ListSkeleton";
+import { Can } from "@/components/Can";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,7 +24,10 @@ type Therapist = { id: string; first_name_en?: string | null; last_name_en?: str
 export default function PhysioCases() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
+  const { can } = usePermissions();
   const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [open, setOpen] = useState(false);
@@ -32,13 +38,17 @@ export default function PhysioCases() {
   });
 
   const load = async () => {
-    if (!currentBranchId) { setItems([]); return; }
-    const { data } = await supabase
+    if (!currentBranchId) { setItems([]); setLoading(false); return; }
+    setLoading(true); setLoadError(null);
+    const { data, error } = await supabase
       .from("physio_cases" as any)
       .select("*, patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)")
       .eq("branch_id", currentBranchId)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false });
+    if (error) setLoadError(error.message);
     setItems((data as any) ?? []);
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -47,9 +57,17 @@ export default function PhysioCases() {
       supabase.from("patients").select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code")
         .is("deleted_at", null).eq("branch_id", currentBranchId).order("created_at", { ascending: false }).limit(500)
         .then(({ data }) => setPatients((data as any) ?? []));
-      supabase.from("staff_profiles").select("id,first_name_en,last_name_en")
-        .eq("branch_id", currentBranchId).limit(500)
-        .then(({ data }) => setTherapists((data as any) ?? []));
+      // Restrict therapist picker to clinical staff (doctor / admin roles).
+      (async () => {
+        const { data: rs } = await supabase
+          .from("user_roles").select("user_id").in("role", ["doctor", "admin"] as any);
+        const ids = Array.from(new Set((rs ?? []).map((r: any) => r.user_id))).filter(Boolean);
+        if (!ids.length) { setTherapists([]); return; }
+        const { data } = await supabase.from("staff_profiles")
+          .select("id,first_name_en,last_name_en")
+          .eq("branch_id", currentBranchId).in("id", ids).limit(500);
+        setTherapists((data as any) ?? []);
+      })();
     }
   }, [currentBranchId]);
 
@@ -87,6 +105,7 @@ export default function PhysioCases() {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Physical Therapy</h1>
           <p className="text-sm text-muted-foreground mt-1">{items.length} cases</p>
         </div>
+        <Can module="medical_records" action="create">
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button className="gradient-primary text-primary-foreground"><Plus className="me-2 size-4" />New case</Button>
@@ -150,10 +169,19 @@ export default function PhysioCases() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </Can>
       </div>
 
       <Card className="shadow-card overflow-hidden">
-        {items.length === 0 ? (
+        {loading ? (
+          <ListSkeleton rows={6} />
+        ) : loadError ? (
+          <div className="p-10 text-center text-destructive flex flex-col items-center gap-2">
+            <AlertCircle className="size-5" />
+            <div className="text-sm">{loadError}</div>
+            <Button variant="outline" size="sm" onClick={load}>Retry</Button>
+          </div>
+        ) : items.length === 0 ? (
           <div className="p-10 text-center text-muted-foreground">No physiotherapy cases yet.</div>
         ) : (
           <div className="divide-y divide-border">

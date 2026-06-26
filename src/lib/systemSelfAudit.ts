@@ -208,6 +208,32 @@ export async function runSystemSelfAudit(opts: {
       }
     }
 
+    // Physio module: table presence + RLS reachability + branch isolation.
+    const pc = await (supabase as any).from("physio_cases").select("id,branch_id").limit(1);
+    if (pc.error) {
+      checks.push(warn("physio_table", "data_integrity", "physio_cases reachable", pc.error.message, "Check RLS / grants on physio_cases.", "medium"));
+    } else {
+      checks.push(pass("physio_table", "data_integrity", "physio_cases reachable", "Table queryable for this user."));
+      const leak = await (supabase as any).from("physio_cases").select("id,branch_id").neq("branch_id", branchId).limit(1);
+      if (!leak.error && (leak.data ?? []).length > 0) {
+        checks.push(fail("iso_physio_cases", "data_integrity", "physio_cases branch isolation", "Cross-branch physio rows leaked through RLS.", "Tighten RLS on physio_cases."));
+      } else {
+        checks.push(pass("iso_physio_cases", "data_integrity", "physio_cases branch isolation", "No cross-branch physio rows visible."));
+      }
+    }
+    const ps = await (supabase as any).from("physio_sessions").select("id").limit(1);
+    if (ps.error) {
+      checks.push(warn("physio_sessions_table", "data_integrity", "physio_sessions reachable", ps.error.message, "Check RLS / grants on physio_sessions.", "medium"));
+    } else {
+      checks.push(pass("physio_sessions_table", "data_integrity", "physio_sessions reachable", "Table queryable via case access."));
+    }
+    const pr = await (supabase as any).from("physio_reassessments").select("id").limit(1);
+    if (pr.error) {
+      checks.push(warn("physio_reassessments_table", "data_integrity", "physio_reassessments reachable", pr.error.message, "Check RLS / grants on physio_reassessments.", "medium"));
+    } else {
+      checks.push(pass("physio_reassessments_table", "data_integrity", "physio_reassessments reachable", "Table queryable via case access."));
+    }
+
     // Stale selected branch (deleted branch still in localStorage handled by branches check)
     // Orphan probe: invoices missing patient_id (sample)
     const orph = await (supabase as any)

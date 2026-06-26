@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Plus, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { ArrowLeft, Plus, TrendingUp, TrendingDown, Minus, Trash2, AlertCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Can } from "@/components/Can";
+import { usePermissions } from "@/hooks/usePermissions";
+import { ListSkeleton } from "@/components/ListSkeleton";
+import { subscribeResilient } from "@/lib/realtime";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate } from "@/lib/format";
@@ -18,7 +22,10 @@ import { toast } from "sonner";
 export default function PhysioCaseDetail() {
   const { id } = useParams();
   const { t, lang } = useI18n();
+  const { can } = usePermissions();
   const [c, setC] = useState<any>(null);
+  const [status, setStatus] = useState<"loading" | "notfound" | "error" | "loaded">("loading");
+  const [errMsg, setErrMsg] = useState<string | null>(null);
   const [sessions, setSessions] = useState<any[]>([]);
   const [reassessments, setReassessments] = useState<any[]>([]);
   const [therapists, setTherapists] = useState<any[]>([]);
@@ -27,20 +34,54 @@ export default function PhysioCaseDetail() {
 
   const loadAll = async () => {
     if (!id) return;
-    const [{ data: caseRow }, { data: sess }, { data: ras }] = await Promise.all([
-      supabase.from("physio_cases" as any).select("*, patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code), branches(name_en,name_ar)").eq("id", id).maybeSingle(),
-      supabase.from("physio_sessions" as any).select("*").eq("case_id", id).order("session_number", { ascending: true }),
-      supabase.from("physio_reassessments" as any).select("*").eq("case_id", id).order("assessment_date", { ascending: false }),
+    const [caseRes, sessRes, rasRes] = await Promise.all([
+      supabase.from("physio_cases" as any)
+        .select("*, patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code), branches(name_en,name_ar)")
+        .eq("id", id).is("deleted_at", null).maybeSingle(),
+      supabase.from("physio_sessions" as any).select("*").eq("case_id", id).is("deleted_at", null).order("session_number", { ascending: true }),
+      supabase.from("physio_reassessments" as any).select("*").eq("case_id", id).is("deleted_at", null).order("assessment_date", { ascending: false }),
     ]);
-    setC(caseRow);
-    setSessions((sess as any) ?? []);
-    setReassessments((ras as any) ?? []);
-    if ((caseRow as any)?.branch_id) {
-      const { data: tps } = await supabase.from("staff_profiles").select("id,first_name_en,last_name_en").eq("branch_id", (caseRow as any).branch_id).limit(500);
-      setTherapists((tps as any) ?? []);
+    if (caseRes.error) { setErrMsg(caseRes.error.message); setStatus("error"); return; }
+    if (!caseRes.data) { setStatus("notfound"); return; }
+    setC(caseRes.data);
+    setSessions((sessRes.data as any) ?? []);
+    setReassessments((rasRes.data as any) ?? []);
+    setStatus("loaded");
+    const branchId = (caseRes.data as any).branch_id;
+    if (branchId) {
+      const { data: rs } = await supabase.from("user_roles").select("user_id").in("role", ["doctor", "admin"] as any);
+      const ids = Array.from(new Set((rs ?? []).map((r: any) => r.user_id))).filter(Boolean);
+      if (ids.length) {
+        const { data: tps } = await supabase.from("staff_profiles").select("id,first_name_en,last_name_en").eq("branch_id", branchId).in("id", ids).limit(500);
+        setTherapists((tps as any) ?? []);
+      } else {
+        setTherapists([]);
+      }
     }
   };
   useEffect(() => { loadAll(); }, [id]);
+
+  // Resilient realtime — refresh sessions & reassessments for this case.
+  useEffect(() => {
+    if (!id) return;
+    const refresh = () => { void loadAll(); };
+    const off1 = subscribeResilient({
+      name: `physio_sessions:${id}`,
+      bind: (ch) => ch.on("postgres_changes" as any,
+        { event: "*", schema: "public", table: "physio_sessions", filter: `case_id=eq.${id}` },
+        () => refresh()),
+      onReconnect: refresh,
+    });
+    const off2 = subscribeResilient({
+      name: `physio_reassessments:${id}`,
+      bind: (ch) => ch.on("postgres_changes" as any,
+        { event: "*", schema: "public", table: "physio_reassessments", filter: `case_id=eq.${id}` },
+        () => refresh()),
+      onReconnect: refresh,
+    });
+    return () => { off1(); off2(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   const patientName = (p: any) => lang === "ar"
     ? `${p?.first_name_ar ?? p?.first_name_en ?? ""} ${p?.last_name_ar ?? p?.last_name_en ?? ""}`.trim()
@@ -67,7 +108,28 @@ export default function PhysioCaseDetail() {
     toast.success("Updated"); loadAll();
   };
 
-  if (!c) return <div className="p-10 text-center text-muted-foreground">Loading…</div>;
+  const softDeleteCase = async () => {
+    if (!confirm("Soft-delete this physiotherapy case?")) return;
+    const { error } = await supabase.from("physio_cases" as any).update({ deleted_at: new Date().toISOString() } as any).eq("id", id!);
+    if (error) return toast.error(error.message);
+    toast.success("Deleted");
+    window.history.back();
+  };
+
+  if (status === "loading") return <div className="p-6"><ListSkeleton rows={6} /></div>;
+  if (status === "notfound") return (
+    <div className="p-10 text-center space-y-3">
+      <div className="text-muted-foreground">Case not found or has been removed.</div>
+      <Button asChild variant="outline"><Link to="/physio"><ArrowLeft className="size-4 me-2" />Back</Link></Button>
+    </div>
+  );
+  if (status === "error") return (
+    <div className="p-10 text-center space-y-3">
+      <AlertCircle className="size-6 text-destructive mx-auto" />
+      <div className="text-sm text-destructive">{errMsg ?? "Failed to load."}</div>
+      <Button variant="outline" onClick={loadAll}>Retry</Button>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -80,15 +142,24 @@ export default function PhysioCaseDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Select value={c.status} onValueChange={updateStatus}>
-            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="paused">Paused</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
-            </SelectContent>
-          </Select>
+          {can("medical_records", "edit") ? (
+            <Select value={c.status} onValueChange={updateStatus}>
+              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="paused">Paused</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+          ) : (
+            <Badge variant="outline">{c.status}</Badge>
+          )}
+          <Can module="medical_records" action="delete">
+            <Button variant="ghost" size="icon" onClick={softDeleteCase} title="Delete case">
+              <Trash2 className="size-4 text-destructive" />
+            </Button>
+          </Can>
         </div>
       </div>
 
@@ -107,15 +178,17 @@ export default function PhysioCaseDetail() {
         </TabsList>
 
         <TabsContent value="sessions" className="space-y-3">
-          <div className="flex justify-end">
-            <SessionDialog
-              open={sessOpen} setOpen={setSessOpen}
-              caseId={c.id} nextNumber={(sessions[sessions.length - 1]?.session_number ?? 0) + 1}
-              defaultTherapistId={c.therapist_id}
-              therapists={therapists}
-              onSaved={loadAll}
-            />
-          </div>
+          <Can module="medical_records" action="create">
+            <div className="flex justify-end">
+              <SessionDialog
+                open={sessOpen} setOpen={setSessOpen}
+                caseId={c.id} nextNumber={(sessions[sessions.length - 1]?.session_number ?? 0) + 1}
+                defaultTherapistId={c.therapist_id}
+                therapists={therapists}
+                onSaved={loadAll}
+              />
+            </div>
+          </Can>
           <Card className="overflow-hidden">
             {sessions.length === 0 ? (
               <div className="p-10 text-center text-muted-foreground">No sessions yet.</div>
@@ -143,14 +216,16 @@ export default function PhysioCaseDetail() {
         </TabsContent>
 
         <TabsContent value="reassessments" className="space-y-3">
-          <div className="flex justify-end">
-            <ReassessmentDialog
-              open={reOpen} setOpen={setReOpen}
-              caseId={c.id} initialFromCase={c.diagnosis ?? ""}
-              therapists={therapists} defaultTherapistId={c.therapist_id}
-              onSaved={loadAll}
-            />
-          </div>
+          <Can module="medical_records" action="create">
+            <div className="flex justify-end">
+              <ReassessmentDialog
+                open={reOpen} setOpen={setReOpen}
+                caseId={c.id} initialFromCase={c.diagnosis ?? ""}
+                therapists={therapists} defaultTherapistId={c.therapist_id}
+                onSaved={loadAll}
+              />
+            </div>
+          </Can>
           <Card className="overflow-hidden">
             {reassessments.length === 0 ? (
               <div className="p-10 text-center text-muted-foreground">No reassessments yet.</div>
@@ -210,9 +285,15 @@ function SessionDialog({ open, setOpen, caseId, nextNumber, defaultTherapistId, 
 
   const save = async () => {
     const { data: u } = await supabase.auth.getUser();
+    // Resolve session_number against the latest DB state to avoid races.
+    const { data: last } = await supabase.from("physio_sessions" as any)
+      .select("session_number").eq("case_id", caseId).is("deleted_at", null)
+      .order("session_number", { ascending: false }).limit(1).maybeSingle();
+    const nextNum = ((last as any)?.session_number ?? 0) + 1;
+    const desired = Number(form.session_number) || nextNum;
     const payload: any = {
       ...form, case_id: caseId,
-      session_number: Number(form.session_number) || 1,
+      session_number: Math.max(desired, nextNum),
       pain_level: form.pain_level === "" ? null : Number(form.pain_level),
       therapist_id: form.therapist_id || null,
       created_by: u.user?.id ?? null,

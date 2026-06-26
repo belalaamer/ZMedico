@@ -34,6 +34,8 @@ const Treasury = lazy(() => import("@/pages/treasury/Treasury"));
 const TreasuryDailyClose = lazy(() => import("@/pages/treasury/DailyClose"));
 const Expenses = lazy(() => import("@/pages/expenses/Expenses"));
 const ExpenseSelfAudit = lazy(() => import("@/pages/expenses/ExpenseSelfAudit"));
+const PhysioCases = lazy(() => import("@/pages/physio/PhysioCases"));
+const PhysioCaseDetail = lazy(() => import("@/pages/physio/PhysioCaseDetail"));
 const Products = lazy(() => import("@/pages/inventory/Products"));
 const ProductDetail = lazy(() => import("@/pages/inventory/ProductDetail"));
 const Categories = lazy(() => import("@/pages/inventory/Categories"));
@@ -154,6 +156,8 @@ function AppContent() {
               <Route path="/treasury/daily-close" element={<PermissionRoute><TreasuryDailyClose /></PermissionRoute>} />
               <Route path="/expenses" element={<PermissionRoute><Expenses /></PermissionRoute>} />
               <Route path="/expenses/self-audit" element={<PermissionRoute><ExpenseSelfAudit /></PermissionRoute>} />
+              <Route path="/physio" element={<PermissionRoute><PhysioCases /></PermissionRoute>} />
+              <Route path="/physio/:id" element={<PermissionRoute><PhysioCaseDetail /></PermissionRoute>} />
               <Route path="/coupons" element={<PermissionRoute><Coupons /></PermissionRoute>} />
               <Route path="/reminders" element={<PermissionRoute><Reminders /></PermissionRoute>} />
               <Route path="/reminders/scheduled" element={<PermissionRoute><Reminders /></PermissionRoute>}>

@@ -149,7 +149,7 @@ function AppContent() {
               <Route path="/calendar" element={<PermissionRoute><CalendarPage /></PermissionRoute>} />
               <Route path="/queue" element={<PermissionRoute><QueuePage /></PermissionRoute>} />
               <Route path="/queue/audit" element={<PermissionRoute><QueueAuditPage /></PermissionRoute>} />
-              <Route path="/queue/self-audit" element={<PermissionRoute><QueueSelfAuditPage /></PermissionRoute>} />
+              <Route path="/queue/self-audit" element={<PermissionRoute adminOnly><QueueSelfAuditPage /></PermissionRoute>} />
               <Route path="/appointments/:appointmentId" element={<PermissionRoute><AppointmentDetailPage /></PermissionRoute>} />
               <Route path="/invoices" element={<PermissionRoute><Invoices /></PermissionRoute>} />
               <Route path="/invoices/outstanding" element={<PermissionRoute><OutstandingDebts /></PermissionRoute>} />
@@ -158,7 +158,7 @@ function AppContent() {
               <Route path="/treasury" element={<PermissionRoute><Treasury /></PermissionRoute>} />
               <Route path="/treasury/daily-close" element={<PermissionRoute><TreasuryDailyClose /></PermissionRoute>} />
               <Route path="/expenses" element={<PermissionRoute><Expenses /></PermissionRoute>} />
-              <Route path="/expenses/self-audit" element={<PermissionRoute><ExpenseSelfAudit /></PermissionRoute>} />
+              <Route path="/expenses/self-audit" element={<PermissionRoute adminOnly><ExpenseSelfAudit /></PermissionRoute>} />
               <Route path="/physio" element={<PermissionRoute><PhysioCases /></PermissionRoute>} />
               <Route path="/physio/dashboard" element={<PermissionRoute><PhysioDashboard /></PermissionRoute>} />
               <Route path="/physio/reports" element={<PermissionRoute><PhysioReports /></PermissionRoute>} />
@@ -233,7 +233,7 @@ function AppContent() {
               <Route path="/settings/backup" element={<PermissionRoute><BackupExport /></PermissionRoute>} />
               <Route path="/settings/audit" element={<PermissionRoute><AuditLogs /></PermissionRoute>} />
               <Route path="/settings/system" element={<PermissionRoute><SystemInfo /></PermissionRoute>} />
-              <Route path="/system/self-audit" element={<PermissionRoute><SystemSelfAudit /></PermissionRoute>} />
+              <Route path="/system/self-audit" element={<PermissionRoute adminOnly><SystemSelfAudit /></PermissionRoute>} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

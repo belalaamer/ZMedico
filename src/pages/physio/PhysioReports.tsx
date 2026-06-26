@@ -26,6 +26,7 @@ export default function PhysioReports() {
   const [sessions, setSessions] = useState<any[]>([]);
   const [reassess, setReassess] = useState<any[]>([]);
   const [therapists, setTherapists] = useState<any[]>([]);
+  const [activeNow, setActiveNow] = useState<number>(0);
 
   useEffect(() => {
     if (!currentBranchId) return;
@@ -55,6 +56,14 @@ export default function PhysioReports() {
     if (therapistId !== "_all") rQuery = rQuery.eq("therapist_id", therapistId);
     const [{ data: cs }, { data: ss }, { data: rs }] = await Promise.all([cQuery, sQuery, rQuery]);
     setCases((cs as any) ?? []); setSessions((ss as any) ?? []); setReassess((rs as any) ?? []);
+    // "Active cases" KPI is independent of start_date range — it's a snapshot of cases
+    // currently active in this branch (optionally filtered by therapist).
+    let aQuery = supabase.from("physio_cases" as any)
+      .select("id", { count: "exact", head: true })
+      .eq("branch_id", currentBranchId).is("deleted_at", null).eq("status", "active");
+    if (therapistId !== "_all") aQuery = aQuery.eq("therapist_id", therapistId);
+    const { count: ac } = await aQuery;
+    setActiveNow(ac ?? 0);
     setLoading(false);
   };
 
@@ -65,9 +74,8 @@ export default function PhysioReports() {
     const missed = sessions.filter(s => s.attendance === "missed").length;
     const improving = reassess.filter(r => r.trend === "improving").length;
     const worsening = reassess.filter(r => r.trend === "worsening").length;
-    const active = cases.filter(c => c.status === "active").length;
-    return { done, missed, improving, worsening, active, reassessTotal: reassess.length };
-  }, [sessions, reassess, cases]);
+    return { done, missed, improving, worsening, reassessTotal: reassess.length };
+  }, [sessions, reassess]);
 
   const patientName = (p: any) => lang === "ar"
     ? `${p?.first_name_ar ?? p?.first_name_en ?? ""} ${p?.last_name_ar ?? p?.last_name_en ?? ""}`.trim()
@@ -124,7 +132,7 @@ export default function PhysioReports() {
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <Kpi label={lang === "ar" ? "جلسات تمت" : "Sessions done"} value={summary.done} />
         <Kpi label={lang === "ar" ? "غيابات" : "Missed"} value={summary.missed} />
-        <Kpi label={lang === "ar" ? "حالات نشطة" : "Active cases"} value={summary.active} />
+        <Kpi label={lang === "ar" ? "حالات نشطة (الآن)" : "Active cases (now)"} value={activeNow} />
         <Kpi label={lang === "ar" ? "إعادة تقييم" : "Reassessments"} value={summary.reassessTotal} />
         <Kpi label={lang === "ar" ? "تحسن" : "Improving"} value={summary.improving} />
         <Kpi label={lang === "ar" ? "تدهور" : "Worsening"} value={summary.worsening} />

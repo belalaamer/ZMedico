@@ -580,7 +580,10 @@ export default function CalendarPage() {
           </button>
         </div>
         <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-muted-foreground mb-1">
-          {["S","M","T","W","T","F","S"].map((d, i) => <div key={i}>{d}</div>)}
+          {(lang === "ar"
+            ? ["أحد","اثن","ثلا","أرب","خمي","جمع","سبت"]
+            : ["S","M","T","W","T","F","S"]
+          ).map((d, i) => <div key={i}>{d}</div>)}
         </div>
         <div className="grid grid-cols-7 gap-1 text-center text-xs">
           {monthGrid.map((d, i) => {

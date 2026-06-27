@@ -13,8 +13,8 @@ import { useUserRole } from "@/hooks/useUserRole";
 export default function DoctorCommissions() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
-  const { role } = useUserRole();
-  const isDoctorOnly = role === "doctor";
+  const { roles, isAdmin } = useUserRole();
+  const isDoctorOnly = !isAdmin && roles.includes("doctor") && !roles.some(r => ["manager","hr"].includes(r));
   const [start, setStart] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10));
   const [end, setEnd] = useState(new Date().toISOString().slice(0, 10));
   const [doctorId, setDoctorId] = useState<string>("all");

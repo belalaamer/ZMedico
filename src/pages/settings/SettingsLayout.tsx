@@ -1,11 +1,19 @@
-import { ReactNode } from "react";
+import { ReactNode, createContext, useContext } from "react";
 import { NavLink } from "react-router-dom";
-import { Settings, Building2, Calendar, FileText, CreditCard, Briefcase, Bell, Mail, MessageSquare, Phone, Languages, ShieldCheck, Users, HardDrive, ScrollText, Info, GitBranch, Send, Shield, FileSignature } from "lucide-react";
+import { Settings, Building2, Calendar, FileText, CreditCard, Briefcase, Bell, Languages, ShieldCheck, Users, HardDrive, ScrollText, Info, GitBranch, Shield, FileSignature } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { cn } from "@/lib/utils";
 import { useUserRole } from "@/hooks/useUserRole";
 
+// When true, child pages should skip rendering their own SettingsLayout chrome
+// (used by the consolidated Communication hub which renders tabs instead).
+const EmbeddedSettingsCtx = createContext(false);
+export const EmbeddedSettingsProvider = EmbeddedSettingsCtx.Provider;
+export const useEmbeddedSettings = () => useContext(EmbeddedSettingsCtx);
+
 export default function SettingsLayout({ children }: { children: ReactNode }) {
+  const embedded = useEmbeddedSettings();
+  if (embedded) return <>{children}</>;
   const { t } = useI18n();
   const { isAdmin } = useUserRole();
   const items = [
@@ -17,12 +25,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
     { to: "/settings/services", icon: Briefcase, label: t("servicesMgmt") },
     { to: "/settings/insurance", icon: Shield, label: t("insuranceCompanies") },
     { to: "/settings/insurance-contracts", icon: FileSignature, label: t("insuranceContracts") },
-    { to: "/settings/notifications", icon: Bell, label: t("notificationSettings") },
-    { to: "/settings/reminders", icon: Send, label: t("reminders") },
-    { to: "/settings/automated-comm", icon: Bell, label: t("automatedComm") },
-    { to: "/settings/templates/email", icon: Mail, label: t("emailTemplates") },
-    { to: "/settings/templates/sms", icon: MessageSquare, label: t("smsTemplates") },
-    { to: "/settings/templates/whatsapp", icon: Phone, label: t("whatsappTemplates") },
+    { to: "/settings/communication", icon: Bell, label: t("communicationHub") },
     { to: "/settings/languages", icon: Languages, label: t("languageSettings") },
     ...(isAdmin ? [
       { to: "/settings/roles", icon: ShieldCheck, label: t("rolePermissions") },

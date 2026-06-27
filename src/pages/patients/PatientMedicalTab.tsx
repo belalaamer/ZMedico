@@ -112,7 +112,11 @@ export default function PatientMedicalTab({ patientId }: { patientId: string }) 
               <Link key={r.id} to={`/medical/records/${r.id}`} className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/40">
                 <FileText className="size-4 text-muted-foreground"/>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{r.chief_complaint_en || r.chief_complaint_ar || t("consultation")}</div>
+                  <div className="text-sm font-medium truncate">{(() => {
+                    const raw = (r.chief_complaint_en || r.chief_complaint_ar || "").trim();
+                    const meaningful = raw && !/^\d+(\.\d+)?$/.test(raw) && raw.length >= 3;
+                    return meaningful ? raw : t("consultation");
+                  })()}</div>
                   <div className="text-xs text-muted-foreground">{formatDate(r.visit_date, lang)} · {r.medical_specialties ? (lang === "ar" ? r.medical_specialties.name_ar : r.medical_specialties.name_en) : "—"} {r.profiles?.full_name ? ` · ${r.profiles.full_name}` : ""}</div>
                 </div>
                 <Badge variant="outline" className={r.status === "completed" ? "status-completed" : r.status === "reviewed" ? "status-progress" : "status-cancelled"}>{r.status === "draft" ? t("statusDraft") : r.status === "completed" ? t("statusCompleted") : t("statusReviewed")}</Badge>

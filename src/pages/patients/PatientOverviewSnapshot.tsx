@@ -263,9 +263,14 @@ export default function PatientOverviewSnapshot({
                 </div>
               ) : (
                 <ul className="space-y-2">
-                  {recentVisits.map((r) => {
-                    const title = r.chief_complaint_en || r.chief_complaint_ar
-                      || (lang === "ar" ? "استشارة" : "Consultation");
+                {recentVisits.map((r) => {
+                    const raw = (r.chief_complaint_en || r.chief_complaint_ar || "").trim();
+                    // Guard: ignore bare-numeric or too-short stray entries
+                    // (e.g. a pulse value of "80" accidentally saved as complaint).
+                    const meaningful = raw && !/^\d+(\.\d+)?$/.test(raw) && raw.length >= 3;
+                    const title = meaningful
+                      ? raw
+                      : (lang === "ar" ? "استشارة" : "Consultation");
                     const spec = r.medical_specialties
                       ? (lang === "ar" ? r.medical_specialties.name_ar : r.medical_specialties.name_en) : null;
                     return (

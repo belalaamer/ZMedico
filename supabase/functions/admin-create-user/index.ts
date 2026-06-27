@@ -135,10 +135,48 @@ Deno.serve(async (req) => {
     );
     // Create/update staff profile with branch assignment when provided.
     if (branch_id) {
-      await admin.from("staff_profiles").upsert(
-        { id: created.user.id, branch_id },
+      // staff_profiles.employee_id is NOT NULL with no default. Generate one
+      // using the employee_id_counter so the upsert does not violate the
+      // constraint for newly created users.
+      const { data: existing } = await admin
+        .from("staff_profiles")
+        .select("id, employee_id")
+        .eq("id", created.user.id)
+        .maybeSingle();
+
+      let employeeId = existing?.employee_id as string | undefined;
+      if (!employeeId) {
+        const { data: counter } = await admin
+          .from("employee_id_counter")
+          .select("id, last_value")
+          .eq("id", 1)
+          .maybeSingle();
+        const next = ((counter?.last_value as number) ?? 0) + 1;
+        await admin
+          .from("employee_id_counter")
+          .upsert({ id: 1, last_value: next });
+        employeeId = `EMP-${String(next).padStart(4, "0")}`;
+      }
+
+      const { error: spErr } = await admin.from("staff_profiles").upsert(
+        { id: created.user.id, branch_id, employee_id: employeeId },
         { onConflict: "id" },
       );
+      if (spErr) {
+        return new Response(
+          JSON.stringify({
+            error: `User created but staff profile failed: ${spErr.message}`,
+            user_id: created.user.id,
+            email,
+            password,
+            role,
+          }),
+          {
+            status: 207,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
     }
     // Consume invite if still present
     await admin.from("allowed_signup_emails").delete().eq("email", email);

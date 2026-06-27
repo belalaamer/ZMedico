@@ -47,7 +47,11 @@ export default function PatientTimeline({ patientId }: { patientId: string }) {
           id: `v-${v.id}`,
           kind: "visit",
           date: v.visit_date,
-          title: v.chief_complaint_en || v.chief_complaint_ar || t("consultation"),
+          title: (() => {
+            const raw = (v.chief_complaint_en || v.chief_complaint_ar || "").trim();
+            const meaningful = raw && !/^\d+(\.\d+)?$/.test(raw) && raw.length >= 3;
+            return meaningful ? raw : t("consultation");
+          })(),
           subtitle: v.medical_specialties ? (lang === "ar" ? v.medical_specialties.name_ar : v.medical_specialties.name_en) : t(("visit_" + v.visit_type) as any) ?? v.visit_type,
           href: `/medical/records/${v.id}`,
         });

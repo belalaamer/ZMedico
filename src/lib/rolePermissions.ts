@@ -9,7 +9,21 @@ const ALL = [...ACTIONS] as string[];
 
 export const DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
   admin: Object.fromEntries(MODULES.map(m => [m, [...ALL]])),
-  manager: Object.fromEntries(MODULES.map(m => [m, ["view","create","edit","export"]])),
+  // Strict Manager scope: operational modules editable (no delete anywhere),
+  // Settings & HR are view-only, Treasury & Coupons remain editable.
+  manager: {
+    patients: ["view","create","edit","export"],
+    appointments: ["view","create","edit","export"],
+    medical_records: ["view","create","edit","export"],
+    treatment_plans: ["view","create","edit","export"],
+    invoices: ["view","create","edit","export"],
+    treasury: ["view","create","edit","export"],
+    inventory: ["view","create","edit","export"],
+    reports: ["view","export"],
+    hr: ["view"],
+    settings: ["view"],
+    coupons: ["view","create","edit","export"],
+  },
   doctor: {
     patients: ["view","edit"],
     appointments: ["view","create","edit"],
@@ -55,7 +69,9 @@ export const DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
     appointments: ["view"],
     medical_records: [],
     treatment_plans: ["view"],
-    invoices: ["view","create","edit","delete","export"],
+    // Accountant may void/cancel invoices but cannot hard-delete them.
+    // True deletion is reserved for Admin (handled via UI/RLS).
+    invoices: ["view","create","edit","export"],
     treasury: ["view","create","edit","export"],
     inventory: ["view"],
     reports: ["view","export"],

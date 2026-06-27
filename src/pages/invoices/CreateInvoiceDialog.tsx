@@ -443,6 +443,7 @@ export function CreateInvoiceDialog({
           </div>
         </div>
 
+        {showAdvanced && (
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>{t("insuranceCompany")}</Label>
@@ -476,6 +477,7 @@ export function CreateInvoiceDialog({
             )}
           </div>
         </div>
+        )}
 
         {patientId && patientProcedures.length > 0 && (
           <div className="border border-border rounded-lg overflow-hidden">

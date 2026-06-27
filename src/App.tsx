@@ -91,6 +91,7 @@ const NotificationSettings = lazy(() => import("@/pages/settings/NotificationSet
 const RemindersSettings = lazy(() => import("@/pages/settings/RemindersSettings"));
 const AutomatedCommunication = lazy(() => import("@/pages/settings/AutomatedCommunication"));
 const Templates = lazy(() => import("@/pages/settings/Templates"));
+const Communication = lazy(() => import("@/pages/settings/Communication"));
 const LanguagesPage = lazy(() => import("@/pages/settings/Languages"));
 const RolePermissions = lazy(() => import("@/pages/settings/RolePermissions"));
 const UserManagement = lazy(() => import("@/pages/settings/UserManagement"));

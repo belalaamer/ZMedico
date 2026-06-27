@@ -1039,7 +1039,7 @@ export default function CalendarPage() {
                         }}
                         className="block w-full border-b border-border/60 hover:bg-primary/5 transition-colors"
                         style={{ height: HOUR_HEIGHT }}
-                        aria-label={`Create at ${h}:00`}
+                        aria-label={`${t("createAt")} ${h}:00`}
                       />
                     ))}
                     {/* Now line */}

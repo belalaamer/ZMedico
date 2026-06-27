@@ -183,8 +183,16 @@ export default function UserManagement() {
     });
     setCreating(false);
     if (error || (data as any)?.error) {
-      toast.error((data as any)?.error ?? error?.message ?? "Failed");
-      return;
+      let msg = (data as any)?.error ?? error?.message ?? "Failed";
+      try {
+        const ctx: any = (error as any)?.context;
+        if (ctx && typeof ctx.json === "function") {
+          const body = await ctx.json();
+          if (body?.error) msg = body.error;
+        }
+      } catch {}
+      toast.error(msg);
+      return; // keep modal open on failure
     }
     const info = data as { email: string; password: string };
     setCreatedInfo({ email: info.email, password: info.password });

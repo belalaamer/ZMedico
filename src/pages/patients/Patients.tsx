@@ -168,7 +168,14 @@ export default function PatientsPage() {
           <Can module="patients" action="create">
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
-                <Button className="gradient-primary text-primary-foreground hidden sm:inline-flex"><Plus className="me-2 size-4" />{t("addPatient")}</Button>
+                <Button
+                  className="gradient-primary text-primary-foreground min-h-11"
+                  aria-label={t("addPatient")}
+                >
+                  <Plus className="me-2 size-4" />
+                  <span className="hidden xs:inline sm:inline">{t("addPatient")}</span>
+                  <span className="sm:hidden">{t("addPatient")}</span>
+                </Button>
               </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>{t("newPatient")}</DialogTitle></DialogHeader>

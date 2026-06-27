@@ -67,7 +67,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       icon: Activity,
       items: [
         can("medical_records") && { to: "/physio", icon: Activity, label: lang === "ar" ? "الحالات" : "Cases" },
-        can("medical_records") && { to: "/physio/dashboard", icon: BarChart3, label: lang === "ar" ? "لوحة المتابعة" : "Dashboard" },
+        can("medical_records") && { to: "/physio/dashboard", icon: BarChart3, label: lang === "ar" ? "لوحة العلاج الطبيعي" : "Physio Dashboard" },
         can("medical_records") && { to: "/physio/reports", icon: FileText, label: lang === "ar" ? "التقارير" : "Reports" },
         can("medical_records") && { to: "/physio/followups", icon: ListChecks, label: lang === "ar" ? "المتابعات" : "Follow-ups" },
       ].filter(Boolean) as NavItem[],

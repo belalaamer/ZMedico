@@ -396,7 +396,15 @@ export function CreateInvoiceDialog({
     }
 
     setSaving(false);
-    toast.success(`${t("invoice")} ${inv.invoice_number}`);
+    {
+      const num = String(inv.invoice_number ?? "");
+      const isTemp = !num || /^TMP[-_]/i.test(num);
+      toast.success(
+        isTemp
+          ? (t("invoice") + " " + (t("save") ?? "created"))
+          : `${t("invoice")} ${num}`,
+      );
+    }
     setItems([{ item_type: "service", description_en: "", description_ar: "", quantity: 1, unit_price: 0 }]);
     setDiscountPct(0); setTaxPct(0); setNotes(""); setPatientId("");
     setInsuranceCompanyId(""); setCoverageRatio(0);

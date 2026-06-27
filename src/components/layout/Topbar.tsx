@@ -136,14 +136,14 @@ export function Topbar() {
 
   return (
     <header className="h-16 shrink-0 flex items-center gap-3 px-4 md:px-6 border-b border-border bg-card">
-      <Button variant="ghost" size="icon" type="button" className="md:hidden" aria-label="Menu" onClick={() => setMobileOpen(true)}>
+      <Button variant="ghost" size="icon" type="button" className="md:hidden" aria-label={t("menu")} onClick={() => setMobileOpen(true)}>
         <Menu className="size-5" />
       </Button>
 
       <div className="md:hidden" aria-hidden={!mobileOpen}>
         <button
           type="button"
-          aria-label="Close menu overlay"
+          aria-label={t("closeMenuOverlay")}
           tabIndex={mobileOpen ? 0 : -1}
           className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px] transition-opacity duration-150 ease-out ${
             mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
@@ -168,7 +168,7 @@ export function Topbar() {
               size="icon"
               type="button"
               className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              aria-label="Close menu"
+              aria-label={t("closeMenu")}
               onClick={() => setMobileOpen(false)}
             >
               <X className="size-5" />
@@ -227,9 +227,9 @@ export function Topbar() {
         </div>
       )}
 
-      <Button variant="ghost" size="icon" type="button" onClick={() => setLang(lang === "ar" ? "en" : "ar")} title="Language">
+      <Button variant="ghost" size="icon" type="button" onClick={() => setLang(lang === "ar" ? "en" : "ar")} title={t("language")} aria-label={t("language")}>
         <Globe className="size-5" />
-        <span className="sr-only">Language</span>
+        <span className="sr-only">{t("language")}</span>
       </Button>
 
       <DropdownMenu>

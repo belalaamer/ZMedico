@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Trash2, Plus } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NumberInput } from "@/components/ui/number-input";
@@ -56,6 +57,12 @@ export function CreateInvoiceDialog({
   const [couponCode, setCouponCode] = useState("");
   const [couponInfo, setCouponInfo] = useState<{ id: string; code: string; amount: number } | null>(null);
   const [couponLoading, setCouponLoading] = useState(false);
+  // Progressive disclosure: hide insurance, coupon, and tax behind an
+  // "Advanced options" section. Auto-expand if any advanced value is in use.
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  useEffect(() => {
+    if (insuranceCompanyId || couponInfo || (Number(taxPct) || 0) > 0) setShowAdvanced(true);
+  }, [insuranceCompanyId, couponInfo, taxPct]);
 
   useEffect(() => { setPatientId(presetPatientId ?? ""); }, [presetPatientId, open]);
 

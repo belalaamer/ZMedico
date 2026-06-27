@@ -1976,6 +1976,7 @@ export const dict = {
     walletTopupCannotUseWallet: "لا يمكن شحن المحفظة باستخدام طريقة (محفظة)",
     walletBalanceLoading: "جارٍ تحميل رصيد المحفظة…",
     automatedComm: "التواصل الآلي",
+    communicationHub: "التواصل",
     autoCommSubtitle: "تأكيد الحجز، التذكير بالموعد، استرجاع المرضى",
     eventBookingConfirmation: "تأكيد الحجز",
     eventAppointmentReminder: "تذكير بالموعد",

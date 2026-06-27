@@ -21,6 +21,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { ListSkeleton } from "@/components/ListSkeleton";
 import { Fab } from "@/components/ui/fab";
 import { ReferrerPicker } from "./ReferrerPicker";
+import { PullToRefresh } from "@/components/PullToRefresh";
 
 type Patient = {
   id: string;
@@ -154,6 +155,7 @@ export default function PatientsPage() {
   });
 
   return (
+    <PullToRefresh onRefresh={load}>
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>

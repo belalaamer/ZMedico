@@ -937,6 +937,7 @@ export const dict = {
     walletTopupCannotUseWallet: "Wallet top-up cannot use Wallet as payment method",
     walletBalanceLoading: "Loading wallet balance…",
     automatedComm: "Automated Communication",
+    communicationHub: "Communication",
     autoCommSubtitle: "Booking confirmation, appointment reminders, win-back",
     eventBookingConfirmation: "Booking confirmation",
     eventAppointmentReminder: "Appointment reminder",

@@ -24,10 +24,12 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
     { to: "/settings/templates/sms", icon: MessageSquare, label: t("smsTemplates") },
     { to: "/settings/templates/whatsapp", icon: Phone, label: t("whatsappTemplates") },
     { to: "/settings/languages", icon: Languages, label: t("languageSettings") },
-    ...(isAdmin ? [{ to: "/settings/roles", icon: ShieldCheck, label: t("rolePermissions") }] : []),
-    { to: "/settings/users", icon: Users, label: t("userManagement") },
-    { to: "/settings/backup", icon: HardDrive, label: t("backupExport") },
-    { to: "/settings/audit", icon: ScrollText, label: t("auditLogs") },
+    ...(isAdmin ? [
+      { to: "/settings/roles", icon: ShieldCheck, label: t("rolePermissions") },
+      { to: "/settings/users", icon: Users, label: t("userManagement") },
+      { to: "/settings/backup", icon: HardDrive, label: t("backupExport") },
+      { to: "/settings/audit", icon: ScrollText, label: t("auditLogs") },
+    ] : []),
     { to: "/settings/system", icon: Info, label: t("systemInfo") },
   ];
   return (

@@ -34,3 +34,17 @@ export function parseLocaleNumber(input: string): number {
   const n = Number(toLatinDigits(String(input ?? "")).replace(",", "."));
   return Number.isFinite(n) ? n : 0;
 }
+
+// Arabic-aware plural for an "N invoices" count.
+// Handles 0, 1 (مفرد), 2 (مثنى), 3–10 (جمع قلة), 11+ (تمييز مفرد).
+export function invoiceCountLabel(n: number, lang: "en" | "ar"): string {
+  const count = Number.isFinite(n) ? n : 0;
+  if (lang === "ar") {
+    if (count === 0) return "لا توجد فواتير";
+    if (count === 1) return "فاتورة واحدة";
+    if (count === 2) return "فاتورتان";
+    if (count >= 3 && count <= 10) return `${count} فواتير`;
+    return `${count} فاتورة`;
+  }
+  return `${count} ${count === 1 ? "invoice" : "invoices"}`;
+}

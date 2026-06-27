@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Trash2, Plus } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NumberInput } from "@/components/ui/number-input";
@@ -56,6 +57,12 @@ export function CreateInvoiceDialog({
   const [couponCode, setCouponCode] = useState("");
   const [couponInfo, setCouponInfo] = useState<{ id: string; code: string; amount: number } | null>(null);
   const [couponLoading, setCouponLoading] = useState(false);
+  // Progressive disclosure: hide insurance, coupon, and tax behind an
+  // "Advanced options" section. Auto-expand if any advanced value is in use.
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  useEffect(() => {
+    if (insuranceCompanyId || couponInfo || (Number(taxPct) || 0) > 0) setShowAdvanced(true);
+  }, [insuranceCompanyId, couponInfo, taxPct]);
 
   useEffect(() => { setPatientId(presetPatientId ?? ""); }, [presetPatientId, open]);
 
@@ -436,6 +443,7 @@ export function CreateInvoiceDialog({
           </div>
         </div>
 
+        {showAdvanced && (
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>{t("insuranceCompany")}</Label>
@@ -469,6 +477,7 @@ export function CreateInvoiceDialog({
             )}
           </div>
         </div>
+        )}
 
         {patientId && patientProcedures.length > 0 && (
           <div className="border border-border rounded-lg overflow-hidden">
@@ -602,6 +611,17 @@ export function CreateInvoiceDialog({
               <NumberInput className="w-24 text-end" value={discountPct} onChange={setDiscountPct} />
               <span className="font-medium tabular-nums w-28 text-end">- {formatMoney(discount, lang)}</span>
             </div>
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(v => !v)}
+              className="w-full flex items-center justify-between text-xs text-primary hover:underline pt-1"
+              aria-expanded={showAdvanced}
+            >
+              <span>{lang === "ar" ? "خيارات متقدمة (تأمين / كوبون / ضريبة)" : "Advanced options (insurance / coupon / tax)"}</span>
+              <ChevronDown className={`size-4 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+            </button>
+            {showAdvanced && (
+            <>
             <div className="flex items-center justify-between gap-2 text-sm">
               <span className="text-muted-foreground">{t("tax")} %</span>
               <NumberInput className="w-24 text-end" value={taxPct} onChange={setTaxPct} />
@@ -670,6 +690,8 @@ export function CreateInvoiceDialog({
                   </span>
                 </div>
               </>
+            )}
+            </>
             )}
             <div className="flex items-center justify-between text-base font-bold border-t border-border pt-2">
               <span>{t("finalTotal")}</span>

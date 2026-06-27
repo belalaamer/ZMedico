@@ -94,8 +94,6 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
         can("treasury") && { to: "/expenses", icon: Receipt, label: t("expenses") },
         can("coupons") && { to: "/coupons", icon: Ticket, label: lang === "ar" ? "الكوبونات" : "Coupons" },
         can("reports") && { to: "/reports", icon: PieChart, label: t("reports") },
-        can("reports") && { to: "/reports/doctor-performance", icon: Award, label: t("doctorPerformance") },
-        can("reports") && { to: "/reports/commissions", icon: Award, label: lang === "ar" ? "العمولات" : "Commissions" },
       ].filter(Boolean) as NavItem[],
     },
     {

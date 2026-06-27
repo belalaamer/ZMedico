@@ -11,7 +11,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { formatMoney, formatDate } from "@/lib/format";
+import { formatMoney, formatDate, invoiceCountLabel } from "@/lib/format";
 import { CreateInvoiceDialog } from "./CreateInvoiceDialog";
 import { Fab } from "@/components/ui/fab";
 import { RowActions } from "@/components/RowActions";
@@ -99,7 +99,7 @@ export default function Invoices() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("invoices")}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{filtered.length} {t("invoices").toLowerCase()}</p>
+          <p className="text-sm text-muted-foreground mt-1">{invoiceCountLabel(filtered.length, lang)}</p>
         </div>
         <div className="flex gap-2 items-center flex-wrap">
           <div className="relative w-56">

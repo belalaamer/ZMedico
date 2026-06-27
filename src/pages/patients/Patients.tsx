@@ -321,5 +321,6 @@ export default function PatientsPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </PullToRefresh>
   );
 }

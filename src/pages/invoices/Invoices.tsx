@@ -20,6 +20,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Can } from "@/components/Can";
 import { ListSkeleton } from "@/components/ListSkeleton";
+import { PullToRefresh } from "@/components/PullToRefresh";
 
 type Inv = {
   id: string;
@@ -95,6 +96,7 @@ export default function Invoices() {
   };
 
   return (
+    <PullToRefresh onRefresh={load}>
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
@@ -188,5 +190,6 @@ export default function Invoices() {
         </Fab>
       </Can>
     </div>
+    </PullToRefresh>
   );
 }

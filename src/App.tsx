@@ -222,12 +222,14 @@ function AppContent() {
               <Route path="/settings/services" element={<PermissionRoute><ServicesPage /></PermissionRoute>} />
               <Route path="/settings/insurance" element={<PermissionRoute><InsuranceCompanies /></PermissionRoute>} />
               <Route path="/settings/insurance-contracts" element={<PermissionRoute><InsuranceContracts /></PermissionRoute>} />
-              <Route path="/settings/notifications" element={<PermissionRoute><NotificationSettings /></PermissionRoute>} />
-              <Route path="/settings/reminders" element={<PermissionRoute><RemindersSettings /></PermissionRoute>} />
-              <Route path="/settings/automated-comm" element={<PermissionRoute><AutomatedCommunication /></PermissionRoute>} />
-              <Route path="/settings/templates/email" element={<PermissionRoute><Templates kind="email" /></PermissionRoute>} />
-              <Route path="/settings/templates/sms" element={<PermissionRoute><Templates kind="sms" /></PermissionRoute>} />
-              <Route path="/settings/templates/whatsapp" element={<PermissionRoute><Templates kind="whatsapp" /></PermissionRoute>} />
+              <Route path="/settings/communication" element={<PermissionRoute><Communication /></PermissionRoute>} />
+              {/* Backward-compatible redirects from the legacy 6 routes */}
+              <Route path="/settings/notifications" element={<Navigate to="/settings/communication?tab=notifications" replace />} />
+              <Route path="/settings/reminders" element={<Navigate to="/settings/communication?tab=reminders" replace />} />
+              <Route path="/settings/automated-comm" element={<Navigate to="/settings/communication?tab=automated" replace />} />
+              <Route path="/settings/templates/email" element={<Navigate to="/settings/communication?tab=email" replace />} />
+              <Route path="/settings/templates/sms" element={<Navigate to="/settings/communication?tab=sms" replace />} />
+              <Route path="/settings/templates/whatsapp" element={<Navigate to="/settings/communication?tab=whatsapp" replace />} />
               <Route path="/settings/languages" element={<PermissionRoute><LanguagesPage /></PermissionRoute>} />
               <Route path="/settings/roles" element={<PermissionRoute adminOnly><RolePermissions /></PermissionRoute>} />
               <Route path="/settings/users" element={<PermissionRoute adminOnly><UserManagement /></PermissionRoute>} />

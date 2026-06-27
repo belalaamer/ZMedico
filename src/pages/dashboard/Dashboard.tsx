@@ -161,27 +161,40 @@ export default function Dashboard() {
           .gte("invoice.issue_date", rangeStart).lte("invoice.issue_date", rangeEnd),
       ]);
 
-      // Treasury (separate, optional — failures shouldn't break dashboard)
-      const [lastCloseRes, treasuryTxRes] = await Promise.all([
-        branchEq(
-          (supabase as any).from("treasury_daily_closes")
-            .select("business_date,counted_cash,variance,branch_id")
-            .order("business_date", { ascending: false })
-            .limit(1)
-        ),
-        branchEq(
-          (supabase as any).from("treasury_transactions")
-            .select("amount,is_cash,branch_id,created_at")
-            .gte("created_at", start.toISOString())
-            .lte("created_at", end.toISOString())
-        ),
-      ]);
+      // Treasury (mirrors Treasury page: filter by treasury_id for this branch,
+      // sum transaction_type income vs expense, exclude reversed expense pairs).
+      const lastCloseRes = await branchEq(
+        (supabase as any).from("treasury_daily_closes")
+          .select("business_date,counted_cash,variance,branch_id")
+          .order("business_date", { ascending: false })
+          .limit(1)
+      );
       const lc = (lastCloseRes?.data ?? [])[0] as any;
       setLastClose(lc ? { business_date: lc.business_date, counted_cash: Number(lc.counted_cash || 0), variance: Number(lc.variance || 0) } : null);
+
+      let trQ = (supabase as any).from("treasury").select("id").is("deleted_at", null);
+      if (currentBranchId) trQ = trQ.eq("branch_id", currentBranchId);
+      const { data: trRows } = await trQ;
+      const trIds = ((trRows ?? []) as any[]).map((r) => r.id);
       let tIn = 0, tOut = 0;
-      for (const r of ((treasuryTxRes?.data ?? []) as any[])) {
-        const v = Number(r.amount || 0);
-        if (v >= 0) tIn += v; else tOut += -v;
+      if (trIds.length) {
+        const { data: tt } = await (supabase as any).from("treasury_transactions")
+          .select("transaction_type,amount,reference_type,reference_id,created_at")
+          .in("treasury_id", trIds)
+          .gte("created_at", start.toISOString())
+          .lte("created_at", end.toISOString());
+        const reversed = new Set(
+          ((tt ?? []) as any[])
+            .filter((r) => r.reference_type === "expense_reversal" && r.reference_id)
+            .map((r) => r.reference_id as string)
+        );
+        const visible = ((tt ?? []) as any[]).filter((r) => {
+          if (r.reference_type === "expense_reversal") return false;
+          if (r.reference_type === "expense" && r.reference_id && reversed.has(r.reference_id)) return false;
+          return true;
+        });
+        tIn  = visible.filter((r) => r.transaction_type === "income").reduce((s, r) => s + Number(r.amount || 0), 0);
+        tOut = visible.filter((r) => r.transaction_type === "expense").reduce((s, r) => s + Number(r.amount || 0), 0);
       }
       setTodayTreasuryIn(tIn);
       setTodayTreasuryOut(tOut);

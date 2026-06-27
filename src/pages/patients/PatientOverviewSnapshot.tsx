@@ -323,7 +323,7 @@ export default function PatientOverviewSnapshot({
                             {[a.procedure, branch, a.profiles?.full_name].filter(Boolean).join(" · ") || "—"}
                           </div>
                         </div>
-                        <Badge variant="outline" className={statusTone[a.status] ?? ""}>{a.status}</Badge>
+                        <Badge variant="outline" className={statusTone[a.status] ?? ""}>{t(a.status as any) ?? a.status}</Badge>
                       </li>
                     );
                   })}

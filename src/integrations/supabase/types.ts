@@ -1479,6 +1479,7 @@ export type Database = {
           item_type: Database["public"]["Enums"]["invoice_item_type"]
           product_id: string | null
           quantity: number
+          record_procedure_id: string | null
           total: number
           unit_price: number
         }
@@ -1493,6 +1494,7 @@ export type Database = {
           item_type?: Database["public"]["Enums"]["invoice_item_type"]
           product_id?: string | null
           quantity?: number
+          record_procedure_id?: string | null
           total?: number
           unit_price?: number
         }
@@ -1507,6 +1509,7 @@ export type Database = {
           item_type?: Database["public"]["Enums"]["invoice_item_type"]
           product_id?: string | null
           quantity?: number
+          record_procedure_id?: string | null
           total?: number
           unit_price?: number
         }
@@ -1530,6 +1533,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_items_record_procedure_id_fkey"
+            columns: ["record_procedure_id"]
+            isOneToOne: false
+            referencedRelation: "record_procedures"
             referencedColumns: ["id"]
           },
         ]

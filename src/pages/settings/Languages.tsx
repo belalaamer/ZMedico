@@ -61,7 +61,7 @@ export default function Languages() {
             <div className="flex-1"><div className="font-medium">{lang === "ar" ? l.name_ar : l.name_en}</div></div>
             {l.is_rtl && <Badge variant="outline">RTL</Badge>}
             {l.is_default && <Badge className="bg-primary text-primary-foreground">{t("isDefault")}</Badge>}
-            <Button size="sm" variant="outline" onClick={() => setDefault(l)} disabled={l.is_default}>Set default</Button>
+            <Button size="sm" variant="outline" onClick={() => setDefault(l)} disabled={l.is_default}>{t("setDefault")}</Button>
             <Switch checked={l.is_active} onCheckedChange={() => toggleActive(l)} />
           </div>
         ))}</div></Card>

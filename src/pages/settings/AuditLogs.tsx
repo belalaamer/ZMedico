@@ -5,9 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
+import { Info } from "lucide-react";
 
 export default function AuditLogs() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [items, setItems] = useState<any[]>([]);
   const [q, setQ] = useState("");
 
@@ -26,6 +27,14 @@ export default function AuditLogs() {
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <h1 className="text-2xl font-bold">{t("auditLogs")}</h1>
           <Input className="w-64" placeholder={t("search")} value={q} onChange={e => setQ(e.target.value)} />
+        </div>
+        <div className="rounded-md border border-border bg-muted/30 p-3 text-sm flex gap-2">
+          <Info className="size-4 mt-0.5 text-muted-foreground shrink-0" />
+          <p className="text-muted-foreground">
+            {lang === "ar"
+              ? "سجل التدقيق مخصص للقراءة فقط (إلحاق دائم). لا يتم حذف أو تعديل أي إدخال. يتم الاحتفاظ بآخر 100 إدخال هنا للعرض السريع؛ السجل الكامل متاح في قاعدة البيانات."
+              : "The audit log is append-only — entries cannot be edited or deleted. This view shows the latest 100 events for fast review; the full history is retained in the database."}
+          </p>
         </div>
         <Card className="overflow-hidden"><div className="divide-y">
           {filtered.map(i => (

@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -228,11 +228,15 @@ function AppContent() {
               <Route path="/settings/templates/sms" element={<PermissionRoute><Templates kind="sms" /></PermissionRoute>} />
               <Route path="/settings/templates/whatsapp" element={<PermissionRoute><Templates kind="whatsapp" /></PermissionRoute>} />
               <Route path="/settings/languages" element={<PermissionRoute><LanguagesPage /></PermissionRoute>} />
-              <Route path="/settings/roles" element={<PermissionRoute><RolePermissions /></PermissionRoute>} />
-              <Route path="/settings/users" element={<PermissionRoute><UserManagement /></PermissionRoute>} />
-              <Route path="/settings/backup" element={<PermissionRoute><BackupExport /></PermissionRoute>} />
-              <Route path="/settings/audit" element={<PermissionRoute><AuditLogs /></PermissionRoute>} />
+              <Route path="/settings/roles" element={<PermissionRoute adminOnly><RolePermissions /></PermissionRoute>} />
+              <Route path="/settings/users" element={<PermissionRoute adminOnly><UserManagement /></PermissionRoute>} />
+              <Route path="/settings/backup" element={<PermissionRoute adminOnly><BackupExport /></PermissionRoute>} />
+              <Route path="/settings/audit" element={<PermissionRoute adminOnly><AuditLogs /></PermissionRoute>} />
+              <Route path="/settings/audit-logs" element={<Navigate to="/settings/audit" replace />} />
               <Route path="/settings/system" element={<PermissionRoute><SystemInfo /></PermissionRoute>} />
+              <Route path="/settings/system-info" element={<Navigate to="/settings/system" replace />} />
+              <Route path="/commissions" element={<Navigate to="/reports/commissions" replace />} />
+              <Route path="/medical-records" element={<Navigate to="/medical/records" replace />} />
               <Route path="/system/self-audit" element={<PermissionRoute adminOnly><SystemSelfAudit /></PermissionRoute>} />
             </Route>
             <Route path="*" element={<NotFound />} />

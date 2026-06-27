@@ -46,7 +46,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       items: [
         can("appointments") && { to: "/calendar", icon: Calendar, label: t("calendar") },
         can("appointments") && { to: "/queue", icon: ListChecks, label: t("queue") },
-        can("appointments") && { to: "/reminders", icon: Bell, label: t("reminders") },
+        can("appointments") && { to: "/reminders", icon: Bell, label: t("notifications") },
       ].filter(Boolean) as NavItem[],
     },
     {
@@ -59,7 +59,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
         can("medical_records") && { to: "/medical/quick-consult", icon: Zap, label: t("quickConsult") },
         can("medical_records") && { to: "/medical/prescriptions", icon: Pill, label: t("prescriptions") },
         can("medical_records") && { to: "/medical/documents", icon: FolderOpen, label: t("documentsCenter") },
-        can("medical_records") && { to: "/physio", icon: Activity, label: "Physiotherapy" },
+        can("medical_records") && { to: "/physio", icon: Activity, label: t("physiotherapy") },
         can("medical_records") && { to: "/physio/dashboard", icon: Activity, label: lang === "ar" ? "لوحة العلاج الطبيعي" : "Physio dashboard" },
         can("medical_records") && { to: "/physio/reports", icon: FileText, label: lang === "ar" ? "تقارير العلاج الطبيعي" : "Physio reports" },
         can("medical_records") && { to: "/physio/followups", icon: Activity, label: lang === "ar" ? "متابعات العلاج الطبيعي" : "Physio follow-ups" },

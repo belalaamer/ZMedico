@@ -38,7 +38,7 @@ export function usePermissions() {
         });
         // Fallback to defaults for any (role, module) without a DB row.
         roles.forEach((role) => {
-          ["patients","appointments","medical_records","invoices","treasury","inventory","reports","hr","settings"].forEach((mod) => {
+          ["patients","appointments","medical_records","treatment_plans","invoices","treasury","inventory","reports","hr","settings","coupons"].forEach((mod) => {
             if (seen.has(`${role}:${mod}`)) return;
             const acts = defaultActionsFor(role, mod);
             if (!acts.length) return;
@@ -53,7 +53,7 @@ export function usePermissions() {
         if (!active) return;
         const map: Record<string, Set<string>> = {};
         roles.forEach((role) => {
-          ["patients","appointments","medical_records","treatment_plans","invoices","treasury","inventory","reports","hr","settings"].forEach((mod) => {
+          ["patients","appointments","medical_records","treatment_plans","invoices","treasury","inventory","reports","hr","settings","coupons"].forEach((mod) => {
             const acts = defaultActionsFor(role, mod);
             if (!acts.length) return;
             const s = map[mod] ?? new Set<string>();

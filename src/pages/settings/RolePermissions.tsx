@@ -27,6 +27,7 @@ const MODULE_LABELS: Record<string, { ar: string; en: string }> = {
   reports: { ar: "التقارير", en: "Reports" },
   hr: { ar: "الموارد البشرية", en: "HR" },
   settings: { ar: "الإعدادات", en: "Settings" },
+  coupons: { ar: "الكوبونات", en: "Coupons" },
 };
 
 type Matrix = Record<string, Record<string, string[]>>;
@@ -152,6 +153,12 @@ export default function RolePermissions() {
                       <div className="flex flex-wrap gap-1 justify-center">
                         {ACTIONS.map(a => {
                           const allowed = matrix[r]?.[m]?.includes(a);
+                          // Receptionist 'delete' on appointments is enforced as a soft-cancel
+                          // (status = cancelled) in the UI/triggers. Surface that semantically.
+                          const actionLabel =
+                            (r === "receptionist" && m === "appointments" && a === "delete")
+                              ? (lang === "ar" ? "إلغاء" : "cancel")
+                              : a;
                           return (
                             <button
                               type="button"
@@ -163,12 +170,15 @@ export default function RolePermissions() {
                                 (isAdmin ? "cursor-pointer hover:scale-105" : "cursor-default")
                               }
                               aria-pressed={allowed}
+                              title={a === "delete" && r === "receptionist" && m === "appointments"
+                                ? (lang === "ar" ? "للحذف على مستوى المستقبلين يتم تنفيذ إلغاء ناعم" : "Receptionist delete performs a soft-cancel")
+                                : undefined}
                             >
                               <Badge
                                 variant={allowed ? "default" : "outline"}
                                 className={allowed ? "" : "opacity-40"}
                               >
-                                {a}
+                                {actionLabel}
                               </Badge>
                             </button>
                           );

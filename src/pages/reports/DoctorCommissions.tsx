@@ -8,10 +8,13 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { formatMoney } from "@/lib/format";
 import { ReportPageHeader, ReportFilterBar, StatCard } from "./_shared";
+import { useUserRole } from "@/hooks/useUserRole";
 
 export default function DoctorCommissions() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
+  const { roles, isAdmin } = useUserRole();
+  const isDoctorOnly = !isAdmin && roles.includes("doctor") && !roles.some(r => ["manager","hr"].includes(r));
   const [start, setStart] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10));
   const [end, setEnd] = useState(new Date().toISOString().slice(0, 10));
   const [doctorId, setDoctorId] = useState<string>("all");
@@ -71,7 +74,7 @@ export default function DoctorCommissions() {
       <ReportPageHeader title={t("doctorCommissions")} />
       <ReportFilterBar start={start} end={end} setStart={setStart} setEnd={setEnd} extra={
         <>
-          <div>
+          {!isDoctorOnly && <div>
             <Label className="text-xs">{lang === "ar" ? "الطبيب" : "Doctor"}</Label>
             <Select value={doctorId} onValueChange={setDoctorId}>
               <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
@@ -80,7 +83,7 @@ export default function DoctorCommissions() {
                 {doctors.map((d) => <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>)}
               </SelectContent>
             </Select>
-          </div>
+          </div>}
           <div>
             <Label className="text-xs">{t("commissionStatus")}</Label>
             <Select value={status} onValueChange={setStatus}>

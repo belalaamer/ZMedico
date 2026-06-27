@@ -59,10 +59,24 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
         can("medical_records") && { to: "/medical/quick-consult", icon: Zap, label: t("quickConsult") },
         can("medical_records") && { to: "/medical/prescriptions", icon: Pill, label: t("prescriptions") },
         can("medical_records") && { to: "/medical/documents", icon: FolderOpen, label: t("documentsCenter") },
-        can("medical_records") && { to: "/physio", icon: Activity, label: t("physiotherapy") },
-        can("medical_records") && { to: "/physio/dashboard", icon: Activity, label: lang === "ar" ? "لوحة العلاج الطبيعي" : "Physio dashboard" },
-        can("medical_records") && { to: "/physio/reports", icon: FileText, label: lang === "ar" ? "تقارير العلاج الطبيعي" : "Physio reports" },
-        can("medical_records") && { to: "/physio/followups", icon: Activity, label: lang === "ar" ? "متابعات العلاج الطبيعي" : "Physio follow-ups" },
+      ].filter(Boolean) as NavItem[],
+    },
+    {
+      key: "physio",
+      label: lang === "ar" ? "العلاج الطبيعي" : "Physiotherapy",
+      icon: Activity,
+      items: [
+        can("medical_records") && { to: "/physio", icon: Activity, label: lang === "ar" ? "الحالات" : "Cases" },
+        can("medical_records") && { to: "/physio/dashboard", icon: BarChart3, label: lang === "ar" ? "لوحة المتابعة" : "Dashboard" },
+        can("medical_records") && { to: "/physio/reports", icon: FileText, label: lang === "ar" ? "التقارير" : "Reports" },
+        can("medical_records") && { to: "/physio/followups", icon: ListChecks, label: lang === "ar" ? "المتابعات" : "Follow-ups" },
+      ].filter(Boolean) as NavItem[],
+    },
+    {
+      key: "catalogues",
+      label: lang === "ar" ? "المراجع السريرية" : "Clinical Catalogues",
+      icon: FolderTree,
+      items: [
         can("medical_records") && { to: "/medical/specialties", icon: Stethoscope, label: t("specialties") },
         can("medical_records") && { to: "/medical/diagnoses", icon: HeartPulse, label: t("diagnoses") },
         can("medical_records") && { to: "/medical/medications", icon: Pill, label: t("medications") },

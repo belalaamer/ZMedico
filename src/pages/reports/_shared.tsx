@@ -5,14 +5,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Download, FileSpreadsheet, Printer } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
+import { CanExport } from "@/components/CanExport";
 
 export function ReportFilterBar({
-  start, end, setStart, setEnd, extra, onPdf, onExcel,
+  start, end, setStart, setEnd, extra, onPdf, onExcel, module = "reports",
 }: {
   start: string; end: string;
   setStart: (v: string) => void; setEnd: (v: string) => void;
   extra?: ReactNode;
   onPdf?: () => void; onExcel?: () => void;
+  /** Permission module used to gate export/print buttons. */
+  module?: string;
 }) {
   const { t } = useI18n();
   return (
@@ -28,9 +31,11 @@ export function ReportFilterBar({
         </div>
         {extra}
         <div className="ms-auto flex gap-2">
-          {onPdf && <Button variant="outline" size="sm" onClick={onPdf}><Download className="size-4 me-1" />PDF</Button>}
-          {onExcel && <Button variant="outline" size="sm" onClick={onExcel}><FileSpreadsheet className="size-4 me-1" />Excel</Button>}
-          <Button variant="outline" size="sm" onClick={() => window.print()}><Printer className="size-4 me-1" />{t("print")}</Button>
+          <CanExport module={module}>
+            {onPdf && <Button variant="outline" size="sm" onClick={onPdf}><Download className="size-4 me-1" />PDF</Button>}
+            {onExcel && <Button variant="outline" size="sm" onClick={onExcel}><FileSpreadsheet className="size-4 me-1" />Excel</Button>}
+            <Button variant="outline" size="sm" onClick={() => window.print()}><Printer className="size-4 me-1" />{t("print")}</Button>
+          </CanExport>
         </div>
       </CardContent>
     </Card>

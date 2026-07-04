@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { z } from "zod";
 import { Stethoscope, Globe } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,6 +40,7 @@ function safeRedirectPath(value?: string | null) {
 
 export default function AuthPage() {
   const { t, lang, setLang } = useI18n();
+  const { user, loading: authLoading } = useAuth();
   const nav = useNavigate();
   const location = useLocation();
   const from = useMemo(() => {
@@ -62,9 +64,17 @@ export default function AuthPage() {
     console.info(AUTH_DEBUG_PREFIX, "auth page mounted", {
       path: window.location.pathname + window.location.search,
       redirectAfterLogin: from,
+      authLoading,
+      hasUser: Boolean(user),
       hasStoredToken: Object.keys(window.localStorage).some((k) => k.startsWith("sb-") && k.endsWith("-auth-token")),
     });
-  }, [from]);
+  }, [authLoading, from, user]);
+
+  useEffect(() => {
+    if (authLoading || !user) return;
+    console.info(AUTH_DEBUG_PREFIX, "auth page detected existing session", { redirectAfterLogin: from });
+    nav(from, { replace: true });
+  }, [authLoading, from, nav, user]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,6 +97,10 @@ export default function AuthPage() {
       error: sessionError?.message ?? null,
       hasStoredToken: Object.keys(window.localStorage).some((k) => k.startsWith("sb-") && k.endsWith("-auth-token")),
     });
+    if (sessionError || !sessionData.session) {
+      toast.error(sessionError?.message ?? (lang === "ar" ? "لم يتم حفظ جلسة تسجيل الدخول" : "Sign-in session was not saved"));
+      return;
+    }
     nav(from, { replace: true });
   };
 

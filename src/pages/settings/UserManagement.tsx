@@ -442,6 +442,18 @@ export default function UserManagement() {
                 )}
               </div>
               <Button size="sm" variant="outline" onClick={() => openEdit(u)}>{t("edit")}</Button>
+              {!staffLinks[u.id]?.branch_id && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-primary"
+                  title={lang === "ar" ? "ربط بسجل موظف (اختر فرعاً)" : "Link to employee record (pick a branch)"}
+                  onClick={() => openEdit(u)}
+                >
+                  <Link2 className="me-1 size-4" />
+                  {lang === "ar" ? "ربط" : "Link"}
+                </Button>
+              )}
               {staffLinks[u.id]?.branch_id && currentUserId !== u.id && (
                 <Button
                   size="sm"

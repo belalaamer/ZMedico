@@ -240,7 +240,16 @@ html { font-family: "Inter", system-ui, sans-serif; }
   input, select, textarea { font-size: 16px; }
 }
 
-/* Floating action button (FAB) safe-area aware */
+/* Floating action button (FAB) safe-area aware.
+   On mobile the fixed bottom navigation bar is 4rem tall (see
+   MobileBottomNav — `.h-16`), so the FAB must sit above it. On md+
+   there is no bottom nav, and the FAB itself is `md:hidden`, so the
+   md rule is defensive only. */
 .fab-safe-bottom {
-  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  bottom: calc(1rem + 4rem + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 768px) {
+  .fab-safe-bottom {
+    bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  }
 }

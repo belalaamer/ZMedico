@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Search, UserPlus, Trash2, Copy, KeyRound, AlertTriangle, Lock } from "lucide-react";
+import { Link } from "react-router-dom";
+import { useBranch } from "@/contexts/BranchContext";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
@@ -23,8 +25,20 @@ import { toast } from "sonner";
 const ROLES = ["admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr", "staff"] as const;
 type Role = typeof ROLES[number];
 
+function suggestRoleFromPosition(titleEn: string | null | undefined, groupKey: string | null | undefined): Role {
+  const s = `${titleEn ?? ""} ${groupKey ?? ""}`.toLowerCase();
+  if (/(doctor|physician|طبيب|أطباء)/i.test(s)) return "doctor";
+  if (/(nurse|ممرض)/i.test(s)) return "nurse";
+  if (/(reception|استقبال)/i.test(s)) return "receptionist";
+  if (/(account|محاسب)/i.test(s)) return "accountant";
+  if (/(hr|human|موارد)/i.test(s)) return "hr";
+  if (/(manager|مدير)/i.test(s)) return "manager";
+  return "staff";
+}
+
 export default function UserManagement() {
   const { t, lang } = useI18n();
+  const { currentBranchId } = useBranch();
   const [users, setUsers] = useState<any[]>([]);
   const [roles, setRoles] = useState<Record<string, string[]>>({});
   const [q, setQ] = useState("");
@@ -47,6 +61,9 @@ export default function UserManagement() {
   const [cBranch, setCBranch] = useState<string>("");
   const [creating, setCreating] = useState(false);
   const [createdInfo, setCreatedInfo] = useState<{ email: string; password: string } | null>(null);
+  // Linked employee state (for create-user flow)
+  const [cLinkedStaffId, setCLinkedStaffId] = useState<string>("");
+  const [linkableStaff, setLinkableStaff] = useState<any[]>([]);
 
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -122,6 +139,35 @@ export default function UserManagement() {
   };
   useEffect(() => { load(); }, []);
 
+  // Load employees in the current branch that don't yet have any user role assigned.
+  useEffect(() => {
+    if (!createOpen) return;
+    if (!currentBranchId) { setLinkableStaff([]); return; }
+    (async () => {
+      const { data: sps } = await (supabase as any)
+        .from("staff_profiles")
+        .select("id,employee_id,branch_id,position_id,staff_positions(title_en,title_ar,group_key),profiles!inner(email,full_name)")
+        .eq("branch_id", currentBranchId)
+        .is("deleted_at", null);
+      const { data: rs } = await (supabase as any).from("user_roles").select("user_id");
+      const withRoles = new Set((rs ?? []).map((r: any) => r.user_id));
+      setLinkableStaff((sps ?? []).filter((s: any) => !withRoles.has(s.id)));
+    })();
+  }, [createOpen, currentBranchId]);
+
+  const onPickLinkedStaff = (id: string) => {
+    setCLinkedStaffId(id);
+    if (id === "none") {
+      return;
+    }
+    const s = linkableStaff.find((x) => x.id === id);
+    if (!s) return;
+    setCEmail(s.profiles?.email ?? "");
+    setCName(s.profiles?.full_name ?? "");
+    setCBranch(s.branch_id ?? "");
+    setCRole(suggestRoleFromPosition(s.staff_positions?.title_en, s.staff_positions?.group_key));
+  };
+
   const sendInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     const email = invEmail.trim().toLowerCase();
@@ -161,6 +207,26 @@ export default function UserManagement() {
 
   const createUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Linked-employee path: the auth user already exists (profile row is
+    // present). Assign the role + branch instead of creating a new account.
+    if (cLinkedStaffId && cLinkedStaffId !== "none") {
+      setCreating(true);
+      const staff = linkableStaff.find((x) => x.id === cLinkedStaffId);
+      if (!staff) { setCreating(false); toast.error("Staff not found"); return; }
+      const del = await (supabase as any).from("user_roles").delete().eq("user_id", staff.id);
+      if (del.error) { setCreating(false); toast.error(del.error.message); return; }
+      const ins = await (supabase as any).from("user_roles").insert({ user_id: staff.id, role: cRole });
+      if (ins.error) { setCreating(false); toast.error(ins.error.message); return; }
+      if (cBranch) {
+        await (supabase as any).from("staff_profiles").update({ branch_id: cBranch }).eq("id", staff.id);
+      }
+      setCreating(false);
+      toast.success(lang === "ar" ? "تم ربط المستخدم بالموظف" : "User linked to employee");
+      setCEmail(""); setCName(""); setCRole("staff"); setCPassword(""); setCBranch(""); setCLinkedStaffId("");
+      setCreateOpen(false);
+      load();
+      return;
+    }
     const email = cEmail.trim().toLowerCase();
     if (!email || !email.includes("@")) {
       toast.error(lang === "ar" ? "أدخل بريداً صالحاً" : "Enter a valid email");
@@ -196,7 +262,7 @@ export default function UserManagement() {
     }
     const info = data as { email: string; password: string };
     setCreatedInfo({ email: info.email, password: info.password });
-    setCEmail(""); setCName(""); setCRole("staff"); setCPassword(""); setCBranch("");
+    setCEmail(""); setCName(""); setCRole("staff"); setCPassword(""); setCBranch(""); setCLinkedStaffId("");
     setCreateOpen(false);
     load();
   };
@@ -421,16 +487,52 @@ export default function UserManagement() {
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={createUser} className="space-y-4">
+              <div className="space-y-2 rounded-md border p-3 bg-muted/30">
+                <Label>
+                  {lang === "ar" ? "ربط بموظف موجود (اختياري)" : "Link to existing employee (optional)"}
+                </Label>
+                <Select value={cLinkedStaffId || "none"} onValueChange={onPickLinkedStaff}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={lang === "ar" ? "اختر موظفاً من هذا الفرع" : "Pick an employee from this branch"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— {lang === "ar" ? "بدون ربط" : "No link"} —</SelectItem>
+                    {linkableStaff.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {(s.profiles?.full_name ?? s.profiles?.email ?? s.employee_id)}
+                        {s.staff_positions ? ` — ${lang === "ar" ? s.staff_positions.title_ar : s.staff_positions.title_en}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                  <span>
+                    {linkableStaff.length === 0
+                      ? (lang === "ar" ? "لا يوجد موظفون غير مربوطين في هذا الفرع." : "No unlinked employees in this branch.")
+                      : (lang === "ar" ? "سيتم الاقتراح التلقائي للدور بناءً على المسمى الوظيفي." : "Role will be suggested from the employee's position.")}
+                  </span>
+                  <Link to="/hr/staff" className="underline text-primary">
+                    {lang === "ar" ? "إنشاء موظف" : "Create employee"}
+                  </Link>
+                </div>
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="cEmail">{lang === "ar" ? "البريد الإلكتروني" : "Email"}</Label>
-                <Input id="cEmail" type="email" required value={cEmail} onChange={(e) => setCEmail(e.target.value)} />
+                <Input id="cEmail" type="email" required value={cEmail} onChange={(e) => setCEmail(e.target.value)} readOnly={!!cLinkedStaffId && cLinkedStaffId !== "none"} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="cName">{lang === "ar" ? "الاسم الكامل" : "Full name"}</Label>
-                <Input id="cName" value={cName} onChange={(e) => setCName(e.target.value)} />
+                <Input id="cName" value={cName} onChange={(e) => setCName(e.target.value)} readOnly={!!cLinkedStaffId && cLinkedStaffId !== "none"} />
               </div>
               <div className="space-y-2">
-                <Label>{lang === "ar" ? "الدور" : "Role"}</Label>
+                <Label>
+                  {lang === "ar" ? "الدور" : "Role"}
+                  {cLinkedStaffId && cLinkedStaffId !== "none" && (
+                    <span className="ms-2 text-xs text-muted-foreground">
+                      {lang === "ar" ? "(مقترح — يمكن تغييره)" : "(suggested — you can change it)"}
+                    </span>
+                  )}
+                </Label>
                 <Select value={cRole} onValueChange={(v) => setCRole(v as Role)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -457,6 +559,7 @@ export default function UserManagement() {
                   </Select>
                 </div>
               )}
+              {(!cLinkedStaffId || cLinkedStaffId === "none") && (
               <div className="space-y-2">
                 <Label htmlFor="cPassword">
                   {lang === "ar" ? "كلمة مرور (اختياري)" : "Password (optional)"}
@@ -469,6 +572,7 @@ export default function UserManagement() {
                   onChange={(e) => setCPassword(e.target.value)}
                 />
               </div>
+              )}
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>{t("cancel")}</Button>
                 <Button type="submit" disabled={creating} className="gradient-primary text-primary-foreground">

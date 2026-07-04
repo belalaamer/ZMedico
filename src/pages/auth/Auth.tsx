@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { useI18n } from "@/contexts/I18nContext";
 import { toast } from "sonner";
+import { hasPersistedAuthSession, persistAuthSessionForPreview } from "@/lib/authSessionPersistence";
 
 const credSchema = z.object({
   email: z.string().trim().email().max(255),
@@ -66,7 +67,7 @@ export default function AuthPage() {
       redirectAfterLogin: from,
       authLoading,
       hasUser: Boolean(user),
-      hasStoredToken: Object.keys(window.localStorage).some((k) => k.startsWith("sb-") && k.endsWith("-auth-token")),
+      hasStoredToken: hasPersistedAuthSession(),
     });
   }, [authLoading, from, user]);
 
@@ -90,12 +91,14 @@ export default function AuthPage() {
       error: error?.message ?? null,
     });
     if (error) { toast.error(error.message); return; }
+    persistAuthSessionForPreview(data.session, "password-login-result");
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    persistAuthSessionForPreview(sessionData.session, "password-login-get-session");
     console.info(AUTH_DEBUG_PREFIX, "session after password login", {
       hasSession: Boolean(sessionData.session),
       hasUser: Boolean(sessionData.session?.user),
       error: sessionError?.message ?? null,
-      hasStoredToken: Object.keys(window.localStorage).some((k) => k.startsWith("sb-") && k.endsWith("-auth-token")),
+      hasStoredToken: hasPersistedAuthSession(),
     });
     if (sessionError || !sessionData.session) {
       toast.error(sessionError?.message ?? (lang === "ar" ? "لم يتم حفظ جلسة تسجيل الدخول" : "Sign-in session was not saved"));

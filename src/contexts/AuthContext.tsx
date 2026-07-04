@@ -3,6 +3,7 @@ import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { withTimeout } from "@/lib/withTimeout";
 import { toast } from "@/hooks/use-toast";
+import { clearPersistedAuthSessions, hasPersistedAuthSession, persistAuthSessionForPreview } from "@/lib/authSessionPersistence";
 
 type Ctx = {
   user: User | null;
@@ -30,7 +31,7 @@ function describeSession(s: Session | null) {
     expiresAt: s?.expires_at ?? null,
     hasStoredToken:
       typeof window !== "undefined"
-        ? Object.keys(window.localStorage).some((k) => k.startsWith("sb-") && k.endsWith("-auth-token"))
+        ? hasPersistedAuthSession()
         : false,
   };
 }
@@ -48,11 +49,7 @@ function clearLocalAppState() {
   try {
     localStorage.removeItem("zmedico.branch");
     // Best-effort: drop any cached supabase auth tokens if signOut failed.
-    Object.keys(localStorage).forEach((k) => {
-      if (k.startsWith("sb-") && k.endsWith("-auth-token")) {
-        localStorage.removeItem(k);
-      }
-    });
+    clearPersistedAuthSessions();
   } catch {
     /* ignore */
   }
@@ -92,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authDebug("auth state change", { event, ...describeSession(s) });
 
       if (event === "INITIAL_SESSION") {
+        persistAuthSessionForPreview(s, "initial-session-event");
         setSession(s);
         setUser(s?.user ?? null);
         if (s) hadSession = true;
@@ -107,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         hadSession = false;
         return;
       }
+      persistAuthSessionForPreview(s, `auth-event:${event}`);
       setSession(s);
       setUser(s?.user ?? null);
       setLoading(false);
@@ -122,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then(async ({ data: { session: s }, error }) => {
         if (!active) return;
         authDebug("auth.getSession completed", { ...describeSession(s), error: error?.message ?? null });
+        persistAuthSessionForPreview(s, "get-session-bootstrap");
         setSession(s);
         setUser(s?.user ?? null);
         // Validate that the user behind this session still exists in Auth.

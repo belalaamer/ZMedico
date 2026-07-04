@@ -13,6 +13,33 @@ type Ctx = {
 
 const AuthContext = createContext<Ctx | null>(null);
 
+const AUTH_DEBUG_PREFIX = "[auth-debug]";
+
+function authDebug(message: string, details?: Record<string, unknown>) {
+  console.info(AUTH_DEBUG_PREFIX, message, {
+    path: typeof window !== "undefined" ? window.location.pathname + window.location.search : "",
+    ...details,
+  });
+}
+
+function describeSession(s: Session | null) {
+  return {
+    hasSession: Boolean(s),
+    hasUser: Boolean(s?.user),
+    userIdPrefix: s?.user?.id ? s.user.id.slice(0, 8) : null,
+    expiresAt: s?.expires_at ?? null,
+    hasStoredToken:
+      typeof window !== "undefined"
+        ? Object.keys(window.localStorage).some((k) => k.startsWith("sb-") && k.endsWith("-auth-token"))
+        : false,
+  };
+}
+
+function isDeletedUserError(error: unknown) {
+  const message = error instanceof Error ? error.message : String((error as any)?.message ?? error ?? "");
+  return /user.*not.*found|user.*deleted|sub claim/i.test(message);
+}
+
 // Auto-logout after this many ms of user inactivity (no mouse/keyboard/touch).
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
@@ -59,8 +86,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    let active = true;
     let hadSession = false;
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
+      authDebug("auth state change", { event, ...describeSession(s) });
+
+      if (event === "INITIAL_SESSION") {
+        setSession(s);
+        setUser(s?.user ?? null);
+        if (s) hadSession = true;
+        return;
+      }
+
       if (event === "SIGNED_OUT" || (event as string) === "USER_DELETED") {
         clearLocalAppState();
         setSession(null);
@@ -75,12 +112,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       if (s) hadSession = true;
     });
+
+    authDebug("auth state initialization started");
     withTimeout(supabase.auth.getSession(), {
       ms: 8000,
       fallback: { data: { session: null }, error: null } as Awaited<ReturnType<typeof supabase.auth.getSession>>,
       label: "auth.getSession",
     })
-      .then(async ({ data: { session: s } }) => {
+      .then(async ({ data: { session: s }, error }) => {
+        if (!active) return;
+        authDebug("auth.getSession completed", { ...describeSession(s), error: error?.message ?? null });
         setSession(s);
         setUser(s?.user ?? null);
         // Validate that the user behind this session still exists in Auth.
@@ -88,21 +129,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           hadSession = true;
           try {
             const { data, error } = await supabase.auth.getUser();
+            authDebug("auth.getUser validation completed", {
+              hasUser: Boolean(data?.user),
+              error: error?.message ?? null,
+            });
             if (error || !data?.user) {
-              await forceLocalLogout(true);
+              if (isDeletedUserError(error)) {
+                await forceLocalLogout(true);
+              } else {
+                console.warn(AUTH_DEBUG_PREFIX, "auth.getUser validation failed; keeping stored session for auth retry", {
+                  path: window.location.pathname + window.location.search,
+                  error: error?.message ?? "missing user",
+                });
+              }
             }
           } catch {
-            await forceLocalLogout(true);
+            console.warn(AUTH_DEBUG_PREFIX, "auth.getUser validation threw; keeping stored session for auth retry", {
+              path: window.location.pathname + window.location.search,
+            });
           }
         }
       })
       .catch(() => {
+        if (!active) return;
+        authDebug("auth.getSession failed", { hasSession: false });
         setSession(null);
         setUser(null);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!active) return;
+        setLoading(false);
+        authDebug("auth state initialization finished");
+      });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signOut = async () => {

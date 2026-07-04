@@ -28,6 +28,9 @@ export function usePermissions() {
     )
       .then(({ data }: any) => {
         if (!active) return;
+        console.info("[auth-debug] role_permissions fetch completed", {
+          rows: data?.length ?? 0,
+        });
         const map: Record<string, Set<string>> = {};
         const seen = new Set<string>();
         (data ?? []).forEach((r: any) => {
@@ -49,8 +52,9 @@ export function usePermissions() {
         });
         setPerms(map);
       })
-      .catch(() => {
+      .catch((error) => {
         if (!active) return;
+        console.warn("[auth-debug] role_permissions fetch threw; using defaults", { message: error instanceof Error ? error.message : String(error) });
         const map: Record<string, Set<string>> = {};
         roles.forEach((role) => {
           ["patients","appointments","medical_records","treatment_plans","invoices","treasury","inventory","reports","hr","settings","coupons"].forEach((mod) => {

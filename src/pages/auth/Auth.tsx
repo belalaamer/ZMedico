@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { z } from "zod";
 import { Stethoscope, Globe } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,11 +20,38 @@ const credSchema = z.object({
   fullName: z.string().trim().min(1).max(100).optional(),
 });
 
+const AUTH_DEBUG_PREFIX = "[auth-debug]";
+
+function safeRedirectPath(value?: string | null) {
+  if (!value) return "/";
+  try {
+    if (value.startsWith("http://") || value.startsWith("https://")) {
+      const url = new URL(value);
+      if (url.origin !== window.location.origin) return "/";
+      return `${url.pathname}${url.search}${url.hash}` || "/";
+    }
+    if (!value.startsWith("/") || value.startsWith("//")) return "/";
+    if (value.startsWith("/auth")) return "/";
+    return value;
+  } catch {
+    return "/";
+  }
+}
+
 export default function AuthPage() {
   const { t, lang, setLang } = useI18n();
+  const { user, loading: authLoading } = useAuth();
   const nav = useNavigate();
   const location = useLocation();
-  const from = (location.state as any)?.from?.pathname ?? "/";
+  const from = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    const next = params.get("next");
+    const stateFrom = (location.state as any)?.from;
+    const statePath = stateFrom
+      ? `${stateFrom.pathname ?? "/"}${stateFrom.search ?? ""}${stateFrom.hash ?? ""}`
+      : null;
+    return safeRedirectPath(next ?? statePath ?? "/");
+  }, [location.search, location.state]);
 
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
@@ -32,14 +60,47 @@ export default function AuthPage() {
   const [resetEmail, setResetEmail] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
 
+  useEffect(() => {
+    console.info(AUTH_DEBUG_PREFIX, "auth page mounted", {
+      path: window.location.pathname + window.location.search,
+      redirectAfterLogin: from,
+      authLoading,
+      hasUser: Boolean(user),
+      hasStoredToken: Object.keys(window.localStorage).some((k) => k.startsWith("sb-") && k.endsWith("-auth-token")),
+    });
+  }, [authLoading, from, user]);
+
+  useEffect(() => {
+    if (authLoading || !user) return;
+    console.info(AUTH_DEBUG_PREFIX, "auth page detected existing session", { redirectAfterLogin: from });
+    nav(from, { replace: true });
+  }, [authLoading, from, nav, user]);
+
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = credSchema.safeParse({ email, password });
     if (!parsed.success) { toast.error("Invalid email or password"); return; }
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    console.info(AUTH_DEBUG_PREFIX, "password sign-in started", { redirectAfterLogin: from });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
+    console.info(AUTH_DEBUG_PREFIX, "password sign-in completed", {
+      hasSession: Boolean(data.session),
+      hasUser: Boolean(data.user),
+      error: error?.message ?? null,
+    });
     if (error) { toast.error(error.message); return; }
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    console.info(AUTH_DEBUG_PREFIX, "session after password login", {
+      hasSession: Boolean(sessionData.session),
+      hasUser: Boolean(sessionData.session?.user),
+      error: sessionError?.message ?? null,
+      hasStoredToken: Object.keys(window.localStorage).some((k) => k.startsWith("sb-") && k.endsWith("-auth-token")),
+    });
+    if (sessionError || !sessionData.session) {
+      toast.error(sessionError?.message ?? (lang === "ar" ? "لم يتم حفظ جلسة تسجيل الدخول" : "Sign-in session was not saved"));
+      return;
+    }
     nav(from, { replace: true });
   };
 

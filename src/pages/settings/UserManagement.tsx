@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, UserPlus, Trash2, Copy, KeyRound, AlertTriangle, Lock } from "lucide-react";
+import { Search, UserPlus, Trash2, Copy, KeyRound, AlertTriangle, Lock, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useBranch } from "@/contexts/BranchContext";
 import { Link2, Link2Off } from "lucide-react";
@@ -29,7 +29,7 @@ type Role = typeof ROLES[number];
 type StaffLink = { branch_id: string | null; employee_id: string | null };
 
 async function logLinkAudit(
-  action: "link" | "unlink" | "replace",
+  action: "employee_linked" | "employee_unlinked" | "employee_replaced",
   userId: string,
   branchId: string | null,
   oldVals: Record<string, unknown> | null,

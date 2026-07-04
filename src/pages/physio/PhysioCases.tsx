@@ -177,7 +177,11 @@ export default function PhysioCases() {
                   <SelectTrigger><SelectValue placeholder={lang === "ar" ? "المعالج" : "Therapist"} /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="_none">—</SelectItem>
-                    {therapists.map(s => (
+                    {therapists.length === 0 ? (
+                      <div className="px-2 py-3 text-sm text-muted-foreground text-center">
+                        {lang === "ar" ? "لا يوجد أطباء متاحون" : "No providers available"}
+                      </div>
+                    ) : therapists.map(s => (
                       <SelectItem key={s.id} value={s.id}>{therapistLabel(s)}</SelectItem>
                     ))}
                   </SelectContent>

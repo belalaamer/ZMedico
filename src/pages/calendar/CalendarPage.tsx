@@ -1096,10 +1096,11 @@ export default function CalendarPage() {
                 const hasHours = workStartMin != null && workEndMin != null;
                 const bandTop = hasHours ? ((workStartMin! - dayStartHour * 60) / 60) * HOUR_HEIGHT : 0;
                 const bandHeight = hasHours ? ((workEndMin! - workStartMin!) / 60) * HOUR_HEIGHT : 0;
+                const isClosed = !workingDays.includes(d.getDay());
                 return (
                   <div key={dayKey} className="relative border-e border-border last:border-e-0">
                     {/* Working-hours highlight band (behind everything, non-interactive) */}
-                    {hasHours && (
+                    {hasHours && !isClosed && (
                       <div
                         aria-hidden
                         className="absolute inset-x-0 bg-primary/5 pointer-events-none"
@@ -1134,6 +1135,22 @@ export default function CalendarPage() {
                         return renderApptBlock(a, info.lane, info.lanes);
                       });
                     })()}
+                    {/* Closed-day overlay — subtle muted tint + label; keeps the
+                        time grid readable and does not block interaction. */}
+                    {isClosed && (
+                      <div
+                        aria-hidden
+                        className="absolute inset-0 pointer-events-none bg-muted/40 backdrop-blur-[0.5px] flex items-start justify-center pt-3"
+                        style={{
+                          backgroundImage:
+                            "repeating-linear-gradient(135deg, hsl(var(--muted-foreground) / 0.06) 0 6px, transparent 6px 12px)",
+                        }}
+                      >
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground bg-background/70 border border-border rounded-full px-2 py-0.5">
+                          {lang === "ar" ? "مغلق" : "Closed"}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 );
               })}

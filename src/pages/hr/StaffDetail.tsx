@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, User } from "lucide-react";
+import { ArrowLeft, User, Link2Off, Shield } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatMoney, formatDate } from "@/lib/format";
 import { statusLabel } from "./Staff";
 import StaffBranchesTab from "./StaffBranchesTab";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
+import { Can } from "@/components/Can";
 
 const DAYS = ["sun","mon","tue","wed","thu","fri","sat"] as const;
 
@@ -24,6 +30,9 @@ export default function StaffDetail() {
   const [attendance, setAttendance] = useState<any[]>([]);
   const [leaves, setLeaves] = useState<any[]>([]);
   const [payroll, setPayroll] = useState<any[]>([]);
+  const [userRoles, setUserRoles] = useState<string[]>([]);
+  const [confirmUnlink, setConfirmUnlink] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -42,8 +51,32 @@ export default function StaffDetail() {
       setLeaves(lv ?? []);
       const { data: pr } = await supabase.from("payroll").select("*").eq("staff_id", id).order("period_year", { ascending: false }).order("period_month", { ascending: false }).limit(24);
       setPayroll(pr ?? []);
+      const { data: rs } = await (supabase as any).from("user_roles").select("role").eq("user_id", id);
+      setUserRoles((rs ?? []).map((r: any) => r.role));
     })();
   }, [id]);
+
+  const unlinkUser = async () => {
+    if (!id) return;
+    setBusy(true);
+    const { data: me } = await supabase.auth.getUser();
+    const { error: sErr } = await (supabase as any).from("staff_profiles")
+      .update({ deleted_at: new Date().toISOString(), status: "terminated" }).eq("id", id);
+    if (sErr) { setBusy(false); toast.error(sErr.message); return; }
+    await (supabase as any).from("user_roles").delete().eq("user_id", id);
+    await (supabase as any).from("audit_logs").insert({
+      user_id: me.user?.id ?? null,
+      branch_id: staff?.branch_id ?? null,
+      action: "unlink",
+      entity_type: "user_employee_link",
+      entity_id: id,
+      old_values: { branch_id: staff?.branch_id ?? null, employee_id: staff?.employee_id ?? null, roles: userRoles },
+      new_values: null,
+    });
+    setBusy(false);
+    setConfirmUnlink(false);
+    toast.success(lang === "ar" ? "تم فك الربط" : "Unlinked");
+  };
 
   if (!staff) return <div className="p-10 text-center text-muted-foreground">…</div>;
 
@@ -60,6 +93,34 @@ export default function StaffDetail() {
         </div>
         <Badge variant="outline" className={staff.status === "active" ? "status-completed" : "status-departed"}>{statusLabel(staff.status, t)}</Badge>
       </Card>
+
+      {/* User access / linkage */}
+      <Card className="p-4 shadow-card flex items-center gap-3 flex-wrap">
+        <Shield className="size-4 text-muted-foreground" />
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold">
+            {lang === "ar" ? "وصول المستخدم" : "User access"}
+          </div>
+          <div className="text-xs text-muted-foreground flex gap-1 flex-wrap mt-1">
+            {userRoles.length > 0
+              ? userRoles.map((r) => <Badge key={r} variant="outline" className="capitalize">{r}</Badge>)
+              : (lang === "ar" ? "لا يوجد وصول — الموظف غير مربوط بحساب فعّال." : "No access — employee is not linked to an active user account.")}
+          </div>
+        </div>
+        <Can module="settings" action="edit">
+          <Button asChild variant="outline" size="sm">
+            <Link to="/settings/users">{lang === "ar" ? "إدارة الوصول" : "Manage access"}</Link>
+          </Button>
+          {userRoles.length > 0 && (
+            <Button variant="outline" size="sm" className="text-destructive"
+              onClick={() => setConfirmUnlink(true)}>
+              <Link2Off className="me-1 size-4" />
+              {lang === "ar" ? "فك ربط المستخدم" : "Unlink user"}
+            </Button>
+          )}
+        </Can>
+      </Card>
+
       <Tabs defaultValue="info">
         <TabsList className="flex flex-wrap h-auto">
           <TabsTrigger value="info">{t("position")}</TabsTrigger>
@@ -156,6 +217,26 @@ export default function StaffDetail() {
           {id && <StaffBranchesTab userId={id} />}
         </TabsContent>
       </Tabs>
+
+      <AlertDialog open={confirmUnlink} onOpenChange={(o) => !o && !busy && setConfirmUnlink(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{lang === "ar" ? "فك ربط المستخدم؟" : "Unlink user?"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {lang === "ar"
+                ? "سيتم إزالة كل الأدوار وأرشفة سجل الموظف. يظل حساب المستخدم موجوداً بلا صلاحيات."
+                : "All roles will be removed and the employee record archived. The user account remains but will have no access."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={unlinkUser} disabled={busy}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {busy ? "…" : (lang === "ar" ? "فك الربط" : "Unlink")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

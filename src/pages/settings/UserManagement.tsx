@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, UserPlus, Trash2, Copy, KeyRound, AlertTriangle, Lock } from "lucide-react";
+import { Search, UserPlus, Trash2, Copy, KeyRound, AlertTriangle, Lock, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useBranch } from "@/contexts/BranchContext";
 import { Link2, Link2Off } from "lucide-react";
@@ -29,7 +29,7 @@ type Role = typeof ROLES[number];
 type StaffLink = { branch_id: string | null; employee_id: string | null };
 
 async function logLinkAudit(
-  action: "link" | "unlink" | "replace",
+  action: "employee_linked" | "employee_unlinked" | "employee_replaced",
   userId: string,
   branchId: string | null,
   oldVals: Record<string, unknown> | null,
@@ -102,6 +102,89 @@ export default function UserManagement() {
   const [unlinkTarget, setUnlinkTarget] = useState<any | null>(null);
   const [unlinking, setUnlinking] = useState(false);
 
+  // Link / Replace picker state
+  const [linkTarget, setLinkTarget] = useState<any | null>(null); // user we're linking
+  const [linkMode, setLinkMode] = useState<"link" | "replace">("link");
+  const [pickerStaff, setPickerStaff] = useState<any[]>([]);
+  const [pickedStaffId, setPickedStaffId] = useState<string>("");
+  const [pickedRole, setPickedRole] = useState<Role>("staff");
+  const [linking, setLinking] = useState(false);
+
+  const openLinkPicker = async (u: any, mode: "link" | "replace") => {
+    setLinkTarget(u);
+    setLinkMode(mode);
+    setPickedStaffId("");
+    setPickedRole(((roles[u.id] ?? [])[0] as Role) ?? "staff");
+    if (!currentBranchId) { setPickerStaff([]); return; }
+    const { data: sps } = await (supabase as any)
+      .from("staff_profiles")
+      .select("id,employee_id,branch_id,linked_user_id,staff_positions(title_en,title_ar),profiles(email,full_name)")
+      .eq("branch_id", currentBranchId)
+      .is("deleted_at", null);
+    setPickerStaff(sps ?? []);
+  };
+
+  const confirmLink = async () => {
+    if (!linkTarget || !pickedStaffId) return;
+    const target = pickerStaff.find((s) => s.id === pickedStaffId);
+    if (!target) return;
+    if (target.linked_user_id) {
+      toast.error(lang === "ar" ? "هذا الموظف مربوط بالفعل" : "This employee is already linked");
+      return;
+    }
+    if (currentBranchId && target.branch_id && target.branch_id !== currentBranchId) {
+      toast.error(lang === "ar" ? "لا يمكن الربط عبر فرع مختلف" : "Cross-branch link is not allowed");
+      return;
+    }
+    setLinking(true);
+    try {
+      const prevStaffId = Object.entries(staffLinks).find(([, v]) => (v as any).linked_user_id === linkTarget.id)?.[0]
+        ?? (staffLinks[linkTarget.id]?.branch_id ? linkTarget.id : null);
+      // Replace: clear previous link atomically-ish
+      if (linkMode === "replace" && prevStaffId) {
+        const { error } = await (supabase as any).from("staff_profiles")
+          .update({ linked_user_id: null })
+          .eq("id", prevStaffId)
+          .eq("linked_user_id", linkTarget.id);
+        if (error) throw error;
+      }
+      // Guarded link: only succeeds if target is still unlinked
+      const { data: upd, error: upErr } = await (supabase as any).from("staff_profiles")
+        .update({ linked_user_id: linkTarget.id })
+        .eq("id", pickedStaffId)
+        .is("linked_user_id", null)
+        .select("id");
+      if (upErr) throw upErr;
+      if (!upd || upd.length === 0) {
+        // Rollback replace if we cleared previous
+        if (linkMode === "replace" && prevStaffId) {
+          await (supabase as any).from("staff_profiles")
+            .update({ linked_user_id: linkTarget.id })
+            .eq("id", prevStaffId);
+        }
+        throw new Error(lang === "ar" ? "الموظف مربوط بالفعل — أعد التحميل" : "Employee is already linked — refresh");
+      }
+      // Assign role
+      await (supabase as any).from("user_roles").delete().eq("user_id", linkTarget.id);
+      const { error: rErr } = await (supabase as any).from("user_roles")
+        .insert({ user_id: linkTarget.id, role: pickedRole });
+      if (rErr) throw rErr;
+      await logLinkAudit(
+        linkMode === "replace" ? "employee_replaced" : "employee_linked",
+        linkTarget.id, target.branch_id ?? currentBranchId,
+        { staff_id: prevStaffId, role: (roles[linkTarget.id] ?? [])[0] ?? null },
+        { staff_id: pickedStaffId, role: pickedRole, branch_id: target.branch_id ?? currentBranchId },
+      );
+      toast.success(lang === "ar" ? "تم الربط" : "Linked");
+      setLinkTarget(null);
+      load();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed");
+    } finally {
+      setLinking(false);
+    }
+  };
+
   const openEdit = (u: any) => {
     const current = (roles[u.id] ?? [])[0] as Role | undefined;
     setERole((current as Role) ?? "staff");
@@ -140,13 +223,13 @@ export default function UserManagement() {
       if (upErr) { setSavingEdit(false); toast.error(upErr.message); return; }
       const isLinkAction = !prev?.branch_id;
       await logLinkAudit(
-        isLinkAction ? "link" : (prev?.branch_id !== eBranch ? "replace" : "link"),
+        isLinkAction ? "employee_linked" : "employee_replaced",
         editTarget.id, eBranch,
         { role: prevRole, branch_id: prev?.branch_id ?? null },
         { role: eRole, branch_id: eBranch },
       );
     } else if (prevRole !== eRole) {
-      await logLinkAudit("replace", editTarget.id, prev?.branch_id ?? null,
+      await logLinkAudit("employee_replaced", editTarget.id, prev?.branch_id ?? null,
         { role: prevRole }, { role: eRole });
     }
     setSavingEdit(false);
@@ -159,13 +242,13 @@ export default function UserManagement() {
     if (!unlinkTarget) return;
     setUnlinking(true);
     const prev = staffLinks[unlinkTarget.id] ?? null;
-    // Soft-delete staff_profile and revoke roles (least-privilege).
+    // Clear the link only — keep the staff record for history.
     const { error: sErr } = await (supabase as any).from("staff_profiles")
-      .update({ deleted_at: new Date().toISOString(), status: "terminated" })
-      .eq("id", unlinkTarget.id);
+      .update({ linked_user_id: null })
+      .eq("linked_user_id", unlinkTarget.id);
     if (sErr) { setUnlinking(false); toast.error(sErr.message); return; }
     await (supabase as any).from("user_roles").delete().eq("user_id", unlinkTarget.id);
-    await logLinkAudit("unlink", unlinkTarget.id, prev?.branch_id ?? null,
+    await logLinkAudit("employee_unlinked", unlinkTarget.id, prev?.branch_id ?? null,
       { branch_id: prev?.branch_id ?? null, employee_id: prev?.employee_id ?? null }, null);
     setUnlinking(false);
     toast.success(lang === "ar" ? "تم فك الربط" : "Unlinked");
@@ -192,7 +275,7 @@ export default function UserManagement() {
       .order("name_en");
     const { data: sps } = await (supabase as any)
       .from("staff_profiles")
-      .select("id,branch_id,employee_id,deleted_at");
+      .select("id,branch_id,employee_id,deleted_at,linked_user_id");
     setUsers(ps ?? []);
     const m: Record<string, string[]> = {};
     (rs ?? []).forEach((r: any) => { (m[r.user_id] = m[r.user_id] || []).push(r.role); });
@@ -202,7 +285,10 @@ export default function UserManagement() {
     const sb: Record<string, StaffLink> = {};
     (sps ?? []).forEach((s: any) => {
       if (s.deleted_at) return; // treat soft-deleted as unlinked
-      sb[s.id] = { branch_id: s.branch_id ?? null, employee_id: s.employee_id ?? null };
+      // Key by the user this staff row is linked to (falls back to id for
+      // legacy rows). This lets us render "linked" state on the user row.
+      const key = s.linked_user_id ?? s.id;
+      sb[key] = { branch_id: s.branch_id ?? null, employee_id: s.employee_id ?? null } as StaffLink;
     });
     setStaffLinks(sb);
   };
@@ -447,22 +533,32 @@ export default function UserManagement() {
                   size="sm"
                   variant="outline"
                   className="text-primary"
-                  title={lang === "ar" ? "ربط بسجل موظف (اختر فرعاً ودوراً)" : "Link to employee record (pick branch + role)"}
-                  onClick={() => openEdit(u)}
+                  title={lang === "ar" ? "ربط بموظف من دليل الموظفين" : "Link to an employee from the staff directory"}
+                  onClick={() => openLinkPicker(u, "link")}
                 >
                   <Link2 className="me-1 size-4" />
                   {lang === "ar" ? "ربط" : "Link"}
                 </Button>
               )}
               {staffLinks[u.id]?.branch_id && currentUserId !== u.id && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  title={lang === "ar" ? "فك الربط بسجل الموظف" : "Unlink from employee record"}
-                  onClick={() => setUnlinkTarget(u)}
-                >
-                  <Link2Off className="size-4" />
-                </Button>
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    title={lang === "ar" ? "استبدال الموظف المربوط" : "Replace linked employee"}
+                    onClick={() => openLinkPicker(u, "replace")}
+                  >
+                    <Users className="size-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    title={lang === "ar" ? "فك الربط بسجل الموظف" : "Unlink from employee record"}
+                    onClick={() => setUnlinkTarget(u)}
+                  >
+                    <Link2Off className="size-4" />
+                  </Button>
+                </>
               )}
               <Button
                 size="sm"
@@ -882,6 +978,109 @@ export default function UserManagement() {
         </Dialog>
 
         {/* Reset result dialog */}
+        {/* Link picker dialog */}
+        <Dialog open={!!linkTarget} onOpenChange={(o) => !o && !linking && setLinkTarget(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {linkMode === "replace"
+                  ? (lang === "ar" ? "استبدال الموظف المربوط" : "Replace linked employee")
+                  : (lang === "ar" ? "ربط بموظف من الدليل" : "Link to an employee")}
+              </DialogTitle>
+              <DialogDescription>
+                {linkTarget?.full_name ?? linkTarget?.email}
+                {" — "}
+                {lang === "ar"
+                  ? "الموظفون المعروضون من الفرع الحالي فقط."
+                  : "Only employees from the current branch are shown."}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="max-h-72 overflow-auto rounded border divide-y">
+                {pickerStaff.length === 0 && (
+                  <div className="p-6 text-center text-sm text-muted-foreground">
+                    {lang === "ar"
+                      ? "لا يوجد موظفون في هذا الفرع."
+                      : "No employees in this branch."}
+                  </div>
+                )}
+                {pickerStaff.map((s) => {
+                  const linkedElsewhere = !!s.linked_user_id && s.linked_user_id !== linkTarget?.id;
+                  const isSelf = s.linked_user_id === linkTarget?.id;
+                  const disabled = linkedElsewhere || isSelf;
+                  const selected = pickedStaffId === s.id;
+                  return (
+                    <button
+                      type="button"
+                      key={s.id}
+                      disabled={disabled}
+                      onClick={() => !disabled && setPickedStaffId(s.id)}
+                      className={`w-full text-start p-3 text-sm flex items-center gap-3 ${
+                        disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-muted"
+                      } ${selected ? "bg-primary/10" : ""}`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">
+                          {s.profiles?.full_name ?? s.profiles?.email ?? s.employee_id}
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {s.employee_id}
+                          {s.staff_positions ? ` · ${lang === "ar" ? s.staff_positions.title_ar : s.staff_positions.title_en}` : ""}
+                        </div>
+                      </div>
+                      {linkedElsewhere && (
+                        <Badge variant="secondary">
+                          {lang === "ar" ? "غير متاح — مربوط" : "Unavailable — already linked"}
+                        </Badge>
+                      )}
+                      {isSelf && (
+                        <Badge variant="outline">
+                          {lang === "ar" ? "الحالي" : "Current"}
+                        </Badge>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {pickerStaff.every((s) => s.linked_user_id && s.linked_user_id !== linkTarget?.id) && pickerStaff.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {lang === "ar"
+                    ? "كل الموظفين في هذا الفرع مربوطون بالفعل. أنشئ موظفاً جديداً من دليل الموظفين."
+                    : "All employees in this branch are already linked. Create a new employee in the staff directory."}
+                </p>
+              )}
+              <div className="space-y-2">
+                <Label>{lang === "ar" ? "الدور" : "Role"}</Label>
+                <Select value={pickedRole} onValueChange={(v) => setPickedRole(v as Role)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {ROLES.map((r) => (
+                      <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setLinkTarget(null)} disabled={linking}>
+                {t("cancel")}
+              </Button>
+              <Button
+                type="button"
+                onClick={confirmLink}
+                disabled={linking || !pickedStaffId}
+                className="gradient-primary text-primary-foreground"
+              >
+                {linking
+                  ? (lang === "ar" ? "جارٍ..." : "Working...")
+                  : (linkMode === "replace"
+                      ? (lang === "ar" ? "استبدال" : "Replace")
+                      : (lang === "ar" ? "ربط" : "Link"))}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <Dialog open={!!resetInfo} onOpenChange={(o) => !o && setResetInfo(null)}>
           <DialogContent>
             <DialogHeader>

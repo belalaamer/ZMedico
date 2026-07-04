@@ -1,123 +1,59 @@
-# Queue / Front Desk Workflow — Phase 1
 
-## Current state
+## Goal
+Support real "unlinked employees" (staff records with no user account) and a proper Link picker on both User and Employee pages, while preserving the current 1:1 model as a strict uniqueness rule (not a shared PK).
 
-- No dedicated Queue page exists. Day-to-day appointment work happens in `src/pages/calendar/CalendarPage.tsx`.
-- `appointments.status` already has the right enum: `scheduled`, `confirmed`, `in_progress`, `completed`, `cancelled`, `no_show`, `departed`. We will **reuse it**, no enum change.
-- `appointments` has `scheduled_at`, `duration_minutes`, `doctor_id`, `branch_id`, `room`, but **no `checked_in_at`, no `started_at`, no priority**.
-- Accurate "waiting time since check-in" and "in-session time since start" cannot be derived from existing columns (`updated_at` changes on any edit and is not reliable). The user said schema changes are allowed only if absolutely necessary — they are necessary here, but the change is minimal and additive.
+## Schema change (single migration)
 
-## Proposed scope
+1. `ALTER TABLE public.staff_profiles ADD COLUMN linked_user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL;`
+2. Backfill: `UPDATE staff_profiles SET linked_user_id = id WHERE linked_user_id IS NULL AND EXISTS (SELECT 1 FROM auth.users u WHERE u.id = staff_profiles.id);`
+3. `CREATE UNIQUE INDEX ux_staff_profiles_linked_user ON public.staff_profiles(linked_user_id) WHERE linked_user_id IS NOT NULL AND deleted_at IS NULL;` — enforces one-to-one.
+4. Keep `staff_profiles.id` as PK (unchanged). Existing rows keep id == user id; new unlinked employees get a fresh `gen_random_uuid()`.
+5. RLS: adjust the "user reads own staff_profile" policy to match on `linked_user_id = auth.uid()` in addition to `id = auth.uid()` (back-compat).
 
-### 1) Minimal additive schema (one migration)
+## Access gating
+Update `usePermissions` / role resolution so a user with **no active `staff_profiles` row where `linked_user_id = auth.uid()` AND `deleted_at IS NULL` AND `status = 'active'`** gets zero permissions and sees no modules. Roles in `user_roles` alone are not enough — the link must exist.
 
-Add to `public.appointments`:
-- `checked_in_at timestamptz NULL`
-- `started_at timestamptz NULL`
-- `priority smallint NOT NULL DEFAULT 0` (`0` normal, `1` urgent)
+## Link picker (User page & StaffDetail page)
+- Query: `staff_profiles` where `deleted_at IS NULL` AND `linked_user_id IS NULL` AND `branch_id = <current branch>`.
+- Also fetch already-linked ones in the same branch to display as **"غير متاح — مرتبط"** / "Unavailable — already linked" (disabled row).
+- Empty state EN/AR when no rows.
+- On confirm: `UPDATE staff_profiles SET linked_user_id = <target user id> WHERE id = <picked staff id> AND linked_user_id IS NULL` (guard against race). If the target user already has a link → block with error.
+- Write `audit_logs` row: action `employee_linked`, entity_type `user_employee_link`, old/new values with user_id, staff_id, branch_id, role.
 
-No enum change, no RLS change, no rename, no drop. Existing rows unaffected (NULL / 0 defaults).
+## Unlink
+- `UPDATE staff_profiles SET linked_user_id = NULL WHERE linked_user_id = <user id>`.
+- Delete user's rows in `user_roles` (revokes access immediately).
+- Audit: `employee_unlinked`.
 
-Status → timestamp mapping handled in the app layer:
-- transition to `confirmed` ("Checked in") → stamp `checked_in_at = now()` if NULL
-- transition to `in_progress` ("With doctor") → stamp `started_at = now()` if NULL
-- backward transitions never clear stamps
+## Replace
+- Single transactional RPC or sequential guarded updates: unlink current staff row, link the new one, keep `user_roles` intact (or update role if picker specifies).
+- On any failure, rollback (RPC preferred). Audit: `employee_replaced` with both old and new staff ids.
 
-### 2) New page: `/queue` (Front Desk)
+## User page (`UserManagement.tsx`)
+- Restore Link button → opens the branch-scoped employee picker (not Edit).
+- Show "Linked to: <employee name / code>" badge with jump-to-employee link.
+- Add Replace action next to Unlink when already linked.
+- Admin/HR gated.
 
-File: `src/pages/queue/Queue.tsx`, route added in `src/App.tsx`, sidebar link in `src/components/layout/Sidebar.tsx` (Arabic: "الطابور" / English: "Queue").
+## Employee page (`StaffDetail.tsx`)
+- If `linked_user_id IS NULL`: show "Not linked" state with **Link to user** button (picker of users without a link).
+- If linked: show linked user with **Unlink** and **Replace** actions and a jump-to-user link.
+- Mirror the same audit writes.
 
-**Status mapping (no new enum):**
+## Cross-branch guard
+Both link and replace refuse when picked staff's `branch_id` ≠ user's current active branch context; return a clear EN/AR error toast.
 
-| UI label    | DB status      |
-|-------------|----------------|
-| Waiting     | `scheduled`    |
-| Checked in  | `confirmed`    |
-| With doctor | `in_progress`  |
-| Completed   | `completed`    |
-| Cancelled   | `cancelled`    |
-| No-show     | `no_show`      |
+## Files to touch
+- migration (new)
+- `src/hooks/usePermissions.ts` (gate on link existence)
+- `src/hooks/useUserRole.ts` (optional: expose link status) OR a new `useEmployeeLink` hook
+- `src/pages/settings/UserManagement.tsx` (picker + link/unlink/replace)
+- `src/pages/hr/StaffDetail.tsx` (mirror actions + linked-user badge)
+- `src/pages/hr/Staff.tsx` (show unlinked badge in list — small)
+- Types regenerate automatically after migration.
 
-`departed` is treated as "Completed" for queue purposes (filtered out of the active queue by default).
+## Out of scope
+- No changes to how staff/schedule/attendance/payroll join on `staff_profiles.id` (existing rows keep id == user id, new unlinked staff have no dependent rows yet, so nothing breaks).
+- No redesign of `user_roles`.
 
-**Default scope:** today's appointments for `currentBranchId`, active statuses (`scheduled`, `confirmed`, `in_progress`) shown by default; `completed`, `cancelled`, `no_show` available via status filter.
-
-**Columns (desktop table) / fields (mobile card):**
-- Patient (name + code, click → `/patients/:id`)
-- Appointment time (`scheduled_at`)
-- Check-in time (`checked_in_at` or `—`)
-- Doctor + room
-- Status badge (semantic colors already in `index.css` via `status-*` classes)
-- Priority badge if `priority = 1`
-- Waiting time (live, see §3)
-- In-session time (live, see §3)
-- Row actions (see §4)
-
-**Filters (sticky header):**
-- Status (multi or single select)
-- Doctor (reuse existing doctor list pattern from CalendarPage)
-- Priority (all / urgent only)
-- Default sort: `checked_in_at` ascending, then `scheduled_at` ascending; urgent items pinned to top within their group.
-
-**Empty / overload states:**
-- Empty: "لا يوجد مرضى في الطابور" / "No patients in the queue".
-- Overload hint: small inline banner above the list when ≥1 waiting > 30 min: "X مرضى ينتظرون أكثر من 30 دقيقة" / "X patients waiting > 30 min".
-
-### 3) Time computations (client-side, 30 s tick)
-
-- `waitingMs = now − checked_in_at` while status ∈ {`confirmed`}
-- `inSessionMs = now − started_at` while status = `in_progress`
-- Long-wait highlight: subtle amber row tint when `waitingMs > 30 min`.
-- A single `useEffect` interval (30 s) drives a `tick` state so all rows re-render without per-row timers.
-
-### 4) Row actions (uses existing `RowActions` component)
-
-Available actions depend on current status:
-
-| From         | Actions shown                                        |
-|--------------|------------------------------------------------------|
-| scheduled    | Check in · Start visit · Mark no-show · Cancel · Open patient · Toggle urgent |
-| confirmed    | Start visit · Cancel · Mark no-show · Open patient · Toggle urgent           |
-| in_progress  | Complete · Open patient · Toggle urgent                                       |
-| completed    | Open patient                                                                  |
-| cancelled / no_show | Open patient · Reopen (→ `scheduled`)                                 |
-
-All actions are single Supabase updates on `appointments`; "Check in" and "Start visit" also stamp the corresponding timestamp when null. Toasts use existing `sonner` pattern.
-
-### 5) Realtime + sync
-
-Subscribe to `appointments` `postgres_changes` for the current branch (same pattern as `Sidebar.tsx`'s alerts channel, with a unique channel name per mount: `queue-${random}`) to keep the list live across reception devices. Listeners attached **before** `.subscribe()`.
-
-### 6) i18n
-
-Add the small set of new keys to `src/lib/i18n.ts` (`queue`, `waitingTime`, `inSessionTime`, `checkIn`, `startVisit`, `markNoShow`, `cancelVisit`, `togglePriority`, `urgent`, `noPatientsInQueue`, `longWaitBanner`). All other labels reuse existing status keys already present in `CalendarPage`.
-
-### 7) Constraints respected
-
-- `CalendarPage.tsx` is **not modified** in Phase 1 — appointments flow untouched.
-- No RLS, no policy, no enum, no rename.
-- Desktop-first table, collapses to stacked cards on `sm:` and below.
-- Uses existing design tokens (`status-*`, `bg-card`, `text-muted-foreground`, etc.) — no hard-coded colors.
-
-## Files
-
-**New**
-- `src/pages/queue/Queue.tsx` — page
-- `supabase/migrations/<ts>_queue_workflow.sql` — adds 3 columns
-
-**Edited**
-- `src/App.tsx` — `/queue` route under `ProtectedRoute` + `PermissionRoute` (reusing `appointments` permission key)
-- `src/components/layout/Sidebar.tsx` — nav entry
-- `src/lib/i18n.ts` — new keys (EN + AR)
-
-## Out of scope (Phase 2)
-
-- Linking queue row to "Start consultation" screen / medical record editor.
-- Auto-creating queue entries for walk-ins without an appointment.
-- Per-doctor waiting analytics / dashboard widgets.
-- Push/SMS notifications when patient is called.
-
-## Deliverables on completion
-
-- Working `/queue` screen with all six statuses, fast row actions, live waiting/in-session timers, sticky filters, mobile cards, empty + overload states.
-- Implementation note: status mapping table, timer formula, the 3 added columns and why they were necessary.
+Approve to proceed and I'll ship the migration first, then the code changes after types regenerate.

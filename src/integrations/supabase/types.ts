@@ -4609,6 +4609,7 @@ export type Database = {
           employee_id: string
           hire_date: string
           id: string
+          linked_user_id: string | null
           national_id: string | null
           position_id: string | null
           profile_image_url: string | null
@@ -4639,6 +4640,7 @@ export type Database = {
           employee_id: string
           hire_date?: string
           id: string
+          linked_user_id?: string | null
           national_id?: string | null
           position_id?: string | null
           profile_image_url?: string | null
@@ -4669,6 +4671,7 @@ export type Database = {
           employee_id?: string
           hire_date?: string
           id?: string
+          linked_user_id?: string | null
           national_id?: string | null
           position_id?: string | null
           profile_image_url?: string | null

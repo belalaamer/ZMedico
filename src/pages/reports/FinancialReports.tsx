@@ -76,7 +76,7 @@ function RevenueTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
 
   return (
     <div className="space-y-4 mt-4">
-      <ReportFilterBar start={start} end={end} setStart={setStart} setEnd={setEnd}
+      <ReportFilterBar module="reports_finance" start={start} end={end} setStart={setStart} setEnd={setEnd}
         onPdf={() => exportReportPDF({ title: t("revenueReport"), subtitle: `${start} → ${end}`, columns: cols, rows: exportRows, summary, lang })}
         onExcel={() => exportReportExcel({ title: t("revenueReport"), columns: cols, rows: exportRows, summary })} />
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -176,7 +176,7 @@ function CollectionTab({ start, end, setStart, setEnd, branchId, lang, t }: any)
 
   return (
     <div className="space-y-4 mt-4">
-      <ReportFilterBar start={start} end={end} setStart={setStart} setEnd={setEnd}
+      <ReportFilterBar module="reports_finance" start={start} end={end} setStart={setStart} setEnd={setEnd}
         onPdf={() => exportReportPDF({ title: t("collectionReport"), subtitle: `${start} → ${end}`, columns: customerCols, rows: customerRows, summary: [{ label: t("totalCollected"), value: formatMoney(total, lang) }], lang })}
         onExcel={() => exportReportExcel({ title: t("collectionReport"), columns: customerCols, rows: customerRows, summary: [{ label: t("totalCollected"), value: formatMoney(total, lang) }] })} />
       <StatCard label={t("totalCollected")} value={formatMoney(total, lang)} />
@@ -306,7 +306,7 @@ function ExpenseTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
 
   return (
     <div className="space-y-4 mt-4">
-      <ReportFilterBar start={start} end={end} setStart={setStart} setEnd={setEnd}
+      <ReportFilterBar module="reports_finance" start={start} end={end} setStart={setStart} setEnd={setEnd}
         onPdf={() => exportReportPDF({ title: t("expenseReport"), subtitle: `${start} → ${end}`, columns: cols, rows: expRows, summary: [{ label: t("totalExpenses"), value: formatMoney(total, lang) }], lang })}
         onExcel={() => exportReportExcel({ title: t("expenseReport"), columns: cols, rows: expRows })} />
       <StatCard label={t("totalExpenses")} value={formatMoney(total, lang)} />
@@ -373,7 +373,7 @@ function PLTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
 
   return (
     <div className="space-y-4 mt-4">
-      <ReportFilterBar start={start} end={end} setStart={setStart} setEnd={setEnd}
+      <ReportFilterBar module="reports_finance" start={start} end={end} setStart={setStart} setEnd={setEnd}
         onPdf={() => exportReportPDF({ title: t("profitLoss"), subtitle: `${start} → ${end}`, columns: cols, rows: expRows, lang })}
         onExcel={() => exportReportExcel({ title: t("profitLoss"), columns: cols, rows: expRows })} />
       <Card><CardContent className="pt-6">

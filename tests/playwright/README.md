@@ -43,3 +43,41 @@ BASE_URL=https://<preview-host> ADMIN_EMAIL=... ADMIN_PASS=... \
    `<role>.setup.ts` file that reads role-specific env vars.
 3. Add a per-role authenticated project that depends on that setup
    and uses the corresponding `storageState`.
+
+## Mobile smoke suite
+
+File: `mobile.smoke.spec.ts`. Runs against the four required mobile
+viewports as separate Playwright projects so a failure tells you *which*
+size broke:
+
+- `mobile-smoke:iphone-se` (375×667)
+- `mobile-smoke:iphone-14` (390×844)
+- `mobile-smoke:pixel` (360×800)
+- `mobile-smoke:ipad-mini` (768×1024)
+
+Each project reuses the seeded Admin `storageState`, so the same
+`ADMIN_EMAIL` / `ADMIN_PASS` env vars are required — `setup:admin` runs
+automatically as a dependency.
+
+Per route the spec asserts:
+
+1. `documentElement.scrollWidth <= clientWidth` — no horizontal overflow.
+2. `html[dir=rtl][lang^=ar]` — Arabic RTL stays intact.
+3. Zero uncaught page errors during load.
+4. Bottom tab bar (phone widths only) does not overlap any card on `/`.
+5. Each critical area (`/patients`, `/calendar`, `/invoices`,
+   `/payments`, `/treasury`, `/medical/quick-consult`, `/medical/records`,
+   `/physio`, `/inventory/products`, `/hr/staff`, `/settings`) exposes a
+   visible primary CTA with a tappable height (≥32 px). No mutations.
+
+### Run
+
+```bash
+# All four viewports:
+BASE_URL=https://<preview-host> ADMIN_EMAIL=... ADMIN_PASS=... \
+  npx playwright test mobile.smoke.spec.ts
+
+# One viewport:
+BASE_URL=https://<preview-host> ADMIN_EMAIL=... ADMIN_PASS=... \
+  npx playwright test --project=mobile-smoke:iphone-14
+```

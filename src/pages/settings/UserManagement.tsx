@@ -242,10 +242,10 @@ export default function UserManagement() {
     if (!unlinkTarget) return;
     setUnlinking(true);
     const prev = staffLinks[unlinkTarget.id] ?? null;
-    // Soft-delete staff_profile and revoke roles (least-privilege).
+    // Clear the link only — keep the staff record for history.
     const { error: sErr } = await (supabase as any).from("staff_profiles")
-      .update({ deleted_at: new Date().toISOString(), status: "terminated" })
-      .eq("id", unlinkTarget.id);
+      .update({ linked_user_id: null })
+      .eq("linked_user_id", unlinkTarget.id);
     if (sErr) { setUnlinking(false); toast.error(sErr.message); return; }
     await (supabase as any).from("user_roles").delete().eq("user_id", unlinkTarget.id);
     await logLinkAudit("employee_unlinked", unlinkTarget.id, prev?.branch_id ?? null,

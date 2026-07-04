@@ -333,6 +333,39 @@ export default function Branches() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            <div className="rounded-md border p-2 text-xs flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="inline-flex items-center gap-1 text-muted-foreground">
+                <CalendarDays className="size-3.5" />
+                {lang === "ar" ? "أيام العمل" : "Working days"}:
+              </span>
+              <span className="font-medium">{formatWorkingDays(currentBranch.working_days, lang)}</span>
+              <span className="inline-flex items-center gap-1 text-muted-foreground ms-2">
+                <Clock className="size-3.5" />
+                {lang === "ar" ? "الدوام" : "Hours"}:
+              </span>
+              <span className="font-medium">
+                {currentBranch.working_hours_start && currentBranch.working_hours_end
+                  ? `${fmtTime(currentBranch.working_hours_start)}–${fmtTime(currentBranch.working_hours_end)}`
+                  : "—"}
+              </span>
+              <div className="flex flex-wrap gap-1 ms-auto">
+                {ALL_DAYS.map((d) => {
+                  const active = normalizeDays(currentBranch.working_days).includes(d);
+                  return (
+                    <span
+                      key={d}
+                      className={`px-1.5 py-0.5 rounded text-[10px] border ${
+                        active
+                          ? "bg-primary/10 text-primary border-primary/30"
+                          : "bg-muted text-muted-foreground/60 border-transparent line-through"
+                      }`}
+                    >
+                      {dayShort(d, lang)}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
               <div className="rounded-md border p-2 flex items-center gap-2">
                 <Clock className="size-3.5 text-muted-foreground" />

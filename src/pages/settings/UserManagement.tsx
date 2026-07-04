@@ -487,16 +487,52 @@ export default function UserManagement() {
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={createUser} className="space-y-4">
+              <div className="space-y-2 rounded-md border p-3 bg-muted/30">
+                <Label>
+                  {lang === "ar" ? "ربط بموظف موجود (اختياري)" : "Link to existing employee (optional)"}
+                </Label>
+                <Select value={cLinkedStaffId || "none"} onValueChange={onPickLinkedStaff}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={lang === "ar" ? "اختر موظفاً من هذا الفرع" : "Pick an employee from this branch"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— {lang === "ar" ? "بدون ربط" : "No link"} —</SelectItem>
+                    {linkableStaff.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {(s.profiles?.full_name ?? s.profiles?.email ?? s.employee_id)}
+                        {s.staff_positions ? ` — ${lang === "ar" ? s.staff_positions.title_ar : s.staff_positions.title_en}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                  <span>
+                    {linkableStaff.length === 0
+                      ? (lang === "ar" ? "لا يوجد موظفون غير مربوطين في هذا الفرع." : "No unlinked employees in this branch.")
+                      : (lang === "ar" ? "سيتم الاقتراح التلقائي للدور بناءً على المسمى الوظيفي." : "Role will be suggested from the employee's position.")}
+                  </span>
+                  <Link to="/hr/staff" className="underline text-primary">
+                    {lang === "ar" ? "إنشاء موظف" : "Create employee"}
+                  </Link>
+                </div>
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="cEmail">{lang === "ar" ? "البريد الإلكتروني" : "Email"}</Label>
-                <Input id="cEmail" type="email" required value={cEmail} onChange={(e) => setCEmail(e.target.value)} />
+                <Input id="cEmail" type="email" required value={cEmail} onChange={(e) => setCEmail(e.target.value)} readOnly={!!cLinkedStaffId && cLinkedStaffId !== "none"} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="cName">{lang === "ar" ? "الاسم الكامل" : "Full name"}</Label>
-                <Input id="cName" value={cName} onChange={(e) => setCName(e.target.value)} />
+                <Input id="cName" value={cName} onChange={(e) => setCName(e.target.value)} readOnly={!!cLinkedStaffId && cLinkedStaffId !== "none"} />
               </div>
               <div className="space-y-2">
-                <Label>{lang === "ar" ? "الدور" : "Role"}</Label>
+                <Label>
+                  {lang === "ar" ? "الدور" : "Role"}
+                  {cLinkedStaffId && cLinkedStaffId !== "none" && (
+                    <span className="ms-2 text-xs text-muted-foreground">
+                      {lang === "ar" ? "(مقترح — يمكن تغييره)" : "(suggested — you can change it)"}
+                    </span>
+                  )}
+                </Label>
                 <Select value={cRole} onValueChange={(v) => setCRole(v as Role)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -523,6 +559,7 @@ export default function UserManagement() {
                   </Select>
                 </div>
               )}
+              {(!cLinkedStaffId || cLinkedStaffId === "none") && (
               <div className="space-y-2">
                 <Label htmlFor="cPassword">
                   {lang === "ar" ? "كلمة مرور (اختياري)" : "Password (optional)"}
@@ -535,6 +572,7 @@ export default function UserManagement() {
                   onChange={(e) => setCPassword(e.target.value)}
                 />
               </div>
+              )}
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>{t("cancel")}</Button>
                 <Button type="submit" disabled={creating} className="gradient-primary text-primary-foreground">

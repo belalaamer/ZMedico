@@ -978,6 +978,109 @@ export default function UserManagement() {
         </Dialog>
 
         {/* Reset result dialog */}
+        {/* Link picker dialog */}
+        <Dialog open={!!linkTarget} onOpenChange={(o) => !o && !linking && setLinkTarget(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {linkMode === "replace"
+                  ? (lang === "ar" ? "استبدال الموظف المربوط" : "Replace linked employee")
+                  : (lang === "ar" ? "ربط بموظف من الدليل" : "Link to an employee")}
+              </DialogTitle>
+              <DialogDescription>
+                {linkTarget?.full_name ?? linkTarget?.email}
+                {" — "}
+                {lang === "ar"
+                  ? "الموظفون المعروضون من الفرع الحالي فقط."
+                  : "Only employees from the current branch are shown."}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="max-h-72 overflow-auto rounded border divide-y">
+                {pickerStaff.length === 0 && (
+                  <div className="p-6 text-center text-sm text-muted-foreground">
+                    {lang === "ar"
+                      ? "لا يوجد موظفون في هذا الفرع."
+                      : "No employees in this branch."}
+                  </div>
+                )}
+                {pickerStaff.map((s) => {
+                  const linkedElsewhere = !!s.linked_user_id && s.linked_user_id !== linkTarget?.id;
+                  const isSelf = s.linked_user_id === linkTarget?.id;
+                  const disabled = linkedElsewhere || isSelf;
+                  const selected = pickedStaffId === s.id;
+                  return (
+                    <button
+                      type="button"
+                      key={s.id}
+                      disabled={disabled}
+                      onClick={() => !disabled && setPickedStaffId(s.id)}
+                      className={`w-full text-start p-3 text-sm flex items-center gap-3 ${
+                        disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-muted"
+                      } ${selected ? "bg-primary/10" : ""}`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">
+                          {s.profiles?.full_name ?? s.profiles?.email ?? s.employee_id}
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {s.employee_id}
+                          {s.staff_positions ? ` · ${lang === "ar" ? s.staff_positions.title_ar : s.staff_positions.title_en}` : ""}
+                        </div>
+                      </div>
+                      {linkedElsewhere && (
+                        <Badge variant="secondary">
+                          {lang === "ar" ? "غير متاح — مربوط" : "Unavailable — already linked"}
+                        </Badge>
+                      )}
+                      {isSelf && (
+                        <Badge variant="outline">
+                          {lang === "ar" ? "الحالي" : "Current"}
+                        </Badge>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {pickerStaff.every((s) => s.linked_user_id && s.linked_user_id !== linkTarget?.id) && pickerStaff.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {lang === "ar"
+                    ? "كل الموظفين في هذا الفرع مربوطون بالفعل. أنشئ موظفاً جديداً من دليل الموظفين."
+                    : "All employees in this branch are already linked. Create a new employee in the staff directory."}
+                </p>
+              )}
+              <div className="space-y-2">
+                <Label>{lang === "ar" ? "الدور" : "Role"}</Label>
+                <Select value={pickedRole} onValueChange={(v) => setPickedRole(v as Role)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {ROLES.map((r) => (
+                      <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setLinkTarget(null)} disabled={linking}>
+                {t("cancel")}
+              </Button>
+              <Button
+                type="button"
+                onClick={confirmLink}
+                disabled={linking || !pickedStaffId}
+                className="gradient-primary text-primary-foreground"
+              >
+                {linking
+                  ? (lang === "ar" ? "جارٍ..." : "Working...")
+                  : (linkMode === "replace"
+                      ? (lang === "ar" ? "استبدال" : "Replace")
+                      : (lang === "ar" ? "ربط" : "Link"))}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <Dialog open={!!resetInfo} onOpenChange={(o) => !o && setResetInfo(null)}>
           <DialogContent>
             <DialogHeader>

@@ -3,11 +3,32 @@ import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
 import { defaultActionsFor, MODULES } from "@/lib/rolePermissions";
 import { withTimeout } from "@/lib/withTimeout";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function usePermissions() {
   const { roles, isAdmin, loading: rolesLoading } = useUserRole();
+  const { user } = useAuth();
   const [perms, setPerms] = useState<Record<string, Set<string>>>({});
   const [loading, setLoading] = useState(true);
+  const [linked, setLinked] = useState<boolean | null>(null);
+
+  // Access gate: a user must be linked to an active staff_profile to have
+  // module access. Admins bypass to prevent bootstrap lockout.
+  useEffect(() => {
+    let active = true;
+    if (!user) { setLinked(null); return; }
+    (supabase as any)
+      .from("staff_profiles")
+      .select("id")
+      .eq("linked_user_id", user.id)
+      .is("deleted_at", null)
+      .neq("status", "terminated")
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }: any) => { if (active) setLinked(!!data); })
+      .catch(() => { if (active) setLinked(false); });
+    return () => { active = false; };
+  }, [user?.id]);
 
   useEffect(() => {
     let active = true;
@@ -76,8 +97,9 @@ export function usePermissions() {
 
   const can = (module: string, action: string = "view") => {
     if (isAdmin) return true;
+    if (linked === false) return false;
     return perms[module]?.has(action) ?? false;
   };
 
-  return { can, isAdmin, loading: rolesLoading || loading };
+  return { can, isAdmin, loading: rolesLoading || loading || (!isAdmin && linked === null && !!user) };
 }

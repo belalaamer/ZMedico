@@ -65,8 +65,10 @@ export function Combobox({
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="p-0 w-[--radix-popover-trigger-width] max-w-[calc(100vw-2rem)] z-50"
+        className="p-0 w-[--radix-popover-trigger-width] min-w-[220px] max-w-[calc(100vw-1rem)] z-50 shadow-lg"
         align="start"
+        sideOffset={6}
+        collisionPadding={{ top: 8, left: 8, right: 8, bottom: 88 }}
       >
         <Command
           // Disable cmdk's pointer-move auto-highlight so scroll drags on

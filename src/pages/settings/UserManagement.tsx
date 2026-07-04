@@ -275,7 +275,7 @@ export default function UserManagement() {
       .order("name_en");
     const { data: sps } = await (supabase as any)
       .from("staff_profiles")
-      .select("id,branch_id,employee_id,deleted_at");
+      .select("id,branch_id,employee_id,deleted_at,linked_user_id");
     setUsers(ps ?? []);
     const m: Record<string, string[]> = {};
     (rs ?? []).forEach((r: any) => { (m[r.user_id] = m[r.user_id] || []).push(r.role); });
@@ -285,7 +285,10 @@ export default function UserManagement() {
     const sb: Record<string, StaffLink> = {};
     (sps ?? []).forEach((s: any) => {
       if (s.deleted_at) return; // treat soft-deleted as unlinked
-      sb[s.id] = { branch_id: s.branch_id ?? null, employee_id: s.employee_id ?? null };
+      // Key by the user this staff row is linked to (falls back to id for
+      // legacy rows). This lets us render "linked" state on the user row.
+      const key = s.linked_user_id ?? s.id;
+      sb[key] = { branch_id: s.branch_id ?? null, employee_id: s.employee_id ?? null } as StaffLink;
     });
     setStaffLinks(sb);
   };

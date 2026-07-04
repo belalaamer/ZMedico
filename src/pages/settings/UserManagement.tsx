@@ -101,80 +101,6 @@ export default function UserManagement() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [unlinkTarget, setUnlinkTarget] = useState<any | null>(null);
   const [unlinking, setUnlinking] = useState(false);
-  // Post-creation "link to existing employee" dialog
-  const [linkTarget, setLinkTarget] = useState<any | null>(null);
-  const [linkStaffId, setLinkStaffId] = useState<string>("");
-  const [linking, setLinking] = useState(false);
-
-  const openLink = (u: any) => {
-    setLinkStaffId("");
-    setLinkTarget(u);
-  };
-
-  const linkExistingEmployee = async () => {
-    if (!linkTarget || !linkStaffId) return;
-    const src = linkableStaff.find((s) => s.id === linkStaffId);
-    if (!src) { toast.error(lang === "ar" ? "الموظف غير موجود" : "Employee not found"); return; }
-    if (src.id === linkTarget.id) { toast.error(lang === "ar" ? "نفس الحساب" : "Same account"); return; }
-    setLinking(true);
-    // Fetch full source row so we can copy employment fields onto the target user.
-    const { data: full, error: fErr } = await (supabase as any)
-      .from("staff_profiles").select("*").eq("id", src.id).maybeSingle();
-    if (fErr || !full) { setLinking(false); toast.error(fErr?.message ?? "Not found"); return; }
-    const payload: any = {
-      id: linkTarget.id,
-      employee_id: full.employee_id,
-      position_id: full.position_id,
-      department_id: full.department_id,
-      branch_id: full.branch_id,
-      hire_date: full.hire_date,
-      contract_type: full.contract_type,
-      contract_end_date: full.contract_end_date,
-      salary: full.salary,
-      salary_currency: full.salary_currency,
-      commission_percent: full.commission_percent,
-      working_hours_per_week: full.working_hours_per_week,
-      annual_leave_balance: full.annual_leave_balance,
-      sick_leave_balance: full.sick_leave_balance,
-      bank_name: full.bank_name,
-      bank_account: full.bank_account,
-      national_id: full.national_id,
-      date_of_birth: full.date_of_birth,
-      address: full.address,
-      profile_image_url: full.profile_image_url,
-      emergency_contact_name: full.emergency_contact_name,
-      emergency_contact_phone: full.emergency_contact_phone,
-      status: "active",
-      deleted_at: null,
-    };
-    // Free the employee_id on the source first so the unique constraint doesn't clash.
-    const tempCode = `${full.employee_id}-OLD-${Date.now().toString(36)}`;
-    const { error: srcErr } = await (supabase as any).from("staff_profiles")
-      .update({ employee_id: tempCode, deleted_at: new Date().toISOString(), status: "terminated" })
-      .eq("id", src.id);
-    if (srcErr) { setLinking(false); toast.error(srcErr.message); return; }
-    const { error: upErr } = await (supabase as any).from("staff_profiles")
-      .upsert(payload, { onConflict: "id" });
-    if (upErr) {
-      // rollback source rename
-      await (supabase as any).from("staff_profiles")
-        .update({ employee_id: full.employee_id, deleted_at: null, status: full.status }).eq("id", src.id);
-      setLinking(false); toast.error(upErr.message); return;
-    }
-    // Assign a suggested role only if the user has none yet.
-    const currentRole = (roles[linkTarget.id] ?? [])[0];
-    if (!currentRole) {
-      const suggested = suggestRoleFromPosition(src.staff_positions?.title_en, src.staff_positions?.group_key);
-      await (supabase as any).from("user_roles").insert({ user_id: linkTarget.id, role: suggested });
-    }
-    await logLinkAudit("link", linkTarget.id, full.branch_id,
-      { source_staff_id: src.id, source_employee_id: full.employee_id, target_had_role: !!currentRole },
-      { employee_id: full.employee_id, branch_id: full.branch_id, position_id: full.position_id });
-    setLinking(false);
-    setLinkTarget(null);
-    toast.success(lang === "ar" ? "تم الربط بالموظف" : "Linked to employee");
-    load();
-  };
 
   const openEdit = (u: any) => {
     const current = (roles[u.id] ?? [])[0] as Role | undefined;
@@ -521,8 +447,8 @@ export default function UserManagement() {
                   size="sm"
                   variant="outline"
                   className="text-primary"
-                  title={lang === "ar" ? "ربط بموظف من الدليل" : "Link to an employee from the directory"}
-                  onClick={() => openLink(u)}
+                  title={lang === "ar" ? "ربط بسجل موظف (اختر فرعاً ودوراً)" : "Link to employee record (pick branch + role)"}
+                  onClick={() => openEdit(u)}
                 >
                   <Link2 className="me-1 size-4" />
                   {lang === "ar" ? "ربط" : "Link"}
@@ -882,61 +808,6 @@ export default function UserManagement() {
               </Button>
               <Button type="button" onClick={saveEdit} disabled={savingEdit} className="gradient-primary text-primary-foreground">
                 {savingEdit ? (lang === "ar" ? "جارٍ الحفظ..." : "Saving...") : (lang === "ar" ? "حفظ" : "Save")}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Link to existing employee dialog */}
-        <Dialog open={!!linkTarget} onOpenChange={(o) => !o && !linking && setLinkTarget(null)}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{lang === "ar" ? "ربط بموظف من الدليل" : "Link to an existing employee"}</DialogTitle>
-              <DialogDescription>
-                {linkTarget?.full_name ?? linkTarget?.email}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-3">
-              <div className="space-y-2">
-                <Label>{lang === "ar" ? "اختر موظفاً (من الفرع الحالي)" : "Pick an employee (current branch)"}</Label>
-                <Select value={linkStaffId} onValueChange={setLinkStaffId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={lang === "ar" ? "اختر موظفاً" : "Select an employee"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {linkableStaff
-                      .filter((s) => s.id !== linkTarget?.id)
-                      .map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {(s.profiles?.full_name ?? s.profiles?.email ?? s.employee_id)}
-                          {s.staff_positions ? ` — ${lang === "ar" ? s.staff_positions.title_ar : s.staff_positions.title_en}` : ""}
-                          {s.employee_id ? ` · ${s.employee_id}` : ""}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-                {linkableStaff.filter((s) => s.id !== linkTarget?.id).length === 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    {lang === "ar"
-                      ? "لا يوجد موظفون غير مربوطين في هذا الفرع."
-                      : "No unlinked employees in this branch."}
-                  </p>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {lang === "ar"
-                  ? "سيتم نقل بيانات التوظيف (المسمى، القسم، الفرع، كود الموظف، الراتب...) إلى هذا الحساب، وأرشفة سجل الموظف المصدر. يُقترح الدور تلقائياً من المسمى."
-                  : "Employment data (position, department, branch, employee code, salary…) will be transferred to this user account, and the source employee record archived. Role is suggested from the position."}
-              </p>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" disabled={linking} onClick={() => setLinkTarget(null)}>
-                {t("cancel")}
-              </Button>
-              <Button type="button" disabled={linking || !linkStaffId}
-                onClick={linkExistingEmployee}
-                className="gradient-primary text-primary-foreground">
-                {linking ? (lang === "ar" ? "جارٍ الربط..." : "Linking...") : (lang === "ar" ? "ربط" : "Link")}
               </Button>
             </DialogFooter>
           </DialogContent>

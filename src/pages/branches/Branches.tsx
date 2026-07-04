@@ -271,6 +271,41 @@ export default function Branches() {
                   <Input type="time" value={form.working_hours_end} onChange={(e) => setForm({ ...form, working_hours_end: e.target.value })} />
                 </div>
               </div>
+              <div className="md:col-span-2">
+                <Label>{lang === "ar" ? "أيام العمل" : "Working days"}</Label>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {ALL_DAYS.map((d) => {
+                    const active = form.working_days.includes(d);
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() =>
+                          setForm({
+                            ...form,
+                            working_days: active
+                              ? form.working_days.filter((x) => x !== d)
+                              : [...form.working_days, d].sort((a, b) => a - b),
+                          })
+                        }
+                        aria-pressed={active}
+                        className={`px-3 py-1.5 rounded-full text-xs border transition ${
+                          active
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-muted text-muted-foreground border-transparent hover:bg-muted/70"
+                        }`}
+                      >
+                        {dayShort(d, lang)}
+                      </button>
+                    );
+                  })}
+                </div>
+                {form.working_days.length === 0 && (
+                  <p className="mt-1 text-xs text-destructive">
+                    {lang === "ar" ? "الفرع مغلق — لم يتم اختيار أي يوم." : "Branch will be marked closed — no days selected."}
+                  </p>
+                )}
+              </div>
               <div className="flex items-center justify-between rounded-md border p-3">
                 <div className="flex items-center gap-2"><Star className="size-4 text-primary" /><span className="text-sm font-medium">{t("mainBranch") ?? "Main Branch"}</span></div>
                 <Switch checked={form.is_main_branch} onCheckedChange={(v) => setForm({ ...form, is_main_branch: v })} />

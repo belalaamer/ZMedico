@@ -813,6 +813,7 @@ export default function UserManagement() {
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={resetPassword} className="space-y-4">
+              {/* unlink dialog inserted just above via sibling AlertDialog */}
               <div className="space-y-2">
                 <Label htmlFor="rPassword">
                   {lang === "ar" ? "كلمة مرور جديدة (اختياري)" : "New password (optional)"}

@@ -1080,6 +1080,12 @@ export default function CalendarPage() {
                     {new Date(2000, 0, 1, h).toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US", { hour: "numeric", hour12: true })}
                   </div>
                 ))}
+                {/* Closing-hour marker — sits flush with the bottom edge of
+                    the last row so the branch's end time is visible. */}
+                <div className="text-[10px] text-muted-foreground text-end pe-2 -mt-2">
+                  {new Date(2000, 0, 1, Math.min(23, endHourLabel), endHourLabel >= 24 ? 59 : 0)
+                    .toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US", { hour: "numeric", hour12: true })}
+                </div>
               </div>
 
               {/* Day columns */}
@@ -1120,8 +1126,14 @@ export default function CalendarPage() {
                         <div className="size-2 -mt-1 ms-0 rounded-full bg-destructive" />
                       </div>
                     )}
-                    {/* Appointment blocks */}
-                    {dayItems.map(renderApptBlock)}
+                    {/* Appointment blocks (side-by-side when overlapping) */}
+                    {(() => {
+                      const lanesMap = layoutDay(dayItems);
+                      return dayItems.map((a) => {
+                        const info = lanesMap.get(a.id) ?? { lane: 0, lanes: 1 };
+                        return renderApptBlock(a, info.lane, info.lanes);
+                      });
+                    })()}
                   </div>
                 );
               })}

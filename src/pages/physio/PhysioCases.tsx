@@ -19,7 +19,12 @@ import { formatDate } from "@/lib/format";
 import { toast } from "sonner";
 
 type Patient = { id: string; first_name_en?: string; last_name_en?: string; first_name_ar?: string; last_name_ar?: string; patient_code?: number };
-type Therapist = { id: string; first_name_en?: string | null; last_name_en?: string | null };
+type Therapist = {
+  id: string;
+  employee_id?: string | null;
+  profile?: { full_name?: string | null; email?: string | null } | null;
+  position?: { title_en?: string | null; title_ar?: string | null } | null;
+};
 
 export default function PhysioCases() {
   const { t, lang } = useI18n();
@@ -58,15 +63,16 @@ export default function PhysioCases() {
       supabase.from("patients").select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code")
         .is("deleted_at", null).eq("branch_id", currentBranchId).order("created_at", { ascending: false }).limit(500)
         .then(({ data }) => setPatients((data as any) ?? []));
-      // Restrict therapist picker to clinical staff (doctor / admin roles).
+      // Therapists = active staff in the current branch (from HR staff
+      // directory). We surface the position title so the user can pick
+      // the right doctor/therapist. therapist_id FK -> staff_profiles.id.
       (async () => {
-        const { data: rs } = await supabase
-          .from("user_roles").select("user_id").in("role", ["doctor", "admin"] as any);
-        const ids = Array.from(new Set((rs ?? []).map((r: any) => r.user_id))).filter(Boolean);
-        if (!ids.length) { setTherapists([]); return; }
         const { data } = await supabase.from("staff_profiles")
-          .select("id,first_name_en,last_name_en")
-          .eq("branch_id", currentBranchId).in("id", ids).limit(500);
+          .select("id,employee_id,profile:profiles!staff_profiles_id_fkey(full_name,email),position:staff_positions(title_en,title_ar)")
+          .eq("branch_id", currentBranchId)
+          .eq("status", "active")
+          .is("deleted_at", null)
+          .limit(500);
         setTherapists((data as any) ?? []);
       })();
     }
@@ -113,6 +119,23 @@ export default function PhysioCases() {
   const statusVariant = (s: string) =>
     s === "active" ? "status-progress" : s === "completed" ? "status-completed" : s === "paused" ? "status-pending" : "status-cancelled";
 
+  const statusLabel = (s: string) => {
+    if (lang !== "ar") return s;
+    switch (s) {
+      case "active": return "نشطة";
+      case "completed": return "مكتملة";
+      case "paused": return "متوقفة";
+      case "cancelled": return "ملغاة";
+      default: return s;
+    }
+  };
+
+  const therapistLabel = (s: Therapist) => {
+    const name = (s.profile?.full_name || s.profile?.email || s.employee_id || s.id.slice(0, 8)).trim();
+    const title = lang === "ar" ? s.position?.title_ar : s.position?.title_en;
+    return title ? `${name} · ${title}` : name;
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
@@ -146,7 +169,7 @@ export default function PhysioCases() {
                   <SelectContent>
                     <SelectItem value="_none">—</SelectItem>
                     {therapists.map(s => (
-                      <SelectItem key={s.id} value={s.id}>{`${s.first_name_en ?? ""} ${s.last_name_en ?? ""}`.trim() || s.id.slice(0,8)}</SelectItem>
+                      <SelectItem key={s.id} value={s.id}>{therapistLabel(s)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -209,7 +232,7 @@ export default function PhysioCases() {
                   <div className="font-medium truncate">{patientName(c.patients)} {c.patients?.patient_code ? <span className="text-xs text-muted-foreground">#{c.patients.patient_code}</span> : null}</div>
                   <div className="text-xs text-muted-foreground truncate">{c.diagnosis || "—"} · start {formatDate(c.start_date, lang)} · {c.expected_sessions} sessions</div>
                 </div>
-                <Badge variant="outline" className={statusVariant(c.status)}>{c.status}</Badge>
+                <Badge variant="outline" className={statusVariant(c.status)}>{statusLabel(c.status)}</Badge>
               </Link>
             ))}
           </div>

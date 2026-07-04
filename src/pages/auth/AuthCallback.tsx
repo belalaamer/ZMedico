@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useI18n } from "@/contexts/I18nContext";
+import { hasPersistedAuthSession, persistAuthSessionForPreview } from "@/lib/authSessionPersistence";
 
 const AUTH_DEBUG_PREFIX = "[auth-debug]";
 
@@ -56,6 +57,7 @@ export default function AuthCallback() {
 
       if (code) {
         const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+        persistAuthSessionForPreview(data.session, "callback-code-exchange");
         console.info(AUTH_DEBUG_PREFIX, "callback code exchange completed", {
           hasSession: Boolean(data.session),
           hasUser: Boolean(data.session?.user),
@@ -68,12 +70,13 @@ export default function AuthCallback() {
       }
 
       const { data, error } = await supabase.auth.getSession();
+      persistAuthSessionForPreview(data.session, "callback-get-session");
       console.info(AUTH_DEBUG_PREFIX, "callback redirect completion", {
         hasSession: Boolean(data.session),
         hasUser: Boolean(data.session?.user),
         error: error?.message ?? null,
         next,
-        hasStoredToken: Object.keys(window.localStorage).some((k) => k.startsWith("sb-") && k.endsWith("-auth-token")),
+        hasStoredToken: hasPersistedAuthSession(),
       });
 
       if (cancelled) return;

@@ -42,15 +42,24 @@ setup("authenticate as admin", async ({ page }) => {
 
   await page.goto("/auth", { waitUntil: "domcontentloaded" });
 
-  await page.getByLabel(/email/i).first().fill(email);
-  await page.getByLabel(/password/i).first().fill(password);
+  // App renders auth UI in Arabic by default (dir=rtl), so match by input
+  // type rather than a locale-specific label. The primary submit button
+  // reads "تسجيل الدخول" in Arabic and "Sign in" / "Log in" in English.
+  await page.locator('input[type="email"]').first().waitFor({ timeout: 30_000 });
+  await page.locator('input[type="email"]').first().fill(email);
+  await page.locator('input[type="password"]').first().fill(password);
 
   await Promise.all([
     page.waitForURL(
       (url) => !url.pathname.startsWith("/auth"),
       { timeout: 30_000 },
     ),
-    page.getByRole("button", { name: /sign in|log in|login/i }).first().click(),
+    page
+      .getByRole("button", {
+        name: /تسجيل الدخول|sign in|log in|login/i,
+      })
+      .first()
+      .click(),
   ]);
 
   // Ensure the Supabase session key landed in localStorage before saving.

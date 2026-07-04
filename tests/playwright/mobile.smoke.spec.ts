@@ -57,18 +57,21 @@ const ROUTES = [
   "/settings/users",
 ] as const;
 
-// CTA hints per critical area. Arabic + English, matched loosely on the
-// visible button text. If the button exists at all on the page the area
-// smoke passes; we intentionally do NOT click through to avoid mutating
-// production data.
+// CTA hints per critical area. Arabic + English. Matched against the
+// button accessible name (visible text OR aria-label) because many
+// mobile primary actions are icon-only FABs. If any button matches, the
+// area smoke passes; we intentionally do NOT click through — no
+// production data is mutated.
 const INTEGRATION_CTAS: Array<{ route: string; label: RegExp }> = [
   { route: "/patients", label: /مريض|Patient|إضافة|Add|New|جديد/i },
   { route: "/calendar", label: /موعد|Appointment|جديد|New|حجز|Book/i },
   { route: "/invoices", label: /فاتورة|Invoice|جديد|New|إنشاء|Create/i },
   { route: "/payments", label: /دفع|Payment|تسجيل|Record|جديد|New/i },
-  { route: "/treasury", label: /خزينة|Treasury|إغلاق|Close|جديد|New|إضافة|Add/i },
+  // Treasury exposes "الإقفال اليومي" (Daily Close), "تحويل أموال" (Transfer
+  // Funds), and "تعديل" (Edit). Match the actual roots used on the page.
+  { route: "/treasury", label: /خزينة|Treasury|الإقفال|إغلاق|Close|تحويل|Transfer|تعديل|Edit|جديد|New|إضافة|Add/i },
   { route: "/medical/quick-consult", label: /حفظ|Save/i },
-  { route: "/medical/records", label: /سجل|Record|جديد|New|إضافة|Add/i },
+  { route: "/medical/records", label: /سجل|Record|جديد|New|إضافة|Add|كشف|Consult/i },
   { route: "/physio", label: /حالة|Case|جديد|New|إضافة|Add/i },
   { route: "/inventory/products", label: /منتج|Product|جديد|New|إضافة|Add/i },
   { route: "/hr/staff", label: /موظف|Staff|جديد|New|إضافة|Add/i },
@@ -117,36 +120,51 @@ test.describe("ZMedico mobile smoke @mobile", () => {
     });
   }
 
-  test("bottom navigation does not cover the last visible card", async ({
+  test("scroll container reserves space for the bottom navigation", async ({
     page,
     viewport,
   }) => {
-    // Only meaningful on phone-sized viewports where the bottom tab bar shows.
-    test.skip(!viewport || viewport.width >= 600, "Tablet: no bottom nav");
+    // Only phone widths — tablet (≥768px) hides the bottom tab bar.
+    test.skip(!viewport || viewport.width >= 768, "Tablet: no bottom nav");
     await gotoStable(page, "/");
-    const overlap = await page.evaluate(() => {
+    const info = await page.evaluate(() => {
       const nav = document.querySelector<HTMLElement>(
-        "nav[aria-label*=bottom i], nav.fixed.bottom-0, [data-mobile-tabbar]",
+        "nav.md\\:hidden.fixed.bottom-0, nav[aria-label][class*='bottom-0']",
       );
-      if (!nav) return { hasNav: false, overlap: 0 };
-      const nr = nav.getBoundingClientRect();
-      // Find any card/section that ends within the nav band.
-      const cards = Array.from(
-        document.querySelectorAll<HTMLElement>(
-          "main [class*=card i], main section, main article",
-        ),
-      );
-      let worst = 0;
-      for (const el of cards) {
-        const r = el.getBoundingClientRect();
-        if (r.bottom > nr.top && r.top < nr.top) {
-          worst = Math.max(worst, r.bottom - nr.top);
-        }
-      }
-      return { hasNav: true, overlap: Math.round(worst) };
+      const main = document.querySelector<HTMLElement>("main");
+      if (!nav || !main) return { hasNav: !!nav, hasMain: !!main };
+      const navH = Math.round(nav.getBoundingClientRect().height);
+      const padBottom = parseFloat(getComputedStyle(main).paddingBottom) || 0;
+      // Scroll to the very end and confirm the last child of main is not
+      // hidden under the fixed bottom nav.
+      main.scrollTo({ top: main.scrollHeight, behavior: "instant" as ScrollBehavior });
+      const last = main.lastElementChild as HTMLElement | null;
+      const lastBottom = last ? last.getBoundingClientRect().bottom : 0;
+      const navTop = nav.getBoundingClientRect().top;
+      return {
+        hasNav: true,
+        hasMain: true,
+        navH,
+        padBottom: Math.round(padBottom),
+        lastBottom: Math.round(lastBottom),
+        navTop: Math.round(navTop),
+      };
     });
-    // Allow up to 8px overlap for shadows; anything larger means content is hidden.
-    expect(overlap.overlap, "Bottom nav overlaps content").toBeLessThanOrEqual(8);
+    expect(info.hasNav, "Mobile bottom nav should be present").toBe(true);
+    expect(info.hasMain, "Main scroll container should be present").toBe(true);
+    // The main container must reserve at least the nav's height as bottom padding.
+    expect(
+      info.padBottom ?? 0,
+      `main paddingBottom=${info.padBottom}px is less than nav height=${info.navH}px`,
+    ).toBeGreaterThanOrEqual(info.navH ?? 64);
+    // When scrolled to the end, the last child's bottom edge must not
+    // extend past the nav's top edge (i.e. it must be visible above the nav).
+    if (info.lastBottom && info.navTop) {
+      expect(
+        info.lastBottom,
+        `last content bottom=${info.lastBottom}px is below nav top=${info.navTop}px`,
+      ).toBeLessThanOrEqual(info.navTop + 2);
+    }
   });
 
   for (const { route, label } of INTEGRATION_CTAS) {
@@ -154,14 +172,22 @@ test.describe("ZMedico mobile smoke @mobile", () => {
       page,
     }) => {
       await gotoStable(page, route);
-      const cta = page.getByRole("button").filter({ hasText: label }).first();
+      // Match on accessible name — covers visible text AND aria-label,
+      // so icon-only FABs (common mobile pattern) are counted. Include
+      // role=link because some "new record" affordances are `<Link>`s
+      // styled as buttons.
+      const cta = page
+        .getByRole("button", { name: label })
+        .or(page.getByRole("link", { name: label }))
+        .first();
       await expect(
         cta,
         `No primary CTA matching ${label} on ${route}`,
       ).toBeVisible({ timeout: 8_000 });
       const box = await cta.boundingBox();
       expect(box, `CTA has no layout on ${route}`).not.toBeNull();
-      // Tappable minimum: at least 32px tall (Apple HIG 44 is ideal, we allow 32 to avoid false positives on chip-style CTAs).
+      // Tappable minimum: 32px tall (Apple HIG suggests 44; we allow 32
+      // to avoid false positives on chip-style secondary CTAs).
       expect(
         box!.height,
         `CTA too small to tap on ${route}: h=${box!.height}`,

@@ -533,22 +533,32 @@ export default function UserManagement() {
                   size="sm"
                   variant="outline"
                   className="text-primary"
-                  title={lang === "ar" ? "ربط بسجل موظف (اختر فرعاً ودوراً)" : "Link to employee record (pick branch + role)"}
-                  onClick={() => openEdit(u)}
+                  title={lang === "ar" ? "ربط بموظف من دليل الموظفين" : "Link to an employee from the staff directory"}
+                  onClick={() => openLinkPicker(u, "link")}
                 >
                   <Link2 className="me-1 size-4" />
                   {lang === "ar" ? "ربط" : "Link"}
                 </Button>
               )}
               {staffLinks[u.id]?.branch_id && currentUserId !== u.id && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  title={lang === "ar" ? "فك الربط بسجل الموظف" : "Unlink from employee record"}
-                  onClick={() => setUnlinkTarget(u)}
-                >
-                  <Link2Off className="size-4" />
-                </Button>
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    title={lang === "ar" ? "استبدال الموظف المربوط" : "Replace linked employee"}
+                    onClick={() => openLinkPicker(u, "replace")}
+                  >
+                    <Users className="size-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    title={lang === "ar" ? "فك الربط بسجل الموظف" : "Unlink from employee record"}
+                    onClick={() => setUnlinkTarget(u)}
+                  >
+                    <Link2Off className="size-4" />
+                  </Button>
+                </>
               )}
               <Button
                 size="sm"

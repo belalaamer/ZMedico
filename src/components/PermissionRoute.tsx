@@ -25,7 +25,10 @@ export function PermissionRoute({ children, module, adminOnly }: { children: Rea
 
   if (adminOnly) {
     if (isAdmin) return <>{children}</>;
-  } else if (isAdmin || !mod || can(mod, "view")) {
+  } else if (isAdmin) {
+    return <>{children}</>;
+  } else if (mod && can(mod, "view")) {
+    // Deny by default: unmapped protected routes never fall through.
     return <>{children}</>;
   }
 

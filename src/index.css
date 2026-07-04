@@ -253,3 +253,45 @@ html { font-family: "Inter", system-ui, sans-serif; }
     bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* ============================================================
+   Elegant, smooth scrollbars (WebKit + Firefox)
+   ============================================================ */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--primary) / 0.35) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--primary) / 0.3);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    transition: background-color 200ms ease;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--primary) / 0.55);
+    background-clip: padding-box;
+  }
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  /* Momentum scrolling on iOS + smoother wheel behavior */
+  main,
+  [data-radix-scroll-area-viewport],
+  .overflow-y-auto,
+  .overflow-auto {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+}

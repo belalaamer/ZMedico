@@ -73,7 +73,16 @@ export default function PhysioCases() {
           .eq("status", "active")
           .is("deleted_at", null)
           .limit(500);
-        setTherapists((data as any) ?? []);
+        // Only clinical providers valid for physiotherapy: doctor / physiotherapist.
+        // Filter by position title keywords in EN/AR so the picker never exposes
+        // admin/receptionist/manager/HR/finance/inventory or other non-clinical staff.
+        const CLINICAL = /(doctor|physio|therapist|physical\s*therap|طبيب|علاج\s*طبيعي|أخصائي\s*علاج|معالج)/i;
+        const filtered = ((data as any) ?? []).filter((s: any) => {
+          const en = s.position?.title_en ?? "";
+          const ar = s.position?.title_ar ?? "";
+          return CLINICAL.test(en) || CLINICAL.test(ar);
+        });
+        setTherapists(filtered);
       })();
     }
   }, [currentBranchId]);
@@ -168,7 +177,11 @@ export default function PhysioCases() {
                   <SelectTrigger><SelectValue placeholder={lang === "ar" ? "المعالج" : "Therapist"} /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="_none">—</SelectItem>
-                    {therapists.map(s => (
+                    {therapists.length === 0 ? (
+                      <div className="px-2 py-3 text-sm text-muted-foreground text-center">
+                        {lang === "ar" ? "لا يوجد أطباء متاحون" : "No providers available"}
+                      </div>
+                    ) : therapists.map(s => (
                       <SelectItem key={s.id} value={s.id}>{therapistLabel(s)}</SelectItem>
                     ))}
                   </SelectContent>

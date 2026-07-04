@@ -392,6 +392,7 @@ export type Database = {
           name_en: string
           phone: string | null
           updated_at: string
+          working_days: number[]
           working_hours_end: string | null
           working_hours_start: string | null
         }
@@ -412,6 +413,7 @@ export type Database = {
           name_en: string
           phone?: string | null
           updated_at?: string
+          working_days?: number[]
           working_hours_end?: string | null
           working_hours_start?: string | null
         }
@@ -432,6 +434,7 @@ export type Database = {
           name_en?: string
           phone?: string | null
           updated_at?: string
+          working_days?: number[]
           working_hours_end?: string | null
           working_hours_start?: string | null
         }

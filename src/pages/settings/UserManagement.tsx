@@ -801,6 +801,32 @@ export default function UserManagement() {
           </DialogContent>
         </Dialog>
 
+        {/* Unlink employee confirmation */}
+        <AlertDialog open={!!unlinkTarget} onOpenChange={(o) => !o && !unlinking && setUnlinkTarget(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {lang === "ar" ? "فك ربط سجل الموظف؟" : "Unlink employee record?"}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {lang === "ar"
+                  ? `سيتم فك ربط ${unlinkTarget?.full_name ?? unlinkTarget?.email} من سجل الموظف وإزالة كل الأدوار. يظل حساب المستخدم موجوداً ولكن بلا صلاحيات.`
+                  : `${unlinkTarget?.full_name ?? unlinkTarget?.email} will be unlinked from their employee record and all roles removed. The user account remains but will have no access.`}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={unlinking}>{t("cancel")}</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={unlinkEmployee}
+                disabled={unlinking}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {unlinking ? (lang === "ar" ? "جارٍ فك الربط..." : "Unlinking...") : (lang === "ar" ? "فك الربط" : "Unlink")}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         {/* Reset password dialog */}
         <Dialog open={!!resetTarget} onOpenChange={(o) => !o && !resetting && setResetTarget(null)}>
           <DialogContent>
@@ -813,7 +839,6 @@ export default function UserManagement() {
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={resetPassword} className="space-y-4">
-              {/* unlink dialog inserted just above via sibling AlertDialog */}
               <div className="space-y-2">
                 <Label htmlFor="rPassword">
                   {lang === "ar" ? "كلمة مرور جديدة (اختياري)" : "New password (optional)"}

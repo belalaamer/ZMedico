@@ -6060,6 +6060,10 @@ export type Database = {
         Args: { _rx: string }
         Returns: boolean
       }
+      user_has_branch_access_via_purchase_order: {
+        Args: { _po: string }
+        Returns: boolean
+      }
       user_has_branch_access_via_treasury: {
         Args: { _treasury: string }
         Returns: boolean

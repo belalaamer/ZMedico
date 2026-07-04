@@ -21,10 +21,8 @@ import { toast } from "sonner";
 type Patient = { id: string; first_name_en?: string; last_name_en?: string; first_name_ar?: string; last_name_ar?: string; patient_code?: number };
 type Therapist = {
   id: string;
-  first_name_en?: string | null;
-  last_name_en?: string | null;
-  first_name_ar?: string | null;
-  last_name_ar?: string | null;
+  employee_id?: string | null;
+  profile?: { full_name?: string | null; email?: string | null } | null;
   position?: { title_en?: string | null; title_ar?: string | null } | null;
 };
 
@@ -70,7 +68,7 @@ export default function PhysioCases() {
       // the right doctor/therapist. therapist_id FK -> staff_profiles.id.
       (async () => {
         const { data } = await supabase.from("staff_profiles")
-          .select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,position:staff_positions(title_en,title_ar)")
+          .select("id,employee_id,profile:profiles!staff_profiles_id_fkey(full_name,email),position:staff_positions(title_en,title_ar)")
           .eq("branch_id", currentBranchId)
           .eq("status", "active")
           .is("deleted_at", null)
@@ -133,12 +131,9 @@ export default function PhysioCases() {
   };
 
   const therapistLabel = (s: Therapist) => {
-    const name = lang === "ar"
-      ? `${s.first_name_ar ?? s.first_name_en ?? ""} ${s.last_name_ar ?? s.last_name_en ?? ""}`.trim()
-      : `${s.first_name_en ?? ""} ${s.last_name_en ?? ""}`.trim();
+    const name = (s.profile?.full_name || s.profile?.email || s.employee_id || s.id.slice(0, 8)).trim();
     const title = lang === "ar" ? s.position?.title_ar : s.position?.title_en;
-    const base = name || s.id.slice(0, 8);
-    return title ? `${base} · ${title}` : base;
+    return title ? `${name} · ${title}` : name;
   };
 
   return (

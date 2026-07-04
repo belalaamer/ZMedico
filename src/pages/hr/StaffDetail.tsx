@@ -16,12 +16,18 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { Can } from "@/components/Can";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { useBranch } from "@/contexts/BranchContext";
 
 const DAYS = ["sun","mon","tue","wed","thu","fri","sat"] as const;
 
 export default function StaffDetail() {
   const { t, lang } = useI18n();
   const { id } = useParams();
+  const { currentBranchId } = useBranch();
   const [staff, setStaff] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [position, setPosition] = useState<any>(null);
@@ -33,6 +39,28 @@ export default function StaffDetail() {
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [confirmUnlink, setConfirmUnlink] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [linkedProfile, setLinkedProfile] = useState<any>(null);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkMode, setLinkMode] = useState<"link" | "replace">("link");
+  const [candidateUsers, setCandidateUsers] = useState<any[]>([]);
+  const [pickedUserId, setPickedUserId] = useState<string>("");
+  const [linking, setLinking] = useState(false);
+
+  const reload = async () => {
+    if (!id) return;
+    const { data: s } = await supabase.from("staff_profiles").select("*").eq("id", id).maybeSingle();
+    setStaff(s);
+    const linkedUid = (s as any)?.linked_user_id ?? null;
+    if (linkedUid) {
+      const { data: lp } = await supabase.from("profiles").select("*").eq("id", linkedUid).maybeSingle();
+      setLinkedProfile(lp);
+      const { data: rs } = await (supabase as any).from("user_roles").select("role").eq("user_id", linkedUid);
+      setUserRoles((rs ?? []).map((r: any) => r.role));
+    } else {
+      setLinkedProfile(null);
+      setUserRoles([]);
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -51,8 +79,13 @@ export default function StaffDetail() {
       setLeaves(lv ?? []);
       const { data: pr } = await supabase.from("payroll").select("*").eq("staff_id", id).order("period_year", { ascending: false }).order("period_month", { ascending: false }).limit(24);
       setPayroll(pr ?? []);
-      const { data: rs } = await (supabase as any).from("user_roles").select("role").eq("user_id", id);
-      setUserRoles((rs ?? []).map((r: any) => r.role));
+      const linkedUid = (s as any)?.linked_user_id ?? null;
+      if (linkedUid) {
+        const { data: lp } = await supabase.from("profiles").select("*").eq("id", linkedUid).maybeSingle();
+        setLinkedProfile(lp);
+        const { data: rs } = await (supabase as any).from("user_roles").select("role").eq("user_id", linkedUid);
+        setUserRoles((rs ?? []).map((r: any) => r.role));
+      }
     })();
   }, [id]);
 
@@ -60,22 +93,80 @@ export default function StaffDetail() {
     if (!id) return;
     setBusy(true);
     const { data: me } = await supabase.auth.getUser();
+    const linkedUid = (staff as any)?.linked_user_id ?? null;
     const { error: sErr } = await (supabase as any).from("staff_profiles")
-      .update({ deleted_at: new Date().toISOString(), status: "terminated" }).eq("id", id);
+      .update({ linked_user_id: null }).eq("id", id);
     if (sErr) { setBusy(false); toast.error(sErr.message); return; }
-    await (supabase as any).from("user_roles").delete().eq("user_id", id);
+    if (linkedUid) {
+      await (supabase as any).from("user_roles").delete().eq("user_id", linkedUid);
+    }
     await (supabase as any).from("audit_logs").insert({
       user_id: me.user?.id ?? null,
       branch_id: staff?.branch_id ?? null,
-      action: "unlink",
+      action: "employee_unlinked",
       entity_type: "user_employee_link",
-      entity_id: id,
+      entity_id: linkedUid ?? id,
       old_values: { branch_id: staff?.branch_id ?? null, employee_id: staff?.employee_id ?? null, roles: userRoles },
       new_values: null,
     });
     setBusy(false);
     setConfirmUnlink(false);
     toast.success(lang === "ar" ? "تم فك الربط" : "Unlinked");
+    reload();
+  };
+
+  const openLinkPicker = async (mode: "link" | "replace") => {
+    setLinkMode(mode);
+    setPickedUserId("");
+    // Load all user profiles, then exclude those already linked to another
+    // active staff_profile (via linked_user_id).
+    const { data: ps } = await supabase.from("profiles").select("id,email,full_name");
+    const { data: linkedRows } = await (supabase as any)
+      .from("staff_profiles").select("linked_user_id").not("linked_user_id","is",null).is("deleted_at", null);
+    const takenIds = new Set((linkedRows ?? []).map((r: any) => r.linked_user_id));
+    // Allow current linked user (for replace/current preview)
+    if ((staff as any)?.linked_user_id) takenIds.delete((staff as any).linked_user_id);
+    setCandidateUsers((ps ?? []).map((p: any) => ({ ...p, _taken: takenIds.has(p.id) })));
+    setLinkOpen(true);
+  };
+
+  const confirmLink = async () => {
+    if (!id || !pickedUserId) return;
+    if (staff?.branch_id && currentBranchId && staff.branch_id !== currentBranchId) {
+      toast.error(lang === "ar" ? "لا يمكن الربط عبر فرع مختلف" : "Cross-branch link is not allowed");
+      return;
+    }
+    setLinking(true);
+    try {
+      const prevLinkedUid = (staff as any)?.linked_user_id ?? null;
+      const { data: upd, error } = await (supabase as any).from("staff_profiles")
+        .update({ linked_user_id: pickedUserId })
+        .eq("id", id)
+        .select("id");
+      if (error) throw error;
+      if (!upd || upd.length === 0) throw new Error("Link failed");
+      // Revoke roles from previous linked user if replace
+      if (linkMode === "replace" && prevLinkedUid && prevLinkedUid !== pickedUserId) {
+        await (supabase as any).from("user_roles").delete().eq("user_id", prevLinkedUid);
+      }
+      const { data: me } = await supabase.auth.getUser();
+      await (supabase as any).from("audit_logs").insert({
+        user_id: me.user?.id ?? null,
+        branch_id: staff?.branch_id ?? null,
+        action: linkMode === "replace" ? "employee_replaced" : "employee_linked",
+        entity_type: "user_employee_link",
+        entity_id: pickedUserId,
+        old_values: { staff_id: id, prev_linked_user_id: prevLinkedUid },
+        new_values: { staff_id: id, linked_user_id: pickedUserId, branch_id: staff?.branch_id ?? null },
+      });
+      toast.success(lang === "ar" ? "تم الربط" : "Linked");
+      setLinkOpen(false);
+      reload();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed");
+    } finally {
+      setLinking(false);
+    }
   };
 
   if (!staff) return <div className="p-10 text-center text-muted-foreground">…</div>;
@@ -101,22 +192,39 @@ export default function StaffDetail() {
           <div className="text-sm font-semibold">
             {lang === "ar" ? "وصول المستخدم" : "User access"}
           </div>
-          <div className="text-xs text-muted-foreground flex gap-1 flex-wrap mt-1">
-            {userRoles.length > 0
-              ? userRoles.map((r) => <Badge key={r} variant="outline" className="capitalize">{r}</Badge>)
-              : (lang === "ar" ? "لا يوجد وصول — الموظف غير مربوط بحساب فعّال." : "No access — employee is not linked to an active user account.")}
+          <div className="text-xs text-muted-foreground flex gap-2 flex-wrap mt-1 items-center">
+            {linkedProfile ? (
+              <>
+                <span className="font-medium text-foreground">
+                  {linkedProfile.full_name ?? linkedProfile.email}
+                </span>
+                {userRoles.map((r) => <Badge key={r} variant="outline" className="capitalize">{r}</Badge>)}
+              </>
+            ) : (
+              <span>{lang === "ar" ? "لا يوجد وصول — الموظف غير مربوط بحساب مستخدم." : "No access — employee is not linked to a user account."}</span>
+            )}
           </div>
         </div>
         <Can module="settings" action="edit">
-          <Button asChild variant="outline" size="sm">
-            <Link to="/settings/users">{lang === "ar" ? "إدارة الوصول" : "Manage access"}</Link>
-          </Button>
-          {userRoles.length > 0 && (
-            <Button variant="outline" size="sm" className="text-destructive"
-              onClick={() => setConfirmUnlink(true)}>
-              <Link2Off className="me-1 size-4" />
-              {lang === "ar" ? "فك ربط المستخدم" : "Unlink user"}
+          {!linkedProfile && (
+            <Button variant="outline" size="sm" onClick={() => openLinkPicker("link")}>
+              {lang === "ar" ? "ربط بمستخدم" : "Link to user"}
             </Button>
+          )}
+          {linkedProfile && (
+            <>
+              <Button asChild variant="outline" size="sm">
+                <Link to="/settings/users">{lang === "ar" ? "إدارة الوصول" : "Manage access"}</Link>
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => openLinkPicker("replace")}>
+                {lang === "ar" ? "استبدال" : "Replace"}
+              </Button>
+              <Button variant="outline" size="sm" className="text-destructive"
+                onClick={() => setConfirmUnlink(true)}>
+                <Link2Off className="me-1 size-4" />
+                {lang === "ar" ? "فك الربط" : "Unlink"}
+              </Button>
+            </>
           )}
         </Can>
       </Card>

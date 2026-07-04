@@ -98,8 +98,8 @@ export default function PhysioCases() {
       : `${p?.first_name_en ?? ""} ${p?.last_name_en ?? ""}`.trim();
 
   const create = async () => {
-    if (!currentBranchId) { toast.error("Select a branch first"); return; }
-    if (!form.patient_id) { toast.error("Patient is required"); return; }
+    if (!currentBranchId) { toast.error(lang === "ar" ? "اختر فرعًا أولًا" : "Select a branch first"); return; }
+    if (!form.patient_id) { toast.error(lang === "ar" ? "المريض مطلوب" : "Patient is required"); return; }
     const { data: u } = await supabase.auth.getUser();
     const payload: any = {
       ...form,
@@ -148,24 +148,24 @@ export default function PhysioCases() {
         <Can module="medical_records" action="create">
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button className="gradient-primary text-primary-foreground"><Plus className="me-2 size-4" />New case</Button>
+            <Button className="gradient-primary text-primary-foreground"><Plus className="me-2 size-4" />{lang === "ar" ? "حالة جديدة" : "New case"}</Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
-            <DialogHeader><DialogTitle>New physiotherapy case</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{lang === "ar" ? "حالة علاج طبيعي جديدة" : "New physiotherapy case"}</DialogTitle></DialogHeader>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="md:col-span-2">
-                <Label>Patient</Label>
+                <Label>{lang === "ar" ? "المريض" : "Patient"}</Label>
                 <Select value={form.patient_id} onValueChange={(v) => setForm({ ...form, patient_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Select patient" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={lang === "ar" ? "اختر المريض" : "Select patient"} /></SelectTrigger>
                   <SelectContent>{patients.map(p => (
                     <SelectItem key={p.id} value={p.id}>{patientName(p)} {p.patient_code ? `· #${p.patient_code}` : ""}</SelectItem>
                   ))}</SelectContent>
                 </Select>
               </div>
               <div>
-                <Label>Therapist</Label>
+                <Label>{lang === "ar" ? "المعالج" : "Therapist"}</Label>
                 <Select value={form.therapist_id || "_none"} onValueChange={(v) => setForm({ ...form, therapist_id: v === "_none" ? "" : v })}>
-                  <SelectTrigger><SelectValue placeholder="Therapist" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={lang === "ar" ? "المعالج" : "Therapist"} /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="_none">—</SelectItem>
                     {therapists.map(s => (
@@ -175,31 +175,31 @@ export default function PhysioCases() {
                 </Select>
               </div>
               <div>
-                <Label>Start date</Label>
+                <Label>{lang === "ar" ? "تاريخ البدء" : "Start date"}</Label>
                 <Input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} />
               </div>
               <div>
-                <Label>Expected sessions</Label>
+                <Label>{lang === "ar" ? "عدد الجلسات المتوقعة" : "Expected sessions"}</Label>
                 <Input type="number" min={0} value={form.expected_sessions} onChange={e => setForm({ ...form, expected_sessions: e.target.value })} />
               </div>
               <div>
-                <Label>Status</Label>
-                <div className="text-sm text-muted-foreground py-2">Active (default)</div>
+                <Label>{lang === "ar" ? "الحالة" : "Status"}</Label>
+                <div className="text-sm text-muted-foreground py-2">{lang === "ar" ? "نشطة (افتراضي)" : "Active (default)"}</div>
               </div>
               <div className="md:col-span-2">
-                <Label>Diagnosis / complaint</Label>
+                <Label>{lang === "ar" ? "التشخيص / الشكوى" : "Diagnosis / complaint"}</Label>
                 <Input value={form.diagnosis} onChange={e => setForm({ ...form, diagnosis: e.target.value })} />
               </div>
               <div className="md:col-span-2">
-                <Label>Treatment goal</Label>
+                <Label>{lang === "ar" ? "هدف العلاج" : "Treatment goal"}</Label>
                 <Input value={form.treatment_goal} onChange={e => setForm({ ...form, treatment_goal: e.target.value })} />
               </div>
               <div className="md:col-span-2">
-                <Label>Treatment plan</Label>
+                <Label>{lang === "ar" ? "خطة العلاج" : "Treatment plan"}</Label>
                 <Textarea rows={3} value={form.treatment_plan} onChange={e => setForm({ ...form, treatment_plan: e.target.value })} />
               </div>
               <div className="md:col-span-2">
-                <Label>Notes</Label>
+                <Label>{lang === "ar" ? "ملاحظات" : "Notes"}</Label>
                 <Textarea rows={2} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
               </div>
             </div>
@@ -219,10 +219,10 @@ export default function PhysioCases() {
           <div className="p-10 text-center text-destructive flex flex-col items-center gap-2">
             <AlertCircle className="size-5" />
             <div className="text-sm">{loadError}</div>
-            <Button variant="outline" size="sm" onClick={load}>Retry</Button>
+            <Button variant="outline" size="sm" onClick={load}>{lang === "ar" ? "إعادة المحاولة" : "Retry"}</Button>
           </div>
         ) : items.length === 0 ? (
-          <div className="p-10 text-center text-muted-foreground">No physiotherapy cases yet.</div>
+          <div className="p-10 text-center text-muted-foreground">{lang === "ar" ? "لا توجد حالات علاج طبيعي بعد." : "No physiotherapy cases yet."}</div>
         ) : (
           <div className="divide-y divide-border">
             {items.map(c => (
@@ -230,7 +230,7 @@ export default function PhysioCases() {
                 <Activity className="size-5 text-muted-foreground" />
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">{patientName(c.patients)} {c.patients?.patient_code ? <span className="text-xs text-muted-foreground">#{c.patients.patient_code}</span> : null}</div>
-                  <div className="text-xs text-muted-foreground truncate">{c.diagnosis || "—"} · start {formatDate(c.start_date, lang)} · {c.expected_sessions} sessions</div>
+                  <div className="text-xs text-muted-foreground truncate">{c.diagnosis || "—"} · {lang === "ar" ? "بدء" : "start"} {formatDate(c.start_date, lang)} · {c.expected_sessions} {lang === "ar" ? "جلسة" : "sessions"}</div>
                 </div>
                 <Badge variant="outline" className={statusVariant(c.status)}>{statusLabel(c.status)}</Badge>
               </Link>

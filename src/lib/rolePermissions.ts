@@ -1,5 +1,23 @@
 export const ROLES = ["admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr", "staff"] as const;
-export const MODULES = ["patients", "appointments", "medical_records", "treatment_plans", "invoices", "treasury", "inventory", "reports", "hr", "settings", "coupons"] as const;
+export const MODULES = [
+  "patients",
+  "appointments",
+  "medical_records",
+  "vitals",
+  "treatment_plans",
+  "invoices",
+  "treasury",
+  "inventory",
+  "reports",
+  "reports_finance",
+  "reports_medical",
+  "reports_operational",
+  "reports_hr",
+  "reports_inventory",
+  "hr",
+  "settings",
+  "coupons",
+] as const;
 export const ACTIONS = ["view", "create", "edit", "delete", "export"] as const;
 
 export type RoleName = typeof ROLES[number] | string;
@@ -9,83 +27,75 @@ const ALL = [...ACTIONS] as string[];
 
 export const DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
   admin: Object.fromEntries(MODULES.map(m => [m, [...ALL]])),
-  // Strict Manager scope: operational modules editable (no delete anywhere),
-  // Settings & HR are view-only, Treasury & Coupons remain editable.
+  // Manager: operational oversight — no clinical writes, treasury read/export only.
   manager: {
     patients: ["view","create","edit","export"],
     appointments: ["view","create","edit","export"],
-    medical_records: ["view","create","edit","export"],
-    treatment_plans: ["view","create","edit","export"],
+    medical_records: ["view"],
+    vitals: ["view"],
+    treatment_plans: ["view"],
     invoices: ["view","create","edit","export"],
-    treasury: ["view","create","edit","export"],
+    treasury: ["view","export"],
     inventory: ["view","create","edit","export"],
     reports: ["view","export"],
+    reports_finance: ["view","export"],
+    reports_medical: ["view","export"],
+    reports_operational: ["view","export"],
+    reports_hr: [],
+    reports_inventory: ["view","export"],
     hr: ["view"],
     settings: ["view"],
     coupons: ["view","create","edit","export"],
   },
   doctor: {
-    patients: ["view","edit"],
-    appointments: ["view","create","edit"],
-    medical_records: ["view","create","edit"],
-    treatment_plans: ["view","create","edit"],
-    invoices: ["view"], // read-only billing
-    treasury: [],
-    inventory: [],
-    reports: ["view"],
-    hr: [],
-    settings: [],
-  },
-  nurse: {
-    // Vitals, patient lists, specific medical logs. No delete on billing/records.
     patients: ["view"],
     appointments: ["view","create","edit"],
     medical_records: ["view","create","edit"],
-    treatment_plans: ["view","edit"],
+    vitals: ["view","create","edit"],
+    treatment_plans: ["view","create","edit"],
     invoices: ["view"],
-    treasury: [],
+    reports: ["view"],
+    reports_medical: ["view"],
+    reports_operational: ["view"],
+    reports_finance: [],
+    reports_hr: [],
+    reports_inventory: [],
+  },
+  nurse: {
+    patients: ["view"],
+    appointments: ["view","create","edit"],
+    medical_records: ["view"],
+    vitals: ["view","create","edit"],
+    treatment_plans: ["view"],
     inventory: ["view"],
-    reports: [],
-    hr: [],
-    settings: [],
   },
   receptionist: {
-    // Calendar, patient registration, invoices. No clinical notes/medical history.
     patients: ["view","create","edit"],
     appointments: ["view","create","edit","delete"],
-    medical_records: [],
-    treatment_plans: ["view"],
-    invoices: ["view","create","edit"],
-    treasury: [],
-    inventory: [],
-    reports: [],
-    hr: [],
-    settings: [],
+    invoices: ["view","create"],
     coupons: ["view"],
   },
   accountant: {
-    // Invoices, payments, expenses. No medical records.
     patients: ["view"],
     appointments: ["view"],
-    medical_records: [],
-    treatment_plans: ["view"],
-    // Accountant may void/cancel invoices but cannot hard-delete them.
-    // True deletion is reserved for Admin (handled via UI/RLS).
     invoices: ["view","create","edit","export"],
     treasury: ["view","create","edit","export"],
     inventory: ["view"],
     reports: ["view","export"],
-    hr: [],
-    settings: [],
-    coupons: ["view","create","edit","export"],
+    reports_finance: ["view","export"],
+    reports_inventory: ["view","export"],
+    reports_operational: ["view","export"],
+    reports_medical: [],
+    reports_hr: [],
+    coupons: ["view","export"],
   },
   hr: {
-    patients: [], appointments: [], medical_records: [], treatment_plans: [], invoices: [], treasury: [],
-    inventory: [], reports: ["view"], hr: ["view","create","edit","export"], settings: [],
+    reports: ["view"],
+    reports_hr: ["view","export"],
+    hr: ["view","create","edit","export"],
   },
   staff: {
-    patients: [], appointments: ["view"], medical_records: [], treatment_plans: [], invoices: [], treasury: [],
-    inventory: [], reports: [], hr: [], settings: [],
+    appointments: ["view"],
   },
 };
 
@@ -105,6 +115,12 @@ export function moduleForPath(path: string): string | null {
   if (path.startsWith("/inventory")) return "inventory";
   if (path.startsWith("/medical")) return "medical_records";
   if (path.startsWith("/hr")) return "hr";
+  if (path.startsWith("/reports/financial")) return "reports_finance";
+  if (path.startsWith("/reports/medical")) return "reports_medical";
+  if (path.startsWith("/reports/operational")) return "reports_operational";
+  if (path.startsWith("/reports/hr")) return "reports_hr";
+  if (path.startsWith("/reports/inventory")) return "reports_inventory";
+  if (path.startsWith("/reports/commissions") || path.startsWith("/reports/doctor-performance")) return "reports_medical";
   if (path.startsWith("/reports")) return "reports";
   if (path.startsWith("/settings") || path.startsWith("/branches")) return "settings";
   if (path.startsWith("/pricing")) return "settings";

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
-import { defaultActionsFor } from "@/lib/rolePermissions";
+import { defaultActionsFor, MODULES } from "@/lib/rolePermissions";
 import { withTimeout } from "@/lib/withTimeout";
 
 export function usePermissions() {
@@ -41,7 +41,7 @@ export function usePermissions() {
         });
         // Fallback to defaults for any (role, module) without a DB row.
         roles.forEach((role) => {
-          ["patients","appointments","medical_records","treatment_plans","invoices","treasury","inventory","reports","hr","settings","coupons"].forEach((mod) => {
+          MODULES.forEach((mod) => {
             if (seen.has(`${role}:${mod}`)) return;
             const acts = defaultActionsFor(role, mod);
             if (!acts.length) return;
@@ -57,7 +57,7 @@ export function usePermissions() {
         console.warn("[auth-debug] role_permissions fetch threw; using defaults", { message: error instanceof Error ? error.message : String(error) });
         const map: Record<string, Set<string>> = {};
         roles.forEach((role) => {
-          ["patients","appointments","medical_records","treatment_plans","invoices","treasury","inventory","reports","hr","settings","coupons"].forEach((mod) => {
+          MODULES.forEach((mod) => {
             const acts = defaultActionsFor(role, mod);
             if (!acts.length) return;
             const s = map[mod] ?? new Set<string>();

@@ -218,13 +218,13 @@ function AppContent() {
               <Route path="/settings/branches" element={<PermissionRoute><Branches /></PermissionRoute>} />
               <Route path="/settings" element={<PermissionRoute><GeneralSettings /></PermissionRoute>} />
               <Route path="/settings/general" element={<PermissionRoute><GeneralSettings /></PermissionRoute>} />
-              <Route path="/settings/appointments" element={<PermissionRoute><AppointmentSettings /></PermissionRoute>} />
-              <Route path="/settings/invoices" element={<PermissionRoute><InvoiceSettings /></PermissionRoute>} />
-              <Route path="/settings/payments" element={<PermissionRoute><PaymentMethodsPage /></PermissionRoute>} />
-              <Route path="/settings/services" element={<PermissionRoute><ServicesPage /></PermissionRoute>} />
-              <Route path="/settings/insurance" element={<PermissionRoute><InsuranceCompanies /></PermissionRoute>} />
-              <Route path="/settings/insurance-contracts" element={<PermissionRoute><InsuranceContracts /></PermissionRoute>} />
-              <Route path="/settings/communication" element={<PermissionRoute><Communication /></PermissionRoute>} />
+              <Route path="/settings/appointments" element={<PermissionRoute adminOnly><AppointmentSettings /></PermissionRoute>} />
+              <Route path="/settings/invoices" element={<PermissionRoute adminOnly><InvoiceSettings /></PermissionRoute>} />
+              <Route path="/settings/payments" element={<PermissionRoute adminOnly><PaymentMethodsPage /></PermissionRoute>} />
+              <Route path="/settings/services" element={<PermissionRoute adminOnly><ServicesPage /></PermissionRoute>} />
+              <Route path="/settings/insurance" element={<PermissionRoute adminOnly><InsuranceCompanies /></PermissionRoute>} />
+              <Route path="/settings/insurance-contracts" element={<PermissionRoute adminOnly><InsuranceContracts /></PermissionRoute>} />
+              <Route path="/settings/communication" element={<PermissionRoute adminOnly><Communication /></PermissionRoute>} />
               {/* Backward-compatible redirects from the legacy 6 routes */}
               <Route path="/settings/notifications" element={<Navigate to="/settings/communication?tab=notifications" replace />} />
               <Route path="/settings/reminders" element={<Navigate to="/settings/communication?tab=reminders" replace />} />
@@ -232,7 +232,7 @@ function AppContent() {
               <Route path="/settings/templates/email" element={<Navigate to="/settings/communication?tab=email" replace />} />
               <Route path="/settings/templates/sms" element={<Navigate to="/settings/communication?tab=sms" replace />} />
               <Route path="/settings/templates/whatsapp" element={<Navigate to="/settings/communication?tab=whatsapp" replace />} />
-              <Route path="/settings/languages" element={<PermissionRoute><LanguagesPage /></PermissionRoute>} />
+              <Route path="/settings/languages" element={<PermissionRoute adminOnly><LanguagesPage /></PermissionRoute>} />
               <Route path="/settings/roles" element={<PermissionRoute adminOnly><RolePermissions /></PermissionRoute>} />
               <Route path="/settings/users" element={<PermissionRoute adminOnly><UserManagement /></PermissionRoute>} />
               <Route path="/settings/backup" element={<PermissionRoute adminOnly><BackupExport /></PermissionRoute>} />

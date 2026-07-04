@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Search, UserPlus, Trash2, Copy, KeyRound, AlertTriangle, Lock } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useBranch } from "@/contexts/BranchContext";
+import { Link2, Link2Off } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
@@ -24,6 +25,27 @@ import { toast } from "sonner";
 
 const ROLES = ["admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr", "staff"] as const;
 type Role = typeof ROLES[number];
+
+type StaffLink = { branch_id: string | null; employee_id: string | null };
+
+async function logLinkAudit(
+  action: "link" | "unlink" | "replace",
+  userId: string,
+  branchId: string | null,
+  oldVals: Record<string, unknown> | null,
+  newVals: Record<string, unknown> | null,
+) {
+  const { data: me } = await supabase.auth.getUser();
+  await (supabase as any).from("audit_logs").insert({
+    user_id: me.user?.id ?? null,
+    branch_id: branchId,
+    action,
+    entity_type: "user_employee_link",
+    entity_id: userId,
+    old_values: oldVals,
+    new_values: newVals,
+  });
+}
 
 function suggestRoleFromPosition(titleEn: string | null | undefined, groupKey: string | null | undefined): Role {
   const s = `${titleEn ?? ""} ${groupKey ?? ""}`.toLowerCase();
@@ -44,7 +66,7 @@ export default function UserManagement() {
   const [q, setQ] = useState("");
   const [invites, setInvites] = useState<any[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
-  const [staffBranches, setStaffBranches] = useState<Record<string, string | null>>({});
+  const [staffLinks, setStaffLinks] = useState<Record<string, StaffLink>>({});
   const [open, setOpen] = useState(false);
   const [invEmail, setInvEmail] = useState("");
   const [invName, setInvName] = useState("");
@@ -77,11 +99,13 @@ export default function UserManagement() {
   const [eRole, setERole] = useState<Role>("staff");
   const [eBranch, setEBranch] = useState<string>("");
   const [savingEdit, setSavingEdit] = useState(false);
+  const [unlinkTarget, setUnlinkTarget] = useState<any | null>(null);
+  const [unlinking, setUnlinking] = useState(false);
 
   const openEdit = (u: any) => {
     const current = (roles[u.id] ?? [])[0] as Role | undefined;
     setERole((current as Role) ?? "staff");
-    setEBranch(staffBranches[u.id] ?? "");
+    setEBranch(staffLinks[u.id]?.branch_id ?? "");
     setEditTarget(u);
   };
 
@@ -92,18 +116,60 @@ export default function UserManagement() {
       return;
     }
     setSavingEdit(true);
+    const prev = staffLinks[editTarget.id] ?? null;
+    const prevRole = (roles[editTarget.id] ?? [])[0] ?? null;
     // Replace roles: delete all then insert the chosen one
     const del = await (supabase as any).from("user_roles").delete().eq("user_id", editTarget.id);
     if (del.error) { setSavingEdit(false); toast.error(del.error.message); return; }
     const ins = await (supabase as any).from("user_roles").insert({ user_id: editTarget.id, role: eRole });
     if (ins.error) { setSavingEdit(false); toast.error(ins.error.message); return; }
-    // Update staff_profiles branch if row exists
+    // Upsert staff_profiles branch. If no row exists yet, create one (post-creation linking).
     if (eBranch) {
-      await (supabase as any).from("staff_profiles").update({ branch_id: eBranch }).eq("id", editTarget.id);
+      const existing = prev?.employee_id;
+      let employeeId = existing ?? null;
+      if (!employeeId) {
+        // Generate an employee code so the NOT NULL constraint holds.
+        const { data: counter } = await (supabase as any)
+          .from("employee_id_counter").select("id,last_value").eq("id", 1).maybeSingle();
+        const next = ((counter?.last_value as number) ?? 0) + 1;
+        await (supabase as any).from("employee_id_counter").upsert({ id: 1, last_value: next });
+        employeeId = `EMP-${String(next).padStart(4, "0")}`;
+      }
+      const { error: upErr } = await (supabase as any).from("staff_profiles")
+        .upsert({ id: editTarget.id, branch_id: eBranch, employee_id: employeeId }, { onConflict: "id" });
+      if (upErr) { setSavingEdit(false); toast.error(upErr.message); return; }
+      const isLinkAction = !prev?.branch_id;
+      await logLinkAudit(
+        isLinkAction ? "link" : (prev?.branch_id !== eBranch ? "replace" : "link"),
+        editTarget.id, eBranch,
+        { role: prevRole, branch_id: prev?.branch_id ?? null },
+        { role: eRole, branch_id: eBranch },
+      );
+    } else if (prevRole !== eRole) {
+      await logLinkAudit("replace", editTarget.id, prev?.branch_id ?? null,
+        { role: prevRole }, { role: eRole });
     }
     setSavingEdit(false);
     toast.success(lang === "ar" ? "تم تحديث الصلاحيات" : "Permissions updated");
     setEditTarget(null);
+    load();
+  };
+
+  const unlinkEmployee = async () => {
+    if (!unlinkTarget) return;
+    setUnlinking(true);
+    const prev = staffLinks[unlinkTarget.id] ?? null;
+    // Soft-delete staff_profile and revoke roles (least-privilege).
+    const { error: sErr } = await (supabase as any).from("staff_profiles")
+      .update({ deleted_at: new Date().toISOString(), status: "terminated" })
+      .eq("id", unlinkTarget.id);
+    if (sErr) { setUnlinking(false); toast.error(sErr.message); return; }
+    await (supabase as any).from("user_roles").delete().eq("user_id", unlinkTarget.id);
+    await logLinkAudit("unlink", unlinkTarget.id, prev?.branch_id ?? null,
+      { branch_id: prev?.branch_id ?? null, employee_id: prev?.employee_id ?? null }, null);
+    setUnlinking(false);
+    toast.success(lang === "ar" ? "تم فك الربط" : "Unlinked");
+    setUnlinkTarget(null);
     load();
   };
 
@@ -126,22 +192,26 @@ export default function UserManagement() {
       .order("name_en");
     const { data: sps } = await (supabase as any)
       .from("staff_profiles")
-      .select("id,branch_id");
+      .select("id,branch_id,employee_id,deleted_at");
     setUsers(ps ?? []);
     const m: Record<string, string[]> = {};
     (rs ?? []).forEach((r: any) => { (m[r.user_id] = m[r.user_id] || []).push(r.role); });
     setRoles(m);
     setInvites(inv ?? []);
     setBranches(brs ?? []);
-    const sb: Record<string, string | null> = {};
-    (sps ?? []).forEach((s: any) => { sb[s.id] = s.branch_id ?? null; });
-    setStaffBranches(sb);
+    const sb: Record<string, StaffLink> = {};
+    (sps ?? []).forEach((s: any) => {
+      if (s.deleted_at) return; // treat soft-deleted as unlinked
+      sb[s.id] = { branch_id: s.branch_id ?? null, employee_id: s.employee_id ?? null };
+    });
+    setStaffLinks(sb);
   };
   useEffect(() => { load(); }, []);
 
   // Load employees in the current branch that don't yet have any user role assigned.
+  // Loaded on branch/data change so the picker (and the "link" flow from any surface)
+  // always reflects the active branch — not only when the Create dialog opens.
   useEffect(() => {
-    if (!createOpen) return;
     if (!currentBranchId) { setLinkableStaff([]); return; }
     (async () => {
       const { data: sps } = await (supabase as any)
@@ -153,7 +223,7 @@ export default function UserManagement() {
       const withRoles = new Set((rs ?? []).map((r: any) => r.user_id));
       setLinkableStaff((sps ?? []).filter((s: any) => !withRoles.has(s.id)));
     })();
-  }, [createOpen, currentBranchId]);
+  }, [currentBranchId, users.length]);
 
   const onPickLinkedStaff = (id: string) => {
     setCLinkedStaffId(id);
@@ -354,7 +424,17 @@ export default function UserManagement() {
               </div>
               <div className="flex gap-1 flex-wrap items-center">
                 {(roles[u.id] ?? []).map(r => <Badge key={r} variant="outline" className="capitalize">{r}</Badge>)}
-                {(roles[u.id] ?? []).includes("manager") && !staffBranches[u.id] && (
+                {staffLinks[u.id]?.branch_id ? (
+                  <Badge variant="outline" className="gap-1 text-primary">
+                    <Link2 className="size-3" />
+                    {lang === "ar" ? "مربوط" : "Linked"}
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="gap-1">
+                    {lang === "ar" ? "غير مربوط" : "Unlinked"}
+                  </Badge>
+                )}
+                {(roles[u.id] ?? []).includes("manager") && !staffLinks[u.id]?.branch_id && (
                   <Badge variant="destructive" className="gap-1">
                     <AlertTriangle className="size-3" />
                     {lang === "ar" ? "بدون فرع" : "No branch"}
@@ -362,6 +442,16 @@ export default function UserManagement() {
                 )}
               </div>
               <Button size="sm" variant="outline" onClick={() => openEdit(u)}>{t("edit")}</Button>
+              {staffLinks[u.id]?.branch_id && currentUserId !== u.id && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  title={lang === "ar" ? "فك الربط بسجل الموظف" : "Unlink from employee record"}
+                  onClick={() => setUnlinkTarget(u)}
+                >
+                  <Link2Off className="size-4" />
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="outline"

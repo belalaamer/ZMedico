@@ -237,6 +237,9 @@ export default function CalendarPage() {
     () => Array.from({ length: Math.max(1, dayEndHour - dayStartHour) }, (_, i) => dayStartHour + i),
     [dayStartHour, dayEndHour]
   );
+  // Extra label for the closing hour (e.g. 10 PM) rendered at the bottom
+  // edge of the last hour row so the full branch window is visible.
+  const endHourLabel = dayEndHour;
 
   const load = async () => {
     const start = rangeStart.toISOString();
@@ -515,12 +518,60 @@ export default function CalendarPage() {
   }, [filteredItems]);
 
   // Block position for time grid
-  const blockStyle = (a: Appt) => {
+  const blockStyle = (a: Appt, lane = 0, lanes = 1) => {
     const dt = new Date(a.scheduled_at);
     const minutesFromStart = (dt.getHours() - dayStartHour) * 60 + dt.getMinutes();
     const top = (minutesFromStart / 60) * HOUR_HEIGHT;
     const height = Math.max(28, (a.duration_minutes / 60) * HOUR_HEIGHT - 2);
-    return { top: `${top}px`, height: `${height}px` };
+    // Side-by-side lanes when appointments overlap. Small horizontal padding
+    // is applied via inline left/right instead of the previous inset-x-1.
+    const gap = 2; // px between lanes
+    const widthPct = 100 / lanes;
+    const leftPct = widthPct * lane;
+    return {
+      top: `${top}px`,
+      height: `${height}px`,
+      left: `calc(${leftPct}% + ${lane === 0 ? 4 : gap}px)`,
+      width: `calc(${widthPct}% - ${lane === 0 || lane === lanes - 1 ? 6 : gap * 2}px)`,
+    } as React.CSSProperties;
+  };
+
+  // Assign each appointment to a lane so overlapping events render side-by-side.
+  // Returns Map<apptId, {lane, lanes}> where `lanes` = total lanes in the
+  // overlap cluster the appt belongs to.
+  const layoutDay = (day: Appt[]) => {
+    const sorted = [...day].sort(
+      (a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()
+    );
+    const out = new Map<string, { lane: number; lanes: number }>();
+    let cluster: Appt[] = [];
+    let clusterEnd = 0;
+    const flush = () => {
+      if (!cluster.length) return;
+      const lanes: number[] = []; // end-time per lane
+      const assigned: Record<string, number> = {};
+      for (const a of cluster) {
+        const s = new Date(a.scheduled_at).getTime();
+        const e = s + a.duration_minutes * 60000;
+        let idx = lanes.findIndex((end) => end <= s);
+        if (idx === -1) { lanes.push(e); idx = lanes.length - 1; }
+        else lanes[idx] = e;
+        assigned[a.id] = idx;
+      }
+      const total = lanes.length;
+      for (const a of cluster) out.set(a.id, { lane: assigned[a.id], lanes: total });
+      cluster = [];
+      clusterEnd = 0;
+    };
+    for (const a of sorted) {
+      const s = new Date(a.scheduled_at).getTime();
+      const e = s + a.duration_minutes * 60000;
+      if (cluster.length && s >= clusterEnd) flush();
+      cluster.push(a);
+      clusterEnd = Math.max(clusterEnd, e);
+    }
+    flush();
+    return out;
   };
 
   const timeStr = (d: Date) => d.toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US",
@@ -529,17 +580,33 @@ export default function CalendarPage() {
     ? `${p.first_name_ar ?? p.first_name_en} ${p.last_name_ar ?? p.last_name_en ?? ""}`.trim()
     : `${p.first_name_en} ${p.last_name_en ?? ""}`.trim();
 
-  const renderApptBlock = (a: Appt) => (
+  const renderApptBlock = (a: Appt, lane = 0, lanes = 1) => (
     <button
       key={a.id}
       id={`appt-${a.id}`}
-      onClick={() => navigate(`/appointments/${a.id}`)}
-      className={`absolute inset-x-1 rounded-md border text-start px-2 py-1 overflow-hidden hover:shadow-md transition-all ${statusBlock[a.status]} ${highlightId === a.id ? "ring-2 ring-primary shadow-lg z-10" : ""}`}
-      style={blockStyle(a)}
+      onClick={(e) => { e.stopPropagation(); navigate(`/appointments/${a.id}`); }}
+      className={cn(
+        "absolute rounded-md border text-start px-2 py-1 overflow-hidden shadow-sm",
+        "hover:shadow-md hover:z-20 hover:scale-[1.01] transition-all",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+        statusBlock[a.status],
+        highlightId === a.id && "ring-2 ring-primary shadow-lg z-20",
+        lanes > 1 && "ring-1 ring-background/60",
+      )}
+      style={blockStyle(a, lane, lanes)}
       title={`${fullName(a.patients!)} · ${timeStr(new Date(a.scheduled_at))}`}
     >
-      <div className="text-[11px] font-medium truncate">{timeStr(new Date(a.scheduled_at))} · {fullName(a.patients!)}</div>
-      <div className="text-[10px] opacity-80 truncate">{a.procedure || "—"}{a.room ? ` · ${a.room}` : ""}</div>
+      <div className="text-[11px] font-semibold leading-tight truncate">
+        {timeStr(new Date(a.scheduled_at))}
+      </div>
+      <div className="text-[11px] leading-tight truncate">
+        {fullName(a.patients!)}
+      </div>
+      {(a.procedure || a.room) && (
+        <div className="text-[10px] opacity-75 truncate">
+          {a.procedure || "—"}{a.room ? ` · ${a.room}` : ""}
+        </div>
+      )}
     </button>
   );
 
@@ -1013,6 +1080,12 @@ export default function CalendarPage() {
                     {new Date(2000, 0, 1, h).toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US", { hour: "numeric", hour12: true })}
                   </div>
                 ))}
+                {/* Closing-hour marker — sits flush with the bottom edge of
+                    the last row so the branch's end time is visible. */}
+                <div className="text-[10px] text-muted-foreground text-end pe-2 -mt-2">
+                  {new Date(2000, 0, 1, Math.min(23, endHourLabel), endHourLabel >= 24 ? 59 : 0)
+                    .toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US", { hour: "numeric", hour12: true })}
+                </div>
               </div>
 
               {/* Day columns */}
@@ -1053,8 +1126,14 @@ export default function CalendarPage() {
                         <div className="size-2 -mt-1 ms-0 rounded-full bg-destructive" />
                       </div>
                     )}
-                    {/* Appointment blocks */}
-                    {dayItems.map(renderApptBlock)}
+                    {/* Appointment blocks (side-by-side when overlapping) */}
+                    {(() => {
+                      const lanesMap = layoutDay(dayItems);
+                      return dayItems.map((a) => {
+                        const info = lanesMap.get(a.id) ?? { lane: 0, lanes: 1 };
+                        return renderApptBlock(a, info.lane, info.lanes);
+                      });
+                    })()}
                   </div>
                 );
               })}

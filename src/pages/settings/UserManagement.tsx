@@ -102,6 +102,89 @@ export default function UserManagement() {
   const [unlinkTarget, setUnlinkTarget] = useState<any | null>(null);
   const [unlinking, setUnlinking] = useState(false);
 
+  // Link / Replace picker state
+  const [linkTarget, setLinkTarget] = useState<any | null>(null); // user we're linking
+  const [linkMode, setLinkMode] = useState<"link" | "replace">("link");
+  const [pickerStaff, setPickerStaff] = useState<any[]>([]);
+  const [pickedStaffId, setPickedStaffId] = useState<string>("");
+  const [pickedRole, setPickedRole] = useState<Role>("staff");
+  const [linking, setLinking] = useState(false);
+
+  const openLinkPicker = async (u: any, mode: "link" | "replace") => {
+    setLinkTarget(u);
+    setLinkMode(mode);
+    setPickedStaffId("");
+    setPickedRole(((roles[u.id] ?? [])[0] as Role) ?? "staff");
+    if (!currentBranchId) { setPickerStaff([]); return; }
+    const { data: sps } = await (supabase as any)
+      .from("staff_profiles")
+      .select("id,employee_id,branch_id,linked_user_id,staff_positions(title_en,title_ar),profiles(email,full_name)")
+      .eq("branch_id", currentBranchId)
+      .is("deleted_at", null);
+    setPickerStaff(sps ?? []);
+  };
+
+  const confirmLink = async () => {
+    if (!linkTarget || !pickedStaffId) return;
+    const target = pickerStaff.find((s) => s.id === pickedStaffId);
+    if (!target) return;
+    if (target.linked_user_id) {
+      toast.error(lang === "ar" ? "هذا الموظف مربوط بالفعل" : "This employee is already linked");
+      return;
+    }
+    if (currentBranchId && target.branch_id && target.branch_id !== currentBranchId) {
+      toast.error(lang === "ar" ? "لا يمكن الربط عبر فرع مختلف" : "Cross-branch link is not allowed");
+      return;
+    }
+    setLinking(true);
+    try {
+      const prevStaffId = Object.entries(staffLinks).find(([, v]) => (v as any).linked_user_id === linkTarget.id)?.[0]
+        ?? (staffLinks[linkTarget.id]?.branch_id ? linkTarget.id : null);
+      // Replace: clear previous link atomically-ish
+      if (linkMode === "replace" && prevStaffId) {
+        const { error } = await (supabase as any).from("staff_profiles")
+          .update({ linked_user_id: null })
+          .eq("id", prevStaffId)
+          .eq("linked_user_id", linkTarget.id);
+        if (error) throw error;
+      }
+      // Guarded link: only succeeds if target is still unlinked
+      const { data: upd, error: upErr } = await (supabase as any).from("staff_profiles")
+        .update({ linked_user_id: linkTarget.id })
+        .eq("id", pickedStaffId)
+        .is("linked_user_id", null)
+        .select("id");
+      if (upErr) throw upErr;
+      if (!upd || upd.length === 0) {
+        // Rollback replace if we cleared previous
+        if (linkMode === "replace" && prevStaffId) {
+          await (supabase as any).from("staff_profiles")
+            .update({ linked_user_id: linkTarget.id })
+            .eq("id", prevStaffId);
+        }
+        throw new Error(lang === "ar" ? "الموظف مربوط بالفعل — أعد التحميل" : "Employee is already linked — refresh");
+      }
+      // Assign role
+      await (supabase as any).from("user_roles").delete().eq("user_id", linkTarget.id);
+      const { error: rErr } = await (supabase as any).from("user_roles")
+        .insert({ user_id: linkTarget.id, role: pickedRole });
+      if (rErr) throw rErr;
+      await logLinkAudit(
+        linkMode === "replace" ? "employee_replaced" : "employee_linked",
+        linkTarget.id, target.branch_id ?? currentBranchId,
+        { staff_id: prevStaffId, role: (roles[linkTarget.id] ?? [])[0] ?? null },
+        { staff_id: pickedStaffId, role: pickedRole, branch_id: target.branch_id ?? currentBranchId },
+      );
+      toast.success(lang === "ar" ? "تم الربط" : "Linked");
+      setLinkTarget(null);
+      load();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed");
+    } finally {
+      setLinking(false);
+    }
+  };
+
   const openEdit = (u: any) => {
     const current = (roles[u.id] ?? [])[0] as Role | undefined;
     setERole((current as Role) ?? "staff");

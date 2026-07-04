@@ -39,6 +39,7 @@ export default function Staff() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"existing" | "new">("new");
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [newUser, setNewUser] = useState({ email: "", full_name: "", role: "staff" as string, password: "" });
   const [creatingUser, setCreatingUser] = useState(false);
   const [createdInfo, setCreatedInfo] = useState<{ email: string; password: string } | null>(null);
@@ -67,7 +68,7 @@ export default function Staff() {
   useDataSync(["staff", "departments", "positions"], () => { load(); });
 
   const save = async () => {
-    let profileId = form.profile_id;
+    let profileId = editingId ?? form.profile_id;
 
     const effectiveBranchId = form.branch_id || currentBranchId;
     if (!effectiveBranchId) {
@@ -75,7 +76,7 @@ export default function Staff() {
       return;
     }
 
-    if (mode === "new") {
+    if (mode === "new" && !editingId) {
       if (!newUser.email || !newUser.full_name) { toast.error(t("fullName") + " / Email"); return; }
       setCreatingUser(true);
       const { data, error } = await supabase.functions.invoke("admin-create-user", {
@@ -121,7 +122,8 @@ export default function Staff() {
     const { error } = await supabase.from("staff_profiles").upsert(payload, { onConflict: "id" });
     if (error) return toast.error(error.message);
     toast.success(t("save"));
-    if (mode !== "new") setOpen(false);
+    if (editingId || mode !== "new") setOpen(false);
+    setEditingId(null);
     load();
   };
 
@@ -131,6 +133,33 @@ export default function Staff() {
 
   const usedIds = new Set(items.map((s) => s.id));
   const availableProfiles = profiles.filter((p) => !usedIds.has(p.id));
+
+  const openEdit = (s: any) => {
+    setEditingId(s.id);
+    setMode("existing");
+    setCreatedInfo(null);
+    setForm({
+      profile_id: s.id,
+      position_id: s.position_id ?? "",
+      department_id: s.department_id ?? "",
+      branch_id: s.branch_id ?? "",
+      hire_date: s.hire_date ?? new Date().toISOString().slice(0, 10),
+      contract_type: s.contract_type ?? "full_time",
+      salary: String(s.salary ?? "0"),
+      commission_percent: String(s.commission_percent ?? "0"),
+      bank_name: s.bank_name ?? "",
+      bank_account: s.bank_account ?? "",
+      working_hours_per_week: s.working_hours_per_week ?? 40,
+      annual_leave_balance: s.annual_leave_balance ?? 21,
+      sick_leave_balance: s.sick_leave_balance ?? 10,
+      emergency_contact_name: s.emergency_contact_name ?? "",
+      emergency_contact_phone: s.emergency_contact_phone ?? "",
+      national_id: s.national_id ?? "",
+      date_of_birth: s.date_of_birth ?? "",
+      address: s.address ?? "",
+    });
+    setOpen(true);
+  };
 
   const softDelete = async (s: any): Promise<void> => {
     const { error } = await supabase.from("staff_profiles").update({ deleted_at: new Date().toISOString() } as any).eq("id", s.id);
@@ -169,14 +198,14 @@ export default function Staff() {
               <SelectItem value="suspended">{t("statusSuspended")}</SelectItem>
             </SelectContent>
           </Select>
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setEditingId(null); }}>
             <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground"><Plus className="me-2 size-4" />{t("addStaff")}</Button></DialogTrigger>
             <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-              <DialogHeader><DialogTitle>{t("newStaff")}</DialogTitle></DialogHeader>
-              <div className="flex gap-2 mb-2">
+              <DialogHeader><DialogTitle>{editingId ? t("edit") : t("newStaff")}</DialogTitle></DialogHeader>
+              {!editingId && <div className="flex gap-2 mb-2">
                 <Button type="button" size="sm" variant={mode === "new" ? "default" : "outline"} onClick={() => setMode("new")}>+ New user</Button>
                 <Button type="button" size="sm" variant={mode === "existing" ? "default" : "outline"} onClick={() => setMode("existing")}>Existing user</Button>
-              </div>
+              </div>}
               {createdInfo && (
                 <Card className="p-3 mb-2 border-success/40 bg-success/5 text-sm">
                   <div className="font-medium">User created ✓</div>
@@ -188,7 +217,7 @@ export default function Staff() {
                 </Card>
               )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {mode === "existing" ? (
+                {editingId ? null : mode === "existing" ? (
                   <div className="space-y-2 sm:col-span-2"><Label>{t("fullName")}</Label>
                     <Select value={form.profile_id} onValueChange={(v) => setForm({ ...form, profile_id: v })}>
                       <SelectTrigger><SelectValue placeholder={t("selectStaff")} /></SelectTrigger>
@@ -274,7 +303,7 @@ export default function Staff() {
               </div>
               <Badge variant="outline" className={s.status === "active" ? "status-completed" : "status-departed"}>{statusLabel(s.status, t)}</Badge>
             </Link>
-            <RowActions onEdit={() => navigate(`/hr/staff/${s.id}`)} onDelete={() => softDelete(s)} />
+            <RowActions onEdit={() => openEdit(s)} onDelete={() => softDelete(s)} />
           </Card>
         ))}
         {filtered.length === 0 && <Card className="p-10 col-span-full text-center text-muted-foreground">{t("noPatients")}</Card>}

@@ -22,12 +22,14 @@ import { Slider } from "@/components/ui/slider";
 import { getCurrentLocation } from "@/lib/geo";
 import { Loader2 } from "lucide-react";
 import { fetchQueueSettings, saveQueueSettings, DEFAULT_QUEUE_SETTINGS, type QueueSettings } from "@/lib/queueSettings";
+import { ALL_DAYS, dayShort, formatWorkingDays, normalizeDays, fmtTime } from "@/lib/branchSchedule";
 
 type Branch = {
   id: string; name_ar: string; name_en: string; code: string | null;
   phone: string | null; email: string | null; address: string | null; city: string | null;
   is_main_branch: boolean; is_active: boolean; manager_id: string | null;
   working_hours_start: string | null; working_hours_end: string | null;
+  working_days?: number[] | null;
   allowed_latitude: number | null; allowed_longitude: number | null; allowed_radius: number | null;
 };
 
@@ -36,6 +38,7 @@ type Staff = { id: string; full_name: string | null; email: string | null };
 const empty = {
   name: "", code: "", phone: "", email: "", address: "", city: "",
   manager_id: "", working_hours_start: "09:00", working_hours_end: "21:00",
+  working_days: [...ALL_DAYS] as number[],
   is_main_branch: false, is_active: true,
 };
 
@@ -125,6 +128,7 @@ export default function Branches() {
       manager_id: b.manager_id ?? "",
       working_hours_start: b.working_hours_start ?? "09:00",
       working_hours_end: b.working_hours_end ?? "21:00",
+      working_days: normalizeDays(b.working_days),
       is_main_branch: b.is_main_branch,
       is_active: b.is_active,
     });
@@ -141,6 +145,7 @@ export default function Branches() {
       manager_id: form.manager_id || null,
       working_hours_start: form.working_hours_start || null,
       working_hours_end: form.working_hours_end || null,
+      working_days: normalizeDays(form.working_days),
       is_main_branch: form.is_main_branch, is_active: form.is_active,
     };
     let error;
@@ -266,6 +271,41 @@ export default function Branches() {
                   <Input type="time" value={form.working_hours_end} onChange={(e) => setForm({ ...form, working_hours_end: e.target.value })} />
                 </div>
               </div>
+              <div className="md:col-span-2">
+                <Label>{lang === "ar" ? "أيام العمل" : "Working days"}</Label>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {ALL_DAYS.map((d) => {
+                    const active = form.working_days.includes(d);
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() =>
+                          setForm({
+                            ...form,
+                            working_days: active
+                              ? form.working_days.filter((x) => x !== d)
+                              : [...form.working_days, d].sort((a, b) => a - b),
+                          })
+                        }
+                        aria-pressed={active}
+                        className={`px-3 py-1.5 rounded-full text-xs border transition ${
+                          active
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-muted text-muted-foreground border-transparent hover:bg-muted/70"
+                        }`}
+                      >
+                        {dayShort(d, lang)}
+                      </button>
+                    );
+                  })}
+                </div>
+                {form.working_days.length === 0 && (
+                  <p className="mt-1 text-xs text-destructive">
+                    {lang === "ar" ? "الفرع مغلق — لم يتم اختيار أي يوم." : "Branch will be marked closed — no days selected."}
+                  </p>
+                )}
+              </div>
               <div className="flex items-center justify-between rounded-md border p-3">
                 <div className="flex items-center gap-2"><Star className="size-4 text-primary" /><span className="text-sm font-medium">{t("mainBranch") ?? "Main Branch"}</span></div>
                 <Switch checked={form.is_main_branch} onCheckedChange={(v) => setForm({ ...form, is_main_branch: v })} />
@@ -293,6 +333,39 @@ export default function Branches() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            <div className="rounded-md border p-2 text-xs flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="inline-flex items-center gap-1 text-muted-foreground">
+                <CalendarDays className="size-3.5" />
+                {lang === "ar" ? "أيام العمل" : "Working days"}:
+              </span>
+              <span className="font-medium">{formatWorkingDays(currentBranch.working_days, lang)}</span>
+              <span className="inline-flex items-center gap-1 text-muted-foreground ms-2">
+                <Clock className="size-3.5" />
+                {lang === "ar" ? "الدوام" : "Hours"}:
+              </span>
+              <span className="font-medium">
+                {currentBranch.working_hours_start && currentBranch.working_hours_end
+                  ? `${fmtTime(currentBranch.working_hours_start)}–${fmtTime(currentBranch.working_hours_end)}`
+                  : "—"}
+              </span>
+              <div className="flex flex-wrap gap-1 ms-auto">
+                {ALL_DAYS.map((d) => {
+                  const active = normalizeDays(currentBranch.working_days).includes(d);
+                  return (
+                    <span
+                      key={d}
+                      className={`px-1.5 py-0.5 rounded text-[10px] border ${
+                        active
+                          ? "bg-primary/10 text-primary border-primary/30"
+                          : "bg-muted text-muted-foreground/60 border-transparent line-through"
+                      }`}
+                    >
+                      {dayShort(d, lang)}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
               <div className="rounded-md border p-2 flex items-center gap-2">
                 <Clock className="size-3.5 text-muted-foreground" />
@@ -344,6 +417,7 @@ export default function Branches() {
                 <TableHead>{t("code")}</TableHead>
                 <TableHead>{t("city")}</TableHead>
                 <TableHead>{t("manager")}</TableHead>
+                <TableHead>{lang === "ar" ? "الجدول" : "Schedule"}</TableHead>
                 <TableHead>{t("status")}</TableHead>
                 <TableHead className="w-32">{t("actions")}</TableHead>
               </TableRow>
@@ -358,6 +432,14 @@ export default function Branches() {
                   <TableCell className="font-mono text-xs">{b.code ?? "—"}</TableCell>
                   <TableCell>{b.city ?? "—"}</TableCell>
                   <TableCell>{staffName(b.manager_id)}</TableCell>
+                  <TableCell className="text-xs">
+                    <div className="font-medium">{formatWorkingDays(b.working_days, lang)}</div>
+                    <div className="text-muted-foreground">
+                      {b.working_hours_start && b.working_hours_end
+                        ? `${fmtTime(b.working_hours_start)}–${fmtTime(b.working_hours_end)}`
+                        : "—"}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     {b.is_active
                       ? <Badge className="bg-emerald-500/10 text-emerald-600 border-0">{t("active")}</Badge>

@@ -145,21 +145,25 @@ export default function CalendarPage() {
   const [workStartMin, setWorkStartMin] = useState<number | null>(null);
   const [workEndMin, setWorkEndMin] = useState<number | null>(null);
 
+  const [workingDays, setWorkingDays] = useState<number[]>([0,1,2,3,4,5,6]);
   const loadBranchHours = async () => {
     if (!currentBranchId) {
       setDayStartHour(DEFAULT_DAY_START_HOUR);
       setDayEndHour(DEFAULT_DAY_END_HOUR);
+      setWorkingDays([0,1,2,3,4,5,6]);
       return;
     }
     const { data } = await supabase
       .from("branches")
-      .select("working_hours_start,working_hours_end")
+      .select("working_hours_start,working_hours_end,working_days")
       .eq("id", currentBranchId)
       .maybeSingle();
     const start = parseHour((data as any)?.working_hours_start, "floor");
     const end = parseHour((data as any)?.working_hours_end, "ceil");
     const sMin = parseMinutes((data as any)?.working_hours_start);
     const eMin = parseMinutes((data as any)?.working_hours_end);
+    const wd = (data as any)?.working_days;
+    setWorkingDays(Array.isArray(wd) ? wd.map(Number).filter((n: number) => n >= 0 && n <= 6) : [0,1,2,3,4,5,6]);
     if (start != null && end != null && end > start) {
       setDayStartHour(start);
       setDayEndHour(end);

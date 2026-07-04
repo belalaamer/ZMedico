@@ -140,13 +140,13 @@ export default function UserManagement() {
       if (upErr) { setSavingEdit(false); toast.error(upErr.message); return; }
       const isLinkAction = !prev?.branch_id;
       await logLinkAudit(
-        isLinkAction ? "link" : (prev?.branch_id !== eBranch ? "replace" : "link"),
+        isLinkAction ? "employee_linked" : "employee_replaced",
         editTarget.id, eBranch,
         { role: prevRole, branch_id: prev?.branch_id ?? null },
         { role: eRole, branch_id: eBranch },
       );
     } else if (prevRole !== eRole) {
-      await logLinkAudit("replace", editTarget.id, prev?.branch_id ?? null,
+      await logLinkAudit("employee_replaced", editTarget.id, prev?.branch_id ?? null,
         { role: prevRole }, { role: eRole });
     }
     setSavingEdit(false);
@@ -165,7 +165,7 @@ export default function UserManagement() {
       .eq("id", unlinkTarget.id);
     if (sErr) { setUnlinking(false); toast.error(sErr.message); return; }
     await (supabase as any).from("user_roles").delete().eq("user_id", unlinkTarget.id);
-    await logLinkAudit("unlink", unlinkTarget.id, prev?.branch_id ?? null,
+    await logLinkAudit("employee_unlinked", unlinkTarget.id, prev?.branch_id ?? null,
       { branch_id: prev?.branch_id ?? null, employee_id: prev?.employee_id ?? null }, null);
     setUnlinking(false);
     toast.success(lang === "ar" ? "تم فك الربط" : "Unlinked");

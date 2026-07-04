@@ -417,6 +417,7 @@ export default function Branches() {
                 <TableHead>{t("code")}</TableHead>
                 <TableHead>{t("city")}</TableHead>
                 <TableHead>{t("manager")}</TableHead>
+                <TableHead>{lang === "ar" ? "الجدول" : "Schedule"}</TableHead>
                 <TableHead>{t("status")}</TableHead>
                 <TableHead className="w-32">{t("actions")}</TableHead>
               </TableRow>
@@ -431,6 +432,14 @@ export default function Branches() {
                   <TableCell className="font-mono text-xs">{b.code ?? "—"}</TableCell>
                   <TableCell>{b.city ?? "—"}</TableCell>
                   <TableCell>{staffName(b.manager_id)}</TableCell>
+                  <TableCell className="text-xs">
+                    <div className="font-medium">{formatWorkingDays(b.working_days, lang)}</div>
+                    <div className="text-muted-foreground">
+                      {b.working_hours_start && b.working_hours_end
+                        ? `${fmtTime(b.working_hours_start)}–${fmtTime(b.working_hours_end)}`
+                        : "—"}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     {b.is_active
                       ? <Badge className="bg-emerald-500/10 text-emerald-600 border-0">{t("active")}</Badge>

@@ -67,7 +67,9 @@ const INTEGRATION_CTAS: Array<{ route: string; label: RegExp }> = [
   { route: "/calendar", label: /موعد|Appointment|جديد|New|حجز|Book/i },
   { route: "/invoices", label: /فاتورة|Invoice|جديد|New|إنشاء|Create/i },
   { route: "/payments", label: /دفع|Payment|تسجيل|Record|جديد|New/i },
-  { route: "/treasury", label: /خزينة|Treasury|إغلاق|Close|جديد|New|إضافة|Add/i },
+  // Treasury exposes "الإقفال اليومي" (Daily Close), "تحويل أموال" (Transfer
+  // Funds), and "تعديل" (Edit). Match the actual roots used on the page.
+  { route: "/treasury", label: /خزينة|Treasury|الإقفال|إغلاق|Close|تحويل|Transfer|تعديل|Edit|جديد|New|إضافة|Add/i },
   { route: "/medical/quick-consult", label: /حفظ|Save/i },
   { route: "/medical/records", label: /سجل|Record|جديد|New|إضافة|Add|كشف|Consult/i },
   { route: "/physio", label: /حالة|Case|جديد|New|إضافة|Add/i },
@@ -171,8 +173,13 @@ test.describe("ZMedico mobile smoke @mobile", () => {
     }) => {
       await gotoStable(page, route);
       // Match on accessible name — covers visible text AND aria-label,
-      // so icon-only FABs (common mobile pattern) are counted.
-      const cta = page.getByRole("button", { name: label }).first();
+      // so icon-only FABs (common mobile pattern) are counted. Include
+      // role=link because some "new record" affordances are `<Link>`s
+      // styled as buttons.
+      const cta = page
+        .getByRole("button", { name: label })
+        .or(page.getByRole("link", { name: label }))
+        .first();
       await expect(
         cta,
         `No primary CTA matching ${label} on ${route}`,

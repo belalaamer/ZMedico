@@ -3,7 +3,13 @@ import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { withTimeout } from "@/lib/withTimeout";
 import { toast } from "@/hooks/use-toast";
-import { clearPersistedAuthSessions, hasPersistedAuthSession, persistAuthSessionForPreview } from "@/lib/authSessionPersistence";
+import {
+  clearPersistedAuthSessions,
+  getAuthStorageSnapshot,
+  hasPersistedAuthSession,
+  persistAuthSessionForPreview,
+  readPersistedAuthSession,
+} from "@/lib/authSessionPersistence";
 
 type Ctx = {
   user: User | null;
@@ -69,9 +75,9 @@ function notifySessionInvalid() {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState<Session | null>(() => readPersistedAuthSession());
+  const [user, setUser] = useState<User | null>(() => readPersistedAuthSession()?.user ?? null);
+  const [loading, setLoading] = useState(() => !readPersistedAuthSession());
 
   const forceLocalLogout = async (notify: boolean) => {
     try { await supabase.auth.signOut(); } catch { /* deleted-user JWT may fail */ }
@@ -84,7 +90,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    let hadSession = false;
+    let hadSession = Boolean(readPersistedAuthSession());
+    const bootstrappedSession = readPersistedAuthSession();
+    if (bootstrappedSession) {
+      authDebug("auth state bootstrapped from canonical storage", getAuthStorageSnapshot());
+      void supabase.auth.setSession({
+        access_token: bootstrappedSession.access_token,
+        refresh_token: bootstrappedSession.refresh_token,
+      }).then(({ data, error }) => {
+        authDebug("auth.setSession from canonical storage completed", {
+          ...describeSession(data.session),
+          error: error?.message ?? null,
+        });
+        persistAuthSessionForPreview(data.session, "canonical-storage-bootstrap");
+      });
+    }
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
       authDebug("auth state change", { event, ...describeSession(s) });
 
@@ -93,6 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(s);
         setUser(s?.user ?? null);
         if (s) hadSession = true;
+        setLoading(false);
         return;
       }
 
@@ -112,7 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (s) hadSession = true;
     });
 
-    authDebug("auth state initialization started");
+    authDebug("auth state initialization started", getAuthStorageSnapshot());
     withTimeout(supabase.auth.getSession(), {
       ms: 8000,
       fallback: { data: { session: null }, error: null } as Awaited<ReturnType<typeof supabase.auth.getSession>>,
@@ -120,7 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
       .then(async ({ data: { session: s }, error }) => {
         if (!active) return;
-        authDebug("auth.getSession completed", { ...describeSession(s), error: error?.message ?? null });
+        authDebug("auth.getSession completed", { ...describeSession(s), ...getAuthStorageSnapshot(), error: error?.message ?? null });
         persistAuthSessionForPreview(s, "get-session-bootstrap");
         setSession(s);
         setUser(s?.user ?? null);

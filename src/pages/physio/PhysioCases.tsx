@@ -73,7 +73,16 @@ export default function PhysioCases() {
           .eq("status", "active")
           .is("deleted_at", null)
           .limit(500);
-        setTherapists((data as any) ?? []);
+        // Only clinical providers valid for physiotherapy: doctor / physiotherapist.
+        // Filter by position title keywords in EN/AR so the picker never exposes
+        // admin/receptionist/manager/HR/finance/inventory or other non-clinical staff.
+        const CLINICAL = /(doctor|physio|therapist|physical\s*therap|طبيب|علاج\s*طبيعي|أخصائي\s*علاج|معالج)/i;
+        const filtered = ((data as any) ?? []).filter((s: any) => {
+          const en = s.position?.title_en ?? "";
+          const ar = s.position?.title_ar ?? "";
+          return CLINICAL.test(en) || CLINICAL.test(ar);
+        });
+        setTherapists(filtered);
       })();
     }
   }, [currentBranchId]);

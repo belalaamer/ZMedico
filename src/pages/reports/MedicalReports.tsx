@@ -51,7 +51,7 @@ function DxTab({ start, end, setStart, setEnd, lang, t }: any) {
 
   return (
     <div className="space-y-4 mt-4">
-      <ReportFilterBar start={start} end={end} setStart={setStart} setEnd={setEnd}
+      <ReportFilterBar module="reports_medical" start={start} end={end} setStart={setStart} setEnd={setEnd}
         onPdf={() => exportReportPDF({ title: t("diagnosesReport"), columns: cols, rows: data, lang })}
         onExcel={() => exportReportExcel({ title: t("diagnosesReport"), columns: cols, rows: data })} />
       <Card><CardContent className="pt-6">
@@ -97,7 +97,7 @@ function ProcTab({ start, end, setStart, setEnd, lang, t }: any) {
 
   return (
     <div className="space-y-4 mt-4">
-      <ReportFilterBar start={start} end={end} setStart={setStart} setEnd={setEnd}
+      <ReportFilterBar module="reports_medical" start={start} end={end} setStart={setStart} setEnd={setEnd}
         onPdf={() => exportReportPDF({ title: t("proceduresReport"), columns: cols, rows: expRows, lang })}
         onExcel={() => exportReportExcel({ title: t("proceduresReport"), columns: cols, rows: expRows })} />
       <Card><CardContent className="pt-6">

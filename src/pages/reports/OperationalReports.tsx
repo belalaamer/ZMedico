@@ -63,7 +63,7 @@ function ApptsTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
 
   return (
     <div className="space-y-4 mt-4">
-      <ReportFilterBar start={start} end={end} setStart={setStart} setEnd={setEnd}
+      <ReportFilterBar module="reports_operational" start={start} end={end} setStart={setStart} setEnd={setEnd}
         onPdf={() => exportReportPDF({ title: t("appointmentsReport"), columns: cols, rows: expRows, lang })}
         onExcel={() => exportReportExcel({ title: t("appointmentsReport"), columns: cols, rows: expRows })} />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -125,7 +125,7 @@ function DoctorTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
 
   return (
     <div className="space-y-4 mt-4">
-      <ReportFilterBar start={start} end={end} setStart={setStart} setEnd={setEnd}
+      <ReportFilterBar module="reports_operational" start={start} end={end} setStart={setStart} setEnd={setEnd}
         onPdf={() => exportReportPDF({ title: t("doctorPerformance"), columns: cols, rows: expRows, lang })}
         onExcel={() => exportReportExcel({ title: t("doctorPerformance"), columns: cols, rows: expRows })} />
       <Card><CardContent className="pt-6">
@@ -177,7 +177,7 @@ function BranchTab({ start, end, setStart, setEnd, lang, t }: any) {
 
   return (
     <div className="space-y-4 mt-4">
-      <ReportFilterBar start={start} end={end} setStart={setStart} setEnd={setEnd}
+      <ReportFilterBar module="reports_operational" start={start} end={end} setStart={setStart} setEnd={setEnd}
         onPdf={() => exportReportPDF({ title: t("branchPerformance"), columns: cols, rows: expRows, lang })}
         onExcel={() => exportReportExcel({ title: t("branchPerformance"), columns: cols, rows: expRows })} />
       <Card><CardContent className="pt-6">

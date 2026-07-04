@@ -72,7 +72,7 @@ export default function DoctorCommissions() {
   return (
     <div className="space-y-6">
       <ReportPageHeader title={t("doctorCommissions")} />
-      <ReportFilterBar start={start} end={end} setStart={setStart} setEnd={setEnd} extra={
+      <ReportFilterBar module="reports_medical" start={start} end={end} setStart={setStart} setEnd={setEnd} extra={
         <>
           {!isDoctorOnly && <div>
             <Label className="text-xs">{lang === "ar" ? "الطبيب" : "Doctor"}</Label>

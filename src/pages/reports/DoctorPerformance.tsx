@@ -197,7 +197,7 @@ export default function DoctorPerformance() {
   return (
     <div className="space-y-6">
       <ReportPageHeader title={title} />
-      <ReportFilterBar start={start} end={end} setStart={setStart} setEnd={setEnd} onPdf={exportPdf} onExcel={exportExcel} />
+      <ReportFilterBar module="reports_medical" start={start} end={end} setStart={setStart} setEnd={setEnd} onPdf={exportPdf} onExcel={exportExcel} />
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         <StatCard label={lang === "ar" ? "إجمالي المحولين" : "Total Assigned"} value={totals.assigned} />
         <StatCard label={lang === "ar" ? "إجمالي المرضى" : "Total Patients"} value={totals.patients} />

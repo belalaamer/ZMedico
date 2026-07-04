@@ -69,7 +69,7 @@ function AttTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
 
   return (
     <div className="space-y-4 mt-4">
-      <ReportFilterBar start={start} end={end} setStart={setStart} setEnd={setEnd}
+      <ReportFilterBar module="reports_hr" start={start} end={end} setStart={setStart} setEnd={setEnd}
         onPdf={() => exportReportPDF({ title: t("attendanceReport"), columns: cols, rows: expRows, lang })}
         onExcel={() => exportReportExcel({ title: t("attendanceReport"), columns: cols, rows: expRows })} />
       <Card><CardContent className="pt-6">

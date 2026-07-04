@@ -69,6 +69,25 @@ export default function AuthCallback() {
         }
       }
 
+      const hashAccessToken = hashParams.get("access_token");
+      const hashRefreshToken = hashParams.get("refresh_token");
+      if (!code && hashAccessToken && hashRefreshToken) {
+        const { data, error } = await supabase.auth.setSession({
+          access_token: hashAccessToken,
+          refresh_token: hashRefreshToken,
+        });
+        persistAuthSessionForPreview(data.session, "callback-hash-token-set-session");
+        console.info(AUTH_DEBUG_PREFIX, "callback hash token session completed", {
+          hasSession: Boolean(data.session),
+          hasUser: Boolean(data.session?.user),
+          error: error?.message ?? null,
+        });
+        if (error) {
+          if (!cancelled) setError(error.message);
+          return;
+        }
+      }
+
       const { data, error } = await supabase.auth.getSession();
       persistAuthSessionForPreview(data.session, "callback-get-session");
       console.info(AUTH_DEBUG_PREFIX, "callback redirect completion", {

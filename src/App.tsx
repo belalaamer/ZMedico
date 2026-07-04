@@ -15,6 +15,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 const AppShell = lazy(() => import("@/components/layout/AppShell"));
 const AuthPage = lazy(() => import("@/pages/auth/Auth"));
+const AuthCallback = lazy(() => import("@/pages/auth/AuthCallback"));
 const ResetPassword = lazy(() => import("@/pages/auth/ResetPassword"));
 const Pricing = lazy(() => import("@/pages/pricing/Pricing"));
 const Trust = lazy(() => import("@/pages/Trust"));
@@ -134,6 +135,7 @@ function AppContent() {
         <Suspense fallback={<RouteLoader />}>
           <Routes>
             <Route path="/auth" element={<AuthPage />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/trust" element={<Trust />} />

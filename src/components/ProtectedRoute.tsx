@@ -1,9 +1,20 @@
+import { useEffect } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const location = useLocation();
+
+  useEffect(() => {
+    console.info("[auth-debug] route guard decision", {
+      path: location.pathname + location.search,
+      loading,
+      hasUser: Boolean(user),
+      decision: loading ? "wait" : user ? "allow" : "redirect-to-auth",
+    });
+  }, [loading, location.pathname, location.search, user]);
+
   if (loading) {
     return (
       <div className="min-h-dvh flex items-center justify-center bg-background">

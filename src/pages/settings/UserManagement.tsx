@@ -887,6 +887,61 @@ export default function UserManagement() {
           </DialogContent>
         </Dialog>
 
+        {/* Link to existing employee dialog */}
+        <Dialog open={!!linkTarget} onOpenChange={(o) => !o && !linking && setLinkTarget(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{lang === "ar" ? "ربط بموظف من الدليل" : "Link to an existing employee"}</DialogTitle>
+              <DialogDescription>
+                {linkTarget?.full_name ?? linkTarget?.email}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label>{lang === "ar" ? "اختر موظفاً (من الفرع الحالي)" : "Pick an employee (current branch)"}</Label>
+                <Select value={linkStaffId} onValueChange={setLinkStaffId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={lang === "ar" ? "اختر موظفاً" : "Select an employee"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {linkableStaff
+                      .filter((s) => s.id !== linkTarget?.id)
+                      .map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {(s.profiles?.full_name ?? s.profiles?.email ?? s.employee_id)}
+                          {s.staff_positions ? ` — ${lang === "ar" ? s.staff_positions.title_ar : s.staff_positions.title_en}` : ""}
+                          {s.employee_id ? ` · ${s.employee_id}` : ""}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                {linkableStaff.filter((s) => s.id !== linkTarget?.id).length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {lang === "ar"
+                      ? "لا يوجد موظفون غير مربوطين في هذا الفرع."
+                      : "No unlinked employees in this branch."}
+                  </p>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {lang === "ar"
+                  ? "سيتم نقل بيانات التوظيف (المسمى، القسم، الفرع، كود الموظف، الراتب...) إلى هذا الحساب، وأرشفة سجل الموظف المصدر. يُقترح الدور تلقائياً من المسمى."
+                  : "Employment data (position, department, branch, employee code, salary…) will be transferred to this user account, and the source employee record archived. Role is suggested from the position."}
+              </p>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" disabled={linking} onClick={() => setLinkTarget(null)}>
+                {t("cancel")}
+              </Button>
+              <Button type="button" disabled={linking || !linkStaffId}
+                onClick={linkExistingEmployee}
+                className="gradient-primary text-primary-foreground">
+                {linking ? (lang === "ar" ? "جارٍ الربط..." : "Linking...") : (lang === "ar" ? "ربط" : "Link")}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {/* Unlink employee confirmation */}
         <AlertDialog open={!!unlinkTarget} onOpenChange={(o) => !o && !unlinking && setUnlinkTarget(null)}>
           <AlertDialogContent>

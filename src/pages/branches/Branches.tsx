@@ -29,7 +29,7 @@ type Branch = {
   phone: string | null; email: string | null; address: string | null; city: string | null;
   is_main_branch: boolean; is_active: boolean; manager_id: string | null;
   working_hours_start: string | null; working_hours_end: string | null;
-  working_days: number[] | null;
+  working_days?: number[] | null;
   allowed_latitude: number | null; allowed_longitude: number | null; allowed_radius: number | null;
 };
 

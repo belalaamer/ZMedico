@@ -22,12 +22,14 @@ import { Slider } from "@/components/ui/slider";
 import { getCurrentLocation } from "@/lib/geo";
 import { Loader2 } from "lucide-react";
 import { fetchQueueSettings, saveQueueSettings, DEFAULT_QUEUE_SETTINGS, type QueueSettings } from "@/lib/queueSettings";
+import { ALL_DAYS, dayShort, formatWorkingDays, normalizeDays, fmtTime } from "@/lib/branchSchedule";
 
 type Branch = {
   id: string; name_ar: string; name_en: string; code: string | null;
   phone: string | null; email: string | null; address: string | null; city: string | null;
   is_main_branch: boolean; is_active: boolean; manager_id: string | null;
   working_hours_start: string | null; working_hours_end: string | null;
+  working_days: number[] | null;
   allowed_latitude: number | null; allowed_longitude: number | null; allowed_radius: number | null;
 };
 
@@ -36,6 +38,7 @@ type Staff = { id: string; full_name: string | null; email: string | null };
 const empty = {
   name: "", code: "", phone: "", email: "", address: "", city: "",
   manager_id: "", working_hours_start: "09:00", working_hours_end: "21:00",
+  working_days: [...ALL_DAYS] as number[],
   is_main_branch: false, is_active: true,
 };
 
@@ -125,6 +128,7 @@ export default function Branches() {
       manager_id: b.manager_id ?? "",
       working_hours_start: b.working_hours_start ?? "09:00",
       working_hours_end: b.working_hours_end ?? "21:00",
+      working_days: normalizeDays(b.working_days),
       is_main_branch: b.is_main_branch,
       is_active: b.is_active,
     });
@@ -141,6 +145,7 @@ export default function Branches() {
       manager_id: form.manager_id || null,
       working_hours_start: form.working_hours_start || null,
       working_hours_end: form.working_hours_end || null,
+      working_days: normalizeDays(form.working_days),
       is_main_branch: form.is_main_branch, is_active: form.is_active,
     };
     let error;

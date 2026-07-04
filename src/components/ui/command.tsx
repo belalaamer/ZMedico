@@ -57,16 +57,33 @@ CommandInput.displayName = CommandPrimitive.Input.displayName;
 const CommandList = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.List>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.List>
->(({ className, ...props }, ref) => (
-  <CommandPrimitive.List
-    ref={ref}
-    className={cn(
-      "max-h-[300px] overflow-y-auto overflow-x-hidden overscroll-contain [touch-action:pan-y] [-webkit-overflow-scrolling:touch]",
-      className,
-    )}
-    {...props}
-  />
-));
+>(({ className, onWheel, ...props }, ref) => {
+  // When rendered inside a Radix Dialog, react-remove-scroll blocks wheel
+  // events on portaled popovers (the popover is outside the Dialog subtree).
+  // Manually drive scrollTop so mouse-wheel works everywhere.
+  const handleWheel = React.useCallback(
+    (e: React.WheelEvent<HTMLDivElement>) => {
+      const el = e.currentTarget;
+      if (el.scrollHeight > el.clientHeight) {
+        el.scrollTop += e.deltaY;
+        e.stopPropagation();
+      }
+      onWheel?.(e);
+    },
+    [onWheel],
+  );
+  return (
+    <CommandPrimitive.List
+      ref={ref}
+      onWheel={handleWheel}
+      className={cn(
+        "max-h-[300px] overflow-y-auto overflow-x-hidden overscroll-contain [touch-action:pan-y] [-webkit-overflow-scrolling:touch]",
+        className,
+      )}
+      {...props}
+    />
+  );
+});
 
 CommandList.displayName = CommandPrimitive.List.displayName;
 

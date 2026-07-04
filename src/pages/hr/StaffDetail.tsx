@@ -345,6 +345,66 @@ export default function StaffDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={linkOpen} onOpenChange={(o) => !o && !linking && setLinkOpen(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {linkMode === "replace"
+                ? (lang === "ar" ? "استبدال المستخدم المربوط" : "Replace linked user")
+                : (lang === "ar" ? "ربط بمستخدم" : "Link to a user")}
+            </DialogTitle>
+            <DialogDescription>
+              {lang === "ar"
+                ? "المستخدمون المربوطون بموظف آخر يظهرون كغير متاحين."
+                : "Users already linked to another employee are shown as unavailable."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-72 overflow-auto rounded border divide-y">
+            {candidateUsers.length === 0 && (
+              <div className="p-6 text-center text-sm text-muted-foreground">
+                {lang === "ar" ? "لا يوجد مستخدمون." : "No users."}
+              </div>
+            )}
+            {candidateUsers.map((u) => {
+              const isSelf = (staff as any)?.linked_user_id === u.id;
+              const disabled = u._taken && !isSelf;
+              const selected = pickedUserId === u.id;
+              return (
+                <button
+                  key={u.id}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => !disabled && setPickedUserId(u.id)}
+                  className={`w-full text-start p-3 text-sm flex items-center gap-3 ${
+                    disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-muted"
+                  } ${selected ? "bg-primary/10" : ""}`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">{u.full_name ?? u.email}</div>
+                    <div className="text-xs text-muted-foreground truncate">{u.email}</div>
+                  </div>
+                  {isSelf && <Badge variant="outline">{lang === "ar" ? "الحالي" : "Current"}</Badge>}
+                  {disabled && (
+                    <Badge variant="secondary">
+                      {lang === "ar" ? "غير متاح — مربوط" : "Unavailable — linked"}
+                    </Badge>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLinkOpen(false)} disabled={linking}>
+              {t("cancel")}
+            </Button>
+            <Button onClick={confirmLink} disabled={linking || !pickedUserId}
+              className="gradient-primary text-primary-foreground">
+              {linking ? "…" : (linkMode === "replace" ? (lang === "ar" ? "استبدال" : "Replace") : (lang === "ar" ? "ربط" : "Link"))}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -68,9 +68,14 @@ export function Combobox({
         className="p-0 w-[--radix-popover-trigger-width] max-w-[calc(100vw-2rem)] z-50"
         align="start"
       >
-        <Command>
+        <Command
+          // Disable cmdk's pointer-move auto-highlight so scroll drags on
+          // touch don't get treated as item hover/selection.
+          disablePointerSelection
+          loop
+        >
           <CommandInput placeholder={searchPlaceholder} />
-          <CommandList className="max-h-[260px]">
+          <CommandList className="max-h-[50vh] sm:max-h-[260px]">
             <CommandEmpty>{emptyText}</CommandEmpty>
             <CommandGroup>
               {options.map((o) => (

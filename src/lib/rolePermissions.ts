@@ -25,16 +25,20 @@ export type ModuleName = typeof MODULES[number] | string;
 
 const ALL = [...ACTIONS] as string[];
 
+// STRICT RBAC - Delete is Admin-only across every module. Every non-admin
+// action mirrors what RLS + `role_permissions` allow in the database.
+// See docs/RBAC_MATRIX.md for the authoritative matrix.
 export const DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
   admin: Object.fromEntries(MODULES.map(m => [m, [...ALL]])),
-  // Manager: operational oversight — no clinical writes, treasury read/export only.
+  // Manager: branch operations oversight. No delete, no clinical writes,
+  // no financial writes.
   manager: {
     patients: ["view","create","edit","export"],
     appointments: ["view","create","edit","export"],
     medical_records: ["view"],
     vitals: ["view"],
     treatment_plans: ["view"],
-    invoices: ["view","create","edit","export"],
+    invoices: ["view","export"],
     treasury: ["view","export"],
     inventory: ["view","create","edit","export"],
     reports: ["view","export"],
@@ -45,15 +49,15 @@ export const DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
     reports_inventory: ["view","export"],
     hr: ["view"],
     settings: ["view"],
-    coupons: ["view","create","edit","export"],
+    coupons: ["view","export"],
   },
+  // Doctor: clinical only. Demographics owned by front desk. No invoice access.
   doctor: {
     patients: ["view"],
     appointments: ["view","create","edit"],
     medical_records: ["view","create","edit"],
     vitals: ["view","create","edit"],
     treatment_plans: ["view","create","edit"],
-    invoices: ["view"],
     reports: ["view"],
     reports_medical: ["view"],
     reports_operational: ["view"],
@@ -61,6 +65,7 @@ export const DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
     reports_hr: [],
     reports_inventory: [],
   },
+  // Nurse: assistant. Vitals write, everything else view.
   nurse: {
     patients: ["view"],
     appointments: ["view","create","edit"],
@@ -69,15 +74,20 @@ export const DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
     treatment_plans: ["view"],
     inventory: ["view"],
   },
+  // Receptionist: front desk. Cancels appointments via status update
+  // (no delete). No invoice edits - accountant owns invoice edits.
   receptionist: {
     patients: ["view","create","edit"],
-    appointments: ["view","create","edit","delete"],
+    appointments: ["view","create","edit"],
+    treatment_plans: ["view"],
     invoices: ["view","create"],
     coupons: ["view"],
   },
+  // Accountant: finance. No clinical access.
   accountant: {
     patients: ["view"],
     appointments: ["view"],
+    treatment_plans: ["view"],
     invoices: ["view","create","edit","export"],
     treasury: ["view","create","edit","export"],
     inventory: ["view"],
@@ -87,13 +97,15 @@ export const DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
     reports_operational: ["view","export"],
     reports_medical: [],
     reports_hr: [],
-    coupons: ["view","export"],
+    coupons: ["view","create","edit","export"],
   },
+  // HR: people only.
   hr: {
     reports: ["view"],
     reports_hr: ["view","export"],
     hr: ["view","create","edit","export"],
   },
+  // Staff: schedule visibility only.
   staff: {
     appointments: ["view"],
   },

@@ -58,6 +58,21 @@ export class AuthorizationService {
     if (permissions.length === 0) return true;
     return permissions.every((p) => this.can(p));
   }
+
+  /**
+   * Identity predicate — true iff the current user belongs to the admin
+   * bundle (legacy `app_role = 'admin'`). Callers must prefer permission
+   * keys (`can("x.view")`) whenever a permission exists; this getter is
+   * only for the handful of admin-bundle-only surfaces (e.g. `/branches`)
+   * that do not yet have a dedicated permission key in the catalog.
+   *
+   * Routing this through the service keeps the migration free of
+   * hardcoded `roles.includes("admin")` / `role === "admin"` checks and
+   * gives us a single point to swap for a real permission later.
+   */
+  isSuperAdmin(): boolean {
+    return this.isAdmin;
+  }
 }
 
 /**

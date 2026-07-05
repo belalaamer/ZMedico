@@ -1,59 +1,87 @@
 
-## Goal
-Support real "unlinked employees" (staff records with no user account) and a proper Link picker on both User and Employee pages, while preserving the current 1:1 model as a strict uniqueness rule (not a shared PK).
+# مراجعة كاملة للأدوار والصلاحيات — إعادة ضبط صارمة
 
-## Schema change (single migration)
+## القواعد الحاكمة
+1. **Delete = Admin فقط** في كل الموديولات بدون استثناء. أي دور تاني يعمل Cancel / Void / Soft-close حسب الموديول.
+2. **Segregation of Duties صارم**: كل دور يشوف اللي يخص شغلته بس.
+3. لازم يبقى فيه **تطابق كامل** بين ثلاث طبقات:
+   - UI defaults (`DEFAULT_PERMISSIONS`)
+   - جدول `role_permissions` في قاعدة البيانات (اللي بتقرأ منه `usePermissions`)
+   - سياسات RLS على الجداول
 
-1. `ALTER TABLE public.staff_profiles ADD COLUMN linked_user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL;`
-2. Backfill: `UPDATE staff_profiles SET linked_user_id = id WHERE linked_user_id IS NULL AND EXISTS (SELECT 1 FROM auth.users u WHERE u.id = staff_profiles.id);`
-3. `CREATE UNIQUE INDEX ux_staff_profiles_linked_user ON public.staff_profiles(linked_user_id) WHERE linked_user_id IS NOT NULL AND deleted_at IS NULL;` — enforces one-to-one.
-4. Keep `staff_profiles.id` as PK (unchanged). Existing rows keep id == user id; new unlinked employees get a fresh `gen_random_uuid()`.
-5. RLS: adjust the "user reads own staff_profile" policy to match on `linked_user_id = auth.uid()` in addition to `id = auth.uid()` (back-compat).
+## مصفوفة الصلاحيات الجديدة
 
-## Access gating
-Update `usePermissions` / role resolution so a user with **no active `staff_profiles` row where `linked_user_id = auth.uid()` AND `deleted_at IS NULL` AND `status = 'active'`** gets zero permissions and sees no modules. Roles in `user_roles` alone are not enough — the link must exist.
+Legend: `V`=view · `C`=create · `E`=edit · `X`=export · `—`=no access. **Delete محذوف من كل الأدوار ما عدا admin.**
 
-## Link picker (User page & StaffDetail page)
-- Query: `staff_profiles` where `deleted_at IS NULL` AND `linked_user_id IS NULL` AND `branch_id = <current branch>`.
-- Also fetch already-linked ones in the same branch to display as **"غير متاح — مرتبط"** / "Unavailable — already linked" (disabled row).
-- Empty state EN/AR when no rows.
-- On confirm: `UPDATE staff_profiles SET linked_user_id = <target user id> WHERE id = <picked staff id> AND linked_user_id IS NULL` (guard against race). If the target user already has a link → block with error.
-- Write `audit_logs` row: action `employee_linked`, entity_type `user_employee_link`, old/new values with user_id, staff_id, branch_id, role.
+| Module               | admin  | manager | doctor | nurse | receptionist | accountant | hr    | staff |
+|----------------------|:------:|:-------:|:------:|:-----:|:------------:|:----------:|:-----:|:-----:|
+| patients             | VCEX+D | VCEX    | V      | V     | VCE          | V          | —     | —     |
+| appointments         | VCEX+D | VCEX    | VCE    | VCE   | VCE          | V          | —     | V     |
+| medical_records      | VCEX+D | V       | VCE    | V     | —            | —          | —     | —     |
+| vitals               | VCEX+D | V       | VCE    | VCE   | —            | —          | —     | —     |
+| treatment_plans      | VCEX+D | V       | VCE    | V     | V            | V          | —     | —     |
+| invoices             | VCEX+D | VX      | —      | —     | VC           | VCEX       | —     | —     |
+| treasury             | VCEX+D | VX      | —      | —     | —            | VCEX       | —     | —     |
+| inventory            | VCEX+D | VCEX    | —      | V     | —            | V          | —     | —     |
+| coupons              | VCEX+D | VX      | —      | —     | V            | VCEX       | —     | —     |
+| hr                   | VCEX+D | V       | —      | —     | —            | —          | VCEX  | —     |
+| settings             | VCEX+D | V       | —      | —     | —            | —          | —     | —     |
+| reports (index)      | VX     | VX      | V      | —     | —            | VX         | V     | —     |
+| reports_finance      | VX     | VX      | —      | —     | —            | VX         | —     | —     |
+| reports_medical      | VX     | VX      | V      | —     | —            | —          | —     | —     |
+| reports_operational  | VX     | VX      | V      | —     | —            | VX         | —     | —     |
+| reports_hr           | VX     | —       | —      | —     | —            | —          | VX    | —     |
+| reports_inventory    | VX     | VX      | —      | —     | —            | VX         | —     | —     |
 
-## Unlink
-- `UPDATE staff_profiles SET linked_user_id = NULL WHERE linked_user_id = <user id>`.
-- Delete user's rows in `user_roles` (revokes access immediately).
-- Audit: `employee_unlinked`.
+**التغييرات الأساسية عن الوضع الحالي:**
+- Manager: خسر Create/Edit/Delete على الفواتير والكوبونات (بقى مراقب فقط) ولا يعدّل في السجل الطبي إطلاقاً.
+- Receptionist: خسر Cancel-as-Delete على المواعيد → يتحول لـ status update عبر زر Cancel صريح. خسر Edit على الفواتير.
+- Doctor: خسر Edit على بيانات المريض الديموغرافية (يعدّل السجل الطبي فقط).
+- Nurse: خسر Edit على السجل الطبي وعلى خطط العلاج (view + vitals فقط).
+- Accountant: خسر أي وصول للسجل الطبي بأي شكل.
+- HR: صلاحياته على HR فقط + تقارير HR فقط.
+- Staff: مواعيد view فقط (زي ما هو).
 
-## Replace
-- Single transactional RPC or sequential guarded updates: unlink current staff row, link the new one, keep `user_roles` intact (or update role if picker specifies).
-- On any failure, rollback (RPC preferred). Audit: `employee_replaced` with both old and new staff ids.
+## الخطوات
 
-## User page (`UserManagement.tsx`)
-- Restore Link button → opens the branch-scoped employee picker (not Edit).
-- Show "Linked to: <employee name / code>" badge with jump-to-employee link.
-- Add Replace action next to Unlink when already linked.
-- Admin/HR gated.
+### 1. UI layer — `src/lib/rolePermissions.ts`
+إعادة كتابة `DEFAULT_PERMISSIONS` بالكامل حسب المصفوفة أعلاه، مع إزالة `delete` من كل الأدوار ما عدا admin.
 
-## Employee page (`StaffDetail.tsx`)
-- If `linked_user_id IS NULL`: show "Not linked" state with **Link to user** button (picker of users without a link).
-- If linked: show linked user with **Unlink** and **Replace** actions and a jump-to-user link.
-- Mirror the same audit writes.
+### 2. Database layer — Migration واحدة
+- **Seed جدول `role_permissions`**: `TRUNCATE` ثم `INSERT` صف واحد لكل (role, module) بالـ actions الصحيحة من المصفوفة، عشان الـ UI اللي في `RolePermissions.tsx` يعرض القيم الجديدة كنقطة بداية موحدة.
+- **إصلاح RLS**:
+  - `expenses`: حذف INSERT policy الخاصة بـ receptionist (المصاريف = accountant + manager + admin بس).
+  - `coupons`: تضييق `Coupons manage by privileged roles` لتشمل admin + manager + accountant فقط (بدون receptionist). Receptionist عنده SELECT فقط عن طريق branch_isolation. + منع UPDATE/DELETE على coupons من manager (يقتصر على admin/accountant).
+  - `appointments`: توحيد الـ policies المكررة وإزالة DELETE من الكل عدا `appts_delete_admin`.
+  - `medical_records` / `vitals` / `prescriptions` / `treatment_plans`: التأكد إن nurse مالوش UPDATE على medical_records وعلى treatment_plans، ومالوش INSERT عليها.
+  - `invoices` / `payments`: منع UPDATE من receptionist (INSERT فقط).
+  - `patients`: منع UPDATE من doctor/nurse (SELECT فقط، الـ update عبر receptionist أو admin).
+  - `staff_profiles`: التأكد إن الـ trigger الحالي `tg_staff_self_update_guard` كافي، وأضيف guard إضافي إن غير admin/hr مايعملش INSERT.
+  - كل الجداول: التأكد إن `DELETE` policy موجودة صريحة `has_role(auth.uid(),'admin')` فقط (وإن الـ ALL policies تُقسم لـ SELECT/INSERT/UPDATE منفصلة عشان الـ DELETE ماياخدهاش بالغلط عن طريق `FOR ALL`).
 
-## Cross-branch guard
-Both link and replace refuse when picked staff's `branch_id` ≠ user's current active branch context; return a clear EN/AR error toast.
+### 3. Navigation — `src/components/layout/Sidebar.tsx` + `SettingsLayout.tsx`
+مراجعة كل عنصر في السايدبار وربطه بـ `can(module, "view")` — أي عنصر ماعندوش view يختفي. الوضع الحالي غالباً بيعمل ده لكن هراجعه بند بند.
 
-## Files to touch
-- migration (new)
-- `src/hooks/usePermissions.ts` (gate on link existence)
-- `src/hooks/useUserRole.ts` (optional: expose link status) OR a new `useEmployeeLink` hook
-- `src/pages/settings/UserManagement.tsx` (picker + link/unlink/replace)
-- `src/pages/hr/StaffDetail.tsx` (mirror actions + linked-user badge)
-- `src/pages/hr/Staff.tsx` (show unlinked badge in list — small)
-- Types regenerate automatically after migration.
+### 4. Route guards — `src/App.tsx`
+- التأكد إن `PermissionRoute` مطبّق على كل مسار محمي (خاصة `/reports/*` الفرعية).
+- إضافة `adminOnly` صريح على أي مسار حساس مش موجود عليه (مثلاً `/settings/backup`, `/settings/audit`, `/settings/users`, `/settings/roles`, `/system/self-audit`, `/queue/self-audit`, `/expenses/self-audit`).
 
-## Out of scope
-- No changes to how staff/schedule/attendance/payroll join on `staff_profiles.id` (existing rows keep id == user id, new unlinked staff have no dependent rows yet, so nothing breaks).
-- No redesign of `user_roles`.
+### 5. UI action gating
+- استبدال زر Delete في `RowActions.tsx` بـ Cancel/Archive/Void حسب الموديول للأدوار غير-admin.
+- في `InvoiceDetail.tsx`: إخفاء أي زر تعديل من receptionist بعد الحفظ الأولي.
+- في `Appointments`: زر Cancel بديل عن Delete للـ receptionist (تحديث status → cancelled بدل حذف صف).
 
-Approve to proceed and I'll ship the migration first, then the code changes after types regenerate.
+### 6. توثيق — `docs/RBAC_MATRIX.md`
+تحديث الملف بالكامل ليعكس المصفوفة الجديدة + قائمة السياسات المعدلة.
+
+## ترتيب التنفيذ
+1. Migration واحدة تجمع كل تغييرات الـ RLS + seed جدول `role_permissions`.
+2. بعد اعتماد migration: تعديل `rolePermissions.ts` وباقي ملفات الـ UI.
+3. تحديث التوثيق.
+
+## خارج النطاق
+- مفيش تغيير على `has_role` / `user_has_branch_access` / نظام الـ branches.
+- مفيش تغيير على نموذج linking (linked_user_id) اللي اعتمدته قبل كده.
+- مفيش تغيير على triggers الحسابية (invoices, treasury, wallet).
+
+اعتمد الخطة وأنا هبدأ بالـ migration الأول ثم أكمل الـ UI بعد إعادة توليد الـ types.

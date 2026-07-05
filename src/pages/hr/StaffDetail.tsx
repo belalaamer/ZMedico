@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useBranch } from "@/contexts/BranchContext";
+import { useUserRole } from "@/hooks/useUserRole";
 
 const DAYS = ["sun","mon","tue","wed","thu","fri","sat"] as const;
 
@@ -28,6 +29,12 @@ export default function StaffDetail() {
   const { t, lang } = useI18n();
   const { id } = useParams();
   const { currentBranchId } = useBranch();
+  const { roles, isAdmin } = useUserRole();
+  // Least-privilege UI mask: only admin + HR see salary / bank / national_id
+  // / DOB / commission %. Applies even when a linked employee views their
+  // own profile.
+  const canSeeSensitive = isAdmin || roles.includes("hr");
+  const MASK = "••••";
   const [staff, setStaff] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [position, setPosition] = useState<any>(null);
@@ -242,15 +249,15 @@ export default function StaffDetail() {
           <Card className="p-5 shadow-card grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <Field label={t("hireDate")}>{formatDate(staff.hire_date, lang)}</Field>
             <Field label={t("contractType")}>{staff.contract_type}</Field>
-            <Field label={t("salary")}>{formatMoney(staff.salary, lang, staff.salary_currency)}</Field>
-            <Field label={t("commissionPercent")}>{Number(staff.commission_percent ?? 0).toFixed(2)}%</Field>
+            <Field label={t("salary")}>{canSeeSensitive ? formatMoney(staff.salary, lang, staff.salary_currency) : MASK}</Field>
+            <Field label={t("commissionPercent")}>{canSeeSensitive ? `${Number(staff.commission_percent ?? 0).toFixed(2)}%` : MASK}</Field>
             <Field label={t("weeklyHours")}>{staff.working_hours_per_week}</Field>
             <Field label={t("annualLeave")}>{staff.annual_leave_balance}</Field>
             <Field label={t("sickLeave")}>{staff.sick_leave_balance}</Field>
-            <Field label={t("bankName")}>{staff.bank_name ?? "—"}</Field>
-            <Field label={t("bankAccount")}>{staff.bank_account ?? "—"}</Field>
-            <Field label={t("nationalId")}>{staff.national_id ?? "—"}</Field>
-            <Field label={t("dob")}>{formatDate(staff.date_of_birth, lang)}</Field>
+            <Field label={t("bankName")}>{canSeeSensitive ? (staff.bank_name ?? "—") : MASK}</Field>
+            <Field label={t("bankAccount")}>{canSeeSensitive ? (staff.bank_account ?? "—") : MASK}</Field>
+            <Field label={t("nationalId")}>{canSeeSensitive ? (staff.national_id ?? "—") : MASK}</Field>
+            <Field label={t("dob")}>{canSeeSensitive ? formatDate(staff.date_of_birth, lang) : MASK}</Field>
             <Field label={t("emergencyContact")}>{staff.emergency_contact_name ?? "—"}</Field>
             <Field label={t("emergencyPhone")}>{staff.emergency_contact_phone ?? "—"}</Field>
             <Field label={t("address")} className="sm:col-span-2">{staff.address ?? "—"}</Field>

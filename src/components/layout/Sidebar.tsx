@@ -7,7 +7,7 @@ import { subscribeResilient } from "@/lib/realtime";
 import { useBranch } from "@/contexts/BranchContext";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { usePermissions } from "@/hooks/usePermissions";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 
 type NavItem = { to: string; icon: any; label: string; end?: boolean; badge?: number };
 
@@ -16,7 +16,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
   const { currentBranchId } = useBranch();
   const { pathname } = useLocation();
   const [alertCount, setAlertCount] = useState(0);
-  const { can, isAdmin } = usePermissions();
+  const { authz } = useAuthorization();
 
   useEffect(() => {
     const refresh = () => {
@@ -44,9 +44,9 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       label: lang === "ar" ? "العمليات" : "Operations",
       icon: Calendar,
       items: [
-        can("appointments") && { to: "/calendar", icon: Calendar, label: t("calendar") },
-        can("appointments") && { to: "/queue", icon: ListChecks, label: t("queue") },
-        can("appointments") && { to: "/reminders", icon: Bell, label: t("notifications") },
+        authz.can("appointments.view") && { to: "/calendar", icon: Calendar, label: t("calendar") },
+        authz.can("appointments.view") && { to: "/queue", icon: ListChecks, label: t("queue") },
+        authz.can("appointments.view") && { to: "/reminders", icon: Bell, label: t("notifications") },
       ].filter(Boolean) as NavItem[],
     },
     {
@@ -54,11 +54,11 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       label: lang === "ar" ? "العيادة والمرضى" : "Patients & Clinical",
       icon: Stethoscope,
       items: [
-        can("patients") && { to: "/patients", icon: Users, label: t("patients") },
-        can("medical_records") && { to: "/medical/records", icon: FileText, label: t("medicalRecords") },
-        can("medical_records") && { to: "/medical/quick-consult", icon: Zap, label: t("quickConsult") },
-        can("medical_records") && { to: "/medical/prescriptions", icon: Pill, label: t("prescriptions") },
-        can("medical_records") && { to: "/medical/documents", icon: FolderOpen, label: t("documentsCenter") },
+        authz.can("patients.view") && { to: "/patients", icon: Users, label: t("patients") },
+        authz.can("medical_records.view") && { to: "/medical/records", icon: FileText, label: t("medicalRecords") },
+        authz.can("medical_records.view") && { to: "/medical/quick-consult", icon: Zap, label: t("quickConsult") },
+        authz.can("medical_records.view") && { to: "/medical/prescriptions", icon: Pill, label: t("prescriptions") },
+        authz.can("medical_records.view") && { to: "/medical/documents", icon: FolderOpen, label: t("documentsCenter") },
       ].filter(Boolean) as NavItem[],
     },
     {
@@ -66,10 +66,10 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       label: lang === "ar" ? "العلاج الطبيعي" : "Physiotherapy",
       icon: Activity,
       items: [
-        can("medical_records") && { to: "/physio", icon: Activity, label: lang === "ar" ? "الحالات" : "Cases" },
-        can("medical_records") && { to: "/physio/dashboard", icon: BarChart3, label: lang === "ar" ? "لوحة العلاج الطبيعي" : "Physio Dashboard" },
-        can("medical_records") && { to: "/physio/reports", icon: FileText, label: lang === "ar" ? "التقارير" : "Reports" },
-        can("medical_records") && { to: "/physio/followups", icon: ListChecks, label: lang === "ar" ? "المتابعات" : "Follow-ups" },
+        authz.can("medical_records.view") && { to: "/physio", icon: Activity, label: lang === "ar" ? "الحالات" : "Cases" },
+        authz.can("medical_records.view") && { to: "/physio/dashboard", icon: BarChart3, label: lang === "ar" ? "لوحة العلاج الطبيعي" : "Physio Dashboard" },
+        authz.can("medical_records.view") && { to: "/physio/reports", icon: FileText, label: lang === "ar" ? "التقارير" : "Reports" },
+        authz.can("medical_records.view") && { to: "/physio/followups", icon: ListChecks, label: lang === "ar" ? "المتابعات" : "Follow-ups" },
       ].filter(Boolean) as NavItem[],
     },
     {
@@ -77,10 +77,10 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       label: lang === "ar" ? "المراجع السريرية" : "Clinical Catalogues",
       icon: FolderTree,
       items: [
-        can("medical_records") && { to: "/medical/specialties", icon: Stethoscope, label: t("specialties") },
-        can("medical_records") && { to: "/medical/diagnoses", icon: HeartPulse, label: t("diagnoses") },
-        can("medical_records") && { to: "/medical/medications", icon: Pill, label: t("medications") },
-        can("medical_records") && isAdmin && { to: "/medical/procedures", icon: Activity, label: t("proceduresCatalog") },
+        authz.can("medical_records.view") && { to: "/medical/specialties", icon: Stethoscope, label: t("specialties") },
+        authz.can("medical_records.view") && { to: "/medical/diagnoses", icon: HeartPulse, label: t("diagnoses") },
+        authz.can("medical_records.view") && { to: "/medical/medications", icon: Pill, label: t("medications") },
+        authz.can("medical_records.view") && authz.isSuperAdmin() && { to: "/medical/procedures", icon: Activity, label: t("proceduresCatalog") },
       ].filter(Boolean) as NavItem[],
     },
     {
@@ -88,12 +88,12 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       label: lang === "ar" ? "المالية" : "Finance",
       icon: Wallet,
       items: [
-        can("invoices") && { to: "/invoices", icon: FileText, label: t("invoices") },
-        can("invoices") && { to: "/payments", icon: CreditCard, label: t("payments") },
-        can("treasury") && { to: "/treasury", icon: Banknote, label: t("treasury") },
-        can("treasury") && { to: "/expenses", icon: Receipt, label: t("expenses") },
-        can("coupons") && { to: "/coupons", icon: Ticket, label: lang === "ar" ? "الكوبونات" : "Coupons" },
-        can("reports") && { to: "/reports", icon: PieChart, label: t("reports") },
+        authz.can("invoices.view") && { to: "/invoices", icon: FileText, label: t("invoices") },
+        authz.can("invoices.view") && { to: "/payments", icon: CreditCard, label: t("payments") },
+        authz.can("treasury.view") && { to: "/treasury", icon: Banknote, label: t("treasury") },
+        authz.can("treasury.view") && { to: "/expenses", icon: Receipt, label: t("expenses") },
+        authz.can("coupons.view") && { to: "/coupons", icon: Ticket, label: lang === "ar" ? "الكوبونات" : "Coupons" },
+        authz.can("reports.view") && { to: "/reports", icon: PieChart, label: t("reports") },
       ].filter(Boolean) as NavItem[],
     },
     {
@@ -101,7 +101,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       label: t("inventoryHub"),
       icon: Boxes,
       badge: alertCount,
-      items: !can("inventory") ? [] : [
+      items: !authz.can("inventory.view") ? [] : [
         { to: "/inventory/stock", icon: BarChart3, label: t("stockOverview") },
         { to: "/inventory/products", icon: Package, label: t("products") },
         { to: "/inventory/categories", icon: FolderTree, label: t("categories") },
@@ -114,7 +114,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       key: "hr",
       label: t("hr"),
       icon: UserCog,
-      items: !can("hr") ? [] : [
+      items: !authz.can("hr.view") ? [] : [
         { to: "/hr/staff", icon: UserCog, label: t("staffDirectory") },
         { to: "/hr/departments", icon: Building2, label: t("departments") },
         { to: "/hr/positions", icon: Briefcase, label: t("positions") },
@@ -131,11 +131,11 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       label: lang === "ar" ? "الإدارة" : "Admin",
       icon: ShieldCheck,
       items: [
-        isAdmin && { to: "/branches", icon: Building2, label: t("branches") },
-        can("settings") && { to: "/settings", icon: Settings, label: t("settings") },
+        authz.isSuperAdmin() && { to: "/branches", icon: Building2, label: t("branches") },
+        authz.can("settings.view") && { to: "/settings", icon: Settings, label: t("settings") },
       ].filter(Boolean) as NavItem[],
     },
-  ].filter(g => g.items.length > 0), [t, lang, can, isAdmin, alertCount]);
+  ].filter(g => g.items.length > 0), [t, lang, authz, alertCount]);
 
   const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
   const activeGroupKey = useMemo(() => {

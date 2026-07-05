@@ -4,6 +4,7 @@ import {
   parsePermissionKey,
   createAuthorizationServiceFromLegacy,
 } from "./AuthorizationService";
+import { DEFAULT_PERMISSIONS, MODULES, ACTIONS } from "../rolePermissions";
 
 function legacyCanFrom(map: Record<string, string[]>) {
   return (module: string, action: string = "view") =>
@@ -97,9 +98,6 @@ describe("createAuthorizationServiceFromLegacy adapter", () => {
  * that guarantees "no visible behavior changes".
  */
 describe("Wave 1 parity: legacy DEFAULT_PERMISSIONS -> AuthorizationService", () => {
-  // Import here (inside describe) so top-level imports stay stable.
-  const { DEFAULT_PERMISSIONS, MODULES, ACTIONS } = require("../rolePermissions") as typeof import("../rolePermissions");
-
   for (const role of Object.keys(DEFAULT_PERMISSIONS)) {
     it(`role='${role}' produces identical decisions across every (module,action)`, () => {
       const map = DEFAULT_PERMISSIONS[role];

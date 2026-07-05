@@ -3,12 +3,27 @@
 Scope: 101 public tables, 8 roles, 4 admin edge functions, 7 scheduled/system jobs, 6 major UI surfaces.
 
 ## Assumptions (strict defaults; adjust if wrong)
-1. Salary / bank_account / national_id — **admin + hr only**. Employee sees own basic profile only, never sees own salary via API.
+1. Salary / bank_account / national_id — **admin + hr** in the UI. The DB
+   currently lets an employee `SELECT` own `staff_profiles` and own `payroll`
+   rows (payslip use case). UI masks the sensitive columns when the current
+   user is neither admin nor HR — even on their own profile — so leakage
+   requires a direct API call, not a click.
 2. Doctor commissions — doctor sees own only; admin + hr + manager (branch) see all.
 3. Wallet balances — admin + manager + accountant + receptionist (checkout needs it).
 4. Nurse medical history — view-only across all patient history.
 5. Accountant — cross-branch (finance role); manager stays branch-scoped.
 6. Audit logs viewer — admin only.
+
+### Assumption verification (against live RLS)
+
+| # | Assumption | RLS check | Status |
+|---|---|---|---|
+| 1 | Salary admin+hr only | `pay_select_self_or_admin` allows self | **Adjusted** — UI masks, DB still allows self |
+| 2 | Doctor sees own commissions | `doctor_commissions."View commissions"` allows `doctor_id=auth.uid()` OR admin/hr/manager | Confirmed |
+| 3 | Wallet balances for receptionist | `wallets_select_scoped` includes receptionist | Confirmed |
+| 4 | Nurse reads medical history | `medical_records` SELECT policy includes nurse role | Confirmed |
+| 5 | Accountant cross-branch | `branch_isolation` runs on invoices/treasury, and `user_has_branch_access` grants admins/accountants everything via role bypass in `has_role` short-circuit — verify each accountant is granted branches explicitly | Confirmed by convention (accountants get all branches at seed time) |
+| 6 | Audit logs admin-only | `al_select_admin` = admin only | Confirmed |
 
 ## Critical findings
 

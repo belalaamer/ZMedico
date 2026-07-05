@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { useLocation } from "react-router-dom";
-import { usePermissions } from "@/hooks/usePermissions";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { moduleForPath } from "@/lib/rolePermissions";
 import { useI18n } from "@/contexts/I18nContext";
 import { ShieldAlert } from "lucide-react";
@@ -11,7 +11,7 @@ import { ShieldAlert } from "lucide-react";
  */
 export function PermissionRoute({ children, module, adminOnly }: { children: ReactNode; module?: string; adminOnly?: boolean }) {
   const { pathname } = useLocation();
-  const { can, isAdmin, loading } = usePermissions();
+  const { authz, loading } = useAuthorization();
   const { lang } = useI18n();
   const mod = module ?? moduleForPath(pathname);
 
@@ -24,10 +24,10 @@ export function PermissionRoute({ children, module, adminOnly }: { children: Rea
   }
 
   if (adminOnly) {
-    if (isAdmin) return <>{children}</>;
-  } else if (isAdmin) {
+    if (authz.isSuperAdmin()) return <>{children}</>;
+  } else if (authz.isSuperAdmin()) {
     return <>{children}</>;
-  } else if (mod && can(mod, "view")) {
+  } else if (mod && authz.can(`${mod}.view`)) {
     // Deny by default: unmapped protected routes never fall through.
     return <>{children}</>;
   }

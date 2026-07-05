@@ -1,129 +1,115 @@
-# ZMedico — RBAC Verification Matrix
+# ZMedico — RBAC Verification Matrix (Strict)
 
-Derived from `src/lib/rolePermissions.ts` (`DEFAULT_PERMISSIONS`, `moduleForPath`),
-`src/components/PermissionRoute.tsx`, `src/components/Can.tsx`, the route table in
-`src/App.tsx`, the navigation in `src/components/layout/Sidebar.tsx` /
-`src/pages/settings/SettingsLayout.tsx`, and Supabase RLS policies on the
-tables listed in the schema summary.
+Authoritative matrix. Enforced in three layers that MUST agree:
+1. UI defaults — `src/lib/rolePermissions.ts` (`DEFAULT_PERMISSIONS`)
+2. DB seed — `public.role_permissions` table (read by `usePermissions`)
+3. RLS policies on each table
 
-## Modules x Actions (DEFAULT_PERMISSIONS)
+## Governing rules
 
-Legend: `V`=view  `C`=create  `E`=edit  `D`=delete  `X`=export  `—`=no access
+- **Delete = Admin only.** No other role can hard-delete any row. Cancel /
+  Void / Soft-archive are exposed via UI where appropriate.
+- **Segregation of Duties (strict).** Each role sees only what it needs.
+- **Branch isolation.** All branch-scoped tables enforce
+  `user_has_branch_access(branch_id)`; admins bypass via `has_role`.
 
-| Module / Role        | admin | manager | doctor | nurse | receptionist | accountant | hr | staff |
-|----------------------|:-----:|:-------:|:------:|:-----:|:------------:|:----------:|:--:|:-----:|
-| patients             | VCEDX | VCEX    | VE     | V     | VCE          | V          | —  | —     |
-| appointments         | VCEDX | VCEX    | VCE    | VCE   | VCED*        | V          | —  | V     |
-| medical_records      | VCEDX | VCEX    | VCE    | VCE   | —            | —          | —  | —     |
-| treatment_plans      | VCEDX | VCEX    | VCE    | VE    | V            | V          | —  | —     |
-| invoices             | VCEDX | VCEX    | V      | V     | VCE          | VCEX**     | —  | —     |
-| treasury             | VCEDX | VCEX    | —      | —     | —            | VCEX       | —  | —     |
-| inventory            | VCEDX | VCEX    | —      | V     | —            | V          | —  | —     |
-| reports              | VCEDX | VX      | V      | —     | —            | VX         | V  | —     |
-| hr                   | VCEDX | V       | —      | —     | —            | —          | VCEX | —   |
-| settings             | VCEDX | V       | —      | —     | —            | —          | —  | —     |
-| coupons              | VCEDX | VCEX    | —      | —     | V            | VCEX       | —  | —     |
+## Modules x Actions
 
-* Receptionist "delete" on appointments is intentionally surfaced in UI as
-  **Cancel** (soft cancel → status=`cancelled`) via `RowActions.tsx` and
-  `CalendarPage.tsx`. True hard-delete is gated to admin.
+Legend: `V`=view  `C`=create  `E`=edit  `X`=export  `—`=no access.
+Delete column omitted — Admin-only everywhere.
 
-** Accountant has `edit` on invoices but **no `delete`** — UI exposes Void/Cancel
-  only (`InvoiceDetail.tsx` action gating + `tg_invoice_after_cancel_reversal`
-  trigger refunds wallet, reverses treasury and cancels commissions).
+| Module / Role        | admin | manager | doctor | nurse | receptionist | accountant | hr    | staff |
+|----------------------|:-----:|:-------:|:------:|:-----:|:------------:|:----------:|:-----:|:-----:|
+| patients             | VCEX  | VCEX    | V      | V     | VCE          | V          | —     | —     |
+| appointments         | VCEX  | VCEX    | VCE    | VCE   | VCE*         | V          | —     | V     |
+| medical_records      | VCEX  | V       | VCE    | V     | —            | —          | —     | —     |
+| vitals               | VCEX  | V       | VCE    | VCE   | —            | —          | —     | —     |
+| treatment_plans      | VCEX  | V       | VCE    | V     | V            | V          | —     | —     |
+| invoices             | VCEX  | VX      | —      | —     | VC           | VCEX**     | —     | —     |
+| treasury             | VCEX  | VX      | —      | —     | —            | VCEX       | —     | —     |
+| inventory            | VCEX  | VCEX    | —      | V     | —            | V          | —     | —     |
+| coupons              | VCEX  | VX      | —      | —     | V            | VCEX       | —     | —     |
+| hr                   | VCEX  | V       | —      | —     | —            | —          | VCEX  | —     |
+| settings             | VCEX  | V       | —      | —     | —            | —          | —     | —     |
+| reports              | VX    | VX      | V      | —     | —            | VX         | V     | —     |
+| reports_finance      | VX    | VX      | —      | —     | —            | VX         | —     | —     |
+| reports_medical      | VX    | VX      | V      | —     | —            | —          | —     | —     |
+| reports_operational  | VX    | VX      | V      | —     | —            | VX         | —     | —     |
+| reports_hr           | VX    | —       | —      | —     | —            | —          | VX    | —     |
+| reports_inventory    | VX    | VX      | —      | —     | —            | VX         | —     | —     |
 
-## Route guards (from `App.tsx` + `PermissionRoute` + `moduleForPath`)
+\* Receptionist "cancel" on appointments is a status update (`status=cancelled`),
+   not a row delete. UI hides Delete for receptionist.
 
-| Route prefix                  | Inferred module      | Notes |
-|-------------------------------|----------------------|-------|
-| `/calendar`, `/reminders`     | `appointments`       | |
-| `/queue`, `/queue/audit`      | `appointments`       | `/queue/self-audit` is `adminOnly` |
-| `/physio`                     | `medical_records`    | |
-| `/patients`                   | `patients`           | |
-| `/invoices`, `/payments`      | `invoices`           | |
-| `/treasury`, `/expenses`      | `treasury`           | `/expenses/self-audit` is `adminOnly` |
-| `/coupons`                    | `coupons`            | |
-| `/inventory`                  | `inventory`          | |
-| `/medical/*`                  | `medical_records`    | |
-| `/hr/*`                       | `hr`                 | |
-| `/reports/*`                  | `reports`            | doctor commissions scoped via RLS to self |
-| `/settings/*`, `/branches/*`  | `settings`           | admin-only: `/settings/roles`, `/settings/users`, `/settings/backup`, `/settings/audit` |
-| `/pricing`                    | `settings`           | manager+ only (SaaS billing) |
-| `/system/self-audit`          | `adminOnly`          | |
-| `/trust`                      | public               | no auth required |
+\** Accountant "edit" on invoices excludes hard-delete; use Void (which triggers
+   `tg_invoice_after_cancel_reversal` for wallet refund + treasury reversal +
+   commission cancellation).
 
-`PermissionRoute` always admits `admin`. Otherwise: if `adminOnly` is set the
-route is blocked; else `can(module, "view")` from `usePermissions()` is
-required. Children inside pages use `<Can module="..." action="...">` to gate
-individual buttons (create / edit / delete / export).
+## Recent changes (this reset)
+
+- Manager lost Create/Edit on invoices and coupons — now view/export only.
+- Receptionist lost Delete on appointments, Edit on invoices, and all coupon
+  writes. Also lost create/edit on expenses.
+- Doctor lost invoice view and all patient demographics edits.
+- Nurse lost medical_records/treatment_plans writes.
+- Accountant lost any medical_records access; gained treatment_plans view.
+- HR unchanged in scope, but confirmed strict isolation to HR modules.
 
 ## Per-role expectations
 
 ### admin
-- Sees every sidebar entry; passes every `PermissionRoute` (including all
-  `adminOnly` routes: Roles, Users, Backup, Audit, Self-audits, System).
-- All CRUD + export allowed everywhere. RLS on all tables admits admins via
-  `has_role(auth.uid(), 'admin')`.
+Sees every sidebar entry; passes every `PermissionRoute` (including all
+`adminOnly` routes). All CRUD + export allowed everywhere.
 
-### manager (strict scope)
-- Sidebar: Operations, Patients & Clinical, Finance, Inventory, HR (view-only),
-  Settings (view-only), Reports.
-- **No delete in any module.** Cannot reach `/settings/roles`, `/settings/users`,
-  `/settings/backup`, `/settings/audit`. Cannot toggle `Can action="delete"`
-  buttons.
-- `/pricing` allowed.
+### manager
+Sidebar: Operations, Patients & Clinical (view), Finance (view), Inventory,
+HR (view), Settings (view), Reports (all except HR). No delete in any
+module. Cannot edit invoices, treasury, coupons, medical records.
 
 ### doctor
-- Allowed: Patients (V/E), Appointments (VCE), Medical Records (VCE),
-  Treatment Plans (VCE), Reports (V), Invoices (V only).
-- Sidebar exposes "Commissions" but RLS on `doctor_commissions` restricts to
-  `staff_id = auth.uid()` — own commissions only.
-- Blocked: Treasury, Inventory, HR, Settings, Coupons.
+Clinical only. Patients V, Appointments VCE, Medical Records VCE,
+Vitals VCE, Treatment Plans VCE, Medical/Operational Reports V.
+Own commissions only (RLS on `doctor_commissions.doctor_id = auth.uid()`).
+Blocked: Invoices, Treasury, Inventory, HR, Settings, Coupons, financial reports.
 
 ### nurse
-- Allowed: Patients (V), Appointments (VCE), Medical Records (VCE),
-  Treatment Plans (VE), Invoices (V), Inventory (V).
-- Blocked: Treasury, Reports, HR, Settings, Coupons.
+Assistant. Vitals VCE (nurses take vitals). Patients/Medical Records/
+Treatment Plans view-only. Appointments VCE. Inventory V. No reports.
 
 ### receptionist
-- Allowed: Patients (VCE), Appointments (VCE + soft-cancel as D),
-  Treatment Plans (V), Invoices (VCE), Coupons (V).
-- Blocked: Medical Records, Treasury, Inventory, Reports, HR, Settings.
-- UI: appointment "Delete" replaced with "Cancel"; invoice delete hidden.
+Front desk. Patients VCE, Appointments VCE (cancel via status update),
+Treatment Plans V, Invoices VC (create initial invoice, no edit),
+Coupons V (apply codes only). No expenses, no treasury, no reports.
 
 ### accountant
-- Allowed: Patients (V), Appointments (V), Treatment Plans (V),
-  Invoices (VCEX, **no delete** — void only),
-  Treasury (VCEX), Inventory (V), Reports (VX), Coupons (VCEX).
-- Blocked: Medical Records, HR, Settings.
+Finance only. Invoices VCEX (void, no hard-delete), Treasury VCEX,
+Coupons VCEX, Treatment Plans V, Inventory V, Finance/Operational/Inventory
+reports VX. No clinical access, no HR, no settings.
 
 ### hr
-- Allowed: HR (VCEX), Reports (V).
-- Blocked: every clinical / financial module and Settings.
+HR VCEX, HR Reports VX. Nothing else.
 
 ### staff
-- Allowed: Appointments (V) only.
-- Blocked: everything else.
+Appointments V only.
 
-## Branch isolation (RLS)
+## RLS policy alignment
 
-`branches`, `appointments`, `patients`, `invoices`, `payments`, `treasury`,
-`treasury_transactions`, `expenses`, `inventory`, `medical_records`,
-`prescriptions`, `physio_cases`, `physio_sessions`, `queue_alerts`,
-`queue_settings`, `notification_settings`, `attendance`, etc. all enforce
-access through `public.user_has_branch_access(branch_id)` (joins
-`staff_branches` for non-admins). Admins bypass via `has_role`. Frontend
-selection uses `BranchContext`; data queries always filter on the
-currently-selected branch and re-check on the server.
+Tables tightened alongside this matrix:
+- `patients`: doctor/nurse INSERT+UPDATE dropped; write access = admin + manager (branch) + receptionist.
+- `coupons`: receptionist write dropped; write = admin + manager + accountant.
+- `expenses`: receptionist INSERT dropped; SELECT restricted to admin + accountant + manager (branch).
+- `appointments` / `invoices` / `payments` / `medical_records` / `treasury` /
+  `treasury_transactions` / `doctor_commissions` / `staff_profiles`: DELETE
+  gated to `has_role(auth.uid(),'admin')` via dedicated DELETE policies.
 
 ## Backend safeguards worth verifying alongside the matrix
 
 - `add_treasury_tx`, `default_treasury_for_branch`, `apply_coupon_code`,
-  `staff_target_actual`, `fn_treasury_day_cash_summary` — SECURITY DEFINER with
-  explicit role checks inside the function body.
+  `check_expiry_alerts` — SECURITY DEFINER with explicit role checks inside.
 - `tg_invoice_after_cancel_reversal` — wallet refund + treasury reversal +
   commission cancellation on invoice void.
-- `tg_branches_cleanup_orphans` — reminders/alerts purged on branch delete
-  (EXECUTE revoked from PUBLIC/anon/authenticated; trigger-only).
-- `admin-create-user`, `admin-reset-password`, `admin-delete-user`,
-  `admin-export` — Edge Functions require service-role / admin context.
+- `tg_staff_self_update_guard` — non-admin/non-HR users cannot modify their
+  own employment / salary / identity fields.
+- `tg_branches_cleanup_orphans` — reminders/alerts purged on branch delete.
+- Edge functions (`admin-create-user`, `admin-reset-password`,
+  `admin-delete-user`, `admin-export`) — verify admin role server-side.

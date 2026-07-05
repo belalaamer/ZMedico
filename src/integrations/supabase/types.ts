@@ -275,6 +275,13 @@ export type Database = {
             referencedRelation: "staff_profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "attendance_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles_directory"
+            referencedColumns: ["id"]
+          },
         ]
       }
       audit_export_presets: {
@@ -982,6 +989,13 @@ export type Database = {
             columns: ["doctor_id"]
             isOneToOne: false
             referencedRelation: "staff_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "doctor_commissions_doctor_id_fkey"
+            columns: ["doctor_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles_directory"
             referencedColumns: ["id"]
           },
           {
@@ -1798,6 +1812,13 @@ export type Database = {
             referencedRelation: "staff_profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "leave_requests_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles_directory"
+            referencedColumns: ["id"]
+          },
         ]
       }
       leave_types: {
@@ -2585,6 +2606,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "patients_assigned_doctor_id_fkey"
+            columns: ["assigned_doctor_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles_directory"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "patients_branch_id_fkey"
             columns: ["branch_id"]
             isOneToOne: false
@@ -2831,6 +2859,13 @@ export type Database = {
             referencedRelation: "staff_profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "payroll_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles_directory"
+            referencedColumns: ["id"]
+          },
         ]
       }
       performance_reviews: {
@@ -2891,6 +2926,13 @@ export type Database = {
             columns: ["staff_id"]
             isOneToOne: false
             referencedRelation: "staff_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_reviews_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles_directory"
             referencedColumns: ["id"]
           },
         ]
@@ -2987,6 +3029,13 @@ export type Database = {
             referencedRelation: "staff_profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "physio_cases_therapist_id_fkey"
+            columns: ["therapist_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles_directory"
+            referencedColumns: ["id"]
+          },
         ]
       }
       physio_reassessments: {
@@ -3048,6 +3097,13 @@ export type Database = {
             columns: ["therapist_id"]
             isOneToOne: false
             referencedRelation: "staff_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_reassessments_therapist_id_fkey"
+            columns: ["therapist_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles_directory"
             referencedColumns: ["id"]
           },
         ]
@@ -3148,6 +3204,13 @@ export type Database = {
             columns: ["therapist_id"]
             isOneToOne: false
             referencedRelation: "staff_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_sessions_therapist_id_fkey"
+            columns: ["therapist_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles_directory"
             referencedColumns: ["id"]
           },
         ]
@@ -4785,6 +4848,13 @@ export type Database = {
             referencedRelation: "staff_profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "staff_targets_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles_directory"
+            referencedColumns: ["id"]
+          },
         ]
       }
       stock_alerts: {
@@ -5534,6 +5604,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "treatment_plans_doctor_id_fkey"
+            columns: ["doctor_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles_directory"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "treatment_plans_invoice_id_fkey"
             columns: ["invoice_id"]
             isOneToOne: false
@@ -5608,6 +5685,13 @@ export type Database = {
             columns: ["doctor_id"]
             isOneToOne: false
             referencedRelation: "staff_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "treatment_sessions_doctor_id_fkey"
+            columns: ["doctor_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles_directory"
             referencedColumns: ["id"]
           },
           {
@@ -5861,11 +5945,97 @@ export type Database = {
             referencedRelation: "staff_profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "work_schedules_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles_directory"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
     Views: {
-      [_ in never]: never
+      staff_profiles_directory: {
+        Row: {
+          branch_id: string | null
+          contract_type: Database["public"]["Enums"]["contract_type"] | null
+          created_at: string | null
+          department_id: string | null
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          employee_id: string | null
+          hire_date: string | null
+          id: string | null
+          linked_user_id: string | null
+          position_id: string | null
+          profile_image_url: string | null
+          status: Database["public"]["Enums"]["staff_status"] | null
+          updated_at: string | null
+        }
+        Insert: {
+          branch_id?: string | null
+          contract_type?: Database["public"]["Enums"]["contract_type"] | null
+          created_at?: string | null
+          department_id?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          employee_id?: string | null
+          hire_date?: string | null
+          id?: string | null
+          linked_user_id?: string | null
+          position_id?: string | null
+          profile_image_url?: string | null
+          status?: Database["public"]["Enums"]["staff_status"] | null
+          updated_at?: string | null
+        }
+        Update: {
+          branch_id?: string | null
+          contract_type?: Database["public"]["Enums"]["contract_type"] | null
+          created_at?: string | null
+          department_id?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          employee_id?: string | null
+          hire_date?: string | null
+          id?: string | null
+          linked_user_id?: string | null
+          position_id?: string | null
+          profile_image_url?: string | null
+          status?: Database["public"]["Enums"]["staff_status"] | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_profiles_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_profiles_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_profiles_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_profiles_position_id_fkey"
+            columns: ["position_id"]
+            isOneToOne: false
+            referencedRelation: "staff_positions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       _audit_write: {

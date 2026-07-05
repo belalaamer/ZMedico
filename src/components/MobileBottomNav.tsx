@@ -2,21 +2,21 @@ import { NavLink } from "react-router-dom";
 import { LayoutDashboard, Users, Calendar, FileText, ListChecks } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { usePermissions } from "@/hooks/usePermissions";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { cn } from "@/lib/utils";
 
 export function MobileBottomNav() {
   const isMobile = useIsMobile();
   const { t } = useI18n();
-  const { can } = usePermissions();
+  const { authz } = useAuthorization();
   if (!isMobile) return null;
 
   const items = [
     { to: "/", icon: LayoutDashboard, label: t("dashboard"), end: true, show: true },
-    { to: "/patients", icon: Users, label: t("patients"), show: can("patients") },
-    { to: "/calendar", icon: Calendar, label: t("calendar"), show: can("appointments") },
-    { to: "/invoices", icon: FileText, label: t("invoices"), show: can("invoices") },
-    { to: "/queue", icon: ListChecks, label: t("queue"), show: can("appointments") },
+    { to: "/patients", icon: Users, label: t("patients"), show: authz.can("patients.view") },
+    { to: "/calendar", icon: Calendar, label: t("calendar"), show: authz.can("appointments.view") },
+    { to: "/invoices", icon: FileText, label: t("invoices"), show: authz.can("invoices.view") },
+    { to: "/queue", icon: ListChecks, label: t("queue"), show: authz.can("appointments.view") },
   ].filter(i => i.show);
 
   return (

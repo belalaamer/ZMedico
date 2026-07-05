@@ -381,6 +381,181 @@ export type Database = {
           },
         ]
       }
+      authz_bundle_implies: {
+        Row: {
+          child_bundle_key: string
+          created_at: string
+          parent_bundle_key: string
+        }
+        Insert: {
+          child_bundle_key: string
+          created_at?: string
+          parent_bundle_key: string
+        }
+        Update: {
+          child_bundle_key?: string
+          created_at?: string
+          parent_bundle_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "authz_bundle_implies_child_bundle_key_fkey"
+            columns: ["child_bundle_key"]
+            isOneToOne: false
+            referencedRelation: "authz_bundles"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "authz_bundle_implies_parent_bundle_key_fkey"
+            columns: ["parent_bundle_key"]
+            isOneToOne: false
+            referencedRelation: "authz_bundles"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
+      authz_bundle_permissions: {
+        Row: {
+          bundle_key: string
+          created_at: string
+          permission_key: string
+        }
+        Insert: {
+          bundle_key: string
+          created_at?: string
+          permission_key: string
+        }
+        Update: {
+          bundle_key?: string
+          created_at?: string
+          permission_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "authz_bundle_permissions_bundle_key_fkey"
+            columns: ["bundle_key"]
+            isOneToOne: false
+            referencedRelation: "authz_bundles"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "authz_bundle_permissions_permission_key_fkey"
+            columns: ["permission_key"]
+            isOneToOne: false
+            referencedRelation: "authz_permissions"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
+      authz_bundles: {
+        Row: {
+          created_at: string
+          deprecated: boolean
+          description: string | null
+          display_name: string
+          key: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          deprecated?: boolean
+          description?: string | null
+          display_name: string
+          key: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          deprecated?: boolean
+          description?: string | null
+          display_name?: string
+          key?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
+      }
+      authz_permissions: {
+        Row: {
+          created_at: string
+          default_scope: string
+          deprecated: boolean
+          description: string | null
+          display_name: string
+          group_key: string
+          introduced_in: string | null
+          key: string
+          metadata: Json
+          replaced_by: string | null
+          risk_level: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          default_scope?: string
+          deprecated?: boolean
+          description?: string | null
+          display_name: string
+          group_key: string
+          introduced_in?: string | null
+          key: string
+          metadata?: Json
+          replaced_by?: string | null
+          risk_level?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          default_scope?: string
+          deprecated?: boolean
+          description?: string | null
+          display_name?: string
+          group_key?: string
+          introduced_in?: string | null
+          key?: string
+          metadata?: Json
+          replaced_by?: string | null
+          risk_level?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "authz_permissions_replaced_by_fkey"
+            columns: ["replaced_by"]
+            isOneToOne: false
+            referencedRelation: "authz_permissions"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
+      authz_role_bundles: {
+        Row: {
+          bundle_key: string
+          created_at: string
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Insert: {
+          bundle_key: string
+          created_at?: string
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Update: {
+          bundle_key?: string
+          created_at?: string
+          role?: Database["public"]["Enums"]["app_role"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "authz_role_bundles_bundle_key_fkey"
+            columns: ["bundle_key"]
+            isOneToOne: false
+            referencedRelation: "authz_bundles"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
       branches: {
         Row: {
           address: string | null
@@ -6036,6 +6211,21 @@ export type Database = {
           },
         ]
       }
+      v_authz_effective_permissions: {
+        Row: {
+          permission_key: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "authz_bundle_permissions_permission_key_fkey"
+            columns: ["permission_key"]
+            isOneToOne: false
+            referencedRelation: "authz_permissions"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
     }
     Functions: {
       _audit_write: {
@@ -6162,6 +6352,10 @@ export type Database = {
       generate_product_sku: { Args: never; Returns: string }
       generate_saas_invoice_number: { Args: never; Returns: string }
       get_clinic_logo: { Args: { _branch_id: string }; Returns: string }
+      has_permission: {
+        Args: { _permission_key: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

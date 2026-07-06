@@ -1,0 +1,10 @@
+# Intentional Authorization Changes — Wave 2.5 harness
+#
+# One change per line. Comments start with `#`. Format:
+#     table,operation,role,expected_from,expected_to
+# For RPC changes prefix the name with `rpc:` and set operation to `-`:
+#     rpc:apply_wallet_tx,-,accountant,deny,allow
+#
+# Every entry MUST be accompanied by a design-doc reference in the
+# migration batch PR. The harness fails CI if diff cells are not listed
+# here.

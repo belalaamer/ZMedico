@@ -41,6 +41,53 @@ POLICY_DUMP_SQL = (
     "ORDER BY tablename, cmd, policyname"
 )
 
+# Wave 3 Pilot: resolve every `has_permission(auth.uid(),'<key>')` expression
+# by asking the DB which roles reach that permission through the bundle graph.
+# `admin` is always in the set because `public.has_permission()` short-circuits
+# on `has_role(_user_id,'admin')`. The mapping is captured once per run so the
+# analyzer stays deterministic and offline-cacheable.
+PERM_ROLES_SQL = """
+WITH RECURSIVE role_bundles AS (
+  SELECT r.role, rb.bundle_key
+    FROM (SELECT unnest(enum_range(NULL::public.app_role)) AS role) r
+    JOIN public.authz_role_bundles rb ON rb.role = r.role
+  UNION
+  SELECT rb.role, bi.child_bundle_key
+    FROM role_bundles rb
+    JOIN public.authz_bundle_implies bi ON bi.parent_bundle_key = rb.bundle_key
+)
+SELECT bp.permission_key, rb.role::text
+  FROM role_bundles rb
+  JOIN public.authz_bundle_permissions bp ON bp.bundle_key = rb.bundle_key
+ ORDER BY 1, 2
+"""
+
+_PERM_ROLES: dict[str, set[str]] = {}
+_HAS_PERM_RE = re.compile(
+    r"has_permission\s*\(\s*auth\.uid\(\)\s*,\s*'([^']+)'(?:::text)?\s*\)",
+    re.IGNORECASE,
+)
+
+
+def load_perm_roles() -> dict[str, set[str]]:
+    if _PERM_ROLES:
+        return _PERM_ROLES
+    if not os.environ.get("PGHOST"):
+        return _PERM_ROLES
+    r = subprocess.run(
+        ["psql", "-At", "-F", "|", "-c", PERM_ROLES_SQL],
+        check=True, capture_output=True, text=True,
+    )
+    for line in r.stdout.splitlines():
+        if "|" not in line:
+            continue
+        key, role = line.split("|", 1)
+        _PERM_ROLES.setdefault(key, set()).add(role)
+    # admin bypass baked into public.has_permission()
+    for roles in _PERM_ROLES.values():
+        roles.add("admin")
+    return _PERM_ROLES
+
 
 def dump_policies() -> list[dict]:
     if not os.environ.get("PGHOST"):
@@ -75,6 +122,14 @@ def role_signal(expr: str, role: str) -> str:
     branch = "user_has_branch_access" in e
     owner = "auth.uid()" in e and re.search(r"auth\.uid\(\)\s*=\s*", e) is not None
     is_tenant = "is_tenant_owner" in e
+    # Wave 3: has_permission(auth.uid(),'<key>') — allow for every role whose
+    # bundle graph reaches <key> (admin is always included via the bypass).
+    perm_keys = _HAS_PERM_RE.findall(e)
+    if perm_keys:
+        perm_roles = load_perm_roles()
+        for k in perm_keys:
+            if role in perm_roles.get(k, {"admin"}):
+                return "allow"
     if role == "admin" and has_admin:
         return "allow"
     if role_ref and branch:

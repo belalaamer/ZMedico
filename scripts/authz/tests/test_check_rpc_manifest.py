@@ -60,14 +60,14 @@ class Phase(unittest.TestCase):
         self.assertIn("frozen", r.stderr)
 
     def test_duplicate_name(self):
-        dup = VALID + textwrap.dedent("""
-              - name: apply_wallet_tx
-                signature: "_pid uuid, _amt numeric"
-                permission: payments.write
-                purpose: dup
-                present_by: M1
-                audit: true
-                introduced_in: X
+        dup = VALID + "\n" + textwrap.dedent("""\
+          - name: apply_wallet_tx
+            signature: "_pid uuid, _amt numeric"
+            permission: payments.write
+            purpose: dup
+            present_by: M1
+            audit: true
+            introduced_in: X
         """)
         r = run(dup)
         self.assertEqual(r.returncode, 10)
@@ -84,12 +84,12 @@ class Phase(unittest.TestCase):
         self.assertIn("permission", r.stderr)
 
     def test_missing_required_field(self):
-        r = run(VALID.replace("        audit: true\n", ""))
+        r = run(VALID.replace("    audit: true\n", ""))
         self.assertEqual(r.returncode, 10)
         self.assertIn("missing required fields", r.stderr)
 
     def test_invalid_criticality_when_present(self):
-        body = VALID.replace("audit: true", "audit: true\n        criticality: nope")
+        body = VALID.replace("audit: true", "audit: true\n    criticality: nope")
         r = run(body)
         self.assertEqual(r.returncode, 10)
         self.assertIn("criticality", r.stderr)

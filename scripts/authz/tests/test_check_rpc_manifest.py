@@ -60,15 +60,15 @@ class Phase(unittest.TestCase):
         self.assertIn("frozen", r.stderr)
 
     def test_duplicate_name(self):
-        dup = VALID + "\n" + textwrap.dedent("""\
-          - name: apply_wallet_tx
-            signature: "_pid uuid, _amt numeric"
-            permission: payments.write
-            purpose: dup
-            present_by: M1
-            audit: true
-            introduced_in: X
-        """)
+        dup = VALID + "\n" + (
+            '  - name: apply_wallet_tx\n'
+            '    signature: "_pid uuid, _amt numeric"\n'
+            '    permission: payments.write\n'
+            '    purpose: dup\n'
+            '    present_by: M1\n'
+            '    audit: true\n'
+            '    introduced_in: X\n'
+        )
         r = run(dup)
         self.assertEqual(r.returncode, 10)
         self.assertIn("duplicate", r.stderr)

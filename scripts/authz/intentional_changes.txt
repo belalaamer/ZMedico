@@ -8,3 +8,18 @@
 # Every entry MUST be accompanied by a design-doc reference in the
 # migration batch PR. The harness fails CI if diff cells are not listed
 # here.
+
+# H3-2 `apply_wallet_tx` — single-gate normalization.
+# Analyzer-only reclassification: the runtime gate switched from a
+# literal `has_role(...)` set to `has_permission(_uid, key)`. Static
+# analyzer in analyze_rpcs.py only matches literal has_role() patterns
+# and defaults to "allow" when none are found. Runtime authorization
+# is UNCHANGED — `has_permission('patients.edit'|'patients.delete')`
+# still denies accountant/doctor/hr/nurse/staff because none of those
+# roles hold `patients.edit` via any bundle.
+# See docs/security/H3_2_APPLY_WALLET_TX_HOTFIX.md.
+rpc:apply_wallet_tx,-,accountant,deny,allow
+rpc:apply_wallet_tx,-,doctor,deny,allow
+rpc:apply_wallet_tx,-,hr,deny,allow
+rpc:apply_wallet_tx,-,nurse,deny,allow
+rpc:apply_wallet_tx,-,staff,deny,allow

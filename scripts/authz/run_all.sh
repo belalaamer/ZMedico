@@ -25,6 +25,20 @@ done
 python scripts/authz/analyze_rls.py  --out /tmp/authz_current_rls.csv  --summary "${RLS_ARGS[@]}"
 python scripts/authz/analyze_rpcs.py --out /tmp/authz_current_rpcs.csv "${RPC_ARGS[@]}"
 
+# Sprint S2 — SECURITY DEFINER Standard v1 compliance check.
+# Advisory by default (does not fail the pipeline); pass COMPLIANCE_STRICT=1
+# to promote FAIL verdicts to non-zero exit.
+COMPLIANCE_STRICT_FLAG=()
+[[ "${COMPLIANCE_STRICT:-0}" = "1" ]] && COMPLIANCE_STRICT_FLAG=(--strict)
+python scripts/authz/compliance_definer.py \
+  --csv    /tmp/authz_compliance.csv \
+  --report /tmp/authz_compliance.md \
+  "${COMPLIANCE_STRICT_FLAG[@]}" || COMPLIANCE_EXIT=$?
+if [[ "${COMPLIANCE_EXIT:-0}" -ne 0 && "${COMPLIANCE_STRICT:-0}" = "1" ]]; then
+  echo "[run_all] compliance check reported FAIL verdicts (strict mode)" >&2
+  exit "${COMPLIANCE_EXIT}"
+fi
+
 BASE_RPC=""
 [[ -f /mnt/documents/golden_rpc_baseline.csv ]] && BASE_RPC="--baseline-rpc /mnt/documents/golden_rpc_baseline.csv"
 

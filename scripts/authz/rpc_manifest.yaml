@@ -1,0 +1,124 @@
+# Authorization v2 — Frozen RPC Manifest
+# Source of truth: docs/governance/RC1_1_RC2_REMEDIATION.md §"RPC Manifest"
+# Consumed by: scripts/authz/check_rpc_manifest.py (RPC-09) → scripts/authz/run_all.sh
+#
+# Contract:
+#   - Every entry MUST exist in public.pg_proc as a SECURITY DEFINER function
+#     with the declared signature by the milestone in `present_by`.
+#   - Additions to this file are one-way. Removals require a Product Decision
+#     entry (docs/governance/PRODUCT_DECISIONS.md).
+#   - Every entry maps to exactly one permission key in the frozen catalog
+#     (docs/PERMISSION_CATALOG.md).
+#
+# Fields:
+#   name         : proname in schema public
+#   signature    : pg_get_function_identity_arguments (used for exact match)
+#   permission   : single permission key gated inside the RPC body
+#   purpose      : short human description
+#   present_by   : milestone ID from IMPLEMENTATION_BACKLOG.md by which the
+#                  RPC must exist. Before that milestone the checker warns;
+#                  after, it fails hard.
+#   audit        : true iff the RPC writes public.audit_logs (R7 subject)
+#   introduced_in: backlog ID that adds/last-modifies the function
+
+version: 1
+frozen: true
+
+rpcs:
+  # ── Already present in DB (Wave 1 / H3-1 / H3-2 landed) ─────────────────
+  - name: merge_staff_position
+    signature: "_source_position_id uuid, _target_position_id uuid"
+    permission: hr.positions.write
+    purpose: Merge two staff_positions rows atomically with audit.
+    present_by: M1
+    audit: true
+    introduced_in: H3-1
+
+  - name: apply_wallet_tx
+    signature: "_patient_id uuid, _amount numeric, _direction text, _reason text, _invoice_id uuid, _payment_id uuid"
+    permission: payments.write
+    purpose: Sole path for patient wallet credits/debits.
+    present_by: M1
+    audit: true
+    introduced_in: H3-2
+
+  - name: apply_coupon_code
+    signature: "_code text, _invoice_id uuid"
+    permission: invoices.write
+    purpose: Apply a coupon to an invoice with redemption tracking.
+    present_by: M1
+    audit: true
+    introduced_in: RPC-04
+
+  - name: add_treasury_tx
+    signature: "_treasury_id uuid, _amount numeric, _direction text, _reason text, _reference text"
+    permission: treasury.write
+    purpose: Sole path for treasury cash movements.
+    present_by: M4
+    audit: true
+    introduced_in: RPC-01
+
+  - name: apply_inventory_tx
+    signature: "_product_id uuid, _delta integer, _reason text, _reference text"
+    permission: inventory.write
+    purpose: Sole path for inventory quantity adjustments.
+    present_by: M4
+    audit: true
+    introduced_in: RPC-02
+
+  - name: receive_po_item
+    signature: "_po_item_id uuid, _qty_received integer"
+    permission: purchase_orders.write
+    purpose: Receive a purchase order line and update stock atomically.
+    present_by: M4
+    audit: true
+    introduced_in: RPC-03
+
+  # ── Planned by RC2 (present_by: M4) ─────────────────────────────────────
+  - name: export_patients_rpc
+    signature: "_filter jsonb"
+    permission: patients.export
+    purpose: Sole path for patient bulk export; admin-only per RC2 F-06.
+    present_by: M4
+    audit: true
+    introduced_in: RPC-05
+
+  - name: record_consent
+    signature: "_patient_id uuid, _consent_type text, _payload jsonb"
+    permission: patients.consent.write
+    purpose: Record patient consent (RC2 F-17).
+    present_by: M4
+    audit: true
+    introduced_in: RPC-06
+
+  - name: revoke_consent
+    signature: "_patient_id uuid, _consent_type text, _reason text"
+    permission: patients.consent.write
+    purpose: Revoke patient consent (RC2 F-17).
+    present_by: M4
+    audit: true
+    introduced_in: RPC-06
+
+  - name: refund_payment
+    signature: "_payment_id uuid, _amount numeric, _reason text"
+    permission: payments.refund
+    purpose: Sole path for payment refunds; closes RC2 F-13.
+    present_by: M4
+    audit: true
+    introduced_in: RPC-07
+
+  - name: apply_discount
+    signature: "_invoice_id uuid, _amount numeric, _reason text"
+    permission: invoices.discount
+    purpose: Sole path for invoice discounts; presence-tested per V1 F-13.
+    present_by: M4
+    audit: true
+    introduced_in: RPC-07
+
+  - name: deactivate_staff
+    signature: "_staff_id uuid, _reason text"
+    permission: hr.staff.write
+    purpose: Sole path for staff deactivation; presence-tested per V1 F-13.
+    present_by: M4
+    audit: true
+    introduced_in: RPC-07

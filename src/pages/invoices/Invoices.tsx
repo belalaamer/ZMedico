@@ -16,8 +16,7 @@ import { CreateInvoiceDialog } from "./CreateInvoiceDialog";
 import { Fab } from "@/components/ui/fab";
 import { RowActions } from "@/components/RowActions";
 import { useNavigate } from "react-router-dom";
-import { useUserRole } from "@/hooks/useUserRole";
-import { usePermissions } from "@/hooks/usePermissions";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { Can } from "@/components/Can";
 import { ListSkeleton } from "@/components/ListSkeleton";
 import { PullToRefresh } from "@/components/PullToRefresh";
@@ -45,8 +44,11 @@ export default function Invoices() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
   const navigate = useNavigate();
-  const { isAdmin } = useUserRole();
-  const { can } = usePermissions();
+  // R2: canonical authorization entry point. `canOverride` retains the
+  // legacy "admin can delete non-draft invoices and cascade-delete
+  // linked payments" behavior — routed through the service.
+  const { authz } = useAuthorization("Invoices");
+  const canOverride = authz.isSuperAdmin();
   const [items, setItems] = useState<Inv[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
@@ -81,13 +83,13 @@ export default function Invoices() {
     ({ draft: t("statusDraft"), pending: t("statusPending"), paid: t("statusPaid"), partial: t("statusPartial"), cancelled: t("statusCancelled") }[s]);
 
   const softDelete = async (i: Inv): Promise<void> => {
-    if (i.status !== "draft" && !isAdmin) {
+    if (i.status !== "draft" && !canOverride) {
       toast.error(lang === "ar" ? "يمكن حذف المسودات فقط" : "Only draft invoices can be deleted");
       return;
     }
     const now = new Date().toISOString();
     // Admin: also soft-delete linked payments so totals stay consistent
-    if (isAdmin) {
+    if (canOverride) {
       await supabase.from("payments").update({ deleted_at: now } as any).eq("invoice_id", i.id).is("deleted_at", null);
     }
     const { error } = await supabase.from("invoices").update({ deleted_at: now } as any).eq("id", i.id);
@@ -164,10 +166,10 @@ export default function Invoices() {
                   <RowActions
                     onEdit={() => navigate(`/invoices/${i.id}`)}
                     onDelete={() => softDelete(i)}
-                    canEdit={can("invoices", "edit")}
-                    canDelete={can("invoices", "delete") && (isAdmin || i.status === "draft")}
+                    canEdit={authz.can("invoices.edit")}
+                    canDelete={authz.can("invoices.delete") && (canOverride || i.status === "draft")}
                     extraItems={
-                      i.status !== "paid" && i.status !== "cancelled" && can("payments", "create")
+                      i.status !== "paid" && i.status !== "cancelled" && authz.can("payments.create")
                         ? [{
                             label: t("recordPayment"),
                             icon: <CreditCard className="size-4" />,

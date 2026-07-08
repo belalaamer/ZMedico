@@ -8,11 +8,15 @@ import * as XLSX from "xlsx";
 import { Download, Database } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 
 export default function BackupExport() {
   const { t } = useI18n();
   const { user } = useAuth();
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  // R2: admin gate routed through the canonical AuthorizationService.
+  // Replaces a bespoke user_roles fetch that mirrored `isSuperAdmin()`.
+  const { authz, loading: authzLoading } = useAuthorization("BackupExport");
+  const canBackup = authz.isSuperAdmin();
   const [lastBackup, setLastBackup] = useState<{ created_at: string; rows_count: number | null; size_bytes: number | null } | null>(null);
 
   const refreshLastBackup = () => {
@@ -27,21 +31,8 @@ export default function BackupExport() {
   };
   useEffect(() => { refreshLastBackup(); }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    if (!user) { setIsAdmin(false); return; }
-    supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
-      .maybeSingle()
-      .then(({ data }) => { if (!cancelled) setIsAdmin(!!data); });
-    return () => { cancelled = true; };
-  }, [user]);
-
   const guard = () => {
-    if (!isAdmin) { toast.error("Admin access required"); return false; }
+    if (!canBackup) { toast.error("Admin access required"); return false; }
     return true;
   };
 
@@ -94,7 +85,7 @@ export default function BackupExport() {
             ? (<>Last backup: <span className="font-medium text-foreground">{new Date(lastBackup.created_at).toLocaleString()}</span>{lastBackup.rows_count != null ? <> · {lastBackup.rows_count.toLocaleString()} rows</> : null}{lastBackup.size_bytes != null ? <> · {(lastBackup.size_bytes/1024/1024).toFixed(2)} MB</> : null}</>)
             : <>No backup recorded yet. Use <em>Backup now</em> to create one.</>}
         </div>
-        {isAdmin === false && (
+        {!authzLoading && !canBackup && (
           <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             Backup and export are restricted to administrators.
           </div>
@@ -102,14 +93,14 @@ export default function BackupExport() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Card className="p-5 space-y-3"><div className="flex items-center gap-2"><Database className="size-5 text-primary" /><h3 className="font-semibold">Backup</h3></div>
             <p className="text-sm text-muted-foreground">Export full snapshot of core tables as JSON.</p>
-            <Button disabled={!isAdmin} className="gradient-primary text-primary-foreground" onClick={exportAllJson}><Download className="me-2 size-4" />{t("backupNow")}</Button>
+            <Button disabled={!canBackup} className="gradient-primary text-primary-foreground" onClick={exportAllJson}><Download className="me-2 size-4" />{t("backupNow")}</Button>
           </Card>
           <Card className="p-5 space-y-3"><div className="flex items-center gap-2"><Download className="size-5 text-primary" /><h3 className="font-semibold">Export</h3></div>
             <div className="grid gap-2">
-              <Button disabled={!isAdmin} variant="outline" onClick={() => exportTable("patients", "patients.xlsx")}>{t("exportPatients")}</Button>
-              <Button disabled={!isAdmin} variant="outline" onClick={() => exportTable("invoices", "invoices.xlsx")}>{t("exportInvoices")}</Button>
-              <Button disabled={!isAdmin} variant="outline" onClick={() => exportTable("appointments", "appointments.xlsx")}>Export appointments</Button>
-              <Button disabled={!isAdmin} variant="outline" onClick={() => exportTable("products", "products.xlsx")}>Export products</Button>
+              <Button disabled={!canBackup} variant="outline" onClick={() => exportTable("patients", "patients.xlsx")}>{t("exportPatients")}</Button>
+              <Button disabled={!canBackup} variant="outline" onClick={() => exportTable("invoices", "invoices.xlsx")}>{t("exportInvoices")}</Button>
+              <Button disabled={!canBackup} variant="outline" onClick={() => exportTable("appointments", "appointments.xlsx")}>Export appointments</Button>
+              <Button disabled={!canBackup} variant="outline" onClick={() => exportTable("products", "products.xlsx")}>Export products</Button>
             </div>
           </Card>
         </div>

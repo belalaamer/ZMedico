@@ -23,6 +23,13 @@ export interface AuthorizationServiceOptions {
   /** True when the current user is a global admin. Admin passes everything. */
   isAdmin?: boolean;
   /**
+   * Compatibility only — the raw list of legacy role names for the current
+   * user (from `useUserRole`). Consumed by the transitional `hasRole` /
+   * `hasRoleAny` adapters below so no component has to touch role strings
+   * directly. Will be removed once every gate has a permission-key.
+   */
+  roles?: readonly string[];
+  /**
    * R1 additions (opt-in; all no-ops when omitted).
    *   - source: whether this instance is delegating to legacy or new grants.
    *   - fingerprint: current authz state fingerprint for telemetry.
@@ -52,6 +59,7 @@ export function parsePermissionKey(key: PermissionKey): { module: string; action
 export class AuthorizationService {
   private readonly legacyCan: LegacyCan;
   private readonly isAdmin: boolean;
+  private readonly roles: readonly string[];
   private readonly source: "legacy" | "new";
   private readonly fingerprint: string | null;
   private readonly emit?: AuthorizationServiceOptions["emit"];
@@ -60,6 +68,7 @@ export class AuthorizationService {
   constructor(opts: AuthorizationServiceOptions) {
     this.legacyCan = opts.legacyCan;
     this.isAdmin = Boolean(opts.isAdmin);
+    this.roles = opts.roles ?? [];
     this.source = opts.source ?? "legacy";
     this.fingerprint = opts.fingerprint ?? null;
     this.emit = opts.emit;
@@ -120,6 +129,35 @@ export class AuthorizationService {
   isSuperAdmin(): boolean {
     return this.isAdmin;
   }
+
+  /**
+   * Transitional role-identity adapters — routed through the service so
+   * that no page/component/hook has to grep for role strings. Admin
+   * always satisfies (matches historical `isAdmin || roles.includes(x)`
+   * semantics used across the codebase). Prefer a permission key
+   * (`can("x.y")`) whenever one exists in the catalog. These will be
+   * removed by R8 (Legacy Removal).
+   */
+  hasRole(role: string): boolean {
+    if (this.isAdmin) return true;
+    return this.roles.includes(role);
+  }
+
+  hasRoleAny(...roles: string[]): boolean {
+    if (this.isAdmin) return true;
+    if (roles.length === 0) return false;
+    return roles.some((r) => this.roles.includes(r));
+  }
+
+  /**
+   * Strict role membership — does NOT admin-override. Use only where
+   * the historical behavior explicitly excluded admins (e.g. doctor-only
+   * report scoping). Transitional; also removed by R8.
+   */
+  holdsAnyRole(...roles: string[]): boolean {
+    if (roles.length === 0) return false;
+    return roles.some((r) => this.roles.includes(r));
+  }
 }
 
 /**
@@ -129,6 +167,7 @@ export class AuthorizationService {
 export function createAuthorizationServiceFromLegacy(input: {
   can: LegacyCan;
   isAdmin: boolean;
+  roles?: readonly string[];
 }): AuthorizationService {
-  return new AuthorizationService({ legacyCan: input.can, isAdmin: input.isAdmin });
+  return new AuthorizationService({ legacyCan: input.can, isAdmin: input.isAdmin, roles: input.roles });
 }

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useI18n } from "@/contexts/I18nContext";
 import { ShieldCheck, Info, Save, RotateCcw, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useUserRole } from "@/hooks/useUserRole";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { toast } from "sonner";
 import { ROLES as ALL_ROLES, MODULES as ALL_MODULES, ACTIONS as ALL_ACTIONS, DEFAULT_PERMISSIONS } from "@/lib/rolePermissions";
 
@@ -40,7 +40,11 @@ function emptyMatrix(): Matrix {
 
 export default function RolePermissions() {
   const { t, lang } = useI18n();
-  const { isAdmin, loading: roleLoading } = useUserRole();
+  // R2: this page is the admin CRUD editor for the role_permissions
+  // table itself; DEFAULT_PERMISSIONS is data (seed), not a decision.
+  // The admin gate below is routed through the canonical service.
+  const { authz, loading: roleLoading } = useAuthorization("RolePermissions");
+  const canEditMatrix = authz.isSuperAdmin();
   const [matrix, setMatrix] = useState<Matrix>(() => JSON.parse(JSON.stringify(DEFAULT)));
   const [original, setOriginal] = useState<Matrix>(() => JSON.parse(JSON.stringify(DEFAULT)));
   const [loading, setLoading] = useState(true);
@@ -69,7 +73,7 @@ export default function RolePermissions() {
   const dirty = JSON.stringify(matrix) !== JSON.stringify(original);
 
   const toggle = (role: string, module: string, action: string) => {
-    if (!isAdmin) return;
+    if (!canEditMatrix) return;
     setMatrix(prev => {
       const next = JSON.parse(JSON.stringify(prev)) as Matrix;
       const list = new Set(next[role]?.[module] ?? []);
@@ -99,7 +103,7 @@ export default function RolePermissions() {
     setMatrix(JSON.parse(JSON.stringify(DEFAULT)));
   };
 
-  if (!roleLoading && !isAdmin) return <Navigate to="/settings/general" replace />;
+  if (!roleLoading && !canEditMatrix) return <Navigate to="/settings/general" replace />;
 
   return (
     <SettingsLayout>
@@ -110,8 +114,8 @@ export default function RolePermissions() {
             {t("rolePermissions")}
           </h1>
           <div className="flex items-center gap-2 flex-wrap">
-            {!isAdmin && <Badge variant="outline">Read-only</Badge>}
-            {isAdmin && (
+            {!canEditMatrix && <Badge variant="outline">Read-only</Badge>}
+            {canEditMatrix && (
               <>
                 <Button variant="outline" size="sm" onClick={resetDefaults} disabled={saving}>
                   <RotateCcw className="me-2 size-4" />
@@ -164,10 +168,10 @@ export default function RolePermissions() {
                               type="button"
                               key={a}
                               onClick={() => toggle(r, m, a)}
-                              disabled={!isAdmin || loading}
+                              disabled={!canEditMatrix || loading}
                               className={
                                 "transition " +
-                                (isAdmin ? "cursor-pointer hover:scale-105" : "cursor-default")
+                                (canEditMatrix ? "cursor-pointer hover:scale-105" : "cursor-default")
                               }
                               aria-pressed={allowed}
                               title={a === "delete" && r === "receptionist" && m === "appointments"

@@ -12,7 +12,7 @@ import { Wallet, Plus, Settings2 } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { useUserRole } from "@/hooks/useUserRole";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { Can } from "@/components/Can";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -55,7 +55,9 @@ export default function PatientWalletTab({ patientId }: { patientId: string }) {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
   const { user } = useAuth();
-  const { isAdmin } = useUserRole();
+  // R2: admin-only manual adjustment gate via AuthorizationService.
+  const { authz } = useAuthorization("PatientWalletTab");
+  const canAdjustManually = authz.isSuperAdmin();
 
   const [balance, setBalance] = useState<number>(0);
   const [txs, setTxs] = useState<Tx[]>([]);
@@ -99,7 +101,7 @@ export default function PatientWalletTab({ patientId }: { patientId: string }) {
               <Plus className="me-2 size-4" />{t("topupWallet")}
             </Button>
           </Can>
-          {isAdmin && (
+          {canAdjustManually && (
             <Button variant="outline" onClick={() => setAdjOpen(true)}>
               <Settings2 className="me-2 size-4" />{t("manualAdjustment")}
             </Button>

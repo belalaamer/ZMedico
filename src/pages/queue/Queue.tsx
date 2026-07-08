@@ -18,7 +18,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { subscribeResilient } from "@/lib/realtime";
 import { toast } from "sonner";
-import { usePermissions } from "@/hooks/usePermissions";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { buildStatusPatch, type ApptStatus } from "@/lib/appointmentStatus";
 import { logQueueAudit } from "@/lib/queueAudit";
 import { getQueueSettings, fetchQueueSettings, type QueueSettings } from "@/lib/queueSettings";
@@ -92,10 +92,11 @@ export default function QueuePage() {
   const { currentBranchId } = useBranch();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { can } = usePermissions();
+  // R2: canonical authorization entry point.
+  const { authz } = useAuthorization("Queue");
   // Queue mutations are gated behind appointments:update. Users without it
   // see read-only rows; route-level guard handles view permission.
-  const canMutate = can("appointments", "update") || can("appointments", "manage");
+  const canMutate = authz.can("appointments.update") || authz.can("appointments.manage");
   const [rows, setRows] = useState<QueueRow[]>([]);
   const [doctors, setDoctors] = useState<{ id: string; full_name: string }[]>([]);
   const [loading, setLoading] = useState(true);

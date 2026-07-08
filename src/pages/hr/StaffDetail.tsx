@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useBranch } from "@/contexts/BranchContext";
-import { useUserRole } from "@/hooks/useUserRole";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 
 const DAYS = ["sun","mon","tue","wed","thu","fri","sat"] as const;
 
@@ -29,11 +29,11 @@ export default function StaffDetail() {
   const { t, lang } = useI18n();
   const { id } = useParams();
   const { currentBranchId } = useBranch();
-  const { roles, isAdmin } = useUserRole();
-  // Least-privilege UI mask: only admin + HR see salary / bank / national_id
-  // / DOB / commission %. Applies even when a linked employee views their
-  // own profile.
-  const canSeeSensitive = isAdmin || roles.includes("hr");
+  // R2: least-privilege UI mask routed through AuthorizationService.
+  // Semantics unchanged: admin OR hr sees salary / bank / national_id /
+  // DOB / commission %, even when a linked employee views their own profile.
+  const { authz } = useAuthorization("StaffDetail");
+  const canSeeSensitive = authz.hasRoleAny("hr");
   const MASK = "••••";
   const [staff, setStaff] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);

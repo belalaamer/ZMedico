@@ -12,7 +12,7 @@ import { Banknote, ArrowDownToLine, ArrowUpFromLine, Wallet, Lock, ArrowLeft } f
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { useUserRole } from "@/hooks/useUserRole";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { supabase } from "@/integrations/supabase/client";
 import { formatMoney, formatDateTime } from "@/lib/format";
 import { toast } from "sonner";
@@ -29,8 +29,10 @@ export default function DailyClose() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
   const { user } = useAuth();
-  const { roles } = useUserRole();
-  const canClose = roles.includes("admin") || roles.includes("manager");
+  // R2: route role-identity check through the canonical AuthorizationService.
+  // Semantics unchanged: admin OR manager may close the day.
+  const { authz } = useAuthorization("DailyClose");
+  const canClose = authz.hasRoleAny("admin", "manager");
 
   const today = new Date().toISOString().slice(0, 10);
   const [businessDate, setBusinessDate] = useState<string>(today);

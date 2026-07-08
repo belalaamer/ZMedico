@@ -1,7 +1,7 @@
 import { Calendar, CreditCard, Wallet, FileText, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/contexts/I18nContext";
-import { usePermissions } from "@/hooks/usePermissions";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 
 type Props = {
   onBook?: () => void;
@@ -15,7 +15,8 @@ export default function PatientQuickActions({
   onBook, onRecordPayment, onTopupWallet, onCreateInvoice, onUploadDocument,
 }: Props) {
   const { lang } = useI18n();
-  const { can } = usePermissions();
+  // R2: canonical authorization entry point.
+  const { authz } = useAuthorization("PatientQuickActions");
 
   const items: { key: string; icon: any; label: string; onClick?: () => void; show: boolean }[] = [
     {
@@ -23,35 +24,35 @@ export default function PatientQuickActions({
       icon: Calendar,
       label: lang === "ar" ? "حجز موعد" : "Book appointment",
       onClick: onBook,
-      show: can("appointments", "create"),
+      show: authz.can("appointments.create"),
     },
     {
       key: "invoice",
       icon: FileText,
       label: lang === "ar" ? "إنشاء فاتورة" : "Create invoice",
       onClick: onCreateInvoice,
-      show: can("invoices", "create"),
+      show: authz.can("invoices.create"),
     },
     {
       key: "pay",
       icon: CreditCard,
       label: lang === "ar" ? "تسجيل دفعة" : "Record payment",
       onClick: onRecordPayment,
-      show: can("invoices", "create"),
+      show: authz.can("invoices.create"),
     },
     {
       key: "topup",
       icon: Wallet,
       label: lang === "ar" ? "شحن المحفظة" : "Top-up wallet",
       onClick: onTopupWallet,
-      show: can("invoices", "create"),
+      show: authz.can("invoices.create"),
     },
     {
       key: "upload",
       icon: Upload,
       label: lang === "ar" ? "رفع مستند" : "Upload document",
       onClick: onUploadDocument,
-      show: can("medical_records", "create") || can("patients", "edit"),
+      show: authz.can("medical_records.create") || authz.can("patients.edit"),
     },
   ];
 

@@ -74,7 +74,7 @@ export default function InsuranceCompanies() {
           </div>
           <div className="flex items-center gap-2">
             <Input className="w-56" placeholder={t("search")} value={q} onChange={e => setQ(e.target.value)} />
-            {isAdmin && (
+            {canEdit && (
               <Button onClick={openNew} className="gradient-primary text-primary-foreground">
                 <Plus className="me-2 size-4" />{lang === "ar" ? "إضافة" : "New"}
               </Button>
@@ -95,7 +95,7 @@ export default function InsuranceCompanies() {
                 {r.is_active
                   ? <Badge className="status-completed">{lang === "ar" ? "نشط" : "Active"}</Badge>
                   : <Badge variant="outline">{lang === "ar" ? "متوقف" : "Inactive"}</Badge>}
-                {isAdmin && (
+                {canEdit && (
                   <>
                     <Button size="icon" variant="ghost" onClick={() => openEdit(r)}><Pencil className="size-4" /></Button>
                     <Button size="icon" variant="ghost" onClick={() => remove(r.id)} className="text-destructive"><Trash2 className="size-4" /></Button>

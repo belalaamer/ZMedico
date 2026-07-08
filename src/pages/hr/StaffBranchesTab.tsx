@@ -7,7 +7,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Plus, Trash2, Building2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
-import { useUserRole } from "@/hooks/useUserRole";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { toast } from "@/hooks/use-toast";
 
 type Branch = { id: string; name_en: string; name_ar: string };
@@ -19,8 +19,9 @@ type Branch = { id: string; name_en: string; name_ar: string };
  */
 export default function StaffBranchesTab({ userId }: { userId: string }) {
   const { lang } = useI18n();
-  const { roles, isAdmin } = useUserRole();
-  const canManage = isAdmin || roles.includes("hr");
+  // R2: manage-branches gate routed through AuthorizationService.
+  const { authz } = useAuthorization("StaffBranchesTab");
+  const canManage = authz.hasRoleAny("hr");
 
   const [branches, setBranches] = useState<Branch[]>([]);
   const [assigned, setAssigned] = useState<string[]>([]);

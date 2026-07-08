@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { formatMoney, formatDate } from "@/lib/format";
 import { RowActions } from "@/components/RowActions";
 import { useNavigate } from "react-router-dom";
-import { useUserRole } from "@/hooks/useUserRole";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 
 const statusClass: Record<string, string> = {
   draft: "status-cancelled", pending: "status-review", partial: "status-progress", received: "status-completed", cancelled: "status-departed",
@@ -30,7 +30,9 @@ export default function PurchaseOrders() {
   const { currentBranchId } = useBranch();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { isAdmin } = useUserRole();
+  // R2: admin-can-override-status gate routed through AuthorizationService.
+  const { authz } = useAuthorization("PurchaseOrders");
+  const canOverride = authz.isSuperAdmin();
   const [pos, setPos] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -61,7 +63,7 @@ export default function PurchaseOrders() {
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId]);
 
   const softDelete = async (po: any): Promise<void> => {
-    if (po.status !== "draft" && !isAdmin) {
+    if (po.status !== "draft" && !canOverride) {
       toast.error(lang === "ar" ? "يمكن حذف المسودات فقط" : "Only draft POs can be deleted");
       return;
     }
@@ -232,7 +234,7 @@ export default function PurchaseOrders() {
                   <RowActions
                     onEdit={() => navigate(`/inventory/purchase-orders/${po.id}`)}
                     onDelete={() => softDelete(po)}
-                    canDelete={isAdmin || po.status === "draft"}
+                    canDelete={canOverride || po.status === "draft"}
                   />
                 </div>
               );

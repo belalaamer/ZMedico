@@ -179,7 +179,7 @@ export default function InsuranceContracts() {
             <Card className="p-3 space-y-2">
               <div className="flex items-center justify-between">
                 <div className="text-sm font-semibold">{T("Contracts", "العقود")}</div>
-                {isAdmin && (
+                {canEdit && (
                   <Button size="sm" variant="outline" onClick={() => setContractDialog({ open: true, row: null })}>
                     <Plus className="me-1 size-4" />{T("New", "جديد")}
                   </Button>
@@ -218,7 +218,7 @@ export default function InsuranceContracts() {
                         {" "}{selectedContract.is_active ? T("Active", "نشط") : T("Inactive", "متوقف")}
                       </div>
                     </div>
-                    {isAdmin && (
+                    {canEdit && (
                       <div className="flex items-center gap-1">
                         <Button size="sm" variant="ghost" onClick={() => setContractDialog({ open: true, row: selectedContract })}><Pencil className="size-4" /></Button>
                         <Button size="sm" variant="ghost" className="text-destructive" onClick={() => removeContract(selectedContract.id)}><Trash2 className="size-4" /></Button>
@@ -229,7 +229,7 @@ export default function InsuranceContracts() {
                   <div className="border-t border-border pt-3">
                     <div className="flex items-center justify-between mb-2">
                       <div className="text-sm font-semibold">{T("Coverage rules", "قواعد التغطية")}</div>
-                      {isAdmin && (
+                      {canEdit && (
                         <Button size="sm" variant="outline" onClick={() => setRuleDialog({ open: true, row: null })}>
                           <ListPlus className="me-1 size-4" />{T("Add rule", "إضافة قاعدة")}
                         </Button>
@@ -265,7 +265,7 @@ export default function InsuranceContracts() {
                                 <td className="py-1.5 pr-2 text-end tabular-nums">{r.max_amount_per_item ?? "—"}</td>
                                 <td className="py-1.5 pr-2 text-end tabular-nums">{r.priority}</td>
                                 <td className="text-end">
-                                  {isAdmin && (
+                                  {canEdit && (
                                     <>
                                       <Button size="icon" variant="ghost" onClick={() => setRuleDialog({ open: true, row: r })}><Pencil className="size-4" /></Button>
                                       <Button size="icon" variant="ghost" className="text-destructive" onClick={() => removeRule(r.id)}><Trash2 className="size-4" /></Button>

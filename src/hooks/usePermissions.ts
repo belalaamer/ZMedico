@@ -4,6 +4,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { defaultActionsFor, MODULES } from "@/lib/rolePermissions";
 import { withTimeout } from "@/lib/withTimeout";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAuthzState } from "@/lib/authz/useAuthzState";
 
 export function usePermissions() {
   const { roles, isAdmin, loading: rolesLoading } = useUserRole();
@@ -11,6 +12,11 @@ export function usePermissions() {
   const [perms, setPerms] = useState<Record<string, Set<string>>>({});
   const [loading, setLoading] = useState(true);
   const [linked, setLinked] = useState<boolean | null>(null);
+  // R1: fingerprint-driven cache invalidation. When R1 is off the hook
+  // returns { fingerprint: null } and the effect below re-runs only on
+  // the pre-existing dependencies (roles/isAdmin), preserving byte-
+  // identical legacy behavior.
+  const { fingerprint } = useAuthzState();
 
   // Access gate: a user must be linked to an active staff_profile to have
   // module access. Admins bypass to prevent bootstrap lockout.
@@ -93,7 +99,7 @@ export function usePermissions() {
       });
 
     return () => { active = false; };
-  }, [roles.join(","), isAdmin, rolesLoading]);
+  }, [roles.join(","), isAdmin, rolesLoading, fingerprint]);
 
   const can = (module: string, action: string = "view") => {
     if (isAdmin) return true;

@@ -22,6 +22,25 @@ export interface AuthorizationServiceOptions {
   legacyCan: LegacyCan;
   /** True when the current user is a global admin. Admin passes everything. */
   isAdmin?: boolean;
+  /**
+   * R1 additions (opt-in; all no-ops when omitted).
+   *   - source: whether this instance is delegating to legacy or new grants.
+   *   - fingerprint: current authz state fingerprint for telemetry.
+   *   - emit: telemetry sink invoked once per decision.
+   *   - component: caller tag included in telemetry events.
+   */
+  source?: "legacy" | "new";
+  fingerprint?: string | null;
+  emit?: (evt: {
+    ts: number;
+    permission: string;
+    outcome: "allow" | "deny";
+    source: "legacy" | "new";
+    fingerprint?: string | null;
+    component?: string;
+    latencyMs: number;
+  }) => void;
+  component?: string;
 }
 
 export function parsePermissionKey(key: PermissionKey): { module: string; action: string } {
@@ -33,17 +52,45 @@ export function parsePermissionKey(key: PermissionKey): { module: string; action
 export class AuthorizationService {
   private readonly legacyCan: LegacyCan;
   private readonly isAdmin: boolean;
+  private readonly source: "legacy" | "new";
+  private readonly fingerprint: string | null;
+  private readonly emit?: AuthorizationServiceOptions["emit"];
+  private readonly component?: string;
 
   constructor(opts: AuthorizationServiceOptions) {
     this.legacyCan = opts.legacyCan;
     this.isAdmin = Boolean(opts.isAdmin);
+    this.source = opts.source ?? "legacy";
+    this.fingerprint = opts.fingerprint ?? null;
+    this.emit = opts.emit;
+    this.component = opts.component;
   }
 
   /** Returns true iff the current user holds `permission`. */
   can(permission: PermissionKey): boolean {
-    if (this.isAdmin) return true;
-    const { module, action } = parsePermissionKey(permission);
-    return this.legacyCan(module, action);
+    const started = typeof performance !== "undefined" ? performance.now() : Date.now();
+    let outcome: "allow" | "deny";
+    if (this.isAdmin) {
+      outcome = "allow";
+    } else {
+      const { module, action } = parsePermissionKey(permission);
+      outcome = this.legacyCan(module, action) ? "allow" : "deny";
+    }
+    if (this.emit) {
+      const ended = typeof performance !== "undefined" ? performance.now() : Date.now();
+      try {
+        this.emit({
+          ts: Date.now(),
+          permission,
+          outcome,
+          source: this.source,
+          fingerprint: this.fingerprint,
+          component: this.component,
+          latencyMs: Math.max(0, ended - started),
+        });
+      } catch { /* telemetry must never affect the decision */ }
+    }
+    return outcome === "allow";
   }
 
   /** Returns true iff the user holds at least one of the permissions. */

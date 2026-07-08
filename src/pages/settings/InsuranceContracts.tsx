@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FileSignature, Plus, Pencil, Trash2, Ban, ListPlus } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
-import { useUserRole } from "@/hooks/useUserRole";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -25,7 +25,9 @@ export default function InsuranceContracts() {
   const { t, lang } = useI18n();
   const isAr = lang === "ar";
   const T = (en: string, ar: string) => (isAr ? ar : en);
-  const { isAdmin } = useUserRole();
+  // R2: admin-only edit affordances routed through AuthorizationService.
+  const { authz } = useAuthorization("InsuranceContracts");
+  const canEdit = authz.isSuperAdmin();
   const [sp, setSp] = useSearchParams();
 
   const [companies, setCompanies] = useState<Company[]>([]);

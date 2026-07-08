@@ -3,7 +3,7 @@ import { NavLink } from "react-router-dom";
 import { Settings, Building2, Calendar, FileText, CreditCard, Briefcase, Bell, Languages, ShieldCheck, Users, HardDrive, ScrollText, Info, GitBranch, Shield, FileSignature } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { cn } from "@/lib/utils";
-import { useUserRole } from "@/hooks/useUserRole";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 
 // When true, child pages should skip rendering their own SettingsLayout chrome
 // (used by the consolidated Communication hub which renders tabs instead).
@@ -15,7 +15,9 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
   const embedded = useEmbeddedSettings();
   if (embedded) return <>{children}</>;
   const { t } = useI18n();
-  const { isAdmin } = useUserRole();
+  // R2: admin-only settings items gated through the canonical service.
+  const { authz } = useAuthorization("SettingsLayout");
+  const isAdmin = authz.isSuperAdmin();
   const items = [
     { to: "/settings/general", icon: Building2, label: t("clinicProfile") },
     { to: "/settings/branches", icon: GitBranch, label: t("branches") },

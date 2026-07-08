@@ -17,7 +17,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
   const { t } = useI18n();
   // R2: admin-only settings items gated through the canonical service.
   const { authz } = useAuthorization("SettingsLayout");
-  const isAdmin = authz.isSuperAdmin();
+  const showAdminSettings = authz.isSuperAdmin();
   const items = [
     { to: "/settings/general", icon: Building2, label: t("clinicProfile") },
     { to: "/settings/branches", icon: GitBranch, label: t("branches") },
@@ -29,7 +29,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
     { to: "/settings/insurance-contracts", icon: FileSignature, label: t("insuranceContracts") },
     { to: "/settings/communication", icon: Bell, label: t("communicationHub") },
     { to: "/settings/languages", icon: Languages, label: t("languageSettings") },
-    ...(isAdmin ? [
+    ...(showAdminSettings ? [
       { to: "/settings/roles", icon: ShieldCheck, label: t("rolePermissions") },
       { to: "/settings/users", icon: Users, label: t("userManagement") },
       { to: "/settings/backup", icon: HardDrive, label: t("backupExport") },

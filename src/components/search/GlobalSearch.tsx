@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger, PopoverAnchor } from "@/components/ui/popover";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
-import { usePermissions } from "@/hooks/usePermissions";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 import {
   searchPatients, searchInvoices, searchAppointments,
   searchPayments, searchMedicalRecords, searchPrescriptions, searchStaff,
@@ -19,7 +19,9 @@ type Props = { variant?: "desktop" | "mobile"; onClose?: () => void };
 export function GlobalSearch({ variant = "desktop", onClose }: Props) {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
-  const { can, loading: permLoading } = usePermissions();
+  // R2: gate the visible search groups via AuthorizationService instead of
+  // touching the legacy permission map directly.
+  const { authz, loading: permLoading } = useAuthorization("GlobalSearch");
   const navigate = useNavigate();
 
   const [q, setQ] = useState("");
@@ -52,11 +54,11 @@ export function GlobalSearch({ variant = "desktop", onClose }: Props) {
       { key: "prescriptions",   module: "medical_records" },
       { key: "staff",           module: "hr" },
     ];
-    return defs.filter((d) => can(d.module, "view")).map((d) => ({ ...d, label: labels[d.key] }));
-  }, [can, lang, permLoading]);
+    return defs.filter((d) => authz.can(`${d.module}.view`)).map((d) => ({ ...d, label: labels[d.key] }));
+  }, [authz, lang, permLoading]);
 
   // Stable signature so the search effect doesn't re-fire on every render
-  // (usePermissions returns a fresh `can` each render, which would otherwise
+  // (useAuthorization returns a fresh authz each render, which would otherwise
   // change `allowedGroups`'s identity and re-trigger fetches in a loop).
   const allowedKey = allowedGroups.map((g) => g.key).join(",");
 

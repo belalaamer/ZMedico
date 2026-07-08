@@ -8,13 +8,17 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { formatMoney } from "@/lib/format";
 import { ReportPageHeader, ReportFilterBar, StatCard } from "./_shared";
-import { useUserRole } from "@/hooks/useUserRole";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 
 export default function DoctorCommissions() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
-  const { roles, isAdmin } = useUserRole();
-  const isDoctorOnly = !isAdmin && roles.includes("doctor") && !roles.some(r => ["manager","hr"].includes(r));
+  // R2: doctor-only scoping routed through AuthorizationService.
+  // Semantics unchanged: user must hold `doctor` and NOT be admin/manager/hr.
+  const { authz } = useAuthorization("DoctorCommissions");
+  const isDoctorOnly = !authz.isSuperAdmin()
+    && authz.holdsAnyRole("doctor")
+    && !authz.holdsAnyRole("manager", "hr");
   const [start, setStart] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10));
   const [end, setEnd] = useState(new Date().toISOString().slice(0, 10));
   const [doctorId, setDoctorId] = useState<string>("all");

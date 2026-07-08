@@ -6,7 +6,8 @@
  * wrapper — it protects against direct code paths, keyboard shortcuts, and
  * programmatic callers that bypass the button gating.
  *
- * Callers pass the `can()` function returned by `usePermissions()`. Server-side
+ * Callers pass the `can` function derived from AuthorizationService (see
+ * `useAuthorization()` — the canonical authorization entry point). Server-side
  * RLS still enforces row access; this only prevents the client from packaging
  * data the user could otherwise browse into a downloadable artifact.
  */

@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2, Shield } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
-import { useUserRole } from "@/hooks/useUserRole";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -18,7 +18,9 @@ type Row = any;
 
 export default function InsuranceCompanies() {
   const { t, lang } = useI18n();
-  const { isAdmin } = useUserRole();
+  // R2: admin-only edit affordances routed through AuthorizationService.
+  const { authz } = useAuthorization("InsuranceCompanies");
+  const canEdit = authz.isSuperAdmin();
   const [rows, setRows] = useState<Row[]>([]);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);

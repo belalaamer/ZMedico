@@ -148,6 +148,16 @@ export class AuthorizationService {
     if (roles.length === 0) return false;
     return roles.some((r) => this.roles.includes(r));
   }
+
+  /**
+   * Strict role membership — does NOT admin-override. Use only where
+   * the historical behavior explicitly excluded admins (e.g. doctor-only
+   * report scoping). Transitional; also removed by R8.
+   */
+  holdsAnyRole(...roles: string[]): boolean {
+    if (roles.length === 0) return false;
+    return roles.some((r) => this.roles.includes(r));
+  }
 }
 
 /**

@@ -556,6 +556,51 @@ export type Database = {
           },
         ]
       }
+      authz_versions: {
+        Row: {
+          activated_at: string | null
+          activated_by: string | null
+          artifact_type: string
+          checksum: string | null
+          created_at: string
+          created_by: string | null
+          deprecated_at: string | null
+          deprecated_by: string | null
+          id: string
+          notes: string | null
+          semver: string
+          status: string
+        }
+        Insert: {
+          activated_at?: string | null
+          activated_by?: string | null
+          artifact_type: string
+          checksum?: string | null
+          created_at?: string
+          created_by?: string | null
+          deprecated_at?: string | null
+          deprecated_by?: string | null
+          id?: string
+          notes?: string | null
+          semver: string
+          status?: string
+        }
+        Update: {
+          activated_at?: string | null
+          activated_by?: string | null
+          artifact_type?: string
+          checksum?: string | null
+          created_at?: string
+          created_by?: string | null
+          deprecated_at?: string | null
+          deprecated_by?: string | null
+          id?: string
+          notes?: string | null
+          semver?: string
+          status?: string
+        }
+        Relationships: []
+      }
       branches: {
         Row: {
           address: string | null
@@ -6297,6 +6342,25 @@ export type Database = {
           _tx_type: Database["public"]["Enums"]["wallet_tx_type"]
         }
         Returns: string
+      }
+      authz_current_version: {
+        Args: { _artifact_type: string }
+        Returns: {
+          activated_at: string
+          artifact_type: string
+          checksum: string
+          id: string
+          semver: string
+        }[]
+      }
+      authz_current_versions: {
+        Args: never
+        Returns: {
+          activated_at: string
+          artifact_type: string
+          checksum: string
+          semver: string
+        }[]
       }
       check_expiry_alerts: { Args: never; Returns: number }
       current_user_branch_id: { Args: never; Returns: string }

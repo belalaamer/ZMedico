@@ -23,3 +23,11 @@ rpc:apply_wallet_tx,-,doctor,deny,allow
 rpc:apply_wallet_tx,-,hr,deny,allow
 rpc:apply_wallet_tx,-,nurse,deny,allow
 rpc:apply_wallet_tx,-,staff,deny,allow
+# BA-01 · Authorization Version Registry (additive)
+authz_versions,SELECT,anon,-,deny                # new table; no anon read
+authz_versions,SELECT,authenticated,-,allow      # read-open metadata
+authz_versions,INSERT,authenticated,-,deny       # writes locked to service_role
+authz_versions,UPDATE,authenticated,-,deny
+authz_versions,DELETE,authenticated,-,deny
+rpc:authz_current_version,-,authenticated,-,allow
+rpc:authz_current_versions,-,authenticated,-,allow

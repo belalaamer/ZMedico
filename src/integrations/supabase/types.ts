@@ -6271,6 +6271,12 @@ export type Database = {
           },
         ]
       }
+      v_authz_state: {
+        Row: {
+          state: Json | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       _audit_write: {
@@ -6343,6 +6349,7 @@ export type Database = {
         }
         Returns: string
       }
+      authz_current_state: { Args: never; Returns: Json }
       authz_current_version: {
         Args: { _artifact_type: string }
         Returns: {

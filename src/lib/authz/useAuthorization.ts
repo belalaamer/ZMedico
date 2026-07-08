@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useUserRole } from "@/hooks/useUserRole";
 import { AuthorizationService } from "./AuthorizationService";
 import { useAuthzState } from "@/lib/authz/useAuthzState";
 import { recordDecision } from "@/lib/authz/telemetry";
@@ -22,19 +23,25 @@ import { isR1Enabled } from "@/lib/authz/featureFlags";
  */
 export function useAuthorization(component?: string) {
   const { can, isAdmin, loading } = usePermissions();
+  // R2: inject the raw role list so the service can answer transitional
+  // `hasRole` / `hasRoleAny` questions without any component touching a
+  // role string directly. Behavior remains byte-identical to
+  // `isAdmin || roles.includes(...)`.
+  const { roles } = useUserRole();
   const { fingerprint, enabled: r1 } = useAuthzState();
   const service = useMemo(
     () =>
       new AuthorizationService({
         legacyCan: can,
         isAdmin,
+        roles,
         source: "legacy",
         fingerprint: r1 ? fingerprint : null,
         emit: r1 && isR1Enabled() ? recordDecision : undefined,
         component,
       }),
     // `can` closes over perms; re-derive when identity or fingerprint changes.
-    [can, isAdmin, r1, fingerprint, component],
+    [can, isAdmin, roles, r1, fingerprint, component],
   );
-  return { authz: service, loading, isAdmin };
+  return { authz: service, loading };
 }

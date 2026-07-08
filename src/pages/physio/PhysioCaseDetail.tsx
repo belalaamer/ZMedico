@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Can } from "@/components/Can";
-import { usePermissions } from "@/hooks/usePermissions";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { ListSkeleton } from "@/components/ListSkeleton";
 import { subscribeResilient } from "@/lib/realtime";
 import { useI18n } from "@/contexts/I18nContext";
@@ -23,7 +23,8 @@ import { toast } from "sonner";
 export default function PhysioCaseDetail() {
   const { id } = useParams();
   const { t, lang } = useI18n();
-  const { can } = usePermissions();
+  // R2: canonical authorization entry point.
+  const { authz } = useAuthorization("PhysioCaseDetail");
   const [c, setC] = useState<any>(null);
   const [status, setStatus] = useState<"loading" | "notfound" | "error" | "loaded">("loading");
   const [errMsg, setErrMsg] = useState<string | null>(null);
@@ -175,7 +176,7 @@ export default function PhysioCaseDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {can("medical_records", "edit") ? (
+          {authz.can("medical_records.edit") ? (
             <Select value={c.status} onValueChange={updateStatus}>
               <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
               <SelectContent>

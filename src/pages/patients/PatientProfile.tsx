@@ -22,7 +22,7 @@ import PatientFinancialCard from "./PatientFinancialCard";
 import PatientQuickActions from "./PatientQuickActions";
 import PatientDocumentsTab from "./PatientDocumentsTab";
 import { RecordPaymentDialog } from "../payments/RecordPaymentDialog";
-import { usePermissions } from "@/hooks/usePermissions";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 import PatientOverviewSnapshot from "./PatientOverviewSnapshot";
 
 const statusClass: Record<string, string> = {
@@ -33,7 +33,8 @@ export default function PatientProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t, lang } = useI18n();
-  const { can } = usePermissions();
+  // R2: canonical authorization entry point.
+  const { authz } = useAuthorization("PatientProfile");
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab") ?? "overview";
   const uploadFlag = searchParams.get("upload") === "1";
@@ -54,7 +55,7 @@ export default function PatientProfile() {
 
   useEffect(() => {
     if (!id) return;
-    if (!can("medical_records", "view")) { setPhysioCases([]); return; }
+    if (!authz.can("medical_records.view")) { setPhysioCases([]); return; }
     (async () => {
       // Full set (branch-scoped) for accurate stats.
       let allQ = supabase.from("physio_cases" as any)
@@ -95,7 +96,7 @@ export default function PatientProfile() {
       });
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, reloadKey, can("medical_records", "view"), patient?.branch_id]);
+  }, [id, reloadKey, authz.can("medical_records.view"), patient?.branch_id]);
 
   const setTab = (next: string) => {
     const p = new URLSearchParams(searchParams);
@@ -226,7 +227,7 @@ export default function PatientProfile() {
         }}
       />
 
-      {can("invoices", "view") && (
+      {authz.can("invoices.view") && (
         <PatientFinancialCard
           patientId={patient.id}
           invoices={invoices}
@@ -234,8 +235,8 @@ export default function PatientProfile() {
           onRecordPayment={() => setPayOpen(true)}
           onTopupWallet={() => setTab("financial")}
           onOpenFinancial={() => setTab("financial")}
-          canPay={can("invoices", "create")}
-          canTopup={can("invoices", "create")}
+          canPay={authz.can("invoices.create")}
+          canTopup={authz.can("invoices.create")}
           reloadKey={reloadKey}
         />
       )}
@@ -245,7 +246,7 @@ export default function PatientProfile() {
           <TabsTrigger value="overview">{t("overview")}</TabsTrigger>
           <TabsTrigger value="timeline">{t("timelineTab")}</TabsTrigger>
           <TabsTrigger value="clinical">{lang === "ar" ? "السريري" : "Clinical"}</TabsTrigger>
-          {can("invoices", "view") && (
+          {authz.can("invoices.view") && (
             <TabsTrigger value="financial">{lang === "ar" ? "المالي" : "Financial"}</TabsTrigger>
           )}
           <TabsTrigger value="documents">{lang === "ar" ? "المستندات" : "Documents"}</TabsTrigger>
@@ -256,9 +257,9 @@ export default function PatientProfile() {
             patientId={patient.id}
             invoices={invoices}
             payments={payments}
-            canViewBilling={can("invoices", "view")}
-            canPay={can("invoices", "create")}
-            canTopup={can("invoices", "create")}
+            canViewBilling={authz.can("invoices.view")}
+            canPay={authz.can("invoices.create")}
+            canTopup={authz.can("invoices.create")}
             reloadKey={reloadKey}
             onRecordPayment={() => setPayOpen(true)}
             onTopupWallet={() => setTab("financial")}
@@ -309,7 +310,7 @@ export default function PatientProfile() {
               >
                 {t("medicalTab")}
               </button>
-              {can("treatment_plans", "view") && (
+              {authz.can("treatment_plans.view") && (
                 <button
                   type="button"
                   onClick={() => setClinicalView("plans")}

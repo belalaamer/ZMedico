@@ -17,7 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Can } from "@/components/Can";
-import { usePermissions } from "@/hooks/usePermissions";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { ListSkeleton } from "@/components/ListSkeleton";
 import { Fab } from "@/components/ui/fab";
 import { ReferrerPicker } from "./ReferrerPicker";
@@ -58,7 +58,8 @@ const schema = z.object({
 export default function PatientsPage() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
-  const { can } = usePermissions();
+  // R2: canonical authorization entry point.
+  const { authz } = useAuthorization("Patients");
   const [items, setItems] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
@@ -282,7 +283,7 @@ export default function PatientsPage() {
                       </Badge>
                     )}
                   </Link>
-                  {can("patients", "delete") && (
+                  {authz.can("patients.delete") && (
                     <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive hover:bg-destructive/10 size-11"
                       onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConfirmDel(p); }}
                       aria-label="Delete">

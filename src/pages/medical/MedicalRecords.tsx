@@ -12,13 +12,14 @@ import { RowActions } from "@/components/RowActions";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Can } from "@/components/Can";
-import { usePermissions } from "@/hooks/usePermissions";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 
 export default function MedicalRecords() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
   const navigate = useNavigate();
-  const { can } = usePermissions();
+  // R2: canonical authorization entry point.
+  const { authz } = useAuthorization("MedicalRecords");
   const [items, setItems] = useState<any[]>([]);
   const load = () => {
     let q = supabase.from("medical_records").select("*, patients(*), medical_specialties(name_en,name_ar)").is("deleted_at", null).order("visit_date", { ascending: false }).limit(200);
@@ -66,8 +67,8 @@ export default function MedicalRecords() {
                   <RowActions
                     onEdit={() => navigate(`/medical/records/${r.id}`)}
                     onDelete={() => softDelete(r)}
-                    canEdit={can("medical_records", "edit")}
-                    canDelete={can("medical_records", "delete")}
+                    canEdit={authz.can("medical_records.edit")}
+                    canDelete={authz.can("medical_records.delete")}
                   />
                 </div>
               );

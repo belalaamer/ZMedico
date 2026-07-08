@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ListSkeleton } from "@/components/ListSkeleton";
 import { Can } from "@/components/Can";
-import { usePermissions } from "@/hooks/usePermissions";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,7 +29,8 @@ type Therapist = {
 export default function PhysioCases() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
-  const { can } = usePermissions();
+  // R2: canonical authorization entry point.
+  const { authz } = useAuthorization("PhysioCases");
   const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,7 +92,7 @@ export default function PhysioCases() {
   useEffect(() => {
     const pid = searchParams.get("patient");
     const isNew = searchParams.get("new") === "1";
-    if (pid && isNew && can("medical_records", "create")) {
+    if (pid && isNew && authz.can("medical_records.create")) {
       setForm((f: any) => ({ ...f, patient_id: pid }));
       setOpen(true);
       const p = new URLSearchParams(searchParams);

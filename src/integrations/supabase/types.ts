@@ -6410,27 +6410,13 @@ export type Database = {
           every_granting_bundle_exercised: boolean | null
           every_key_exercised: boolean | null
           every_write_role_exercised: boolean | null
-          expected_expansions: number | null
-          missing_keys: string[] | null
-          observed_denied_roles:
-            | Database["public"]["Enums"]["app_role"][]
-            | null
-          observed_denying_bundles: string[] | null
-          observed_granting_bundles: string[] | null
-          observed_keys: string[] | null
-          observed_write_roles: Database["public"]["Enums"]["app_role"][] | null
+          negative_matrix_complete: boolean | null
+          negative_matrix_green: boolean | null
           parity_green: boolean | null
+          positive_matrix_complete: boolean | null
+          positive_matrix_green: boolean | null
           ready_for_cutover: boolean | null
-          regressions: number | null
-          required_denied_roles:
-            | Database["public"]["Enums"]["app_role"][]
-            | null
-          required_denying_bundles: string[] | null
-          required_granting_bundles: string[] | null
-          required_keys: string[] | null
-          required_write_roles: Database["public"]["Enums"]["app_role"][] | null
           slice: string | null
-          unexpected_expansions: number | null
         }
         Relationships: []
       }
@@ -6443,6 +6429,20 @@ export type Database = {
           permission_key: string | null
           slice: string | null
           unique_users: number | null
+        }
+        Relationships: []
+      }
+      v_authz_shadow_matrix_settings: {
+        Row: {
+          expected_decision: boolean | null
+          last_seen: string | null
+          observations: number | null
+          observed_decision: boolean | null
+          permission_key: string | null
+          regressions: number | null
+          role: string | null
+          status: string | null
+          unexpected_expansions: number | null
         }
         Relationships: []
       }

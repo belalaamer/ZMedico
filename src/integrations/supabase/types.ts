@@ -558,6 +558,10 @@ export type Database = {
       }
       authz_shadow_decisions: {
         Row: {
+          app_version: string | null
+          authz_fingerprint: string | null
+          bundle_version: string | null
+          catalog_version: string | null
           context: Json
           created_at: string
           decision_legacy: boolean
@@ -565,10 +569,16 @@ export type Database = {
           id: string
           match: boolean | null
           permission_key: string
+          request_source: string | null
+          role_snapshot: Json
           slice: string
           user_id: string
         }
         Insert: {
+          app_version?: string | null
+          authz_fingerprint?: string | null
+          bundle_version?: string | null
+          catalog_version?: string | null
           context?: Json
           created_at?: string
           decision_legacy: boolean
@@ -576,10 +586,16 @@ export type Database = {
           id?: string
           match?: boolean | null
           permission_key: string
+          request_source?: string | null
+          role_snapshot?: Json
           slice: string
           user_id: string
         }
         Update: {
+          app_version?: string | null
+          authz_fingerprint?: string | null
+          bundle_version?: string | null
+          catalog_version?: string | null
           context?: Json
           created_at?: string
           decision_legacy?: boolean
@@ -587,8 +603,79 @@ export type Database = {
           id?: string
           match?: boolean | null
           permission_key?: string
+          request_source?: string | null
+          role_snapshot?: Json
           slice?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      authz_shadow_expected_expansions: {
+        Row: {
+          actor_role: Database["public"]["Enums"]["app_role"] | null
+          created_at: string
+          created_by: string | null
+          id: string
+          permission_key: string
+          reason: string
+          slice: string
+          spec_reference: string | null
+        }
+        Insert: {
+          actor_role?: Database["public"]["Enums"]["app_role"] | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          permission_key: string
+          reason: string
+          slice: string
+          spec_reference?: string | null
+        }
+        Update: {
+          actor_role?: Database["public"]["Enums"]["app_role"] | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          permission_key?: string
+          reason?: string
+          slice?: string
+          spec_reference?: string | null
+        }
+        Relationships: []
+      }
+      authz_shadow_slice_gate: {
+        Row: {
+          created_at: string
+          notes: string | null
+          required_denied_roles: Database["public"]["Enums"]["app_role"][]
+          required_denying_bundles: string[]
+          required_granting_bundles: string[]
+          required_keys: string[]
+          required_write_roles: Database["public"]["Enums"]["app_role"][]
+          slice: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          notes?: string | null
+          required_denied_roles?: Database["public"]["Enums"]["app_role"][]
+          required_denying_bundles?: string[]
+          required_granting_bundles?: string[]
+          required_keys?: string[]
+          required_write_roles?: Database["public"]["Enums"]["app_role"][]
+          slice: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          notes?: string | null
+          required_denied_roles?: Database["public"]["Enums"]["app_role"][]
+          required_denying_bundles?: string[]
+          required_granting_bundles?: string[]
+          required_keys?: string[]
+          required_write_roles?: Database["public"]["Enums"]["app_role"][]
+          slice?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -6307,6 +6394,37 @@ export type Database = {
           },
         ]
       }
+      v_authz_shadow_exit_criteria: {
+        Row: {
+          at_least_one_denied_role_exercised: boolean | null
+          every_denying_bundle_exercised: boolean | null
+          every_granting_bundle_exercised: boolean | null
+          every_key_exercised: boolean | null
+          every_write_role_exercised: boolean | null
+          expected_expansions: number | null
+          missing_keys: string[] | null
+          observed_denied_roles:
+            | Database["public"]["Enums"]["app_role"][]
+            | null
+          observed_denying_bundles: string[] | null
+          observed_granting_bundles: string[] | null
+          observed_keys: string[] | null
+          observed_write_roles: Database["public"]["Enums"]["app_role"][] | null
+          parity_green: boolean | null
+          ready_for_cutover: boolean | null
+          regressions: number | null
+          required_denied_roles:
+            | Database["public"]["Enums"]["app_role"][]
+            | null
+          required_denying_bundles: string[] | null
+          required_granting_bundles: string[] | null
+          required_keys: string[] | null
+          required_write_roles: Database["public"]["Enums"]["app_role"][] | null
+          slice: string | null
+          unexpected_expansions: number | null
+        }
+        Relationships: []
+      }
       v_authz_shadow_key_coverage: {
         Row: {
           decisions: number | null
@@ -6321,18 +6439,19 @@ export type Database = {
       }
       v_authz_shadow_parity_report: {
         Row: {
-          expansions: number | null
+          expected_expansions: number | null
           first_seen_at: string | null
           last_seen_at: string | null
           legacy_allow: number | null
           legacy_deny: number | null
+          matches: number | null
           new_allow: number | null
           new_deny: number | null
-          no_regressions: boolean | null
+          parity_green: boolean | null
           regressions: number | null
           slice: string | null
           total_decisions: number | null
-          total_mismatches: number | null
+          unexpected_expansions: number | null
           unique_keys: number | null
           unique_users: number | null
         }
@@ -6443,16 +6562,29 @@ export type Database = {
           permission_key: string
         }[]
       }
-      authz_record_shadow_decision: {
-        Args: {
-          _context?: Json
-          _decision_legacy: boolean
-          _decision_new: boolean
-          _permission_key: string
-          _slice: string
-        }
-        Returns: undefined
-      }
+      authz_record_shadow_decision:
+        | {
+            Args: {
+              _app_version: string
+              _context?: Json
+              _decision_legacy: boolean
+              _decision_new: boolean
+              _permission_key: string
+              _request_source: string
+              _slice: string
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              _context?: Json
+              _decision_legacy: boolean
+              _decision_new: boolean
+              _permission_key: string
+              _slice: string
+            }
+            Returns: undefined
+          }
       check_expiry_alerts: { Args: never; Returns: number }
       current_user_branch_id: { Args: never; Returns: string }
       default_treasury_for_branch: {

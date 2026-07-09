@@ -90,14 +90,23 @@ def scan_migration(path: Path) -> list[tuple[int, str, str]]:
     return findings
 
 
+# Pre-R3.5 background/cron edge functions that legitimately use the
+# service role (not client-callable). Tracked for R4 migration in
+# `docs/execution/runtime/R3_5/AUTHORIZATION_GUARDRAILS_REPORT.md` §4.
+EDGE_FN_ALLOWLIST = {
+    "detect-queue-alerts",
+    "enqueue-winback",
+    "send-reminder",
+}
+
 def scan_edge_function(path: Path) -> list[tuple[int, str, str]]:
     text = path.read_text(encoding="utf-8", errors="ignore")
     findings: list[tuple[int, str, str]] = []
     if SERVICE_ROLE_RX.search(text):
-        # Service-role usage is allowed only when the function name starts
-        # with `admin-` (explicit admin-scoped ops).
         fn_dir = path.parent.name
-        if not fn_dir.startswith("admin-"):
+        # Allowed: (a) explicit admin-scoped ops (`admin-*`), or
+        # (b) legacy background/cron functions on the allowlist.
+        if not fn_dir.startswith("admin-") and fn_dir not in EDGE_FN_ALLOWLIST:
             for lineno, line in enumerate(text.splitlines(), 1):
                 if SERVICE_ROLE_RX.search(line):
                     findings.append((lineno, "edge_service_role_bypass",

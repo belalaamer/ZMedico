@@ -22,6 +22,13 @@ import { useAuth } from "@/contexts/AuthContext";
  */
 
 const SLICE = "settings";
+const REQUEST_SOURCE = "UI";
+// App/build version — surfaced via Vite env at build time. Falls back to
+// 'dev' when not set. Kept short; never contains PHI.
+const APP_VERSION: string =
+  ((import.meta as any)?.env?.VITE_APP_VERSION as string | undefined) ??
+  ((import.meta as any)?.env?.VITE_COMMIT_SHA as string | undefined) ??
+  "dev";
 
 // New-model key → legacy (module, action) equivalence used to compute the
 // pre-migration decision. Legacy defaults grant `settings` ops only to
@@ -96,6 +103,8 @@ export function useSettingsShadowProbe(pathHint?: string) {
             _permission_key: key,
             _decision_legacy: legacy,
             _decision_new: nu,
+            _app_version: APP_VERSION,
+            _request_source: REQUEST_SOURCE,
             _context: context,
           })
           .then(() => {})

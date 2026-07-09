@@ -6321,16 +6321,18 @@ export type Database = {
       }
       v_authz_shadow_parity_report: {
         Row: {
+          expansions: number | null
           first_seen_at: string | null
           last_seen_at: string | null
           legacy_allow: number | null
           legacy_deny: number | null
-          mismatches: number | null
           new_allow: number | null
           new_deny: number | null
-          ready_for_cutover: boolean | null
+          no_regressions: boolean | null
+          regressions: number | null
           slice: string | null
           total_decisions: number | null
+          total_mismatches: number | null
           unique_keys: number | null
           unique_users: number | null
         }

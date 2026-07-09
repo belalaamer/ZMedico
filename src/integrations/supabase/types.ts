@@ -561,15 +561,18 @@ export type Database = {
           app_version: string | null
           authz_fingerprint: string | null
           bundle_version: string | null
+          catalog_row_snapshot: Json
           catalog_version: string | null
           context: Json
           created_at: string
           decision_legacy: boolean
           decision_new: boolean
+          effective_permission: Json
           id: string
           match: boolean | null
           permission_key: string
           request_source: string | null
+          resolved_bundles: Json
           role_snapshot: Json
           slice: string
           user_id: string
@@ -578,15 +581,18 @@ export type Database = {
           app_version?: string | null
           authz_fingerprint?: string | null
           bundle_version?: string | null
+          catalog_row_snapshot?: Json
           catalog_version?: string | null
           context?: Json
           created_at?: string
           decision_legacy: boolean
           decision_new: boolean
+          effective_permission?: Json
           id?: string
           match?: boolean | null
           permission_key: string
           request_source?: string | null
+          resolved_bundles?: Json
           role_snapshot?: Json
           slice: string
           user_id: string
@@ -595,15 +601,18 @@ export type Database = {
           app_version?: string | null
           authz_fingerprint?: string | null
           bundle_version?: string | null
+          catalog_row_snapshot?: Json
           catalog_version?: string | null
           context?: Json
           created_at?: string
           decision_legacy?: boolean
           decision_new?: boolean
+          effective_permission?: Json
           id?: string
           match?: boolean | null
           permission_key?: string
           request_source?: string | null
+          resolved_bundles?: Json
           role_snapshot?: Json
           slice?: string
           user_id?: string

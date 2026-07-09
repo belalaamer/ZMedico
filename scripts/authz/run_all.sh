@@ -25,6 +25,23 @@ done
 python scripts/authz/analyze_rls.py  --out /tmp/authz_current_rls.csv  --summary "${RLS_ARGS[@]}"
 python scripts/authz/analyze_rpcs.py --out /tmp/authz_current_rpcs.csv "${RPC_ARGS[@]}"
 
+# R3.5 — Authorization Enforcement Guardrails (advisory by default).
+# Fails only in strict mode; scans new-only migrations past the R3.5
+# landing cutoff so pre-R3.5 legacy code is not re-relitigated here
+# (that debt is tracked by the SECURITY DEFINER compliance report).
+GUARDRAILS_STRICT_FLAG=()
+[[ "${GUARDRAILS_STRICT:-0}" = "1" ]] && GUARDRAILS_STRICT_FLAG=(--strict)
+python scripts/authz/guardrails_frontend.py "${GUARDRAILS_STRICT_FLAG[@]}" || GR_FE_EXIT=$?
+python scripts/authz/guardrails_backend.py \
+  --since 20260708202908_89763348-3ec9-4b38-92c8-39ea21191db5.sql \
+  "${GUARDRAILS_STRICT_FLAG[@]}" || GR_BE_EXIT=$?
+if [[ "${GUARDRAILS_STRICT:-0}" = "1" ]]; then
+  if [[ "${GR_FE_EXIT:-0}" -ne 0 || "${GR_BE_EXIT:-0}" -ne 0 ]]; then
+    echo "[run_all] guardrails failed (strict mode)" >&2
+    exit 2
+  fi
+fi
+
 # RPC-09 — RPC Manifest Checker (Authorization v2).
 # Phase A (schema) always runs. Phase B (runtime) is skipped when PGHOST is
 # unset. Advisory during M1–M3 (`MANIFEST_STRICT=0`), promote to blocking

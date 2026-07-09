@@ -556,6 +556,42 @@ export type Database = {
           },
         ]
       }
+      authz_shadow_decisions: {
+        Row: {
+          context: Json
+          created_at: string
+          decision_legacy: boolean
+          decision_new: boolean
+          id: string
+          match: boolean | null
+          permission_key: string
+          slice: string
+          user_id: string
+        }
+        Insert: {
+          context?: Json
+          created_at?: string
+          decision_legacy: boolean
+          decision_new: boolean
+          id?: string
+          match?: boolean | null
+          permission_key: string
+          slice: string
+          user_id: string
+        }
+        Update: {
+          context?: Json
+          created_at?: string
+          decision_legacy?: boolean
+          decision_new?: boolean
+          id?: string
+          match?: boolean | null
+          permission_key?: string
+          slice?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       authz_versions: {
         Row: {
           activated_at: string | null
@@ -6368,6 +6404,16 @@ export type Database = {
           checksum: string
           semver: string
         }[]
+      }
+      authz_record_shadow_decision: {
+        Args: {
+          _context?: Json
+          _decision_legacy: boolean
+          _decision_new: boolean
+          _permission_key: string
+          _slice: string
+        }
+        Returns: undefined
       }
       check_expiry_alerts: { Args: never; Returns: number }
       current_user_branch_id: { Args: never; Returns: string }

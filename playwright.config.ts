@@ -10,6 +10,14 @@ export const STORAGE_STATE_ADMIN = path.resolve(
   "tests/playwright/.auth/admin.json",
 );
 
+// Per-role storage state files for the Settings shadow QA. Files are
+// written by `settings.setup.ts` if the corresponding TEST_<ROLE>_EMAIL /
+// TEST_<ROLE>_PASSWORD env vars are set; otherwise that role is skipped.
+export const SHADOW_ROLES = ["admin", "manager", "accountant", "staff"] as const;
+export type ShadowRole = (typeof SHADOW_ROLES)[number];
+export const shadowStorageState = (role: ShadowRole) =>
+  path.resolve(__dirname, `tests/playwright/.auth/shadow-${role}.json`);
+
 const BASE_URL = process.env.BASE_URL || "http://localhost:8080";
 
 // Mobile viewports covered by the smoke suite (mobile.smoke.spec.ts).
@@ -79,5 +87,27 @@ export default defineConfig({
             : undefined,
       },
     })),
+    // ---- Settings vertical-slice shadow QA ----------------------------
+    // `setup:shadow` mints one storageState per role whose credentials
+    // are present in the environment. The walk spec exercises Settings
+    // for each role; the validate spec queries the shadow reporting
+    // views and fails if the exit-criteria gate is not green.
+    {
+      name: "setup:shadow",
+      testMatch: /settings\.setup\.ts/,
+      use: { baseURL: BASE_URL },
+    },
+    {
+      name: "settings-shadow-walk",
+      testMatch: /settings\.shadow\.spec\.ts/,
+      dependencies: ["setup:shadow"],
+      use: { ...devices["Desktop Chrome"], baseURL: BASE_URL },
+    },
+    {
+      name: "settings-shadow-validate",
+      testMatch: /settings\.shadow\.validate\.spec\.ts/,
+      dependencies: ["settings-shadow-walk"],
+      use: { baseURL: BASE_URL },
+    },
   ],
 });

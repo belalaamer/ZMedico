@@ -4,6 +4,8 @@ import { Settings, Building2, Calendar, FileText, CreditCard, Briefcase, Bell, L
 import { useI18n } from "@/contexts/I18nContext";
 import { cn } from "@/lib/utils";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
+import { useSettingsShadowProbe } from "@/lib/authz/settingsShadowProbe";
+import { useLocation } from "react-router-dom";
 
 // When true, child pages should skip rendering their own SettingsLayout chrome
 // (used by the consolidated Communication hub which renders tabs instead).
@@ -13,10 +15,13 @@ export const useEmbeddedSettings = () => useContext(EmbeddedSettingsCtx);
 
 export default function SettingsLayout({ children }: { children: ReactNode }) {
   const embedded = useEmbeddedSettings();
-  if (embedded) return <>{children}</>;
   const { t } = useI18n();
   // R2: admin-only settings items gated through the canonical service.
   const { authz } = useAuthorization("SettingsLayout");
+  // Shadow-mode instrumentation. Never affects rendering or gating.
+  const { pathname } = useLocation();
+  useSettingsShadowProbe(pathname);
+  if (embedded) return <>{children}</>;
   const showAdminSettings = authz.isSuperAdmin();
   const items = [
     { to: "/settings/general", icon: Building2, label: t("clinicProfile") },

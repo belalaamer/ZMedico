@@ -1,6 +1,6 @@
 import { ReactNode, createContext, useContext } from "react";
 import { NavLink } from "react-router-dom";
-import { Settings, Building2, Calendar, FileText, CreditCard, Briefcase, Bell, Languages, ShieldCheck, Users, HardDrive, ScrollText, Info, GitBranch, Shield, FileSignature } from "lucide-react";
+import { Settings, Building2, Calendar, FileText, CreditCard, Briefcase, Bell, Languages, ShieldCheck, Users, HardDrive, ScrollText, Info, GitBranch, Shield, FileSignature, FlaskConical } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { cn } from "@/lib/utils";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
@@ -39,6 +39,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
       { to: "/settings/users", icon: Users, label: t("userManagement") },
       { to: "/settings/backup", icon: HardDrive, label: t("backupExport") },
       { to: "/settings/audit", icon: ScrollText, label: t("auditLogs") },
+      { to: "/settings/qa", icon: FlaskConical, label: "QA Identities" },
     ] : []),
     { to: "/settings/system", icon: Info, label: t("systemInfo") },
   ];

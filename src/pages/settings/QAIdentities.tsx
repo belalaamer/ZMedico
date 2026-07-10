@@ -57,6 +57,14 @@ export default function QAIdentities() {
     if (!roleLoading && isAdmin) void load();
   }, [roleLoading, isAdmin]);
 
+  const envText = useMemo(() => {
+    return ACCOUNTS.map((a) => {
+      const c = creds[a.email];
+      if (!c) return `# ${a.envPrefix}_EMAIL / ${a.envPrefix}_PASSWORD not available in this session`;
+      return `${a.envPrefix}_EMAIL=${c.email}\n${a.envPrefix}_PASSWORD=${c.password}`;
+    }).join("\n\n") + "\n";
+  }, [creds]);
+
   if (roleLoading) return null;
   if (!isAdmin) return <Navigate to="/settings/general" replace />;
 
@@ -133,14 +141,6 @@ export default function QAIdentities() {
     try { await navigator.clipboard.writeText(text); toast.success(label); }
     catch { toast.error("Copy failed"); }
   };
-
-  const envText = useMemo(() => {
-    return ACCOUNTS.map((a) => {
-      const c = creds[a.email];
-      if (!c) return `# ${a.envPrefix}_EMAIL / ${a.envPrefix}_PASSWORD not available in this session`;
-      return `${a.envPrefix}_EMAIL=${c.email}\n${a.envPrefix}_PASSWORD=${c.password}`;
-    }).join("\n\n") + "\n";
-  }, [creds]);
 
   const anyCreds = Object.values(creds).some(Boolean);
 

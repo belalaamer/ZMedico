@@ -20,6 +20,9 @@ import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { Can } from "@/components/Can";
 import { ListSkeleton } from "@/components/ListSkeleton";
 import { PullToRefresh } from "@/components/PullToRefresh";
+import { TablePager } from "@/components/TablePager";
+
+const PAGE_SIZE = 50;
 
 type Inv = {
   id: string;
@@ -54,22 +57,28 @@ export default function Invoices() {
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [open, setOpen] = useState(false);
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
 
   const load = async () => {
     setLoading(true);
+    const from = page * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
     let query = supabase.from("invoices")
-      .select("id, invoice_number, invoice_date, total, paid_amount, status, patient_id, patients!inner(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)")
+      .select("id, invoice_number, invoice_date, total, paid_amount, status, patient_id, patients!inner(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)", { count: "exact" })
       .is("deleted_at", null)
-      .order("created_at", { ascending: false }).limit(200);
+      .order("created_at", { ascending: false }).range(from, to);
     if (currentBranchId) query = query.eq("branch_id", currentBranchId);
     if (statusFilter !== "all") query = query.eq("status", statusFilter as Inv["status"]);
-    const { data, error } = await query;
+    const { data, error, count } = await query;
     setLoading(false);
     if (error) { toast.error(error.message); return; }
     setItems((data ?? []) as any);
+    setTotal(count ?? 0);
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId, statusFilter]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId, statusFilter, page]);
+  useEffect(() => { setPage(0); }, [currentBranchId, statusFilter]);
   useDataSync(["invoices", "payments"], () => { load(); });
 
   const filtered = items.filter((i) => {
@@ -183,6 +192,7 @@ export default function Invoices() {
             })}
           </div>
         )}
+        <TablePager page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
       </Card>
 
       <CreateInvoiceDialog open={open} onOpenChange={setOpen} onSaved={() => { setOpen(false); load(); }} />

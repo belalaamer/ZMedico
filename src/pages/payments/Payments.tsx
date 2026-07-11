@@ -12,12 +12,17 @@ import { toast } from "sonner";
 import { formatMoney, formatDateTime } from "@/lib/format";
 import { RecordPaymentDialog } from "./RecordPaymentDialog";
 import { RowActions } from "@/components/RowActions";
+import { TablePager } from "@/components/TablePager";
+
+const PAGE_SIZE = 50;
 
 export default function Payments() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
   const [items, setItems] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
   const [searchParams, setSearchParams] = useSearchParams();
   const prefillInvoice = searchParams.get("invoice") || undefined;
   const prefillPatient = searchParams.get("patient") || undefined;
@@ -37,16 +42,20 @@ export default function Payments() {
   };
 
   const load = async () => {
+    const from = page * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
     let q = supabase.from("payments")
-      .select("*, patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code), invoices(invoice_number)")
+      .select("*, patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code), invoices(invoice_number)", { count: "exact" })
       .is("deleted_at", null)
-      .order("created_at", { ascending: false }).limit(200);
+      .order("created_at", { ascending: false }).range(from, to);
     if (currentBranchId) q = q.eq("branch_id", currentBranchId);
-    const { data, error } = await q;
+    const { data, error, count } = await q;
     if (error) { toast.error(error.message); return; }
     setItems(data ?? []);
+    setTotal(count ?? 0);
   };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId, page]);
+  useEffect(() => { setPage(0); }, [currentBranchId]);
   useDataSync(["payments", "invoices"], () => { load(); });
 
   const softDelete = async (p: any): Promise<void> => {
@@ -100,6 +109,7 @@ export default function Payments() {
             })}
           </div>
         )}
+        <TablePager page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
       </Card>
 
       <RecordPaymentDialog

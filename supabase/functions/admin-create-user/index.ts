@@ -1,12 +1,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
+import { corsHeaders, corsPreflight, jsonResponse } from "../_shared/cors.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
-
-function genPassword(len = 14) {
+// Generates a cryptographically strong random string used ONLY internally to
+// satisfy Supabase's `createUser({ password })` argument. The value is never
+// returned to the caller, never logged, and never persisted anywhere the
+// admin surface can read. Sprint 1 hardening removed plaintext password
+// responses in favour of a recovery-link flow (see docs/security).
+function genInternalPassword(len = 32) {
   const chars =
     "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
   let out = "";
@@ -18,7 +18,7 @@ function genPassword(len = 14) {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return corsPreflight();
   }
 
   try {
@@ -28,10 +28,7 @@ Deno.serve(async (req) => {
 
     const authHeader = req.headers.get("Authorization") ?? "";
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Unauthorized" }, 401);
     }
 
     // Identify caller and verify admin role
@@ -40,10 +37,7 @@ Deno.serve(async (req) => {
     });
     const { data: userData, error: userErr } = await userClient.auth.getUser();
     if (userErr || !userData?.user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Unauthorized" }, 401);
     }
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
@@ -52,10 +46,7 @@ Deno.serve(async (req) => {
       _role: "admin",
     });
     if (roleErr || !isAdmin) {
-      return new Response(JSON.stringify({ error: "Forbidden: admin only" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Forbidden: admin only" }, 403);
     }
 
     const body = await req.json().catch(() => ({}));
@@ -63,36 +54,24 @@ Deno.serve(async (req) => {
     const full_name = body.full_name ? String(body.full_name).trim() : null;
     const role = String(body.role ?? "staff");
     const branch_id = body.branch_id ? String(body.branch_id) : null;
-    const password: string = body.password
-      ? String(body.password)
-      : genPassword(14);
+    // Internal-only initial password. Never returned to the caller; the
+    // account is activated through a recovery link (see below).
+    const internalPassword = genInternalPassword(32);
 
     if (!email || !email.includes("@")) {
-      return new Response(JSON.stringify({ error: "Invalid email" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Invalid email" }, 400);
     }
     const allowedRoles = [
       "admin", "manager", "doctor", "nurse",
       "receptionist", "accountant", "hr", "staff",
     ];
     if (!allowedRoles.includes(role)) {
-      return new Response(JSON.stringify({ error: "Invalid role" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Invalid role" }, 400);
     }
 
     const rolesRequiringBranch = ["manager", "doctor", "nurse", "receptionist", "accountant", "staff"];
     if (rolesRequiringBranch.includes(role) && !branch_id) {
-      return new Response(
-        JSON.stringify({ error: `Branch is required for role: ${role}` }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
+      return jsonResponse({ error: `Branch is required for role: ${role}` }, 400);
     }
 
     // Pre-authorize email so handle_new_user trigger accepts the signup
@@ -102,11 +81,13 @@ Deno.serve(async (req) => {
       { onConflict: "email" },
     );
 
-    // Create the auth user with email pre-confirmed.
+    // Create the auth user with email pre-confirmed. The password used here
+    // is a locally generated random value that is discarded immediately;
+    // the caller receives a recovery link to set the real password.
     const { data: created, error: createErr } =
       await admin.auth.admin.createUser({
         email,
-        password,
+        password: internalPassword,
         email_confirm: true,
         user_metadata: { full_name: full_name ?? undefined },
       });
@@ -114,12 +95,9 @@ Deno.serve(async (req) => {
     if (createErr || !created?.user) {
       // Roll back the allowlist row so it does not linger.
       await admin.from("allowed_signup_emails").delete().eq("email", email);
-      return new Response(
-        JSON.stringify({ error: createErr?.message ?? "Create user failed" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
+      return jsonResponse(
+        { error: createErr?.message ?? "Create user failed" },
+        400,
       );
     }
 
@@ -180,39 +158,47 @@ Deno.serve(async (req) => {
         // or nothing is.
         await admin.auth.admin.deleteUser(created.user.id).catch(() => {});
         await admin.from("allowed_signup_emails").delete().eq("email", email);
-        return new Response(
-          JSON.stringify({
-            error: `Staff profile provisioning failed: ${spErr.message}`,
-          }),
-          {
-            status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          },
+        return jsonResponse(
+          { error: `Staff profile provisioning failed: ${spErr.message}` },
+          500,
         );
       }
     }
     // Consume invite if still present
     await admin.from("allowed_signup_emails").delete().eq("email", email);
 
-    return new Response(
-      JSON.stringify({
-        user_id: created.user.id,
+    // Generate a one-time recovery link so the new user can set their own
+    // password. We never return the internal password. If link generation
+    // fails we still report success — the admin can trigger a reset via
+    // admin-reset-password.
+    let action_link: string | null = null;
+    let action_link_expires_at: string | null = null;
+    try {
+      const { data: linkData } = await admin.auth.admin.generateLink({
+        type: "recovery",
         email,
-        password,
-        role,
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
-    );
+      });
+      // properties.action_link + properties.email_otp are provided by the
+      // Supabase Admin API. We surface only the link + a rough expiry hint.
+      action_link = (linkData as any)?.properties?.action_link ?? null;
+      // Supabase recovery links default to 1h TTL; expose a conservative hint.
+      action_link_expires_at = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    } catch {
+      /* non-fatal: user is created, admin can reset later */
+    }
+
+    return jsonResponse({
+      success: true,
+      user_id: created.user.id,
+      email,
+      role,
+      action_link,
+      action_link_expires_at,
+    });
   } catch (e) {
-    return new Response(
-      JSON.stringify({ error: (e as Error).message ?? "Unknown error" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
+    return jsonResponse(
+      { error: (e as Error).message ?? "Unknown error" },
+      500,
     );
   }
 });

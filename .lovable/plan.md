@@ -1,91 +1,114 @@
-# مراجعة صلاحيات شاملة (Least Privilege) — خطة تنفيذ
+## Patients Slice — Shadow-Auth Migration (mirror of Settings)
 
-الحجم كبير جدًا (7 أدوار × ~40 module × 6+ actions × RLS + Edge Functions + Exports + Field-level). عشان النتيجة تكون **حقيقية مش شكلية**، هنقسّمها على **4 مراحل** كل مرحلة تخرج قابلة للاختبار قبل ما نروح للي بعدها.
+Repeats, without deviation, the process that carried the Settings slice to `ready_for_cutover = true`. Legacy authorization stays active; only shadow instrumentation and gate metadata are added.
 
----
+### Canonical permission keys (patients slice)
 
-## Phase 1 — Discovery & Ground Truth (قبل أي تعديل)
+Direct mirror of the legacy `patients` module actions — no aggregation, no renaming.
 
-المخرجات: تقرير واحد `docs/RBAC_AUDIT.md` فيه:
+- `patients.view`
+- `patients.create`
+- `patients.edit`
+- `patients.delete`
+- `patients.export`
 
-1. **جرد كامل**:
-   - كل route في `App.tsx` + الـ guard الحالي.
-   - كل عنصر في `Sidebar.tsx` + `SettingsLayout.tsx` + شرط الظهور.
-   - كل جدول (95 جدول) + policies الحالية (SELECT/INSERT/UPDATE/DELETE) لكل دور.
-   - كل edge function + من يقدر يستدعيها + الـ JWT check.
-   - كل scheduled job (pg_cron) + الـ secret/role اللي بتشتغل بيه.
-   - كل export/print action (invoicePdf, prescriptionPdf, reportExport, exportGuard).
-   - كل field حساس (salary, national_id, bank_account, commission_percent, cost, wallet balance...).
+Roles participating in the gate (based on `authz_role_bundles` + `role_permissions`):
+- Write roles: `admin`, `manager`, `receptionist`
+- Denied role: `staff` (no patients access at all)
 
-2. **Deny-by-default gap analysis**: كل مكان مفيهوش guard صريح = ثغرة موثقة.
+Intentional expansions: **none required.** Legacy `role_permissions` and new bundle grants match key-for-key; the parity report will show zero unexpected expansions without any registration.
 
-3. **الـ matrix النهائية** (role × module × action × field-mask) تتحط في `docs/RBAC_MATRIX.md` كـ single source of truth.
+### Scope of changes
 
-بدون هذه المرحلة، أي "إصلاح" هيكون تخمين.
+1. **Frontend** — Patients shadow probe + PermissionRoute mount for `/patients/*`.
+2. **Backend** — New matrix view for patients, gate row, and one added branch inside `v_authz_shadow_exit_criteria`.
+3. **Tests** — Playwright shadow walk + validate specs for patients; Vitest parity baseline.
+4. **CI** — New GitHub Actions workflow mirroring `settings-shadow-qa.yml`.
+5. **Registry** — Add `patients` entry (status `shadow`) to `COMPLETED_SLICES`.
+6. **CHANGELOG** — New entry.
 
----
+The Settings slice, its probe, its matrix view, its gate row, and its workflow are untouched.
 
-## Phase 2 — Database Hardening (RLS = Source of Truth)
+### Technical details
 
-قاعدة: **UI-only guards = صفر أمن**. كل شيء يتفرض في DB.
+**Frontend**
 
-1. **Revoke-then-Grant**: على كل جدول public: `REVOKE ALL ... FROM authenticated`، ثم `GRANT` محدود.
-2. **RLS شامل**: كل جدول مفيهوش policy لدور = deny تلقائي. نراجع الـ 95 جدول واحد واحد.
-3. **Column-level security** للحقول الحساسة عبر:
-   - Views (`staff_profiles_public` بدون salary/bank/national_id) للأدوار غير HR/Admin.
-   - `GRANT SELECT (col1, col2, ...)` بدل `GRANT SELECT` الكامل حيث ينطبق.
-4. **SECURITY DEFINER audit**: كل function موجودة (`apply_wallet_tx`, `apply_inventory_tx`, `apply_coupon_code`, `add_treasury_tx`, `fn_resolve_coverage`, ...) نتأكد إن فيها `has_role` check صريح.
-5. **DELETE = Admin only** يتفرض في RLS مش UI.
-6. **Audit triggers** على الجداول الحساسة اللي لسه مفيهاش (coupons, insurance_contracts, role_permissions, user_roles, staff_profiles salary changes).
+- New `src/lib/authz/patientsShadowProbe.ts` — copy of `settingsShadowProbe.ts` with `SLICE = "patients"`, keys `patients.view/create/edit/delete/export`, legacy map:
+  - `patients.view → (patients, view)`
+  - `patients.create → (patients, create)`
+  - `patients.edit → (patients, edit)`
+  - `patients.delete → (patients, delete)`
+  - `patients.export → (patients, export)`
+  Session dedup is local to this file.
+- New `PatientsShadowProbeMount` in `src/components/PermissionRoute.tsx`, mounted whenever `pathname.startsWith("/patients")` — mirrors the settings pattern so denied roles still emit observations without changing the gate outcome.
+- Mount the probe once from `src/pages/patients/Patients.tsx` and `PatientProfile.tsx` (dedup guarantees it fires once per user/path). This mirrors the SettingsLayout mount.
 
-Migration واحد كبير مقسّم لـ sections موثقة.
+**Backend (one migration)**
 
----
+- Insert row into `authz_shadow_slice_gate` for slice `patients` with:
+  - `required_keys = {patients.view, patients.create, patients.edit, patients.delete, patients.export}`
+  - `required_write_roles = {admin, manager, receptionist}`
+  - `required_denied_roles = {staff}`
+  - `required_granting_bundles = {bundle.role.admin, bundle.role.manager, bundle.role.receptionist}`
+  - `required_denying_bundles = {bundle.role.staff}`
+- Create `public.v_authz_shadow_matrix_patients` — exact structural copy of `v_authz_shadow_matrix_settings`, filtered to `slice = 'patients'`. Expected decision is `legacy_role_permissions_match OR registered_expected_expansion` (same expression).
+- `CREATE OR REPLACE VIEW public.v_authz_shadow_exit_criteria` — add a parallel `matrix_patients` CTE and a `WHEN (g.slice = 'patients')` branch for the four matrix booleans and the `ready_for_cutover` conjunction. The existing `settings` branch is preserved byte-for-byte.
+- Standard `GRANT SELECT` on the new view to `authenticated` and `service_role` (matches the settings matrix grants).
 
-## Phase 3 — Edge Functions & Scheduled Jobs
+No RLS, RPC, bundle, or permission-catalog changes.
 
-1. `admin-create-user`, `admin-delete-user`, `admin-reset-password`, `admin-export`: تأكيد `has_role(admin)` من الـ JWT داخل الـ function نفسها (مش بس RLS).
-2. `detect-queue-alerts`, `send-reminder`, `enqueue-winback`: تأكد إنها service-role only + secret header.
-3. `pg_cron` jobs: تأكد إنها بتستخدم vault secret وليس anon key مكشوف.
-4. Response body: مفيش field حساس بيتسرّب (مثلاً bank_account في admin-export).
+**Tests**
 
----
+- `tests/playwright/helpers/patientsShadow.ts` — exports `PATIENTS_ROUTES = ["/patients"]` and a helper to open the first row. (Reuses `getRoleCreds` + `shadowStorageState` from `shadowRoles.ts`; no changes to existing helpers.)
+- `tests/playwright/patients.shadow.spec.ts` — for each role, load storage state, visit `/patients`, click the first patient row if visible to hit the profile, click "New / Add" trigger, escape, wait for probe RPCs.
+- `tests/playwright/patients.shadow.validate.spec.ts` — queries `v_authz_shadow_parity_report` (row where `slice='patients'`), `v_authz_shadow_matrix_patients`, `v_authz_shadow_key_coverage`, `v_authz_shadow_exit_criteria` (row where `slice='patients'`); asserts `regressions=0`, `unexpected_expansions=0`, `ready_for_cutover=true`.
+- `src/lib/authz/patients.slice.parity.test.ts` — Vitest baseline mirroring `settings.slice.parity.test.ts`. Because patient keys align with legacy actions, this baseline asserts the exact legacy matrix per role (no admin-only asymmetry needed).
+- `src/lib/authz/patientsShadowProbe.noninfluence.test.ts` — mirror of the settings noninfluence test.
 
-## Phase 4 — UI Alignment + Tests
+**CI**
 
-1. **UI = مرآة لـ DB**: إخفاء الأزرار اللي DB هترفضها (UX فقط، مش أمن).
-   - `Sidebar.tsx`, `AppShell`, `SettingsLayout.tsx`, `RowActions.tsx`, `exportGuard.ts`.
-   - Field masking في `StaffDetail`, `Payroll`, `PatientFinancialCard`.
-2. **Route guards**: كل route حساس يبقى فيه `adminOnly` أو `requirePermission("module","action")` صريح.
-3. **Tests** (`tests/playwright/rbac.spec.ts` + جديد `rbac.deep.spec.ts`):
-   - لكل دور من الـ 7: allow-list + deny-list متخصصة.
-   - Deny يتحقق **من HTTP response (403/RLS error)** مش بس من إخفاء الزرار.
-   - Field masking assertions (مثلاً receptionist ما يشوفش salary في response).
-   - Edge function tests بـ JWT لدور مش admin → 403.
-4. **RBAC_MATRIX.md** يتحدّث ليطابق الواقع الجديد بالظبط.
+- `.github/workflows/patients-shadow-qa.yml` — copy of `settings-shadow-qa.yml`, replace `TEST_ACCOUNTANT_*` env vars with `TEST_RECEPTIONIST_*`, and switch playwright projects to `setup:shadow-patients`, `patients-shadow-walk`, `patients-shadow-validate`.
+- `playwright.config.ts` — add `SHADOW_PATIENTS_ROLES = ["admin","manager","receptionist","staff"]`, a `setup:shadow-patients` project, a `patients-shadow-walk` project, and a `patients-shadow-validate` project. Existing `setup:shadow` and settings projects untouched.
+- `tests/playwright/patients.setup.ts` — mirror of `settings.setup.ts` iterating `SHADOW_PATIENTS_ROLES`.
 
----
+**Registry & CHANGELOG**
 
-## Deliverables per Phase
+- Add `patients` entry (status `shadow`) to `COMPLETED_SLICES` with `ownedPaths = ["src/pages/patients"]`, `canonicalKeys = [patients.view/create/edit/delete/export]`, `moduleGuardsForbidden = ["patients"]`, forbidden legacy pattern for `can('patients', ...)` and `<Can module="patients">`. `status: "shadow"` keeps the invariant inert until Migration 2.
+- Append a `## [Unreleased] — Patients Shadow Slice` block to `CHANGELOG.md`.
 
-| Phase | Files | Reviewable Output |
-|---|---|---|
-| 1 | `docs/RBAC_AUDIT.md`, `docs/RBAC_MATRIX.md` | تقرير gaps + matrix نهائي — **للموافقة قبل الكود** |
-| 2 | migration واحد كبير | RLS + views + column grants + audit triggers |
-| 3 | edge functions + migration للـ cron | كل function فيها role check |
-| 4 | UI files + tests | Playwright tests خضراء لكل دور |
+### File list
 
----
+New:
+- `src/lib/authz/patientsShadowProbe.ts`
+- `src/lib/authz/patientsShadowProbe.noninfluence.test.ts`
+- `src/lib/authz/patients.slice.parity.test.ts`
+- `tests/playwright/helpers/patientsShadow.ts`
+- `tests/playwright/patients.setup.ts`
+- `tests/playwright/patients.shadow.spec.ts`
+- `tests/playwright/patients.shadow.validate.spec.ts`
+- `.github/workflows/patients-shadow-qa.yml`
+- One new migration under `supabase/migrations/` (gate row + matrix view + exit-criteria view replace).
 
-## أسئلة قبل ما أبدأ Phase 1
+Edited:
+- `src/components/PermissionRoute.tsx` — add `PatientsShadowProbeMount` beside the settings mount.
+- `src/pages/patients/Patients.tsx` and `src/pages/patients/PatientProfile.tsx` — `useEffect` mount of `usePatientsShadowProbe(pathname)`.
+- `playwright.config.ts` — add patients projects and role list.
+- `src/lib/authz/slices/completedSlices.ts` — add `patients` shadow entry.
+- `CHANGELOG.md` — new section.
 
-عشان ما اتخذش قرارات نيابة عنك في نقاط حساسة:
+### Verification
 
-1. **HR ومرتبات**: مين له حق يشوف الـ salary/bank_account غير admin و hr؟ (manager بتاع الفرع؟ الموظف نفسه؟ ولا لأ خالص؟)
-2. **Doctor commissions**: الدكتور نفسه يشوف عمولاته؟ ولا accountant + admin بس؟
-3. **Wallet balances**: receptionist يشوف رصيد محفظة المريض؟ ولا accountant بس؟
-4. **Patient medical history**: nurse يقدر يشوف كل الـ history ولا الزيارة الحالية بس؟
-5. **Cross-branch visibility**: manager بيشوف فرعه بس (مؤكد)، لكن accountant بيشوف كل الفروع ولا فرعه بس؟
-6. **Audit logs viewer**: admin بس؟ ولا manager كمان لفرعه؟
+1. Migration applied, view grants confirmed via `pg_views` inspection.
+2. Vitest run — parity + noninfluence tests green.
+3. Manual `SELECT * FROM v_authz_shadow_exit_criteria WHERE slice='patients'` after workflow run — confirm all booleans `true`.
+4. Report handed back in the same seven-section structure as the Settings completion report.
 
-جاوب على دول وأبدأ Phase 1 على طول (تقرير + matrix للمراجعة قبل أي كود).
+### Risks & rollback
+
+- **Low risk.** All additions are telemetry-only; no legacy authorization outcome changes. `PermissionRoute` gets a second mount path that mirrors the proven settings pattern.
+- **Rollback** = `DELETE FROM authz_shadow_slice_gate WHERE slice='patients'; DROP VIEW public.v_authz_shadow_matrix_patients; CREATE OR REPLACE VIEW v_authz_shadow_exit_criteria` (restore pre-patch definition) + revert the code files listed above.
+
+### Out of scope
+
+- No changes to Settings slice, other slices, RLS, RPCs, bundles, or permission catalog.
+- No Migration 2 (cutover) for patients — this run stops at `ready_for_cutover = true` in shadow, exactly like Settings did.

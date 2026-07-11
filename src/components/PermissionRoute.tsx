@@ -5,6 +5,7 @@ import { moduleForPath } from "@/lib/rolePermissions";
 import { useI18n } from "@/contexts/I18nContext";
 import { ShieldAlert } from "lucide-react";
 import { useSettingsShadowProbe } from "@/lib/authz/settingsShadowProbe";
+import { usePatientsShadowProbe } from "@/lib/authz/patientsShadowProbe";
 
 /**
  * Mounts the Settings shadow probe. Isolated in its own component so
@@ -16,6 +17,16 @@ import { useSettingsShadowProbe } from "@/lib/authz/settingsShadowProbe";
  */
 function SettingsShadowProbeMount({ path }: { path: string }) {
   useSettingsShadowProbe(path);
+  return null;
+}
+
+/**
+ * Mounts the Patients shadow probe. Same rationale as the Settings
+ * mount above — telemetry-only, must fire for denied roles even when
+ * the gate renders the access-denied card.
+ */
+function PatientsShadowProbeMount({ path }: { path: string }) {
+  usePatientsShadowProbe(path);
   return null;
 }
 
@@ -35,6 +46,7 @@ export function PermissionRoute({ children, module, adminOnly }: { children: Rea
   // Dedup inside the probe ensures no duplicate work when SettingsLayout
   // also mounts.
   const isSettingsPath = pathname.startsWith("/settings");
+  const isPatientsPath = pathname.startsWith("/patients");
 
   if (loading) {
     return (
@@ -45,17 +57,38 @@ export function PermissionRoute({ children, module, adminOnly }: { children: Rea
   }
 
   if (adminOnly) {
-    if (authz.isSuperAdmin()) return <>{children}</>;
+    if (authz.isSuperAdmin()) {
+      return (
+        <>
+          {isSettingsPath ? <SettingsShadowProbeMount path={pathname} /> : null}
+          {isPatientsPath ? <PatientsShadowProbeMount path={pathname} /> : null}
+          {children}
+        </>
+      );
+    }
   } else if (authz.isSuperAdmin()) {
-    return <>{children}</>;
+    return (
+      <>
+        {isSettingsPath ? <SettingsShadowProbeMount path={pathname} /> : null}
+        {isPatientsPath ? <PatientsShadowProbeMount path={pathname} /> : null}
+        {children}
+      </>
+    );
   } else if (mod && authz.can(`${mod}.view`)) {
     // Deny by default: unmapped protected routes never fall through.
-    return <>{children}</>;
+    return (
+      <>
+        {isSettingsPath ? <SettingsShadowProbeMount path={pathname} /> : null}
+        {isPatientsPath ? <PatientsShadowProbeMount path={pathname} /> : null}
+        {children}
+      </>
+    );
   }
 
   return (
     <div className="min-h-[60vh] flex items-center justify-center p-6">
       {isSettingsPath ? <SettingsShadowProbeMount path={pathname} /> : null}
+      {isPatientsPath ? <PatientsShadowProbeMount path={pathname} /> : null}
       <div className="max-w-md text-center space-y-4">
         <div className="mx-auto size-14 rounded-full bg-destructive/10 text-destructive flex items-center justify-center">
           <ShieldAlert className="size-7" />

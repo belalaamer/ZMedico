@@ -2,6 +2,51 @@
 
 ## [Unreleased]
 
+### Patients Authorization Slice — Shadow (Ready-for-Cutover)
+
+**Additions**
+- New `src/lib/authz/patientsShadowProbe.ts` — telemetry-only probe covering
+  `patients.view`, `patients.create`, `patients.edit`, `patients.delete`,
+  `patients.export`. Legacy map is 1:1 with the `patients` module actions.
+- `PatientsShadowProbeMount` in `PermissionRoute` fires for every
+  `/patients/*` path (including denied outcomes) so `staff` produces the
+  observations required by `at_least_one_denied_role_exercised` and
+  `negative_matrix_complete`.
+- New migration: adds a `patients` row to `authz_shadow_slice_gate` with
+  canonical bundle keys (`bundle.role.admin`, `bundle.role.manager`,
+  `bundle.role.receptionist`, `bundle.role.staff`); creates
+  `public.v_authz_shadow_matrix_patients`; extends
+  `public.v_authz_shadow_exit_criteria` with a `matrix_patients` CTE and
+  a `patients` branch. Settings branch preserved byte-for-byte.
+- Playwright: `setup:shadow-patients`, `patients-shadow-walk`,
+  `patients-shadow-validate` projects and matching setup/walk/validate
+  specs. Runs under the new `patients-shadow-qa.yml` GitHub Actions
+  workflow (same structure as `settings-shadow-qa.yml`).
+- Vitest baselines: `patients.slice.parity.test.ts` locks the legacy
+  per-role matrix; `patientsShadowProbe.noninfluence.test.ts` proves the
+  probe cannot affect `AuthorizationService.can`.
+- Registered `patients` in `COMPLETED_SLICES` (status `shadow`) so the CI
+  invariant test is armed for Migration 2.
+
+**Design notes**
+- No intentional expansions registered. Patients keys align with legacy
+  `patients` module actions, so `expected_decision = legacy` for every
+  cell in the matrix. Parity is expected to be perfect on first run.
+- Legacy authorization remains active. RLS, RPCs, bundles, and the
+  permission catalog are unchanged. The Settings slice, its probe, its
+  matrix view, its gate row, and its workflow are untouched.
+
+**Exit criteria targets (patients slice)**
+- `regressions = 0`
+- `unexpected_expansions = 0`
+- `parity_green = true`
+- `every_key_exercised = true`
+- `every_granting_bundle_exercised = true`
+- `every_denying_bundle_exercised = true`
+- `every_write_role_exercised = true`
+- `at_least_one_denied_role_exercised = true`
+- `ready_for_cutover = true`
+
 ### Settings Authorization Slice — Cutover Ready
 
 **Fixes applied**

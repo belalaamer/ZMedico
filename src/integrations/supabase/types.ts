@@ -6432,6 +6432,20 @@ export type Database = {
         }
         Relationships: []
       }
+      v_authz_shadow_matrix_patients: {
+        Row: {
+          expected_decision: boolean | null
+          last_seen: string | null
+          observations: number | null
+          observed_decision: boolean | null
+          permission_key: string | null
+          regressions: number | null
+          role: string | null
+          status: string | null
+          unexpected_expansions: number | null
+        }
+        Relationships: []
+      }
       v_authz_shadow_matrix_settings: {
         Row: {
           expected_decision: boolean | null

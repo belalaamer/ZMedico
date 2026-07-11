@@ -222,7 +222,8 @@ export default function UserManagement() {
   }, []);
 
   const load = async () => {
-    const { data: ps } = await supabase.from("profiles").select("*");
+    // Only the identity fields are rendered / edited on this screen.
+    const { data: ps } = await supabase.from("profiles").select("id,full_name,email");
     const { data: rs } = await (supabase as any).from("user_roles").select("user_id,role");
     const { data: inv } = await (supabase as any)
       .from("allowed_signup_emails")

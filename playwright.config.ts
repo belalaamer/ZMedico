@@ -44,6 +44,19 @@ export type ShadowMedicalRole = (typeof SHADOW_MEDICAL_ROLES)[number];
 export const medicalShadowStorageState = (role: ShadowMedicalRole) =>
   path.resolve(__dirname, `tests/playwright/.auth/shadow-medical-${role}.json`);
 
+// Per-role storage state files for the HR shadow QA. Mirrors the
+// Medical Records shadow QA but swaps `doctor` for `hr` because `hr` is
+// the primary write-capable role in the HR slice.
+export const SHADOW_HR_ROLES = [
+  "admin",
+  "hr",
+  "manager",
+  "staff",
+] as const;
+export type ShadowHrRole = (typeof SHADOW_HR_ROLES)[number];
+export const hrShadowStorageState = (role: ShadowHrRole) =>
+  path.resolve(__dirname, `tests/playwright/.auth/shadow-hr-${role}.json`);
+
 const BASE_URL = process.env.BASE_URL || "http://localhost:8080";
 
 // Mobile viewports covered by the smoke suite (mobile.smoke.spec.ts).
@@ -169,6 +182,24 @@ export default defineConfig({
       name: "medical-shadow-validate",
       testMatch: /medical\.shadow\.validate\.spec\.ts/,
       dependencies: ["medical-shadow-walk"],
+      use: { baseURL: BASE_URL },
+    },
+    // ---- HR vertical-slice shadow QA --------------------------------
+    {
+      name: "setup:shadow-hr",
+      testMatch: /hr\.setup\.ts/,
+      use: { baseURL: BASE_URL },
+    },
+    {
+      name: "hr-shadow-walk",
+      testMatch: /hr\.shadow\.spec\.ts/,
+      dependencies: ["setup:shadow-hr"],
+      use: { ...devices["Desktop Chrome"], baseURL: BASE_URL },
+    },
+    {
+      name: "hr-shadow-validate",
+      testMatch: /hr\.shadow\.validate\.spec\.ts/,
+      dependencies: ["hr-shadow-walk"],
       use: { baseURL: BASE_URL },
     },
   ],

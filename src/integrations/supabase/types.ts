@@ -6412,11 +6412,13 @@ export type Database = {
           every_write_role_exercised: boolean | null
           negative_matrix_complete: boolean | null
           negative_matrix_green: boolean | null
+          notes: string | null
           parity_green: boolean | null
           positive_matrix_complete: boolean | null
           positive_matrix_green: boolean | null
           ready_for_cutover: boolean | null
           slice: string | null
+          updated_at: string | null
         }
         Relationships: []
       }
@@ -6429,6 +6431,20 @@ export type Database = {
           permission_key: string | null
           slice: string | null
           unique_users: number | null
+        }
+        Relationships: []
+      }
+      v_authz_shadow_matrix_hr: {
+        Row: {
+          expected_decision: boolean | null
+          last_seen: string | null
+          observations: number | null
+          observed_decision: boolean | null
+          permission_key: string | null
+          regressions: number | null
+          role: string | null
+          status: string | null
+          unexpected_expansions: number | null
         }
         Relationships: []
       }

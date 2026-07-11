@@ -56,7 +56,8 @@ export interface CompletedSlice {
 export const COMPLETED_SLICES: readonly CompletedSlice[] = Object.freeze([
   {
     slice: "settings",
-    status: "shadow", // pending RPC-write cutover (see Migration 2 report)
+    status: "complete",
+    completedAt: "2026-07-11",
     ownedPaths: ["src/pages/settings"],
     canonicalKeys: [
       "settings.org.update",
@@ -76,12 +77,12 @@ export const COMPLETED_SLICES: readonly CompletedSlice[] = Object.freeze([
         pattern: String.raw`<Can\s+[^>]*module\s*=\s*['"\`]settings['"\`]`,
       },
       {
-        name: "direct RLS-bypassing write to settings tables (must go through canonical RPC)",
-        pattern: String.raw`\.from\(\s*['"\`](clinic_profile|clinic_settings|branches|invoice_settings|appointment_settings|queue_settings|notification_settings|payment_methods|coupons|loyalty_settings|service_categories|services|procedures|departments|staff_positions|leave_types|medical_specialties|insurance_companies|insurance_contracts|communication_templates|whatsapp_templates|sms_templates|email_templates)['"\`]\s*\)\s*\.(update|insert|upsert|delete)\b`,
+        name: "direct write to identity/authorization tables — must go through settings_assign_user_role / settings_save_role_permissions",
+        pattern: String.raw`\.from\(\s*['"\`](user_roles|role_permissions|employee_id_counter)['"\`]\s*\)\s*\.(update|insert|upsert|delete)\b`,
       },
     ],
     notes:
-      "Settings vertical slice — Migration 1 shadow, Migration 2 cutover. Flip status to 'complete' the same PR that lands Migration 2.",
+      "Settings vertical slice — Migration 2 complete. Identity/role assignment and role-permissions matrix writes must flow through the two canonical SECURITY DEFINER RPCs (settings_assign_user_role, settings_save_role_permissions). All other Settings writes remain under direct RLS (see docs/execution/M2_SETTINGS).",
   },
   {
     slice: "patients",

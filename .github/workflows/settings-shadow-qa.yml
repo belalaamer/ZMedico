@@ -2,26 +2,29 @@ name: Settings Shadow QA
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-  pull_request:
 
 jobs:
   settings-shadow-qa:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+
     env:
       BASE_URL: ${{ secrets.BASE_URL }}
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
       VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+
       TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL }}
       TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD }}
+
       TEST_MANAGER_EMAIL: ${{ secrets.TEST_MANAGER_EMAIL }}
       TEST_MANAGER_PASSWORD: ${{ secrets.TEST_MANAGER_PASSWORD }}
+
       TEST_ACCOUNTANT_EMAIL: ${{ secrets.TEST_ACCOUNTANT_EMAIL }}
       TEST_ACCOUNTANT_PASSWORD: ${{ secrets.TEST_ACCOUNTANT_PASSWORD }}
+
       TEST_STAFF_EMAIL: ${{ secrets.TEST_STAFF_EMAIL }}
       TEST_STAFF_PASSWORD: ${{ secrets.TEST_STAFF_PASSWORD }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -29,7 +32,7 @@ jobs:
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -39,12 +42,30 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Verify required secrets
+        run: |
+          test -n "$BASE_URL"
+          test -n "$VITE_SUPABASE_URL"
+          test -n "$VITE_SUPABASE_PUBLISHABLE_KEY"
+
+          test -n "$TEST_ADMIN_EMAIL"
+          test -n "$TEST_ADMIN_PASSWORD"
+
+          test -n "$TEST_MANAGER_EMAIL"
+          test -n "$TEST_MANAGER_PASSWORD"
+
+          test -n "$TEST_ACCOUNTANT_EMAIL"
+          test -n "$TEST_ACCOUNTANT_PASSWORD"
+
+          test -n "$TEST_STAFF_EMAIL"
+          test -n "$TEST_STAFF_PASSWORD"
+
       - name: Install Playwright browsers and OS dependencies
         run: npx playwright install --with-deps chromium
 
       - name: Run Settings Shadow QA pipeline
         run: |
-          npx playwright test \
+          bunx playwright test \
             --project=setup:shadow \
             --project=settings-shadow-walk \
             --project=settings-shadow-validate
@@ -57,7 +78,7 @@ jobs:
           path: playwright-report/
           if-no-files-found: ignore
 
-      - name: Upload test-results
+      - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:

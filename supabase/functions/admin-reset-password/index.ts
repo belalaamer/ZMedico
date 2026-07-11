@@ -1,24 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
-
-function genPassword(len = 14) {
-  const chars =
-    "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
-  let out = "";
-  const buf = new Uint8Array(len);
-  crypto.getRandomValues(buf);
-  for (let i = 0; i < len; i++) out += chars[buf[i] % chars.length];
-  return out;
-}
+import { corsPreflight, jsonResponse } from "../_shared/cors.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return corsPreflight();
   }
 
   try {
@@ -28,10 +13,7 @@ Deno.serve(async (req) => {
 
     const authHeader = req.headers.get("Authorization") ?? "";
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Unauthorized" }, 401);
     }
 
     const userClient = createClient(SUPABASE_URL, ANON_KEY, {
@@ -39,10 +21,7 @@ Deno.serve(async (req) => {
     });
     const { data: userData, error: userErr } = await userClient.auth.getUser();
     if (userErr || !userData?.user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Unauthorized" }, 401);
     }
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
@@ -51,61 +30,52 @@ Deno.serve(async (req) => {
       _role: "admin",
     });
     if (roleErr || !isAdmin) {
-      return new Response(JSON.stringify({ error: "Forbidden: admin only" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Forbidden: admin only" }, 403);
     }
 
     const body = await req.json().catch(() => ({}));
     const user_id = String(body.user_id ?? "").trim();
-    const requested = body.password ? String(body.password) : "";
     if (!user_id) {
-      return new Response(JSON.stringify({ error: "user_id required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "user_id required" }, 400);
     }
-    if (requested && requested.length < 6) {
-      return new Response(
-        JSON.stringify({ error: "Password must be at least 6 characters" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
+    // Sprint 1 hardening: admin-initiated password reset no longer accepts
+    // or returns plaintext passwords. The target user receives a one-time
+    // recovery link and sets their own password. Any inbound `password`
+    // field is intentionally ignored.
+
+    // Look up email for the target user; generateLink requires an email.
+    const { data: target, error: getErr } =
+      await admin.auth.admin.getUserById(user_id);
+    if (getErr || !target?.user?.email) {
+      return jsonResponse(
+        { error: getErr?.message ?? "User not found" },
+        404,
       );
     }
 
-    const password = requested || genPassword(14);
-
-    const { data: updated, error: updErr } =
-      await admin.auth.admin.updateUserById(user_id, { password });
-
-    if (updErr) {
-      return new Response(JSON.stringify({ error: updErr.message }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    const { data: linkData, error: linkErr } =
+      await admin.auth.admin.generateLink({
+        type: "recovery",
+        email: target.user.email,
       });
+    if (linkErr) {
+      return jsonResponse({ error: linkErr.message }, 400);
     }
 
-    return new Response(
-      JSON.stringify({
-        user_id,
-        email: updated?.user?.email ?? null,
-        password,
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
-    );
+    const action_link =
+      (linkData as any)?.properties?.action_link ?? null;
+
+    return jsonResponse({
+      success: true,
+      user_id,
+      email: target.user.email,
+      action_link,
+      action_link_expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    });
   } catch (e) {
-    return new Response(
-      JSON.stringify({ error: (e as Error).message ?? "Unknown error" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
+    return jsonResponse(
+      { error: (e as Error).message ?? "Unknown error" },
+      500,
     );
   }
 });

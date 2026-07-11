@@ -163,17 +163,9 @@ export default function UserManagement() {
         }
         throw new Error(lang === "ar" ? "الموظف مربوط بالفعل — أعد التحميل" : "Employee is already linked — refresh");
       }
-      // Assign role
-      await (supabase as any).from("user_roles").delete().eq("user_id", linkTarget.id);
-      const { error: rErr } = await (supabase as any).from("user_roles")
-        .insert({ user_id: linkTarget.id, role: pickedRole });
-      if (rErr) throw rErr;
-      await logLinkAudit(
-        linkMode === "replace" ? "employee_replaced" : "employee_linked",
-        linkTarget.id, target.branch_id ?? currentBranchId,
-        { staff_id: prevStaffId, role: (roles[linkTarget.id] ?? [])[0] ?? null },
-        { staff_id: pickedStaffId, role: pickedRole, branch_id: target.branch_id ?? currentBranchId },
-      );
+      // Role assignment via the atomic Settings RPC (writes its own audit).
+      const r = await assignUserRole(linkTarget.id, pickedRole, null);
+      if (r.error) throw new Error(r.error.message);
       toast.success(lang === "ar" ? "تم الربط" : "Linked");
       setLinkTarget(null);
       load();
@@ -198,40 +190,10 @@ export default function UserManagement() {
       return;
     }
     setSavingEdit(true);
-    const prev = staffLinks[editTarget.id] ?? null;
-    const prevRole = (roles[editTarget.id] ?? [])[0] ?? null;
-    // Replace roles: delete all then insert the chosen one
-    const del = await (supabase as any).from("user_roles").delete().eq("user_id", editTarget.id);
-    if (del.error) { setSavingEdit(false); toast.error(del.error.message); return; }
-    const ins = await (supabase as any).from("user_roles").insert({ user_id: editTarget.id, role: eRole });
-    if (ins.error) { setSavingEdit(false); toast.error(ins.error.message); return; }
-    // Upsert staff_profiles branch. If no row exists yet, create one (post-creation linking).
-    if (eBranch) {
-      const existing = prev?.employee_id;
-      let employeeId = existing ?? null;
-      if (!employeeId) {
-        // Generate an employee code so the NOT NULL constraint holds.
-        const { data: counter } = await (supabase as any)
-          .from("employee_id_counter").select("id,last_value").eq("id", 1).maybeSingle();
-        const next = ((counter?.last_value as number) ?? 0) + 1;
-        await (supabase as any).from("employee_id_counter").upsert({ id: 1, last_value: next });
-        employeeId = `EMP-${String(next).padStart(4, "0")}`;
-      }
-      const { error: upErr } = await (supabase as any).from("staff_profiles")
-        .upsert({ id: editTarget.id, branch_id: eBranch, employee_id: employeeId }, { onConflict: "id" });
-      if (upErr) { setSavingEdit(false); toast.error(upErr.message); return; }
-      const isLinkAction = !prev?.branch_id;
-      await logLinkAudit(
-        isLinkAction ? "employee_linked" : "employee_replaced",
-        editTarget.id, eBranch,
-        { role: prevRole, branch_id: prev?.branch_id ?? null },
-        { role: eRole, branch_id: eBranch },
-      );
-    } else if (prevRole !== eRole) {
-      await logLinkAudit("employee_replaced", editTarget.id, prev?.branch_id ?? null,
-        { role: prevRole }, { role: eRole });
-    }
+    // Atomic: role + optional branch/employee upsert + audit in one call.
+    const r = await assignUserRole(editTarget.id, eRole, eBranch || null);
     setSavingEdit(false);
+    if (r.error) { toast.error(r.error.message); return; }
     toast.success(lang === "ar" ? "تم تحديث الصلاحيات" : "Permissions updated");
     setEditTarget(null);
     load();
@@ -240,15 +202,14 @@ export default function UserManagement() {
   const unlinkEmployee = async () => {
     if (!unlinkTarget) return;
     setUnlinking(true);
-    const prev = staffLinks[unlinkTarget.id] ?? null;
-    // Clear the link only — keep the staff record for history.
+    // Direct link clear stays under RLS (staff_profiles admin policy).
     const { error: sErr } = await (supabase as any).from("staff_profiles")
       .update({ linked_user_id: null })
       .eq("linked_user_id", unlinkTarget.id);
     if (sErr) { setUnlinking(false); toast.error(sErr.message); return; }
-    await (supabase as any).from("user_roles").delete().eq("user_id", unlinkTarget.id);
-    await logLinkAudit("employee_unlinked", unlinkTarget.id, prev?.branch_id ?? null,
-      { branch_id: prev?.branch_id ?? null, employee_id: prev?.employee_id ?? null }, null);
+    // Role clear + audit via the atomic RPC.
+    const r = await assignUserRole(unlinkTarget.id, null, null);
+    if (r.error) { setUnlinking(false); toast.error(r.error.message); return; }
     setUnlinking(false);
     toast.success(lang === "ar" ? "تم فك الربط" : "Unlinked");
     setUnlinkTarget(null);

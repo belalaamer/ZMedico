@@ -105,7 +105,14 @@ export default function StaffDetail() {
       .update({ linked_user_id: null }).eq("id", id);
     if (sErr) { setBusy(false); toast.error(sErr.message); return; }
     if (linkedUid) {
-      await (supabase as any).from("user_roles").delete().eq("user_id", linkedUid);
+      // Route role revocation through the canonical Settings RPC so
+      // user_roles is never mutated directly from client code.
+      const { error: rErr } = await (supabase as any).rpc("settings_assign_user_role", {
+        _target_user_id: linkedUid,
+        _new_role: null,
+        _branch_id: null,
+      });
+      if (rErr) { setBusy(false); toast.error(rErr.message); return; }
     }
     await (supabase as any).from("audit_logs").insert({
       user_id: me.user?.id ?? null,
@@ -154,7 +161,12 @@ export default function StaffDetail() {
       if (!upd || upd.length === 0) throw new Error("Link failed");
       // Revoke roles from previous linked user if replace
       if (linkMode === "replace" && prevLinkedUid && prevLinkedUid !== pickedUserId) {
-        await (supabase as any).from("user_roles").delete().eq("user_id", prevLinkedUid);
+        const { error: rErr } = await (supabase as any).rpc("settings_assign_user_role", {
+          _target_user_id: prevLinkedUid,
+          _new_role: null,
+          _branch_id: null,
+        });
+        if (rErr) throw rErr;
       }
       const { data: me } = await supabase.auth.getUser();
       await (supabase as any).from("audit_logs").insert({

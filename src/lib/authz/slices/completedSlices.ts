@@ -158,6 +158,31 @@ export const COMPLETED_SLICES: readonly CompletedSlice[] = Object.freeze([
     notes:
       "HR vertical slice — Migration 1 shadow. Flip status to 'complete' the same PR that lands Migration 2.",
   },
+  {
+    slice: "invoices",
+    status: "shadow", // → flip to "complete" in the Migration 2 PR
+    ownedPaths: ["src/pages/invoices", "src/pages/payments"],
+    canonicalKeys: [
+      "invoices.view",
+      "invoices.create",
+      "invoices.edit",
+      "invoices.delete",
+      "invoices.export",
+    ],
+    moduleGuardsForbidden: ["invoices"],
+    forbiddenLegacyPatterns: [
+      {
+        name: "legacy usePermissions().can('invoices', ...)",
+        pattern: String.raw`\.can\(\s*['"\`]invoices['"\`]\s*,`,
+      },
+      {
+        name: "legacy <Can module=\"invoices\" ...>",
+        pattern: String.raw`<Can\s+[^>]*module\s*=\s*['"\`]invoices['"\`]`,
+      },
+    ],
+    notes:
+      "Invoices / Finance vertical slice — Migration 1 shadow. Flip status to 'complete' the same PR that lands Migration 2.",
+  },
 ]);
 
 export function activeCompletedSlices(): CompletedSlice[] {

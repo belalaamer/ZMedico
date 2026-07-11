@@ -8,6 +8,7 @@ import { useSettingsShadowProbe } from "@/lib/authz/settingsShadowProbe";
 import { usePatientsShadowProbe } from "@/lib/authz/patientsShadowProbe";
 import { useMedicalRecordsShadowProbe } from "@/lib/authz/medicalRecordsShadowProbe";
 import { useHrShadowProbe } from "@/lib/authz/hrShadowProbe";
+import { useInvoicesShadowProbe } from "@/lib/authz/invoicesShadowProbe";
 
 /**
  * Mounts the Settings shadow probe. Isolated in its own component so
@@ -52,6 +53,16 @@ function HrShadowProbeMount({ path }: { path: string }) {
 }
 
 /**
+ * Mounts the Invoices / Finance shadow probe. Telemetry-only — fires
+ * for denied roles as well so the negative_matrix_complete gate can
+ * turn green.
+ */
+function InvoicesShadowProbeMount({ path }: { path: string }) {
+  useInvoicesShadowProbe(path);
+  return null;
+}
+
+/**
  * Gates a route element based on the user's permission for the module
  * inferred from the current path. Admin always passes.
  */
@@ -70,6 +81,7 @@ export function PermissionRoute({ children, module, adminOnly }: { children: Rea
   const isPatientsPath = pathname.startsWith("/patients");
   const isMedicalPath = pathname.startsWith("/medical");
   const isHrPath = pathname.startsWith("/hr");
+  const isInvoicesPath = pathname.startsWith("/invoices") || pathname.startsWith("/payments");
 
   if (loading) {
     return (
@@ -87,6 +99,7 @@ export function PermissionRoute({ children, module, adminOnly }: { children: Rea
           {isPatientsPath ? <PatientsShadowProbeMount path={pathname} /> : null}
           {isMedicalPath ? <MedicalRecordsShadowProbeMount path={pathname} /> : null}
           {isHrPath ? <HrShadowProbeMount path={pathname} /> : null}
+          {isInvoicesPath ? <InvoicesShadowProbeMount path={pathname} /> : null}
           {children}
         </>
       );
@@ -98,6 +111,7 @@ export function PermissionRoute({ children, module, adminOnly }: { children: Rea
         {isPatientsPath ? <PatientsShadowProbeMount path={pathname} /> : null}
         {isMedicalPath ? <MedicalRecordsShadowProbeMount path={pathname} /> : null}
         {isHrPath ? <HrShadowProbeMount path={pathname} /> : null}
+        {isInvoicesPath ? <InvoicesShadowProbeMount path={pathname} /> : null}
         {children}
       </>
     );
@@ -109,6 +123,7 @@ export function PermissionRoute({ children, module, adminOnly }: { children: Rea
         {isPatientsPath ? <PatientsShadowProbeMount path={pathname} /> : null}
         {isMedicalPath ? <MedicalRecordsShadowProbeMount path={pathname} /> : null}
         {isHrPath ? <HrShadowProbeMount path={pathname} /> : null}
+        {isInvoicesPath ? <InvoicesShadowProbeMount path={pathname} /> : null}
         {children}
       </>
     );
@@ -120,6 +135,7 @@ export function PermissionRoute({ children, module, adminOnly }: { children: Rea
       {isPatientsPath ? <PatientsShadowProbeMount path={pathname} /> : null}
       {isMedicalPath ? <MedicalRecordsShadowProbeMount path={pathname} /> : null}
       {isHrPath ? <HrShadowProbeMount path={pathname} /> : null}
+      {isInvoicesPath ? <InvoicesShadowProbeMount path={pathname} /> : null}
       <div className="max-w-md text-center space-y-4">
         <div className="mx-auto size-14 rounded-full bg-destructive/10 text-destructive flex items-center justify-center">
           <ShieldAlert className="size-7" />

@@ -57,6 +57,19 @@ export type ShadowHrRole = (typeof SHADOW_HR_ROLES)[number];
 export const hrShadowStorageState = (role: ShadowHrRole) =>
   path.resolve(__dirname, `tests/playwright/.auth/shadow-hr-${role}.json`);
 
+// Per-role storage state files for the Invoices / Finance shadow QA.
+// Uses accountant + receptionist as the two non-admin write roles;
+// staff is the required denied role.
+export const SHADOW_INVOICES_ROLES = [
+  "admin",
+  "accountant",
+  "receptionist",
+  "staff",
+] as const;
+export type ShadowInvoicesRole = (typeof SHADOW_INVOICES_ROLES)[number];
+export const invoicesShadowStorageState = (role: ShadowInvoicesRole) =>
+  path.resolve(__dirname, `tests/playwright/.auth/shadow-invoices-${role}.json`);
+
 const BASE_URL = process.env.BASE_URL || "http://localhost:8080";
 
 // Mobile viewports covered by the smoke suite (mobile.smoke.spec.ts).
@@ -200,6 +213,24 @@ export default defineConfig({
       name: "hr-shadow-validate",
       testMatch: /hr\.shadow\.validate\.spec\.ts/,
       dependencies: ["hr-shadow-walk"],
+      use: { baseURL: BASE_URL },
+    },
+    // ---- Invoices / Finance vertical-slice shadow QA ---------------
+    {
+      name: "setup:shadow-invoices",
+      testMatch: /invoices\.setup\.ts/,
+      use: { baseURL: BASE_URL },
+    },
+    {
+      name: "invoices-shadow-walk",
+      testMatch: /invoices\.shadow\.spec\.ts/,
+      dependencies: ["setup:shadow-invoices"],
+      use: { ...devices["Desktop Chrome"], baseURL: BASE_URL },
+    },
+    {
+      name: "invoices-shadow-validate",
+      testMatch: /invoices\.shadow\.validate\.spec\.ts/,
+      dependencies: ["invoices-shadow-walk"],
       use: { baseURL: BASE_URL },
     },
   ],

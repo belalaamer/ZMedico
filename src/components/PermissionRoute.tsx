@@ -4,6 +4,20 @@ import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { moduleForPath } from "@/lib/rolePermissions";
 import { useI18n } from "@/contexts/I18nContext";
 import { ShieldAlert } from "lucide-react";
+import { useSettingsShadowProbe } from "@/lib/authz/settingsShadowProbe";
+
+/**
+ * Mounts the Settings shadow probe. Isolated in its own component so
+ * PermissionRoute can conditionally render it for `/settings/*` paths
+ * without violating the rules of hooks, and so the probe fires for the
+ * required denied role even when the gate ultimately renders the
+ * access-denied card. The probe is telemetry-only: it never renders
+ * anything and never affects the authorization outcome.
+ */
+function SettingsShadowProbeMount({ path }: { path: string }) {
+  useSettingsShadowProbe(path);
+  return null;
+}
 
 /**
  * Gates a route element based on the user's permission for the module
@@ -14,6 +28,13 @@ export function PermissionRoute({ children, module, adminOnly }: { children: Rea
   const { authz, loading } = useAuthorization();
   const { lang } = useI18n();
   const mod = module ?? moduleForPath(pathname);
+  // Shadow-probe telemetry for the Settings vertical slice. Mounted
+  // regardless of the gate outcome so denied roles (e.g. staff) also
+  // record shadow decisions — required for the slice's
+  // negative_matrix_complete / at_least_one_denied_role_exercised gate.
+  // Dedup inside the probe ensures no duplicate work when SettingsLayout
+  // also mounts.
+  const isSettingsPath = pathname.startsWith("/settings");
 
   if (loading) {
     return (
@@ -34,6 +55,7 @@ export function PermissionRoute({ children, module, adminOnly }: { children: Rea
 
   return (
     <div className="min-h-[60vh] flex items-center justify-center p-6">
+      {isSettingsPath ? <SettingsShadowProbeMount path={pathname} /> : null}
       <div className="max-w-md text-center space-y-4">
         <div className="mx-auto size-14 rounded-full bg-destructive/10 text-destructive flex items-center justify-center">
           <ShieldAlert className="size-7" />

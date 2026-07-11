@@ -1,5 +1,5 @@
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
+// html2canvas + jsPDF are loaded on-demand inside the exported async function
+// so the ~600 KB PDF stack is only fetched when the user actually prints / exports.
 
 type Lang = "en" | "ar";
 

@@ -90,9 +90,13 @@ export default function RolePermissions() {
     ROLES.forEach(r => MODULES.forEach(m => {
       rows.push({ role: r, module: m, actions: matrix[r]?.[m] ?? [] });
     }));
-    const { error } = await (supabase as any)
-      .from("role_permissions")
-      .upsert(rows, { onConflict: "role,module" });
+    // M2 Settings cutover: transactional matrix save through
+    // settings_save_role_permissions (SECURITY DEFINER). Eliminates the
+    // partial-write hazard of the previous client-side batch upsert.
+    const { error } = await (supabase as any).rpc(
+      "settings_save_role_permissions",
+      { _matrix: rows },
+    );
     setSaving(false);
     if (error) { toast.error(error.message); return; }
     toast.success(lang === "ar" ? "تم الحفظ" : "Saved");

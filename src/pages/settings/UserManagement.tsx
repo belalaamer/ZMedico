@@ -329,13 +329,8 @@ export default function UserManagement() {
       setCreating(true);
       const staff = linkableStaff.find((x) => x.id === cLinkedStaffId);
       if (!staff) { setCreating(false); toast.error("Staff not found"); return; }
-      const del = await (supabase as any).from("user_roles").delete().eq("user_id", staff.id);
-      if (del.error) { setCreating(false); toast.error(del.error.message); return; }
-      const ins = await (supabase as any).from("user_roles").insert({ user_id: staff.id, role: cRole });
-      if (ins.error) { setCreating(false); toast.error(ins.error.message); return; }
-      if (cBranch) {
-        await (supabase as any).from("staff_profiles").update({ branch_id: cBranch }).eq("id", staff.id);
-      }
+      const r = await assignUserRole(staff.id, cRole, cBranch || null);
+      if (r.error) { setCreating(false); toast.error(r.error.message); return; }
       setCreating(false);
       toast.success(lang === "ar" ? "تم ربط المستخدم بالموظف" : "User linked to employee");
       setCEmail(""); setCName(""); setCRole("staff"); setCPassword(""); setCBranch(""); setCLinkedStaffId("");

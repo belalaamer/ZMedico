@@ -56,8 +56,7 @@ export interface CompletedSlice {
 export const COMPLETED_SLICES: readonly CompletedSlice[] = Object.freeze([
   {
     slice: "settings",
-    status: "complete",
-    completedAt: "2026-07-11",
+    status: "shadow", // pending RPC-write cutover (see Migration 2 report)
     ownedPaths: ["src/pages/settings"],
     canonicalKeys: [
       "settings.org.update",

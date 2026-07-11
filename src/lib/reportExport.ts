@@ -75,6 +75,10 @@ export async function exportReportPDF(opts: {
   document.body.appendChild(container);
   const node = container.firstElementChild as HTMLElement;
   try {
+    const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+      import("html2canvas"),
+      import("jspdf"),
+    ]);
     const canvas = await html2canvas(node, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
     const imgData = canvas.toDataURL("image/jpeg", 0.95);
     const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
@@ -102,12 +106,13 @@ export async function exportReportPDF(opts: {
   }
 }
 
-export function exportReportExcel(opts: {
+export async function exportReportExcel(opts: {
   title: string;
   columns: ReportColumn[];
   rows: Record<string, any>[];
   summary?: { label: string; value: string }[];
 }) {
+  const XLSX = await import("xlsx");
   const data = [opts.columns.map((c) => c.header), ...opts.rows.map((r) => opts.columns.map((c) => r[c.key] ?? ""))];
   if (opts.summary?.length) {
     data.push([]);

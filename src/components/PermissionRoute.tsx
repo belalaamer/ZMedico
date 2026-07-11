@@ -6,6 +6,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { ShieldAlert } from "lucide-react";
 import { useSettingsShadowProbe } from "@/lib/authz/settingsShadowProbe";
 import { usePatientsShadowProbe } from "@/lib/authz/patientsShadowProbe";
+import { useMedicalRecordsShadowProbe } from "@/lib/authz/medicalRecordsShadowProbe";
 
 /**
  * Mounts the Settings shadow probe. Isolated in its own component so
@@ -31,6 +32,16 @@ function PatientsShadowProbeMount({ path }: { path: string }) {
 }
 
 /**
+ * Mounts the Medical Records shadow probe. Same rationale as the
+ * Settings / Patients mounts — telemetry-only, must fire for denied
+ * roles even when the gate renders the access-denied card.
+ */
+function MedicalRecordsShadowProbeMount({ path }: { path: string }) {
+  useMedicalRecordsShadowProbe(path);
+  return null;
+}
+
+/**
  * Gates a route element based on the user's permission for the module
  * inferred from the current path. Admin always passes.
  */
@@ -47,6 +58,7 @@ export function PermissionRoute({ children, module, adminOnly }: { children: Rea
   // also mounts.
   const isSettingsPath = pathname.startsWith("/settings");
   const isPatientsPath = pathname.startsWith("/patients");
+  const isMedicalPath = pathname.startsWith("/medical");
 
   if (loading) {
     return (
@@ -62,6 +74,7 @@ export function PermissionRoute({ children, module, adminOnly }: { children: Rea
         <>
           {isSettingsPath ? <SettingsShadowProbeMount path={pathname} /> : null}
           {isPatientsPath ? <PatientsShadowProbeMount path={pathname} /> : null}
+          {isMedicalPath ? <MedicalRecordsShadowProbeMount path={pathname} /> : null}
           {children}
         </>
       );
@@ -71,6 +84,7 @@ export function PermissionRoute({ children, module, adminOnly }: { children: Rea
       <>
         {isSettingsPath ? <SettingsShadowProbeMount path={pathname} /> : null}
         {isPatientsPath ? <PatientsShadowProbeMount path={pathname} /> : null}
+        {isMedicalPath ? <MedicalRecordsShadowProbeMount path={pathname} /> : null}
         {children}
       </>
     );
@@ -80,6 +94,7 @@ export function PermissionRoute({ children, module, adminOnly }: { children: Rea
       <>
         {isSettingsPath ? <SettingsShadowProbeMount path={pathname} /> : null}
         {isPatientsPath ? <PatientsShadowProbeMount path={pathname} /> : null}
+        {isMedicalPath ? <MedicalRecordsShadowProbeMount path={pathname} /> : null}
         {children}
       </>
     );
@@ -89,6 +104,7 @@ export function PermissionRoute({ children, module, adminOnly }: { children: Rea
     <div className="min-h-[60vh] flex items-center justify-center p-6">
       {isSettingsPath ? <SettingsShadowProbeMount path={pathname} /> : null}
       {isPatientsPath ? <PatientsShadowProbeMount path={pathname} /> : null}
+      {isMedicalPath ? <MedicalRecordsShadowProbeMount path={pathname} /> : null}
       <div className="max-w-md text-center space-y-4">
         <div className="mx-auto size-14 rounded-full bg-destructive/10 text-destructive flex items-center justify-center">
           <ShieldAlert className="size-7" />

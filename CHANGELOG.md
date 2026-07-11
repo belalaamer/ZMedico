@@ -2,6 +2,44 @@
 
 ## [Unreleased]
 
+### Medical Records Authorization Slice — Shadow (Ready-for-Cutover)
+
+**Additions**
+- New `src/lib/authz/medicalRecordsShadowProbe.ts` — telemetry-only probe
+  covering `medical_records.view`, `medical_records.create`,
+  `medical_records.edit`, `medical_records.delete`,
+  `medical_records.export`. Legacy map is 1:1 with the `medical_records`
+  module actions.
+- `MedicalRecordsShadowProbeMount` in `PermissionRoute` fires for every
+  `/medical/*` path (including denied outcomes) so `staff` produces the
+  observations required by `at_least_one_denied_role_exercised` and
+  `negative_matrix_complete`.
+- New migration: adds a `medical_records` row to
+  `authz_shadow_slice_gate` with canonical bundle keys
+  (`bundle.role.admin`, `bundle.role.doctor`, `bundle.role.staff`);
+  creates `public.v_authz_shadow_matrix_medical_records`; extends
+  `public.v_authz_shadow_exit_criteria` with a `matrix_medical_records`
+  CTE and a `medical_records` branch. Settings + Patients branches
+  preserved byte-for-byte.
+- Playwright: `setup:shadow-medical`, `medical-shadow-walk`,
+  `medical-shadow-validate` projects and matching setup/walk/validate
+  specs. Runs under the new `medical-shadow-qa.yml` GitHub Actions
+  workflow.
+- Vitest baselines: `medicalRecords.slice.parity.test.ts` locks the
+  legacy per-role matrix; `medicalRecordsShadowProbe.noninfluence.test.ts`
+  proves the probe cannot affect `AuthorizationService.can`.
+- QA Identities page (`src/pages/settings/QAIdentities.tsx`) gained
+  canonical `doctor` and `nurse` entries so provisioning covers the
+  clinical roles the medical slice requires.
+- Registered `medical_records` in `COMPLETED_SLICES` (status `shadow`)
+  so the CI invariant test is armed for Migration 2.
+
+**Verification**
+- All 9 Playwright projects pass (`setup:shadow-medical`,
+  `medical-shadow-walk` × 4 roles, `medical-shadow-validate`).
+- `regressions = 0`, `unexpected_expansions = 0`, `parity_green = true`,
+  `ready_for_cutover = true` for slice `medical_records`.
+
 ### Patients Authorization Slice — Shadow (Ready-for-Cutover)
 
 **Additions**

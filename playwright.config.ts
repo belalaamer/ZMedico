@@ -31,6 +31,19 @@ export type ShadowPatientsRole = (typeof SHADOW_PATIENTS_ROLES)[number];
 export const patientsShadowStorageState = (role: ShadowPatientsRole) =>
   path.resolve(__dirname, `tests/playwright/.auth/shadow-patients-${role}.json`);
 
+// Per-role storage state files for the Medical Records shadow QA.
+// Mirrors the Patients shadow QA but swaps in `doctor` as the primary
+// write-capable clinical role.
+export const SHADOW_MEDICAL_ROLES = [
+  "admin",
+  "doctor",
+  "manager",
+  "staff",
+] as const;
+export type ShadowMedicalRole = (typeof SHADOW_MEDICAL_ROLES)[number];
+export const medicalShadowStorageState = (role: ShadowMedicalRole) =>
+  path.resolve(__dirname, `tests/playwright/.auth/shadow-medical-${role}.json`);
+
 const BASE_URL = process.env.BASE_URL || "http://localhost:8080";
 
 // Mobile viewports covered by the smoke suite (mobile.smoke.spec.ts).
@@ -138,6 +151,24 @@ export default defineConfig({
       name: "patients-shadow-validate",
       testMatch: /patients\.shadow\.validate\.spec\.ts/,
       dependencies: ["patients-shadow-walk"],
+      use: { baseURL: BASE_URL },
+    },
+    // ---- Medical Records vertical-slice shadow QA -------------------
+    {
+      name: "setup:shadow-medical",
+      testMatch: /medical\.setup\.ts/,
+      use: { baseURL: BASE_URL },
+    },
+    {
+      name: "medical-shadow-walk",
+      testMatch: /medical\.shadow\.spec\.ts/,
+      dependencies: ["setup:shadow-medical"],
+      use: { ...devices["Desktop Chrome"], baseURL: BASE_URL },
+    },
+    {
+      name: "medical-shadow-validate",
+      testMatch: /medical\.shadow\.validate\.spec\.ts/,
+      dependencies: ["medical-shadow-walk"],
       use: { baseURL: BASE_URL },
     },
   ],

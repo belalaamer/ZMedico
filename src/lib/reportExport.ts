@@ -1,6 +1,6 @@
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
-import * as XLSX from "xlsx";
+// jsPDF, html2canvas and xlsx are heavy (>800 KB combined) and only needed when
+// the user triggers an export. They are dynamically imported inside the
+// exporter functions so route bundles stay lean.
 
 export type ReportColumn = { header: string; key: string; width?: number };
 

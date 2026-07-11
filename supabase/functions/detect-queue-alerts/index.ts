@@ -5,12 +5,7 @@
 // no_show_rate), and reconcile queue_alerts so alerts exist independent of any
 // open dashboard session. Heartbeat written to queue_alert_runs.
 import { createClient } from "npm:@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-};
+import { corsHeaders, corsPreflight, jsonResponse } from "../_shared/cors.ts";
 
 type AlertType = "long_wait" | "no_show_rate" | "busy_queue";
 type Condition = { type: AlertType; active: boolean; detail: Record<string, unknown> };
@@ -147,23 +142,22 @@ async function processBranch(admin: any, branchId: string) {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method === "OPTIONS") return corsPreflight();
 
   // Auth guard: only the scheduled cron job (or a service-role caller) may
   // invoke this function. It writes to queue_alerts using the service role
   // key and would otherwise be callable anonymously.
-  const CRON_SECRET =
-    Deno.env.get("DETECT_QUEUE_ALERTS_CRON_SECRET") ??
-    Deno.env.get("SEND_REMINDER_CRON_SECRET");
+  // Sprint 1 hardening: this function now has its own dedicated secret and
+  // no longer falls back to SEND_REMINDER_CRON_SECRET (least-privilege).
+  // See docs/security/SPRINT1_DEFINER_HARDENING.md and the edge-function
+  // audit report for context.
+  const CRON_SECRET = Deno.env.get("DETECT_QUEUE_ALERTS_CRON_SECRET");
   const auth = req.headers.get("Authorization") ?? "";
   const isCron =
     (!!CRON_SECRET && auth === `Bearer ${CRON_SECRET}`) ||
     (!!SERVICE_ROLE && auth === `Bearer ${SERVICE_ROLE}`);
   if (!isCron) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ error: "Unauthorized" }, 401);
   }
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
@@ -202,14 +196,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ ok: true, branches: results.length, results }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
+    return jsonResponse({ ok: true, branches: results.length, results });
   } catch (e) {
-    return new Response(JSON.stringify({ ok: false, error: (e as Error).message }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
+    return jsonResponse({ ok: false, error: (e as Error).message }, 500);
   }
 });

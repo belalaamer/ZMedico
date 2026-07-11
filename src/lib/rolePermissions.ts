@@ -98,6 +98,10 @@ export const DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
     reports_medical: [],
     reports_hr: [],
     coupons: ["view","create","edit","export"],
+    // Coarse-grained prerequisite so PermissionRoute admits accountant
+    // into /settings/* to reach settings.pricing.update. Matches the
+    // canonical bundle.role.accountant grant of settings.view.
+    settings: ["view"],
   },
   // HR: people only.
   hr: {

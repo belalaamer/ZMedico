@@ -22,6 +22,9 @@ import { ListSkeleton } from "@/components/ListSkeleton";
 import { Fab } from "@/components/ui/fab";
 import { ReferrerPicker } from "./ReferrerPicker";
 import { PullToRefresh } from "@/components/PullToRefresh";
+import { TablePager } from "@/components/TablePager";
+
+const PAGE_SIZE = 50;
 
 type Patient = {
   id: string;
@@ -66,6 +69,8 @@ export default function PatientsPage() {
   const [open, setOpen] = useState(false);
   const [confirmDel, setConfirmDel] = useState<Patient | null>(null);
   const [duesByPatient, setDuesByPatient] = useState<Record<string, number>>({});
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
 
   const [form, setForm] = useState({
     name: "", phone: "", phone2: "", email: "",
@@ -76,17 +81,21 @@ export default function PatientsPage() {
 
   const load = async () => {
     setLoading(true);
+    const from = page * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
     let query = supabase.from("patients")
-      .select("id,patient_code,first_name_en,last_name_en,first_name_ar,last_name_ar,phone,phone2,email,gender,city,address,dob,blood_type,notes,branch_id,created_at")
-      .is("deleted_at", null).order("created_at", { ascending: false }).limit(200);
+      .select("id,patient_code,first_name_en,last_name_en,first_name_ar,last_name_ar,phone,phone2,email,gender,city,address,dob,blood_type,notes,branch_id,created_at", { count: "exact" })
+      .is("deleted_at", null).order("created_at", { ascending: false }).range(from, to);
     if (currentBranchId) query = query.eq("branch_id", currentBranchId);
-    const { data, error } = await query;
+    const { data, error, count } = await query;
     setLoading(false);
     if (error) { toast.error(error.message); return; }
     setItems((data ?? []) as Patient[]);
+    setTotal(count ?? 0);
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId, page]);
+  useEffect(() => { setPage(0); }, [currentBranchId]);
   useDataSync(["patients"], () => { load(); });
 
   // Lightweight batched outstanding-debt badge: a single query for the visible
@@ -295,6 +304,7 @@ export default function PatientsPage() {
             })}
           </div>
         )}
+        <TablePager page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
       </Card>
 
       <Can permission="patients.create">

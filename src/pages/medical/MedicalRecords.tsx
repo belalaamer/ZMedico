@@ -13,6 +13,9 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Can } from "@/components/Can";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
+import { TablePager } from "@/components/TablePager";
+
+const PAGE_SIZE = 50;
 
 export default function MedicalRecords() {
   const { t, lang } = useI18n();
@@ -21,12 +24,19 @@ export default function MedicalRecords() {
   // R2: canonical authorization entry point.
   const { authz } = useAuthorization("MedicalRecords");
   const [items, setItems] = useState<any[]>([]);
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
   const load = () => {
-    let q = supabase.from("medical_records").select("*, patients(*), medical_specialties(name_en,name_ar)").is("deleted_at", null).order("visit_date", { ascending: false }).limit(200);
+    const from = page * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+    let q = supabase.from("medical_records")
+      .select("*, patients(id,patient_code,first_name_en,last_name_en,first_name_ar,last_name_ar), medical_specialties(name_en,name_ar)", { count: "exact" })
+      .is("deleted_at", null).order("visit_date", { ascending: false }).range(from, to);
     if (currentBranchId) q = q.eq("branch_id", currentBranchId);
-    q.then(({ data }) => setItems(data ?? []));
+    q.then(({ data, count }) => { setItems(data ?? []); setTotal(count ?? 0); });
   };
-  useEffect(() => { load(); }, [currentBranchId]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId, page]);
+  useEffect(() => { setPage(0); }, [currentBranchId]);
 
   const softDelete = async (r: any): Promise<void> => {
     const { error } = await supabase.from("medical_records").update({ deleted_at: new Date().toISOString() } as any).eq("id", r.id);
@@ -75,6 +85,7 @@ export default function MedicalRecords() {
             })}
           </div>
         )}
+        <TablePager page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
       </Card>
     </div>
   );

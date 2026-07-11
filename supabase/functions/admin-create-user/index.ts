@@ -133,8 +133,13 @@ Deno.serve(async (req) => {
       { user_id: created.user.id, role },
       { onConflict: "user_id,role" },
     );
-    // Create/update staff profile with branch assignment when provided.
-    if (branch_id) {
+    // Non-admin roles are operational identities and MUST own an active,
+    // linked staff_profiles row (see docs/QA_IDENTITY_PROVISIONING.md and
+    // usePermissions.linked gate). Admin bypasses by design. If staff
+    // provisioning fails the entire operation is rolled back so no
+    // partially-provisioned identity is ever left behind.
+    const requiresStaffProfile = role !== "admin";
+    if (requiresStaffProfile || branch_id) {
       // staff_profiles.employee_id is NOT NULL with no default. Generate one
       // using the employee_id_counter so the upsert does not violate the
       // constraint for newly created users.
@@ -159,20 +164,28 @@ Deno.serve(async (req) => {
       }
 
       const { error: spErr } = await admin.from("staff_profiles").upsert(
-        { id: created.user.id, branch_id, employee_id: employeeId },
+        {
+          id: created.user.id,
+          linked_user_id: created.user.id,
+          branch_id,
+          employee_id: employeeId,
+          status: "active",
+        },
         { onConflict: "id" },
       );
       if (spErr) {
+        // Full rollback: remove the auth user (cascades to profiles,
+        // user_roles, staff_profiles via FK) and the allowlist row so
+        // the operation is atomic — either everything is provisioned
+        // or nothing is.
+        await admin.auth.admin.deleteUser(created.user.id).catch(() => {});
+        await admin.from("allowed_signup_emails").delete().eq("email", email);
         return new Response(
           JSON.stringify({
-            error: `User created but staff profile failed: ${spErr.message}`,
-            user_id: created.user.id,
-            email,
-            password,
-            role,
+            error: `Staff profile provisioning failed: ${spErr.message}`,
           }),
           {
-            status: 207,
+            status: 500,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           },
         );

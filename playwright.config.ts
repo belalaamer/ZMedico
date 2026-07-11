@@ -18,6 +18,19 @@ export type ShadowRole = (typeof SHADOW_ROLES)[number];
 export const shadowStorageState = (role: ShadowRole) =>
   path.resolve(__dirname, `tests/playwright/.auth/shadow-${role}.json`);
 
+// Per-role storage state files for the Patients shadow QA. Mirrors the
+// Settings shadow QA but swaps `accountant` for `receptionist` because
+// `receptionist` is the third write-capable role in the patients slice.
+export const SHADOW_PATIENTS_ROLES = [
+  "admin",
+  "manager",
+  "receptionist",
+  "staff",
+] as const;
+export type ShadowPatientsRole = (typeof SHADOW_PATIENTS_ROLES)[number];
+export const patientsShadowStorageState = (role: ShadowPatientsRole) =>
+  path.resolve(__dirname, `tests/playwright/.auth/shadow-patients-${role}.json`);
+
 const BASE_URL = process.env.BASE_URL || "http://localhost:8080";
 
 // Mobile viewports covered by the smoke suite (mobile.smoke.spec.ts).
@@ -107,6 +120,24 @@ export default defineConfig({
       name: "settings-shadow-validate",
       testMatch: /settings\.shadow\.validate\.spec\.ts/,
       dependencies: ["settings-shadow-walk"],
+      use: { baseURL: BASE_URL },
+    },
+    // ---- Patients vertical-slice shadow QA ---------------------------
+    {
+      name: "setup:shadow-patients",
+      testMatch: /patients\.setup\.ts/,
+      use: { baseURL: BASE_URL },
+    },
+    {
+      name: "patients-shadow-walk",
+      testMatch: /patients\.shadow\.spec\.ts/,
+      dependencies: ["setup:shadow-patients"],
+      use: { ...devices["Desktop Chrome"], baseURL: BASE_URL },
+    },
+    {
+      name: "patients-shadow-validate",
+      testMatch: /patients\.shadow\.validate\.spec\.ts/,
+      dependencies: ["patients-shadow-walk"],
       use: { baseURL: BASE_URL },
     },
   ],

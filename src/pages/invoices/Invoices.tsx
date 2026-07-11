@@ -121,7 +121,7 @@ export default function Invoices() {
               <SelectItem value="cancelled">{t("statusCancelled")}</SelectItem>
             </SelectContent>
           </Select>
-          <Can module="invoices" action="create">
+          <Can permission="invoices.create">
             <Button className="gradient-primary text-primary-foreground hidden sm:inline-flex" onClick={() => setOpen(true)}>
               <Plus className="me-2 size-4" />{t("newInvoice")}
             </Button>
@@ -186,7 +186,7 @@ export default function Invoices() {
       </Card>
 
       <CreateInvoiceDialog open={open} onOpenChange={setOpen} onSaved={() => { setOpen(false); load(); }} />
-      <Can module="invoices" action="create">
+      <Can permission="invoices.create">
         <Fab ariaLabel={t("newInvoice")} onClick={() => setOpen(true)}>
           <Plus className="size-6" />
         </Fab>

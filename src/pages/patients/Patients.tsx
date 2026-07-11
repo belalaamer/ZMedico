@@ -168,7 +168,7 @@ export default function PatientsPage() {
             <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("search")} className="ps-9" />
           </div>
-          <Can module="patients" action="create">
+          <Can permission="patients.create">
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
                 <Button
@@ -297,7 +297,7 @@ export default function PatientsPage() {
         )}
       </Card>
 
-      <Can module="patients" action="create">
+      <Can permission="patients.create">
         <Fab ariaLabel={t("addPatient")} onClick={() => setOpen(true)}>
           <Plus className="size-6" />
         </Fab>

@@ -1,5 +1,5 @@
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
+// html2canvas + jsPDF are dynamically imported inside generateInvoicePdf so the
+// heavy PDF renderer is only fetched when the user clicks Print/Download.
 import invoiceArabicRegularUrl from "@/assets/fonts/NotoNaskhArabic-Regular.ttf";
 import invoiceArabicBoldUrl from "@/assets/fonts/NotoNaskhArabic-Bold.ttf";
 
@@ -119,6 +119,11 @@ export async function generateInvoicePdf(opts: {
   t: (k: string) => string;
 }) {
   const { invoice, items, payments, patient, branch, logoUrl, lang, mode = "download", t } = opts;
+
+  const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+    import("html2canvas"),
+    import("jspdf"),
+  ]);
 
   const isAr = lang === "ar";
   const dir = isAr ? "rtl" : "ltr";

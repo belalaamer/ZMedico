@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import * as XLSX from "xlsx";
+// xlsx (~300 KB) is loaded on-demand only when an admin actually triggers an export.
 import { Download, Database } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -44,6 +44,7 @@ export default function BackupExport() {
     if (error) return toast.error(error.message);
     if ((result as any)?.error) return toast.error((result as any).error);
     const rows = (result as any)?.data?.[table] ?? [];
+    const XLSX = await import("xlsx");
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, table);

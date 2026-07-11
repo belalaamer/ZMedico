@@ -29,8 +29,18 @@ export default function Attendance() {
     if (currentBranchId) q = q.eq("branch_id", currentBranchId);
     const { data: s } = await q;
     setStaff(s ?? []);
-    const { data: profs } = await supabase.from("profiles").select("id,full_name,email");
-    setProfiles(profs ?? []);
+    // Only load profile identity for the staff visible on this page/branch —
+    // avoids pulling the entire profiles table just to render name/email labels.
+    const staffIds = (s ?? []).map((row: any) => row.id).filter(Boolean);
+    if (staffIds.length) {
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id,full_name,email")
+        .in("id", staffIds);
+      setProfiles(profs ?? []);
+    } else {
+      setProfiles([]);
+    }
     let qa = supabase.from("attendance").select("*").eq("date", date);
     if (currentBranchId) qa = qa.eq("branch_id", currentBranchId);
     const { data: a } = await qa;

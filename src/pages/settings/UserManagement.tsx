@@ -28,23 +28,22 @@ type Role = typeof ROLES[number];
 
 type StaffLink = { branch_id: string | null; employee_id: string | null };
 
-async function logLinkAudit(
-  action: "employee_linked" | "employee_unlinked" | "employee_replaced",
-  userId: string,
+// M2 Settings cutover: identity/role writes go through the
+// settings_assign_user_role SECURITY DEFINER RPC, which performs the
+// role delete/insert, optional staff_profiles branch upsert, employee_id
+// generation, and audit_logs write inside a single transaction. The
+// legacy client-side audit helper was removed with those writes.
+async function assignUserRole(
+  targetUserId: string,
+  newRole: Role | null,
   branchId: string | null,
-  oldVals: Record<string, unknown> | null,
-  newVals: Record<string, unknown> | null,
-) {
-  const { data: me } = await supabase.auth.getUser();
-  await (supabase as any).from("audit_logs").insert({
-    user_id: me.user?.id ?? null,
-    branch_id: branchId,
-    action,
-    entity_type: "user_employee_link",
-    entity_id: userId,
-    old_values: oldVals,
-    new_values: newVals,
+): Promise<{ error: { message: string } | null }> {
+  const { error } = await (supabase as any).rpc("settings_assign_user_role", {
+    _target_user_id: targetUserId,
+    _new_role: newRole,
+    _branch_id: branchId,
   });
+  return { error: error ? { message: error.message } : null };
 }
 
 function suggestRoleFromPosition(titleEn: string | null | undefined, groupKey: string | null | undefined): Role {

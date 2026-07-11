@@ -15,6 +15,7 @@ type QARoleKey =
   | "receptionist"
   | "doctor"
   | "nurse"
+  | "hr"
   | "staff";
 
 type QAAccount = {
@@ -32,6 +33,7 @@ const ACCOUNTS: QAAccount[] = [
   { key: "receptionist", email: "qa.receptionist@qa.local", role: "receptionist", envPrefix: "TEST_RECEPTIONIST", requiresBranch: true },
   { key: "doctor", email: "qa.doctor@qa.local", role: "doctor", envPrefix: "TEST_DOCTOR", requiresBranch: true },
   { key: "nurse", email: "qa.nurse@qa.local", role: "nurse", envPrefix: "TEST_NURSE", requiresBranch: true },
+  { key: "hr", email: "qa.hr@qa.local", role: "hr", envPrefix: "TEST_HR", requiresBranch: true },
   { key: "staff", email: "qa.staff@qa.local", role: "staff", envPrefix: "TEST_STAFF", requiresBranch: true },
 ];
 

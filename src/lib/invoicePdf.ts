@@ -1,5 +1,5 @@
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
+// html2canvas + jsPDF are dynamically imported inside generateInvoicePdf so the
+// heavy PDF renderer is only fetched when the user clicks Print/Download.
 import invoiceArabicRegularUrl from "@/assets/fonts/NotoNaskhArabic-Regular.ttf";
 import invoiceArabicBoldUrl from "@/assets/fonts/NotoNaskhArabic-Bold.ttf";
 

@@ -2,6 +2,46 @@
 
 ## [Unreleased]
 
+### Migration 2 (Cutover) — Batch 2: Settings slice
+
+Settings slice flipped from `shadow` to `complete` in
+`src/lib/authz/slices/completedSlices.ts`. Two — and only two —
+`SECURITY DEFINER` RPCs were introduced (per the approved
+`docs/execution/M2_SETTINGS/M2_SETTINGS_DATA_PLANE_REVIEW.md`
+architecture, which rejected the previously-scoped ~15-RPC design):
+
+- `public.settings_assign_user_role(_target_user_id, _new_role, _branch_id)`
+  — atomic role assignment / clear. Fails closed on `has_role(actor,'admin')`,
+  writes a single `audit_logs` row inside the same transaction, and
+  handles employee-code generation via `employee_id_counter` when a
+  branch is supplied. Replaces the sequential
+  `user_roles.delete → user_roles.insert [→ staff_profiles.upsert →
+  employee_id_counter.upsert → audit_logs.insert]` chain in three
+  code paths of `UserManagement.tsx`.
+- `public.settings_save_role_permissions(_matrix jsonb)` — transactional
+  bulk upsert of the full role × module → actions matrix. Fails closed on
+  `has_permission(actor,'settings.edit')`, validates payload shape before
+  any write, and writes one audit_logs row (row count + diff hash).
+  Replaces the client-side batch upsert in `RolePermissions.tsx`.
+
+Both functions: `SECURITY DEFINER`, `SET search_path = public`,
+`REVOKE ALL FROM PUBLIC`, `GRANT EXECUTE TO authenticated`, no dynamic
+SQL. All other Settings write tables remain on direct table access
+under their existing admin/manager RLS policies (wrapping them in
+DEFINER would duplicate the check and remove Postgres's row-level
+enforcement — a net regression).
+
+**Slice registry:** the settings entry's `forbiddenLegacyPatterns` was
+narrowed from the broad Settings-tables list to the three tables that
+MUST now flow through the RPCs — `user_roles`, `role_permissions`,
+`employee_id_counter`. This matches the approved architecture and lets
+the invariant permanently protect the two canonical write paths.
+
+**Not changed:** no RLS policies, no permission bundles, no
+authorization catalog entries, no GitHub workflows, no shadow probes
+or telemetry. Shadow-framework cleanup remains a separate future
+migration (after ≥1 stable production release).
+
 ### Migration 2 (Cutover) — Batch 1: Patients, Medical Records, HR, Invoices
 
 Four vertical slices flipped from `shadow` to `complete` in

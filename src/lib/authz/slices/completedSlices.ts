@@ -158,6 +158,10 @@ export const COMPLETED_SLICES: readonly CompletedSlice[] = Object.freeze([
         name: "legacy <Can module=\"hr\" ...>",
         pattern: String.raw`<Can\s+[^>]*module\s*=\s*['"\`]hr['"\`]`,
       },
+      {
+        name: "direct write to identity/authorization tables — must go through settings_assign_user_role",
+        pattern: String.raw`\.from\(\s*['"\`](user_roles|role_permissions|employee_id_counter)['"\`]\s*\)\s*\.(update|insert|upsert|delete)\b`,
+      },
     ],
     notes:
       "HR vertical slice — Migration 1 shadow. Flip status to 'complete' the same PR that lands Migration 2.",

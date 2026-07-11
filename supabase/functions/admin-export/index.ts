@@ -1,10 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+import { corsHeaders, corsPreflight, jsonResponse } from "../_shared/cors.ts";
 
 const ALLOWED_TABLES = new Set([
   "patients",
@@ -16,7 +11,7 @@ const ALLOWED_TABLES = new Set([
 ]);
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return corsPreflight();
 
   try {
     const authHeader = req.headers.get("Authorization") ?? "";
@@ -66,12 +61,52 @@ Deno.serve(async (req) => {
       return json({ error: "No valid table requested" }, 400);
     }
 
+    const requestId = crypto.randomUUID();
+    const branchId = typeof body?.branch_id === "string" ? body.branch_id : null;
+    const startedAt = new Date().toISOString();
+    // Pre-export audit record: written BEFORE any data is read so a caller
+    // cannot exfiltrate data without leaving a trail. Row counts are
+    // filled into new_values after each table read.
+    const rowCounts: Record<string, number> = {};
+    await admin.from("audit_logs").insert({
+      user_id: userData.user.id,
+      branch_id: branchId,
+      action: "admin_export",
+      entity_type: "bulk_export",
+      entity_id: null,
+      new_values: {
+        request_id: requestId,
+        mode,
+        tables,
+        started_at: startedAt,
+        row_counts: rowCounts,
+      },
+    });
+
     const out: Record<string, unknown[]> = {};
     for (const tbl of tables) {
       const { data, error } = await admin.from(tbl).select("*").limit(10000);
       if (error) return json({ error: `Failed to read ${tbl}` }, 500);
       out[tbl] = data ?? [];
+      rowCounts[tbl] = (data ?? []).length;
     }
+
+    // Post-export audit update: capture final row counts + completion time.
+    // Best-effort — a failure here does not affect the caller's response.
+    await admin.from("audit_logs").insert({
+      user_id: userData.user.id,
+      branch_id: branchId,
+      action: "admin_export_complete",
+      entity_type: "bulk_export",
+      entity_id: null,
+      new_values: {
+        request_id: requestId,
+        mode,
+        tables,
+        row_counts: rowCounts,
+        completed_at: new Date().toISOString(),
+      },
+    });
 
     return json({ data: out });
   } catch (_e) {
@@ -80,8 +115,5 @@ Deno.serve(async (req) => {
 });
 
 function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
+  return jsonResponse(body, status);
 }

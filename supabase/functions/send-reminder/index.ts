@@ -11,12 +11,34 @@
 // can be wired by setting the right URL + key.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { corsHeaders, corsPreflight, jsonResponse } from "../_shared/cors.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+// Sprint 1 hardening: bulk-abuse protection. Cap the number of reminders
+// processed per invocation (configurable via SEND_REMINDER_MAX_BATCH, default
+// 200). Requests that would exceed the cap are rejected with 413 so callers
+// must page explicitly rather than silently truncating.
+const DEFAULT_MAX_BATCH = 200;
+function maxBatchSize(): number {
+  const raw = Deno.env.get("SEND_REMINDER_MAX_BATCH");
+  const n = raw ? Number(raw) : NaN;
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : DEFAULT_MAX_BATCH;
+}
+
+// Per-admin rate-limit hook. Kept as a small in-memory token bucket so the
+// function stays self-contained; swap for a durable store when scale demands.
+// Cron and service-role calls bypass this by design.
+const RL_WINDOW_MS = 60_000;
+const RL_MAX = Number(Deno.env.get("SEND_REMINDER_RL_PER_MIN") ?? "10");
+const rlBuckets = new Map<string, number[]>();
+function rateLimit(actorId: string): boolean {
+  if (!Number.isFinite(RL_MAX) || RL_MAX <= 0) return true;
+  const now = Date.now();
+  const hits = (rlBuckets.get(actorId) ?? []).filter((t) => now - t < RL_WINDOW_MS);
+  if (hits.length >= RL_MAX) return false;
+  hits.push(now);
+  rlBuckets.set(actorId, hits);
+  return true;
+}
 
 type Reminder = {
   id: string;
@@ -206,7 +228,7 @@ async function sendOne(
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return corsPreflight();
   }
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -223,12 +245,10 @@ Deno.serve(async (req) => {
     (!!serviceKey && authHeader === `Bearer ${serviceKey}`);
 
   let callerIsAdmin = false;
+  let actorId: string | null = null;
   if (!isCron) {
     if (!authHeader.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Unauthorized" }, 401);
     }
     const token = authHeader.replace("Bearer ", "");
     const userClient = createClient(SUPABASE_URL, ANON_KEY, {
@@ -236,13 +256,11 @@ Deno.serve(async (req) => {
     });
     const { data: claimsData, error: claimsErr } = await userClient.auth.getClaims(token);
     if (claimsErr || !claimsData?.claims?.sub) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Unauthorized" }, 401);
     }
     // Check admin role for bulk operations
     const userId = claimsData.claims.sub as string;
+    actorId = userId;
     const adminCheck = createClient(SUPABASE_URL, SERVICE_KEY);
     const { data: roleRow } = await adminCheck
       .from("user_roles")
@@ -262,12 +280,18 @@ Deno.serve(async (req) => {
   // Previously single-id sends were unrestricted, allowing any authenticated
   // user to enumerate reminders and trigger arbitrary patient messages.
   if (!isCron && !callerIsAdmin) {
-    return new Response(JSON.stringify({ error: "Forbidden: admin role required" }), {
-      status: 403,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ error: "Forbidden: admin role required" }, 403);
   }
 
+  // Enforce per-admin rate limit for non-cron callers.
+  if (!isCron && actorId && !rateLimit(actorId)) {
+    return jsonResponse(
+      { error: "Too many reminder sends, please retry shortly" },
+      429,
+    );
+  }
+
+  const MAX_BATCH = maxBatchSize();
   // Build query
   let q = supabase
     .from("reminders")
@@ -279,17 +303,27 @@ Deno.serve(async (req) => {
     q = q.eq("status", "pending");
     if (body.branch_id) q = q.eq("branch_id", body.branch_id);
     if (body.due_only !== false) q = q.lte("scheduled_time", new Date().toISOString());
+    // Fetch one extra so we can detect (and reject) oversized batches
+    // instead of silently truncating.
+    q = q.limit(MAX_BATCH + 1);
   }
 
   const { data: reminders, error: fetchErr } = await q;
   if (fetchErr) {
-    return new Response(JSON.stringify({ error: fetchErr.message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ error: fetchErr.message }, 500);
   }
 
   const list = (reminders ?? []) as Reminder[];
+  if (!body.reminder_id && list.length > MAX_BATCH) {
+    return jsonResponse(
+      {
+        error: "Batch too large",
+        max_batch: MAX_BATCH,
+        hint: "Narrow the query with branch_id or process in smaller windows.",
+      },
+      413,
+    );
+  }
   let sent = 0;
   let failed = 0;
   const results: Array<{ id: string; ok: boolean; error?: string }> = [];
@@ -358,8 +392,5 @@ Deno.serve(async (req) => {
     }
   }
 
-  return new Response(
-    JSON.stringify({ processed: list.length, sent, failed, results }),
-    { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-  );
+  return jsonResponse({ processed: list.length, sent, failed, results });
 });

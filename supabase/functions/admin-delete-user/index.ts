@@ -1,14 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+import { corsPreflight, jsonResponse } from "../_shared/cors.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return corsPreflight();
   }
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -17,10 +12,7 @@ Deno.serve(async (req) => {
 
     const authHeader = req.headers.get("Authorization") ?? "";
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Unauthorized" }, 401);
     }
 
     const userClient = createClient(SUPABASE_URL, ANON_KEY, {
@@ -28,10 +20,7 @@ Deno.serve(async (req) => {
     });
     const { data: userData, error: userErr } = await userClient.auth.getUser();
     if (userErr || !userData?.user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Unauthorized" }, 401);
     }
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
@@ -40,29 +29,37 @@ Deno.serve(async (req) => {
       _role: "admin",
     });
     if (!isAdmin) {
-      return new Response(JSON.stringify({ error: "Forbidden: admin only" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Forbidden: admin only" }, 403);
     }
 
     const body = await req.json().catch(() => ({}));
     const target_user_id = String(body.user_id ?? "").trim();
+    const reason = body.reason ? String(body.reason).slice(0, 500) : null;
+    const branchId = body.branch_id ? String(body.branch_id) : null;
     if (!target_user_id) {
-      return new Response(JSON.stringify({ error: "user_id required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "user_id required" }, 400);
     }
     if (target_user_id === userData.user.id) {
-      return new Response(
-        JSON.stringify({ error: "You cannot delete your own account" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
+      return jsonResponse(
+        { error: "You cannot delete your own account" },
+        400,
       );
     }
+
+    // Pre-deletion audit record. Written BEFORE the destructive cascade so
+    // the trail exists even if the delete partially fails downstream.
+    await admin.from("audit_logs").insert({
+      user_id: userData.user.id,
+      branch_id: branchId,
+      action: "admin_delete_user",
+      entity_type: "auth_user",
+      entity_id: target_user_id,
+      new_values: {
+        target_user_id,
+        reason,
+        requested_at: new Date().toISOString(),
+      },
+    });
 
     // Clean dependent rows first (best-effort)
     await admin.from("user_roles").delete().eq("user_id", target_user_id);
@@ -71,23 +68,14 @@ Deno.serve(async (req) => {
 
     const { error: delErr } = await admin.auth.admin.deleteUser(target_user_id);
     if (delErr) {
-      return new Response(JSON.stringify({ error: delErr.message }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: delErr.message }, 400);
     }
 
-    return new Response(JSON.stringify({ ok: true }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ ok: true });
   } catch (e) {
-    return new Response(
-      JSON.stringify({ error: (e as Error).message ?? "Unknown error" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
+    return jsonResponse(
+      { error: (e as Error).message ?? "Unknown error" },
+      500,
     );
   }
 });

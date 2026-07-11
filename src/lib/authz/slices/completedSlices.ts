@@ -108,6 +108,31 @@ export const COMPLETED_SLICES: readonly CompletedSlice[] = Object.freeze([
     notes:
       "Patients vertical slice — Migration 1 shadow. Flip status to 'complete' the same PR that lands Migration 2.",
   },
+  {
+    slice: "medical_records",
+    status: "shadow", // → flip to "complete" in the Migration 2 PR
+    ownedPaths: ["src/pages/medical"],
+    canonicalKeys: [
+      "medical_records.view",
+      "medical_records.create",
+      "medical_records.edit",
+      "medical_records.delete",
+      "medical_records.export",
+    ],
+    moduleGuardsForbidden: ["medical_records"],
+    forbiddenLegacyPatterns: [
+      {
+        name: "legacy usePermissions().can('medical_records', ...)",
+        pattern: String.raw`\.can\(\s*['"\`]medical_records['"\`]\s*,`,
+      },
+      {
+        name: "legacy <Can module=\"medical_records\" ...>",
+        pattern: String.raw`<Can\s+[^>]*module\s*=\s*['"\`]medical_records['"\`]`,
+      },
+    ],
+    notes:
+      "Medical Records vertical slice — Migration 1 shadow. Flip status to 'complete' the same PR that lands Migration 2.",
+  },
 ]);
 
 export function activeCompletedSlices(): CompletedSlice[] {

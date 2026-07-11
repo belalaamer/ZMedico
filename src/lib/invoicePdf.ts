@@ -120,6 +120,11 @@ export async function generateInvoicePdf(opts: {
 }) {
   const { invoice, items, payments, patient, branch, logoUrl, lang, mode = "download", t } = opts;
 
+  const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+    import("html2canvas"),
+    import("jspdf"),
+  ]);
+
   const isAr = lang === "ar";
   const dir = isAr ? "rtl" : "ltr";
   const remaining = +(Number(invoice.total) - Number(invoice.paid_amount)).toFixed(2);

@@ -1,3 +1,26 @@
+
+---
+
+## Final Hardening Addendum — 2026-07-11
+
+**Scope:** `src/pages/hr/StaffDetail.tsx` unlink/replace flows.
+
+**Decision:** Reuse the existing `settings_assign_user_role(_target_user_id, NULL, NULL)` RPC to revoke roles in both unlink and replace flows. No new `SECURITY DEFINER` function was introduced — the existing RPC already provides atomic, admin-gated, audit-logged role clearance, so extending or duplicating it would violate least privilege and increase the DEFINER surface unnecessarily.
+
+**Changes:**
+- `StaffDetail.unlinkUser`: replaced `supabase.from("user_roles").delete()` with `supabase.rpc("settings_assign_user_role", { _new_role: null })`.
+- `StaffDetail.confirmLink` (replace mode): same substitution for the previously-linked user's role revocation.
+- `staff_profiles.linked_user_id` writes remain direct — that column is not on the gated-table list and is already RLS-protected.
+- `completedSlices.ts` HR slice: added the identity-table forbidden-pattern regex, so any future direct write to `user_roles` / `role_permissions` / `employee_id_counter` under `src/pages/hr` fails CI.
+
+**Verification:**
+- Repo scan for `.from('user_roles'|'role_permissions'|'employee_id_counter').(update|insert|upsert|delete)` under `src/`: **0 matches**.
+- `completedSlices.invariant.test.ts`: **6/6 pass** with the new HR pattern active.
+- No RLS changes. No bundle changes. No new DEFINER functions. Audit logging preserved (RPC writes its own audit row; existing `employee_unlinked` / `employee_linked` audit inserts kept intact).
+
+**Rollback:** revert this commit — the RPC call reverts to the prior direct delete; no schema change to undo.
+
+**Production readiness:** unchanged — GREEN. Migration 2 identity-write hardening is now complete across all completed slices.
 # Final Authorization Audit — Post-Migration 2
 
 **Date:** 2026-07-11

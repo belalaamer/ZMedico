@@ -2,6 +2,32 @@
 
 ## [Unreleased]
 
+### Migration 2 (Cutover) — Batch 1: Patients, Medical Records, HR, Invoices
+
+Four vertical slices flipped from `shadow` to `complete` in
+`src/lib/authz/slices/completedSlices.ts`. The permanent CI invariant
+(`completedSlices.invariant.test.ts`) is now actively enforcing
+zero-legacy-authorization inside each slice's owned paths.
+
+**UI legacy call sites replaced (behavior byte-identical — the
+canonical `<Can>` internally still delegates to the same grant map):**
+- `src/pages/patients/Patients.tsx` — 2× `<Can module="patients" …>` → `<Can permission="patients.create">`
+- `src/pages/patients/PatientProfile.tsx` — 1× `<Can module="patients" action="edit">` → `<Can permission="patients.edit">`
+- `src/pages/medical/MedicalRecords.tsx` — 1× `<Can module="medical_records" action="create">` → `<Can permission="medical_records.create">`
+- `src/pages/invoices/Invoices.tsx` — 2× `<Can module="invoices" action="create">` → `<Can permission="invoices.create">`
+
+**Component change:**
+- `src/components/Can.tsx` — added `permission="x.y"` prop as the
+  canonical form. Legacy `module` + `action` form still compiles for
+  slices that have not cut over. No runtime behavior change.
+
+**Deferred:** Settings slice remains in `shadow`. Its
+`forbiddenLegacyPatterns` include a strict rule requiring every write
+to settings tables to route through a canonical SECURITY DEFINER RPC
+(currently 21 direct `supabase.from("<settings_table>").{update,insert,upsert,delete}()`
+call sites across 8 files). That is a data-plane refactor with its own
+migration/rollback surface and is tracked as Migration 2 Batch 2.
+
 ### Invoices / Finance Authorization Slice — Shadow (Migration 1)
 
 **Additions**

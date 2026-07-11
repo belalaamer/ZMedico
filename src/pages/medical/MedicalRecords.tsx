@@ -41,7 +41,7 @@ export default function MedicalRecords() {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("medicalRecords")}</h1>
           <p className="text-sm text-muted-foreground mt-1">{items.length}</p>
         </div>
-        <Can module="medical_records" action="create">
+        <Can permission="medical_records.create">
           <Button asChild className="gradient-primary text-primary-foreground"><Link to="/medical/quick-consult"><Plus className="me-2 size-4" />{t("addRecord")}</Link></Button>
         </Can>
       </div>

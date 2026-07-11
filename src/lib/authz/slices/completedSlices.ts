@@ -56,7 +56,7 @@ export interface CompletedSlice {
 export const COMPLETED_SLICES: readonly CompletedSlice[] = Object.freeze([
   {
     slice: "settings",
-    status: "shadow", // → flip to "complete" in the Migration 2 PR
+    status: "shadow", // pending RPC-write cutover (see Migration 2 report)
     ownedPaths: ["src/pages/settings"],
     canonicalKeys: [
       "settings.org.update",
@@ -85,7 +85,8 @@ export const COMPLETED_SLICES: readonly CompletedSlice[] = Object.freeze([
   },
   {
     slice: "patients",
-    status: "shadow", // → flip to "complete" in the Migration 2 PR
+    status: "complete",
+    completedAt: "2026-07-11",
     ownedPaths: ["src/pages/patients"],
     canonicalKeys: [
       "patients.view",
@@ -110,7 +111,8 @@ export const COMPLETED_SLICES: readonly CompletedSlice[] = Object.freeze([
   },
   {
     slice: "medical_records",
-    status: "shadow", // → flip to "complete" in the Migration 2 PR
+    status: "complete",
+    completedAt: "2026-07-11",
     ownedPaths: ["src/pages/medical"],
     canonicalKeys: [
       "medical_records.view",
@@ -135,7 +137,8 @@ export const COMPLETED_SLICES: readonly CompletedSlice[] = Object.freeze([
   },
   {
     slice: "hr",
-    status: "shadow", // → flip to "complete" in the Migration 2 PR
+    status: "complete",
+    completedAt: "2026-07-11",
     ownedPaths: ["src/pages/hr"],
     canonicalKeys: [
       "hr.view",
@@ -160,7 +163,8 @@ export const COMPLETED_SLICES: readonly CompletedSlice[] = Object.freeze([
   },
   {
     slice: "invoices",
-    status: "shadow", // → flip to "complete" in the Migration 2 PR
+    status: "complete",
+    completedAt: "2026-07-11",
     ownedPaths: ["src/pages/invoices", "src/pages/payments"],
     canonicalKeys: [
       "invoices.view",

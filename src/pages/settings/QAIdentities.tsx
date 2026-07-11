@@ -8,7 +8,14 @@ import { toast } from "sonner";
 import { Copy, Download, RefreshCw, Trash2, ShieldAlert } from "lucide-react";
 import SettingsLayout from "./SettingsLayout";
 
-type QARoleKey = "admin" | "manager" | "accountant" | "receptionist" | "staff";
+type QARoleKey =
+  | "admin"
+  | "manager"
+  | "accountant"
+  | "receptionist"
+  | "doctor"
+  | "nurse"
+  | "staff";
 
 type QAAccount = {
   key: QARoleKey;
@@ -23,6 +30,8 @@ const ACCOUNTS: QAAccount[] = [
   { key: "manager", email: "qa.manager@qa.local", role: "manager", envPrefix: "TEST_MANAGER", requiresBranch: true },
   { key: "accountant", email: "qa.accountant@qa.local", role: "accountant", envPrefix: "TEST_ACCOUNTANT", requiresBranch: true },
   { key: "receptionist", email: "qa.receptionist@qa.local", role: "receptionist", envPrefix: "TEST_RECEPTIONIST", requiresBranch: true },
+  { key: "doctor", email: "qa.doctor@qa.local", role: "doctor", envPrefix: "TEST_DOCTOR", requiresBranch: true },
+  { key: "nurse", email: "qa.nurse@qa.local", role: "nurse", envPrefix: "TEST_NURSE", requiresBranch: true },
   { key: "staff", email: "qa.staff@qa.local", role: "staff", envPrefix: "TEST_STAFF", requiresBranch: true },
 ];
 

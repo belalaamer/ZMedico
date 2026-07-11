@@ -2,6 +2,47 @@
 
 ## [Unreleased]
 
+### HR Authorization Slice — Shadow (Migration 1)
+
+**Additions**
+- New `src/lib/authz/hrShadowProbe.ts` — telemetry-only probe covering
+  `hr.view`, `hr.create`, `hr.edit`, `hr.delete`, `hr.export`. Legacy
+  map is 1:1 with the `hr` module actions; no intentional expansions.
+- `HrShadowProbeMount` in `PermissionRoute` fires for every `/hr/*`
+  path (including denied outcomes) so `staff` produces the observations
+  required by `at_least_one_denied_role_exercised` and
+  `negative_matrix_complete`.
+- New migration: adds an `hr` row to `authz_shadow_slice_gate` with
+  canonical bundle keys (`bundle.role.admin`, `bundle.role.hr`,
+  `bundle.role.staff`); creates `public.v_authz_shadow_matrix_hr`;
+  extends `public.v_authz_shadow_exit_criteria` with a `matrix_hr` CTE
+  and an `hr` branch. Settings + Patients + Medical Records branches
+  preserved byte-for-byte.
+- Playwright: `setup:shadow-hr`, `hr-shadow-walk`, `hr-shadow-validate`
+  projects and matching setup/walk/validate specs. Runs under the new
+  `hr-shadow-qa.yml` GitHub Actions workflow.
+- Vitest baselines: `hr.slice.parity.test.ts` locks the legacy per-role
+  matrix; `hrShadowProbe.noninfluence.test.ts` proves the probe cannot
+  affect `AuthorizationService.can`.
+- QA Identities page (`src/pages/settings/QAIdentities.tsx`) gained a
+  canonical `hr` entry (`qa.hr@qa.local`) so provisioning covers the
+  HR write role.
+- Registered `hr` in `COMPLETED_SLICES` (status `shadow`) so the CI
+  invariant test is armed for Migration 2.
+
+**Verification**
+- Typecheck green. Vitest: parity + non-influence + completed-slices
+  invariant all pass.
+- Legacy authorization behavior preserved; RLS policies and bundle
+  contents unchanged.
+
+**Rollback**
+- Drop views `public.v_authz_shadow_matrix_hr`; revert
+  `public.v_authz_shadow_exit_criteria` to the previous definition
+  (Settings + Patients + Medical Records only); `DELETE FROM
+  public.authz_shadow_slice_gate WHERE slice = 'hr'`; revert code files
+  listed above.
+
 ### Medical Records Authorization Slice — Shadow (Ready-for-Cutover)
 
 **Additions**

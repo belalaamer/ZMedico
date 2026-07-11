@@ -6755,6 +6755,18 @@ export type Database = {
       }
       renumber_active_invoices: { Args: never; Returns: undefined }
       renumber_active_patient_codes: { Args: never; Returns: undefined }
+      settings_assign_user_role: {
+        Args: {
+          _branch_id?: string
+          _new_role: Database["public"]["Enums"]["app_role"]
+          _target_user_id: string
+        }
+        Returns: undefined
+      }
+      settings_save_role_permissions: {
+        Args: { _matrix: Json }
+        Returns: number
+      }
       staff_target_actual: { Args: { _target_id: string }; Returns: number }
       storage_patient_docs_branch_allowed: {
         Args: { _name: string }

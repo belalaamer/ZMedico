@@ -2,6 +2,43 @@
 
 ## [Unreleased]
 
+### Invoices / Finance Authorization Slice — Shadow (Migration 1)
+
+**Additions**
+- New `src/lib/authz/invoicesShadowProbe.ts` — telemetry-only probe
+  covering `invoices.view/create/edit/delete/export`. Legacy map is 1:1
+  with the `invoices` module actions; no intentional expansions.
+- `InvoicesShadowProbeMount` in `PermissionRoute` fires for `/invoices/*`
+  and `/payments/*` (allow and deny) so `staff` produces the observations
+  required by `at_least_one_denied_role_exercised` and
+  `negative_matrix_complete`.
+- New migration: adds an `invoices` row to `authz_shadow_slice_gate`
+  with canonical bundle keys (`bundle.role.admin`,
+  `bundle.role.accountant`, `bundle.role.receptionist`,
+  `bundle.role.staff`); creates `public.v_authz_shadow_matrix_invoices`;
+  extends `public.v_authz_shadow_exit_criteria` with a `matrix_invoices`
+  CTE and an `invoices` branch. Prior slice branches preserved
+  byte-for-byte.
+- Playwright: `setup:shadow-invoices`, `invoices-shadow-walk`,
+  `invoices-shadow-validate` projects and matching setup/walk/validate
+  specs. Runs under the new `invoices-shadow-qa.yml` workflow.
+- Vitest baselines: `invoices.slice.parity.test.ts` locks the legacy
+  per-role matrix; `invoicesShadowProbe.noninfluence.test.ts` proves
+  the probe cannot affect `AuthorizationService.can`.
+- Registered `invoices` in `COMPLETED_SLICES` (status `shadow`) so the
+  CI invariant test is armed for Migration 2.
+
+**Verification**
+- Typecheck green; parity + non-influence + completed-slices invariant
+  vitest pass. Legacy authorization behavior preserved; no RLS or
+  bundle deltas.
+
+**Rollback**
+- `DROP VIEW public.v_authz_shadow_matrix_invoices;` restore the prior
+  `v_authz_shadow_exit_criteria` definition; `DELETE FROM
+  public.authz_shadow_slice_gate WHERE slice='invoices'`; revert the
+  code files listed above.
+
 ### HR Authorization Slice — Shadow (Migration 1)
 
 **Additions**

@@ -106,7 +106,7 @@ jobs:
 
       - name: Upload Playwright Report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-${{ matrix.slice }}
           path: playwright-report
@@ -114,7 +114,7 @@ jobs:
 
       - name: Upload Test Results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-${{ matrix.slice }}
           path: test-results
@@ -122,7 +122,7 @@ jobs:
 
       - name: Upload Shadow Reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: shadow-reports-${{ matrix.slice }}
           path: tests/playwright/.shadow-reports

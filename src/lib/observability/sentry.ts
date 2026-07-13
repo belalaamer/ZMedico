@@ -34,9 +34,10 @@ export async function initSentry(): Promise<void> {
     // Loaded from esm.sh so no build-time dependency is required.
     // If the CDN is blocked this fails silently — Sentry is not on the
     // critical UX path.
-    const mod: any = await import(
-      /* @vite-ignore */ "https://esm.sh/@sentry/browser@7?bundle"
-    );
+    // @ts-ignore - remote ESM URL resolved at runtime, no types shipped.
+    const mod: any = await import(/* @vite-ignore */ (
+      "https://esm.sh/@sentry/browser@7?bundle"
+    ));
     mod.init({
       dsn,
       environment: readEnv("VITE_SENTRY_ENV") ?? readEnv("MODE") ?? "production",

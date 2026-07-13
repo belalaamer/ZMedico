@@ -1,1 +1,21 @@
 project_id = "mmlnvypctowdlbvbesui"
+
+# Sprint 1 Phase 2 — defense-in-depth: reject unauthenticated calls at the
+# gateway before they reach the function body. Each of these functions
+# already validates auth.getUser() + has_role('admin') in-code; this block
+# is purely additive and does not change behaviour for authenticated
+# callers. Cron functions (detect-queue-alerts, enqueue-winback,
+# send-reminder) intentionally keep the default (verify_jwt = false) since
+# they are triggered by the scheduler with a shared cron secret and do
+# not present a Supabase JWT.
+[functions.admin-create-user]
+verify_jwt = true
+
+[functions.admin-delete-user]
+verify_jwt = true
+
+[functions.admin-export]
+verify_jwt = true
+
+[functions.admin-reset-password]
+verify_jwt = true

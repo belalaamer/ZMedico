@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zmedico.platform/schemas/invoice/v1.json",
+  "title": "Invoice",
+  "type": "object",
+  "x-entity": "invoice",
+  "x-version": "1.0.0",
+  "x-owner": "Head of Finance",
+  "x-steward": "Finance Data Steward",
+  "x-domain": "invoices",
+  "x-source": "public.invoices (+ public.invoice_items)",
+  "x-classification": "FINANCIAL",
+  "x-retention": "RET-FIN-01",
+  "required": ["id", "invoice_number", "patient_id", "status", "total", "created_at"],
+  "properties": {
+    "id":             { "type": "string", "format": "uuid" },
+    "tenant_id":      { "type": ["string", "null"], "format": "uuid" },
+    "branch_id":      { "type": ["string", "null"], "format": "uuid" },
+    "invoice_number": { "type": "string", "x-quality-rules": ["DQ-INV-01"] },
+    "patient_id":     { "type": "string", "format": "uuid", "x-classification": "PHI-LINK" },
+    "issued_at":      { "type": ["string", "null"], "format": "date-time" },
+    "due_at":         { "type": ["string", "null"], "format": "date-time" },
+    "status":         { "type": "string", "enum": ["draft", "issued", "partially_paid", "paid", "cancelled", "refunded"] },
+    "subtotal":       { "type": "number", "minimum": 0, "x-classification": "FINANCIAL" },
+    "discount":       { "type": ["number", "null"], "minimum": 0 },
+    "tax":            { "type": ["number", "null"], "minimum": 0 },
+    "total":          { "type": "number", "minimum": 0, "x-quality-rules": ["DQ-INV-02"] },
+    "amount_paid":    { "type": ["number", "null"], "minimum": 0, "x-quality-rules": ["DQ-INV-03"] },
+    "currency":       { "type": ["string", "null"], "minLength": 3, "maxLength": 3 },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "description", "quantity", "unit_price", "line_total"],
+        "properties": {
+          "id":          { "type": "string", "format": "uuid" },
+          "description": { "type": "string" },
+          "quantity":    { "type": "number", "minimum": 0 },
+          "unit_price":  { "type": "number", "minimum": 0 },
+          "line_total":  { "type": "number", "minimum": 0, "x-quality-rules": ["DQ-INV-04"] }
+        }
+      }
+    },
+    "created_by":  { "type": ["string", "null"], "format": "uuid" },
+    "created_at":  { "type": "string", "format": "date-time" },
+    "updated_at":  { "type": ["string", "null"], "format": "date-time" },
+    "deleted_at":  { "type": ["string", "null"], "format": "date-time" }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zmedico.platform/schemas/payment/v1.json",
+  "title": "Payment",
+  "type": "object",
+  "x-entity": "payment",
+  "x-version": "1.0.0",
+  "x-owner": "Head of Finance",
+  "x-steward": "Finance Data Steward",
+  "x-domain": "payments",
+  "x-source": "public.payments",
+  "x-classification": "FINANCIAL",
+  "x-retention": "RET-FIN-01",
+  "required": ["id", "patient_id", "amount", "payment_method", "created_at"],
+  "properties": {
+    "id":              { "type": "string", "format": "uuid" },
+    "tenant_id":       { "type": ["string", "null"], "format": "uuid" },
+    "branch_id":       { "type": ["string", "null"], "format": "uuid" },
+    "invoice_id":      { "type": ["string", "null"], "format": "uuid" },
+    "patient_id":      { "type": "string", "format": "uuid", "x-classification": "PHI-LINK" },
+    "amount":          { "type": "number", "exclusiveMinimum": 0, "x-quality-rules": ["DQ-PAY-01"] },
+    "currency":        { "type": ["string", "null"], "minLength": 3, "maxLength": 3 },
+    "payment_method":  { "type": "string", "enum": ["cash", "card", "bank_transfer", "wallet", "insurance", "other"] },
+    "reference_number":{ "type": ["string", "null"] },
+    "received_by":     { "type": ["string", "null"], "format": "uuid" },
+    "notes":           { "type": ["string", "null"] },
+    "created_at":      { "type": "string", "format": "date-time" },
+    "updated_at":      { "type": ["string", "null"], "format": "date-time" },
+    "deleted_at":      { "type": ["string", "null"], "format": "date-time", "description": "Soft-delete triggers treasury reversal + invoice recalculation server-side." }
+  },
+  "additionalProperties": true
+}

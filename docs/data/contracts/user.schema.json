@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zmedico.platform/schemas/user/v1.json",
+  "title": "User",
+  "description": "Composite view: auth.users (identity) + public.profiles (display) + public.user_roles (authorization). Never exposed as a single row in the database.",
+  "type": "object",
+  "x-entity": "user",
+  "x-version": "1.0.0",
+  "x-owner": "Head of Engineering",
+  "x-steward": "Identity Steward (DPO co-owner)",
+  "x-domain": "identity",
+  "x-source": "auth.users + public.profiles + public.user_roles",
+  "x-classification": "PII",
+  "x-retention": "RET-USER-01",
+  "required": ["id", "email", "roles", "created_at"],
+  "properties": {
+    "id":         { "type": "string", "format": "uuid", "x-source": "auth.users.id" },
+    "email":      { "type": "string", "format": "email", "x-classification": "PII", "x-source": "auth.users.email" },
+    "full_name":  { "type": ["string", "null"], "x-classification": "PII", "x-source": "public.profiles.full_name" },
+    "avatar_url": { "type": ["string", "null"], "x-source": "public.profiles.avatar_url" },
+    "locale":     { "type": ["string", "null"], "x-source": "public.profiles.locale" },
+    "roles": {
+      "type": "array",
+      "minItems": 0,
+      "items": { "type": "string", "enum": ["admin", "moderator", "user", "doctor", "receptionist", "accountant", "hr", "manager"] },
+      "x-source": "public.user_roles.role",
+      "x-quality-rules": ["DQ-USR-01"]
+    },
+    "last_sign_in_at": { "type": ["string", "null"], "format": "date-time", "x-source": "auth.users.last_sign_in_at" },
+    "created_at":      { "type": "string", "format": "date-time" },
+    "updated_at":      { "type": ["string", "null"], "format": "date-time" },
+    "banned_until":    { "type": ["string", "null"], "format": "date-time", "x-source": "auth.users.banned_until" }
+  },
+  "additionalProperties": true
+}

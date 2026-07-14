@@ -5,6 +5,8 @@ import { defaultActionsFor, MODULES } from "@/lib/rolePermissions";
 import { withTimeout } from "@/lib/withTimeout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAuthzState } from "@/lib/authz/useAuthzState";
+import { isCanonicalAuthzEnabled } from "@/lib/authz/canonicalFlag";
+import { fetchCanonicalPermissions } from "@/lib/authz/canonicalPermissions";
 
 export function usePermissions() {
   const { roles, isAdmin, loading: rolesLoading } = useUserRole();
@@ -42,6 +44,35 @@ export function usePermissions() {
     if (isAdmin) { setPerms({}); setLoading(false); return; }
     if (!roles.length) { setPerms({}); setLoading(false); return; }
     setLoading(true);
+    // Phase B — Canonical runtime path. When the flag is on, source the
+    // effective permission set from `v_authz_effective_permissions`
+    // (authz_bundles → authz_permissions) instead of `role_permissions`
+    // + DEFAULT_PERMISSIONS. Return shape is identical. On any failure
+    // we transparently fall through to the legacy reader below so the
+    // user never loses access from a canonical outage.
+    if (isCanonicalAuthzEnabled() && user?.id) {
+      fetchCanonicalPermissions(user.id)
+        .then((map) => {
+          if (!active) return;
+          console.info("[auth-debug] canonical permissions loaded", {
+            modules: Object.keys(map).length,
+          });
+          setPerms(map);
+          setLoading(false);
+        })
+        .catch((error) => {
+          console.warn("[auth-debug] canonical permissions failed; falling back to legacy", {
+            message: error instanceof Error ? error.message : String(error),
+          });
+          if (!active) return;
+          loadLegacy();
+        });
+      return () => { active = false; };
+    }
+    loadLegacy();
+    return () => { active = false; };
+
+    function loadLegacy() {
     withTimeout(
       (supabase as any)
         .from("role_permissions")
@@ -97,9 +128,8 @@ export function usePermissions() {
       .finally(() => {
         if (active) setLoading(false);
       });
-
-    return () => { active = false; };
-  }, [roles.join(","), isAdmin, rolesLoading, fingerprint]);
+    }
+  }, [roles.join(","), isAdmin, rolesLoading, fingerprint, user?.id]);
 
   const can = (module: string, action: string = "view") => {
     if (isAdmin) return true;

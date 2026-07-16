@@ -6,11 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Phone, Mail, User as UserIcon, Trash2 } from "lucide-react";
+import { Plus, Search, Phone, Mail, MapPin, MoreHorizontal, Calendar as CalendarIcon, FileText, Eye, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -61,6 +63,7 @@ const schema = z.object({
 export default function PatientsPage() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
+  const navigate = useNavigate();
   // R2: canonical authorization entry point.
   const { authz } = useAuthorization("Patients");
   const [items, setItems] = useState<Patient[]>([]);
@@ -264,44 +267,94 @@ export default function PatientsPage() {
         ) : filtered.length === 0 ? (
           <div className="p-10 text-center text-muted-foreground">{t("noPatients")}</div>
         ) : (
-          <div className="divide-y divide-border">
-            {filtered.map((p) => {
-              const name = lang === "ar"
-                ? `${p.first_name_ar ?? p.first_name_en} ${p.last_name_ar ?? p.last_name_en ?? ""}`.trim()
-                : `${p.first_name_en} ${p.last_name_en ?? ""}`.trim();
-              return (
-                <div key={p.id} className="flex items-center gap-2 p-3 sm:p-4 hover:bg-muted/40 transition-colors">
-                  <Link to={`/patients/${p.id}`} className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
-                    <div className="size-11 rounded-full gradient-primary text-primary-foreground flex items-center justify-center font-semibold shrink-0">
-                      {name.slice(0,1).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <div className="font-semibold truncate text-[15px]">{name}</div>
-                        <Badge variant="outline" className="text-[10px] shrink-0">#{p.patient_code}</Badge>
-                      </div>
-                      <div className="text-[13px] text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
-                        {p.phone && <span className="flex items-center gap-1"><Phone className="size-3" />{p.phone}</span>}
-                        {p.email && <span className="hidden sm:flex items-center gap-1"><Mail className="size-3" />{p.email}</span>}
-                        {p.city && <span className="hidden sm:flex items-center gap-1"><UserIcon className="size-3" />{p.city}</span>}
-                      </div>
-                    </div>
-                    {duesByPatient[p.id] > 0 && (
-                      <Badge variant="outline" className="text-[10px] shrink-0 bg-warning/10 text-warning border-warning/30 tabular-nums">
-                        {lang === "ar" ? "متبقي" : "Due"} {duesByPatient[p.id].toFixed(2)}
-                      </Badge>
-                    )}
-                  </Link>
-                  {authz.can("patients.delete") && (
-                    <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive hover:bg-destructive/10 size-11"
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConfirmDel(p); }}
-                      aria-label="Delete">
-                      <Trash2 className="size-4" />
-                    </Button>
-                  )}
-                </div>
-              );
-            })}
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="min-w-[200px]">{lang === "ar" ? "المريض" : "Patient"}</TableHead>
+                  <TableHead className="hidden md:table-cell">{lang === "ar" ? "التواصل" : "Contact"}</TableHead>
+                  <TableHead className="hidden lg:table-cell">{lang === "ar" ? "الحالة المالية" : "Financial Status"}</TableHead>
+                  <TableHead className="w-[60px] text-end"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((p) => {
+                  const name = lang === "ar"
+                    ? `${p.first_name_ar ?? p.first_name_en} ${p.last_name_ar ?? p.last_name_en ?? ""}`.trim()
+                    : `${p.first_name_en} ${p.last_name_en ?? ""}`.trim();
+                  const due = duesByPatient[p.id] ?? 0;
+                  return (
+                    <TableRow key={p.id} className="hover:bg-muted/40">
+                      <TableCell className="min-w-0">
+                        <Link to={`/patients/${p.id}`} className="flex items-center gap-3 min-w-0">
+                          <div className="size-10 rounded-full gradient-primary text-primary-foreground flex items-center justify-center font-semibold shrink-0">
+                            {name.slice(0, 1).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold truncate text-[15px]">{name}</span>
+                              <Badge variant="outline" className="text-[10px] shrink-0">#{p.patient_code}</Badge>
+                            </div>
+                            <div className="md:hidden text-xs text-muted-foreground truncate mt-0.5">
+                              {p.phone || p.email || "—"}
+                            </div>
+                          </div>
+                        </Link>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell align-middle">
+                        <div className="text-[13px] text-muted-foreground flex flex-col gap-0.5 min-w-0">
+                          {p.phone && <span className="flex items-center gap-1.5 truncate"><Phone className="size-3 shrink-0" />{p.phone}</span>}
+                          {p.email && <span className="flex items-center gap-1.5 truncate"><Mail className="size-3 shrink-0" />{p.email}</span>}
+                          {p.city && <span className="flex items-center gap-1.5 truncate"><MapPin className="size-3 shrink-0" />{p.city}</span>}
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell align-middle">
+                        {due > 0 ? (
+                          <Badge className="bg-destructive/10 text-destructive border border-destructive/30 tabular-nums hover:bg-destructive/15">
+                            {lang === "ar" ? "متبقي" : "Due"} {due.toFixed(2)}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-muted-foreground">
+                            {lang === "ar" ? "مسدد" : "Cleared"}
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-end align-middle">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="size-9" aria-label="Actions">
+                              <MoreHorizontal className="size-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem onClick={() => navigate(`/patients/${p.id}`)}>
+                              <Eye className="size-4 me-2" /> {lang === "ar" ? "عرض الملف" : "View Profile"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => navigate(`/calendar?patient_id=${p.id}`)}>
+                              <CalendarIcon className="size-4 me-2" /> {lang === "ar" ? "حجز موعد" : "Book Appointment"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => navigate(`/invoices/new?patient_id=${p.id}`)}>
+                              <FileText className="size-4 me-2" /> {lang === "ar" ? "إنشاء فاتورة" : "Create Invoice"}
+                            </DropdownMenuItem>
+                            {authz.can("patients.delete") && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => setConfirmDel(p)}
+                                  className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                                >
+                                  <Trash2 className="size-4 me-2" /> {lang === "ar" ? "حذف" : "Delete"}
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
           </div>
         )}
         <TablePager page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />

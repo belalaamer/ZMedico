@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, UserPlus, Trash2, Copy, KeyRound, AlertTriangle, Lock, Users, MoreHorizontal, Pencil } from "lucide-react";
+import { Search, UserPlus, Trash2, Copy, KeyRound, AlertTriangle, Lock, Users, MoreHorizontal, Pencil, Info, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useBranch } from "@/contexts/BranchContext";
 import { Link2, Link2Off } from "lucide-react";
@@ -492,49 +492,53 @@ export default function UserManagement() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="relative flex-1 min-w-[220px] max-w-sm">
-            <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <Input className="ps-9" placeholder={t("search")} value={q} onChange={(e) => setQ(e.target.value)} />
+        <Card className="p-3 shadow-sm bg-muted/30">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative flex-1 min-w-[220px] max-w-sm">
+              <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+              <Input className="ps-9 bg-background" placeholder={t("search")} value={q} onChange={(e) => setQ(e.target.value)} />
+            </div>
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger className="w-[180px] bg-background">
+                <SelectValue placeholder={lang === "ar" ? "الدور" : "Role"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{lang === "ar" ? "كل الأدوار" : "All roles"}</SelectItem>
+                {ROLES.map((r) => (
+                  <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={linkFilter} onValueChange={(v) => setLinkFilter(v as any)}>
+              <SelectTrigger className="w-[180px] bg-background">
+                <SelectValue placeholder={lang === "ar" ? "الربط" : "Link status"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{lang === "ar" ? "الكل" : "All"}</SelectItem>
+                <SelectItem value="linked">{lang === "ar" ? "مربوط" : "Linked"}</SelectItem>
+                <SelectItem value="unlinked">{lang === "ar" ? "غير مربوط" : "Unlinked"}</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="ms-auto flex items-center gap-1.5 text-xs text-muted-foreground tabular-nums px-2 py-1 rounded-md bg-background border border-border">
+              <Users className="size-3.5" />
+              <span className="font-semibold text-foreground">{filtered.length}</span>
+              <span>{lang === "ar" ? "مستخدم" : "users"}</span>
+            </div>
           </div>
-          <Select value={roleFilter} onValueChange={setRoleFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder={lang === "ar" ? "الدور" : "Role"} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{lang === "ar" ? "كل الأدوار" : "All roles"}</SelectItem>
-              {ROLES.map((r) => (
-                <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={linkFilter} onValueChange={(v) => setLinkFilter(v as any)}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder={lang === "ar" ? "الربط" : "Link status"} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{lang === "ar" ? "الكل" : "All"}</SelectItem>
-              <SelectItem value="linked">{lang === "ar" ? "مربوط" : "Linked"}</SelectItem>
-              <SelectItem value="unlinked">{lang === "ar" ? "غير مربوط" : "Unlinked"}</SelectItem>
-            </SelectContent>
-          </Select>
-          <div className="ms-auto text-xs text-muted-foreground tabular-nums">
-            {filtered.length} {lang === "ar" ? "مستخدم" : "users"}
-          </div>
-        </div>
+        </Card>
 
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden shadow-card">
           {isLoading ? (
             <ListSkeleton rows={6} />
           ) : (
             <>
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-10 bg-background/90 backdrop-blur border-b border-border">
                   <TableRow>
-                    <TableHead>{lang === "ar" ? "المستخدم" : "User"}</TableHead>
-                    <TableHead>{lang === "ar" ? "الأدوار" : "Roles"}</TableHead>
-                    <TableHead>{lang === "ar" ? "الربط / الفرع" : "Branch / Link"}</TableHead>
-                    <TableHead className="w-[64px] text-end">{lang === "ar" ? "إجراءات" : "Actions"}</TableHead>
+                    <TableHead className="uppercase tracking-wider text-xs">{lang === "ar" ? "المستخدم" : "User"}</TableHead>
+                    <TableHead className="uppercase tracking-wider text-xs">{lang === "ar" ? "الأدوار" : "Roles"}</TableHead>
+                    <TableHead className="uppercase tracking-wider text-xs">{lang === "ar" ? "الربط / الفرع" : "Branch / Link"}</TableHead>
+                    <TableHead className="w-[64px] text-end uppercase tracking-wider text-xs">{lang === "ar" ? "إجراءات" : "Actions"}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -550,14 +554,14 @@ export default function UserManagement() {
                     const linked = !!staffLinks[u.id]?.branch_id;
                     const isSelf = currentUserId === u.id;
                     return (
-                      <TableRow key={u.id}>
+                      <TableRow key={u.id} className="hover:bg-muted/30 transition-colors">
                         <TableCell>
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className="size-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold shrink-0">
+                            <div className="size-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 text-primary ring-1 ring-primary/20 flex items-center justify-center font-bold shrink-0">
                               {(u.full_name ?? u.email ?? "?").slice(0, 1).toUpperCase()}
                             </div>
                             <div className="min-w-0">
-                              <div className="font-medium truncate">{u.full_name ?? "—"}</div>
+                              <div className="font-semibold truncate text-foreground">{u.full_name ?? "—"}</div>
                               <div className="text-xs text-muted-foreground truncate">{u.email}</div>
                             </div>
                           </div>
@@ -575,17 +579,17 @@ export default function UserManagement() {
                         <TableCell>
                           <div className="flex flex-wrap gap-1 items-center">
                             {linked ? (
-                              <Badge variant="outline" className="gap-1 text-primary">
+                              <Badge variant="outline" className="gap-1 bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
                                 <Link2 className="size-3" />
                                 {lang === "ar" ? "مربوط" : "Linked"}
                               </Badge>
                             ) : (
-                              <Badge variant="secondary" className="gap-1">
+                              <Badge variant="secondary" className="gap-1 bg-muted text-muted-foreground">
                                 {lang === "ar" ? "غير مربوط" : "Unlinked"}
                               </Badge>
                             )}
                             {userRoles.includes("manager") && !linked && (
-                              <Badge variant="destructive" className="gap-1">
+                              <Badge variant="outline" className="gap-1 bg-warning/10 text-warning border-warning/30">
                                 <AlertTriangle className="size-3" />
                                 {lang === "ar" ? "بدون فرع" : "No branch"}
                               </Badge>
@@ -655,26 +659,44 @@ export default function UserManagement() {
         </Card>
 
         <div className="space-y-2">
-          <h2 className="text-lg font-semibold">{lang === "ar" ? "الدعوات المعلقة" : "Pending invites"}</h2>
-          <Card className="overflow-hidden"><div className="divide-y">
-            {invites.map((i) => (
-              <div key={i.id} className="flex items-center gap-3 p-3">
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{i.full_name ?? "—"}</div>
-                  <div className="text-xs text-muted-foreground truncate">{i.email}</div>
-                </div>
-                {i.role && <Badge variant="outline" className="capitalize">{i.role}</Badge>}
-                <Button size="sm" variant="outline" onClick={() => revokeInvite(i.id)}>
-                  <Trash2 className="size-4" />
-                </Button>
-              </div>
-            ))}
-            {invites.length === 0 && (
-              <div className="p-6 text-center text-sm text-muted-foreground">
-                {lang === "ar" ? "لا توجد دعوات معلقة" : "No pending invites"}
-              </div>
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <Users className="size-4 text-muted-foreground" />
+            {lang === "ar" ? "الدعوات المعلقة" : "Pending invites"}
+            {invites.length > 0 && (
+              <Badge variant="secondary" className="ms-1">{invites.length}</Badge>
             )}
-          </div></Card>
+          </h2>
+          <Card className="overflow-hidden shadow-card">
+            <div className="divide-y divide-border">
+              {invites.map((i) => (
+                <div key={i.id} className="flex items-center gap-3 p-3 bg-muted/20 hover:bg-muted/40 transition-colors">
+                  <div className="size-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold shrink-0">
+                    {(i.full_name ?? i.email ?? "?").slice(0, 1).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">{i.full_name ?? "—"}</div>
+                    <div className="text-xs text-muted-foreground truncate">{i.email}</div>
+                  </div>
+                  {i.role && <Badge variant="outline" className="capitalize">{i.role}</Badge>}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => revokeInvite(i.id)}
+                    aria-label={lang === "ar" ? "إلغاء" : "Revoke"}
+                    title={lang === "ar" ? "إلغاء الدعوة" : "Revoke invite"}
+                  >
+                    <X className="size-4" />
+                  </Button>
+                </div>
+              ))}
+              {invites.length === 0 && (
+                <div className="p-6 text-center text-sm text-muted-foreground">
+                  {lang === "ar" ? "لا توجد دعوات معلقة" : "No pending invites"}
+                </div>
+              )}
+            </div>
+          </Card>
           <p className="text-xs text-muted-foreground">
             {lang === "ar"
               ? "ادعُ المستخدم بإضافة بريده هنا، ثم اطلب منه فتح صفحة تسجيل الدخول والتسجيل بنفس البريد. سيتم تعيين الدور تلقائياً."
@@ -756,12 +778,13 @@ export default function UserManagement() {
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={createUser} className="space-y-4">
-              <div className="space-y-2 rounded-md border p-3 bg-muted/30">
-                <Label>
+              <div className="space-y-2 rounded-lg border border-primary/20 p-4 bg-primary/5">
+                <Label className="flex items-center gap-2 text-primary">
+                  <Info className="size-4" />
                   {lang === "ar" ? "ربط بموظف موجود (اختياري)" : "Link to existing employee (optional)"}
                 </Label>
                 <Select value={cLinkedStaffId || "none"} onValueChange={onPickLinkedStaff}>
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-background">
                     <SelectValue placeholder={lang === "ar" ? "اختر موظفاً من هذا الفرع" : "Pick an employee from this branch"} />
                   </SelectTrigger>
                   <SelectContent>

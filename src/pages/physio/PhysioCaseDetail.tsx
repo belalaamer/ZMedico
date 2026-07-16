@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Plus, TrendingUp, TrendingDown, Minus, Trash2, AlertCircle, Calendar, BellRing } from "lucide-react";
+import { ArrowLeft, Plus, TrendingUp, TrendingDown, Minus, Trash2, AlertCircle, Calendar, BellRing, CheckCircle2, Clock, CalendarCheck, Activity, ClipboardList, FileText, Stethoscope } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -222,11 +222,73 @@ export default function PhysioCaseDetail() {
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="p-4"><div className="text-xs text-muted-foreground">Completed</div><div className="text-2xl font-bold">{done}</div></Card>
-        <Card className="p-4"><div className="text-xs text-muted-foreground">Remaining</div><div className="text-2xl font-bold">{remaining}</div></Card>
-        <Card className="p-4"><div className="text-xs text-muted-foreground">Last session</div><div className="text-sm font-medium">{lastDone ? formatDate(lastDone, lang) : "—"}</div></Card>
-        <Card className="p-4"><div className="text-xs text-muted-foreground">Next planned</div><div className="text-sm font-medium">{nextPlanned ? formatDate(nextPlanned, lang) : "—"}</div></Card>
+        <Card className="p-4 shadow-card border-l-4 border-l-emerald-500 bg-emerald-500/5">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Completed</div>
+              <div className="text-3xl font-bold tabular-nums mt-1">{done}</div>
+            </div>
+            <CheckCircle2 className="size-5 text-emerald-500/70" />
+          </div>
+        </Card>
+        <Card className={`p-4 shadow-card border-l-4 ${remaining === 0 ? "border-l-primary bg-primary/5" : "border-l-amber-500 bg-amber-500/5"}`}>
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Remaining</div>
+              <div className="text-3xl font-bold tabular-nums mt-1">{remaining}</div>
+            </div>
+            <Clock className={`size-5 ${remaining === 0 ? "text-primary/70" : "text-amber-500/70"}`} />
+          </div>
+        </Card>
+        <Card className="p-4 shadow-card border-l-4 border-l-sky-500 bg-sky-500/5">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Last session</div>
+              <div className="text-sm font-semibold mt-1">{lastDone ? formatDate(lastDone, lang) : "—"}</div>
+            </div>
+            <Activity className="size-5 text-sky-500/70" />
+          </div>
+        </Card>
+        <Card className="p-4 shadow-card border-l-4 border-l-primary bg-primary/5">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Next planned</div>
+              <div className="text-sm font-semibold mt-1">{nextPlanned ? formatDate(nextPlanned, lang) : "—"}</div>
+            </div>
+            <CalendarCheck className="size-5 text-primary/70" />
+          </div>
+        </Card>
       </div>
+
+      <Can module="medical_records" action="create">
+        <Card className="p-4 shadow-card flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <div className="size-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+              <Stethoscope className="size-4" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold">Quick actions</div>
+              <div className="text-xs text-muted-foreground">Document a session or record a reassessment</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <SessionDialog
+              open={sessOpen} setOpen={setSessOpen}
+              caseId={c.id} nextNumber={(sessions[sessions.length - 1]?.session_number ?? 0) + 1}
+              defaultTherapistId={c.therapist_id}
+              therapists={therapists}
+              appointments={appointments}
+              onSaved={loadAll}
+            />
+            <ReassessmentDialog
+              open={reOpen} setOpen={setReOpen}
+              caseId={c.id} initialFromCase={c.diagnosis ?? ""}
+              therapists={therapists} defaultTherapistId={c.therapist_id}
+              onSaved={loadAll}
+            />
+          </div>
+        </Card>
+      </Can>
 
       <Tabs defaultValue="sessions" className="space-y-4">
         <TabsList>
@@ -237,70 +299,63 @@ export default function PhysioCaseDetail() {
         </TabsList>
 
         <TabsContent value="sessions" className="space-y-3">
-          <Can module="medical_records" action="create">
-            <div className="flex justify-end">
-              <SessionDialog
-                open={sessOpen} setOpen={setSessOpen}
-                caseId={c.id} nextNumber={(sessions[sessions.length - 1]?.session_number ?? 0) + 1}
-                defaultTherapistId={c.therapist_id}
-                therapists={therapists}
-                appointments={appointments}
-                onSaved={loadAll}
-              />
-            </div>
-          </Can>
           <Card className="overflow-hidden">
             {sessions.length === 0 ? (
               <div className="p-10 text-center text-muted-foreground">No sessions yet.</div>
             ) : (
-              <div className="divide-y divide-border">
-                {sessions.map(s => (
-                  <div key={s.id} className="p-4 space-y-1">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="font-medium">Session #{s.session_number} · {formatDate(s.session_date, lang)}</div>
-                      <Badge variant="outline" className={
-                        s.attendance === "done" ? "status-completed" :
-                        s.attendance === "missed" ? "status-cancelled" :
-                        s.attendance === "cancelled" ? "status-cancelled" : "status-pending"
-                      }>{s.attendance}</Badge>
-                    </div>
-                    {s.appointment_id ? (
-                      appointmentMap[s.appointment_id] ? (
-                        <div className="text-xs flex items-center gap-1 text-muted-foreground">
-                          <Calendar className="size-3" />
-                          Linked appointment · {new Date(appointmentMap[s.appointment_id].scheduled_at).toLocaleString()} · {appointmentMap[s.appointment_id].status}
-                        </div>
-                      ) : (
-                        <div className="text-xs flex items-center gap-1 text-muted-foreground">
-                          <Calendar className="size-3" />
-                          Linked appointment · <span className="font-mono">#{String(s.appointment_id).slice(0, 8)}</span>
-                        </div>
-                      )
-                    ) : (
-                      <div className="text-[11px] text-muted-foreground">Standalone (no appointment)</div>
-                    )}
-                    {(s.pain_level !== null && s.pain_level !== undefined) && <div className="text-xs text-muted-foreground">Pain: {s.pain_level}/10</div>}
-                    {s.interventions && <div className="text-sm"><span className="text-muted-foreground">Interventions: </span>{s.interventions}</div>}
-                    {s.progress_note && <div className="text-sm"><span className="text-muted-foreground">Progress: </span>{s.progress_note}</div>}
-                    {s.next_recommendation && <div className="text-sm"><span className="text-muted-foreground">Next: </span>{s.next_recommendation}</div>}
-                  </div>
-                ))}
+              <div className="p-4">
+                <ol className="relative border-s-2 border-border ms-3 space-y-4">
+                  {sessions.map(s => {
+                    const dotClass =
+                      s.attendance === "done" ? "bg-emerald-500 ring-emerald-500/20" :
+                      s.attendance === "missed" ? "bg-destructive ring-destructive/20" :
+                      s.attendance === "cancelled" ? "bg-muted-foreground ring-muted-foreground/20" :
+                      "bg-primary ring-primary/20";
+                    const badgeClass =
+                      s.attendance === "done" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30" :
+                      s.attendance === "missed" ? "bg-destructive/10 text-destructive border-destructive/30" :
+                      s.attendance === "cancelled" ? "bg-muted text-muted-foreground border-border" :
+                      "bg-primary/10 text-primary border-primary/30";
+                    return (
+                      <li key={s.id} className="ms-6">
+                        <span className={`absolute -start-[9px] mt-1.5 size-4 rounded-full ring-4 ${dotClass}`} />
+                        <Card className="p-3 space-y-1.5 shadow-card">
+                          <div className="flex items-center justify-between gap-3 flex-wrap">
+                            <div className="font-semibold text-sm">Session #{s.session_number} · {formatDate(s.session_date, lang)}</div>
+                            <Badge variant="outline" className={`capitalize ${badgeClass}`}>{s.attendance}</Badge>
+                          </div>
+                          {s.appointment_id ? (
+                            appointmentMap[s.appointment_id] ? (
+                              <div className="text-xs flex items-center gap-1 text-muted-foreground">
+                                <Calendar className="size-3" />
+                                Linked appointment · {new Date(appointmentMap[s.appointment_id].scheduled_at).toLocaleString()} · {appointmentMap[s.appointment_id].status}
+                              </div>
+                            ) : (
+                              <div className="text-xs flex items-center gap-1 text-muted-foreground">
+                                <Calendar className="size-3" />
+                                Linked appointment · <span className="font-mono">#{String(s.appointment_id).slice(0, 8)}</span>
+                              </div>
+                            )
+                          ) : (
+                            <div className="text-[11px] text-muted-foreground">Standalone (no appointment)</div>
+                          )}
+                          {(s.pain_level !== null && s.pain_level !== undefined) && (
+                            <div className="text-xs"><span className="text-muted-foreground">Pain: </span><span className="font-medium tabular-nums">{s.pain_level}/10</span></div>
+                          )}
+                          {s.interventions && <div className="text-sm"><span className="text-muted-foreground">Interventions: </span>{s.interventions}</div>}
+                          {s.progress_note && <div className="text-sm"><span className="text-muted-foreground">Progress: </span>{s.progress_note}</div>}
+                          {s.next_recommendation && <div className="text-sm"><span className="text-muted-foreground">Next: </span>{s.next_recommendation}</div>}
+                        </Card>
+                      </li>
+                    );
+                  })}
+                </ol>
               </div>
             )}
           </Card>
         </TabsContent>
 
         <TabsContent value="reassessments" className="space-y-3">
-          <Can module="medical_records" action="create">
-            <div className="flex justify-end">
-              <ReassessmentDialog
-                open={reOpen} setOpen={setReOpen}
-                caseId={c.id} initialFromCase={c.diagnosis ?? ""}
-                therapists={therapists} defaultTherapistId={c.therapist_id}
-                onSaved={loadAll}
-              />
-            </div>
-          </Can>
           <Card className="overflow-hidden">
             {reassessments.length === 0 ? (
               <div className="p-10 text-center text-muted-foreground">No reassessments yet.</div>
@@ -336,43 +391,64 @@ export default function PhysioCaseDetail() {
         </TabsContent>
 
         <TabsContent value="followup">
-          <Card className="p-4 space-y-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="font-medium flex items-center gap-2"><BellRing className="size-4" />Follow-up reminders</div>
-                <div className="text-xs text-muted-foreground">Track when this case needs a reassessment or check-in.</div>
+          <div className="space-y-4">
+            <Card className="p-5 shadow-card">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-start gap-3">
+                  <div className="size-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                    <BellRing className="size-5" />
+                  </div>
+                  <div>
+                    <div className="font-semibold">Follow-up reminders</div>
+                    <div className="text-xs text-muted-foreground">Track when this case needs a reassessment or check-in.</div>
+                  </div>
+                </div>
+                <Can module="medical_records" action="edit" fallback={<Badge variant="outline">{c.followup_enabled ? "On" : "Off"}</Badge>}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">{c.followup_enabled ? "Enabled" : "Disabled"}</span>
+                    <Switch checked={!!c.followup_enabled} onCheckedChange={(v) => saveFollowup({ followup_enabled: v })} />
+                  </div>
+                </Can>
               </div>
-              <Can module="medical_records" action="edit" fallback={<Badge variant="outline">{c.followup_enabled ? "On" : "Off"}</Badge>}>
-                <Switch checked={!!c.followup_enabled} onCheckedChange={(v) => saveFollowup({ followup_enabled: v })} />
-              </Can>
-            </div>
+            </Card>
+
             <Can module="medical_records" action="edit">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Card className="p-5 shadow-card space-y-4">
                 <div>
-                  <Label>Interval (days)</Label>
-                  <Input type="number" min={1} defaultValue={c.followup_interval_days ?? 14}
-                    onBlur={(e) => saveFollowup({ followup_interval_days: Number(e.target.value) || 14 })} />
+                  <div className="text-sm font-semibold mb-1">Schedule</div>
+                  <div className="text-xs text-muted-foreground mb-3">Configure the interval and due date for the next follow-up.</div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label>Interval (days)</Label>
+                      <Input type="number" min={1} defaultValue={c.followup_interval_days ?? 14}
+                        onBlur={(e) => saveFollowup({ followup_interval_days: Number(e.target.value) || 14 })} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Next follow-up due</Label>
+                      <Input type="date" defaultValue={c.followup_due_date ?? ""}
+                        onBlur={(e) => saveFollowup({ followup_due_date: e.target.value || null })} />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <Label>Next follow-up due</Label>
-                  <Input type="date" defaultValue={c.followup_due_date ?? ""}
-                    onBlur={(e) => saveFollowup({ followup_due_date: e.target.value || null })} />
+                <div className="border-t border-border pt-4">
+                  <div className="text-sm font-semibold mb-1">Quick set</div>
+                  <div className="text-xs text-muted-foreground mb-3">Auto-compute the next follow-up from your interval.</div>
+                  <div className="flex gap-2 flex-wrap">
+                    <Button variant="outline" size="sm" onClick={() => {
+                      const d = new Date(); d.setDate(d.getDate() + (c.followup_interval_days ?? 14));
+                      saveFollowup({ followup_enabled: true, followup_due_date: d.toISOString().slice(0,10) });
+                    }}>Suggest from interval</Button>
+                    {reassessments[0]?.assessment_date && (
+                      <Button variant="outline" size="sm" onClick={() => {
+                        const d = new Date(reassessments[0].assessment_date); d.setDate(d.getDate() + (c.followup_interval_days ?? 14));
+                        saveFollowup({ followup_enabled: true, followup_due_date: d.toISOString().slice(0,10) });
+                      }}>From last reassessment</Button>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => {
-                  const d = new Date(); d.setDate(d.getDate() + (c.followup_interval_days ?? 14));
-                  saveFollowup({ followup_enabled: true, followup_due_date: d.toISOString().slice(0,10) });
-                }}>Suggest from interval</Button>
-                {reassessments[0]?.assessment_date && (
-                  <Button variant="outline" size="sm" onClick={() => {
-                    const d = new Date(reassessments[0].assessment_date); d.setDate(d.getDate() + (c.followup_interval_days ?? 14));
-                    saveFollowup({ followup_enabled: true, followup_due_date: d.toISOString().slice(0,10) });
-                  }}>From last reassessment</Button>
-                )}
-              </div>
+              </Card>
             </Can>
-          </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
@@ -423,64 +499,106 @@ function SessionDialog({ open, setOpen, caseId, nextNumber, defaultTherapistId, 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground"><Plus className="me-2 size-4" />Log session</Button></DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Log physio session</DialogTitle></DialogHeader>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div><Label>Session #</Label><Input type="number" value={form.session_number} onChange={e => setForm({ ...form, session_number: e.target.value })} /></div>
-          <div><Label>Date</Label><Input type="date" value={form.session_date} onChange={e => setForm({ ...form, session_date: e.target.value })} /></div>
-          <div className="md:col-span-2">
-            <Label>Link to appointment (optional)</Label>
-            <Select value={form.appointment_id || "_none"} onValueChange={v => {
-              const aid = v === "_none" ? "" : v;
-              const appt = (appointments ?? []).find((a: any) => a.id === aid);
-              setForm((f: any) => ({
-                ...f, appointment_id: aid,
-                session_date: appt ? new Date(appt.scheduled_at).toISOString().slice(0, 10) : f.session_date,
-              }));
-            }}>
-              <SelectTrigger><SelectValue placeholder="Standalone session" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="_none">— Standalone —</SelectItem>
-                {(appointments ?? []).slice(0, 50).map((a: any) => (
-                  <SelectItem key={a.id} value={a.id}>{new Date(a.scheduled_at).toLocaleString()} · {a.status}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Therapist</Label>
-            <Select value={form.therapist_id || "_none"} onValueChange={v => setForm({ ...form, therapist_id: v === "_none" ? "" : v })}>
-              <SelectTrigger><SelectValue placeholder="Therapist" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="_none">—</SelectItem>
-                {therapists.map((s: any) => <SelectItem key={s.id} value={s.id}>{`${s.first_name_en ?? ""} ${s.last_name_en ?? ""}`.trim() || s.id.slice(0,8)}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Attendance</Label>
-            <Select value={form.attendance} onValueChange={v => setForm({ ...form, attendance: v })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="scheduled">Scheduled</SelectItem>
-                <SelectItem value="done">Done</SelectItem>
-                <SelectItem value="missed">Missed</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div><Label>Pain (0–10)</Label><Input type="number" min={0} max={10} value={form.pain_level} onChange={e => setForm({ ...form, pain_level: e.target.value })} /></div>
-          <div><Label>Symptom change</Label><Input value={form.symptom_change} onChange={e => setForm({ ...form, symptom_change: e.target.value })} /></div>
-          <div className="md:col-span-2"><Label>Interventions / exercises performed</Label><Textarea rows={2} value={form.interventions} onChange={e => setForm({ ...form, interventions: e.target.value })} /></div>
-          <div className="md:col-span-2"><Label>Progress note</Label><Textarea rows={2} value={form.progress_note} onChange={e => setForm({ ...form, progress_note: e.target.value })} /></div>
-          <div><Label>Mobility / ROM</Label><Input value={form.mobility_note} onChange={e => setForm({ ...form, mobility_note: e.target.value })} /></div>
-          <div><Label>Strength / function</Label><Input value={form.strength_note} onChange={e => setForm({ ...form, strength_note: e.target.value })} /></div>
-          <div><Label>Adherence</Label><Input value={form.adherence} onChange={e => setForm({ ...form, adherence: e.target.value })} /></div>
-          <div><Label>Home exercise</Label><Input value={form.home_exercise} onChange={e => setForm({ ...form, home_exercise: e.target.value })} /></div>
-          <div className="md:col-span-2"><Label>Therapist assessment</Label><Textarea rows={2} value={form.therapist_assessment} onChange={e => setForm({ ...form, therapist_assessment: e.target.value })} /></div>
-          <div><Label>Next session recommendation</Label><Input value={form.next_recommendation} onChange={e => setForm({ ...form, next_recommendation: e.target.value })} /></div>
-          <div><Label>Plan for next review</Label><Input value={form.next_review_plan} onChange={e => setForm({ ...form, next_review_plan: e.target.value })} /></div>
-        </div>
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><ClipboardList className="size-5 text-primary" />Log physio session</DialogTitle>
+        </DialogHeader>
+        <Tabs defaultValue="soap" className="mt-2">
+          <TabsList className="grid grid-cols-2 w-full">
+            <TabsTrigger value="soap"><FileText className="me-2 size-4" />S.O.A.P. Notes</TabsTrigger>
+            <TabsTrigger value="admin"><Calendar className="me-2 size-4" />Admin / Log</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="soap" className="space-y-4 mt-4">
+            <fieldset className="rounded-lg border border-border p-4 space-y-3">
+              <legend className="px-2 text-xs font-semibold uppercase tracking-wide text-primary">Subjective</legend>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1.5"><Label>Pain (0–10)</Label><Input type="number" min={0} max={10} value={form.pain_level} onChange={e => setForm({ ...form, pain_level: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>Symptom change</Label><Input value={form.symptom_change} onChange={e => setForm({ ...form, symptom_change: e.target.value })} /></div>
+                <div className="space-y-1.5 md:col-span-2"><Label>Adherence</Label><Input value={form.adherence} onChange={e => setForm({ ...form, adherence: e.target.value })} /></div>
+              </div>
+            </fieldset>
+
+            <fieldset className="rounded-lg border border-border p-4 space-y-3">
+              <legend className="px-2 text-xs font-semibold uppercase tracking-wide text-primary">Objective</legend>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1.5"><Label>Mobility / ROM</Label><Input value={form.mobility_note} onChange={e => setForm({ ...form, mobility_note: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>Strength / function</Label><Input value={form.strength_note} onChange={e => setForm({ ...form, strength_note: e.target.value })} /></div>
+              </div>
+            </fieldset>
+
+            <fieldset className="rounded-lg border border-border p-4 space-y-3">
+              <legend className="px-2 text-xs font-semibold uppercase tracking-wide text-primary">Assessment</legend>
+              <div className="grid grid-cols-1 gap-3">
+                <div className="space-y-1.5"><Label>Therapist assessment</Label><Textarea rows={2} value={form.therapist_assessment} onChange={e => setForm({ ...form, therapist_assessment: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>Progress note</Label><Textarea rows={2} value={form.progress_note} onChange={e => setForm({ ...form, progress_note: e.target.value })} /></div>
+              </div>
+            </fieldset>
+
+            <fieldset className="rounded-lg border border-border p-4 space-y-3">
+              <legend className="px-2 text-xs font-semibold uppercase tracking-wide text-primary">Plan</legend>
+              <div className="grid grid-cols-1 gap-3">
+                <div className="space-y-1.5"><Label>Interventions / exercises performed</Label><Textarea rows={2} value={form.interventions} onChange={e => setForm({ ...form, interventions: e.target.value })} /></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1.5"><Label>Home exercise</Label><Input value={form.home_exercise} onChange={e => setForm({ ...form, home_exercise: e.target.value })} /></div>
+                  <div className="space-y-1.5"><Label>Next session recommendation</Label><Input value={form.next_recommendation} onChange={e => setForm({ ...form, next_recommendation: e.target.value })} /></div>
+                </div>
+                <div className="space-y-1.5"><Label>Plan for next review</Label><Input value={form.next_review_plan} onChange={e => setForm({ ...form, next_review_plan: e.target.value })} /></div>
+              </div>
+            </fieldset>
+          </TabsContent>
+
+          <TabsContent value="admin" className="mt-4">
+            <fieldset className="rounded-lg border border-border p-4 space-y-3">
+              <legend className="px-2 text-xs font-semibold uppercase tracking-wide text-primary">Session log</legend>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1.5"><Label>Session #</Label><Input type="number" value={form.session_number} onChange={e => setForm({ ...form, session_number: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>Date</Label><Input type="date" value={form.session_date} onChange={e => setForm({ ...form, session_date: e.target.value })} /></div>
+                <div className="space-y-1.5">
+                  <Label>Therapist</Label>
+                  <Select value={form.therapist_id || "_none"} onValueChange={v => setForm({ ...form, therapist_id: v === "_none" ? "" : v })}>
+                    <SelectTrigger><SelectValue placeholder="Therapist" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_none">—</SelectItem>
+                      {therapists.map((s: any) => <SelectItem key={s.id} value={s.id}>{`${s.first_name_en ?? ""} ${s.last_name_en ?? ""}`.trim() || s.id.slice(0,8)}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Attendance</Label>
+                  <Select value={form.attendance} onValueChange={v => setForm({ ...form, attendance: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="scheduled">Scheduled</SelectItem>
+                      <SelectItem value="done">Done</SelectItem>
+                      <SelectItem value="missed">Missed</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5 md:col-span-2">
+                  <Label>Link to appointment (optional)</Label>
+                  <Select value={form.appointment_id || "_none"} onValueChange={v => {
+                    const aid = v === "_none" ? "" : v;
+                    const appt = (appointments ?? []).find((a: any) => a.id === aid);
+                    setForm((f: any) => ({
+                      ...f, appointment_id: aid,
+                      session_date: appt ? new Date(appt.scheduled_at).toISOString().slice(0, 10) : f.session_date,
+                    }));
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="Standalone session" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_none">— Standalone —</SelectItem>
+                      {(appointments ?? []).slice(0, 50).map((a: any) => (
+                        <SelectItem key={a.id} value={a.id}>{new Date(a.scheduled_at).toLocaleString()} · {a.status}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </fieldset>
+          </TabsContent>
+        </Tabs>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
           <Button onClick={save} className="gradient-primary text-primary-foreground">Save</Button>

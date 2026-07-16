@@ -14,6 +14,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Save, Search, CalendarClock, CheckSquare, XSquare } from "lucide-react";
 
 const DAYS = ["sun","mon","tue","wed","thu","fri","sat"] as const;
 
@@ -234,18 +235,32 @@ export default function Schedules() {
 
         {/* ============ Weekly Planner ============ */}
         <TabsContent value="weekly" className="space-y-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("search") ?? "Search"} className="w-64" />
-            <Badge variant="outline">{selectedIds.length} {lang === "ar" ? "محدد" : "selected"}</Badge>
-            <Button variant="outline" size="sm" onClick={() => { const m: Record<string, boolean> = {}; filteredStaff.forEach((s) => { m[s.id] = true; }); setSelected(m); }}>
-              {lang === "ar" ? "تحديد الكل" : "Select all"}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setSelected({})}>{lang === "ar" ? "مسح" : "Clear"}</Button>
-            <div className="flex-1" />
-            <Button variant="outline" onClick={confirmApply} disabled={selectedIds.length === 0 || savingPlanner} title={`${branchHours.start} - ${branchHours.end}`}>
+          <Card className="p-3 flex items-center gap-2 flex-wrap sticky top-0 z-10 bg-background/80 backdrop-blur-md">
+            <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
+              <div className="relative">
+                <Search className="absolute start-2 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("search") ?? "Search"} className="w-full sm:w-64 ps-8" />
+              </div>
+              <Button variant="outline" size="sm" onClick={() => { const m: Record<string, boolean> = {}; filteredStaff.forEach((s) => { m[s.id] = true; }); setSelected(m); }}>
+                <CheckSquare className="size-4 me-1.5" />
+                {lang === "ar" ? "تحديد الكل" : "Select all"}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setSelected({})}>
+                <XSquare className="size-4 me-1.5" />
+                {lang === "ar" ? "مسح" : "Clear"}
+              </Button>
+              <Badge variant="secondary" className="font-medium">{selectedIds.length} {lang === "ar" ? "محدد" : "selected"}</Badge>
+            </div>
+            <Button
+              className="gradient-primary text-primary-foreground"
+              onClick={confirmApply}
+              disabled={selectedIds.length === 0 || savingPlanner}
+              title={`${branchHours.start} - ${branchHours.end}`}
+            >
+              <CalendarClock className="size-4 me-1.5" />
               {t("applyToSelected")} ({branchHours.start}-{branchHours.end})
             </Button>
-          </div>
+          </Card>
 
           <Card className="shadow-card overflow-x-auto">
             <table className="w-full text-sm border-collapse">
@@ -284,15 +299,15 @@ export default function Schedules() {
                               <button
                                 type="button"
                                 className={
-                                  "w-full text-left rounded-md border px-2 py-1.5 transition-colors hover:bg-accent/40 " +
+                                  "w-full text-start rounded-lg border px-2.5 py-2 transition-all hover:shadow-sm " +
                                   (slot.is_working_day
-                                    ? "border-primary/40 bg-primary/5"
-                                    : "border-dashed border-muted bg-muted/20 text-muted-foreground")
+                                    ? "border-primary/30 bg-primary/10 text-foreground hover:bg-primary/15"
+                                    : "border-dashed border-muted-foreground/30 bg-muted/30 text-muted-foreground hover:bg-muted/50")
                                 }
                               >
                                 {slot.is_working_day ? (
                                   <>
-                                    <div className="text-xs font-medium tabular-nums">{slot.start_time}–{slot.end_time}</div>
+                                    <div className="text-xs font-semibold tabular-nums text-primary">{slot.start_time}–{slot.end_time}</div>
                                     {slot.room
                                       ? <div className="text-[10px] mt-0.5"><Badge variant="outline" className="text-[10px] py-0 px-1">{slot.room}</Badge></div>
                                       : <div className="text-[10px] mt-0.5 text-muted-foreground">{t("room")}: —</div>}
@@ -331,7 +346,9 @@ export default function Schedules() {
                                 </datalist>
                               </div>
                               <div className="flex justify-end">
-                                <Button size="sm" className="gradient-primary text-primary-foreground" onClick={() => saveCell(s.id)}>{t("save")}</Button>
+                                <Button size="sm" className="gradient-primary text-primary-foreground" onClick={() => saveCell(s.id)}>
+                                  <Save className="size-3.5 me-1.5" />{t("save")}
+                                </Button>
                               </div>
                             </PopoverContent>
                           </Popover>
@@ -344,7 +361,7 @@ export default function Schedules() {
                           className={dirtyStaff[s.id] ? "gradient-primary text-primary-foreground" : ""}
                           onClick={() => saveCell(s.id)}
                         >
-                          {t("save")}{dirtyStaff[s.id] ? " •" : ""}
+                          <Save className="size-3.5 me-1.5" />{t("save")}{dirtyStaff[s.id] ? " •" : ""}
                         </Button>
                       </td>
                     </tr>
@@ -365,22 +382,26 @@ export default function Schedules() {
 
         {/* ============ Detailed editor (legacy single-staff) ============ */}
         <TabsContent value="detailed" className="space-y-4">
-          <div className="flex items-center gap-2 flex-wrap">
+          <Card className="p-3 flex items-center gap-2 flex-wrap sticky top-0 z-10 bg-background/80 backdrop-blur-md">
             <Select value={staffId} onValueChange={setStaffId}>
-              <SelectTrigger className="w-64"><SelectValue placeholder={t("selectStaff")} /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-64"><SelectValue placeholder={t("selectStaff")} /></SelectTrigger>
               <SelectContent>{staff.map((s) => <SelectItem key={s.id} value={s.id}>{profName(s.id)} · {s.employee_id}</SelectItem>)}</SelectContent>
             </Select>
-            <Button variant="outline" onClick={applyBranchHours} disabled={!staffId} title={`${branchHours.start} - ${branchHours.end}`}>
+            <Button variant="outline" size="sm" onClick={applyBranchHours} disabled={!staffId} title={`${branchHours.start} - ${branchHours.end}`}>
+              <CalendarClock className="size-4 me-1.5" />
               {lang === "ar" ? `تطبيق ساعات الفرع (${branchHours.start} - ${branchHours.end})` : `Apply branch hours (${branchHours.start} - ${branchHours.end})`}
             </Button>
-            <Button className="gradient-primary text-primary-foreground" onClick={save} disabled={!staffId}>{t("save")}</Button>
             {detailedDirty && staffId && (
               <Badge variant="outline" className="text-[11px] border-amber-500 text-amber-600 bg-amber-500/10">
                 {lang === "ar" ? "تغييرات غير محفوظة" : "Unsaved changes"}
               </Badge>
             )}
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
+            <div className="flex-1" />
+            <Button className="gradient-primary text-primary-foreground" onClick={save} disabled={!staffId}>
+              <Save className="size-4 me-1.5" />{t("save")}
+            </Button>
+          </Card>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {slots.map((s, i) => (
               <Card key={i} className="p-4 shadow-card space-y-3">
                 <div className="flex items-center justify-between">
@@ -388,8 +409,10 @@ export default function Schedules() {
                   <Switch checked={s.is_working_day} onCheckedChange={(v) => update(i, { is_working_day: v })} />
                 </div>
                 <div className="space-y-2">
-                  <div><div className="text-[11px] text-muted-foreground">{t("startTime")}</div><Input type="time" value={s.start_time} onChange={(e) => update(i, { start_time: e.target.value })} disabled={!s.is_working_day} /></div>
-                  <div><div className="text-[11px] text-muted-foreground">{t("endTime")}</div><Input type="time" value={s.end_time} onChange={(e) => update(i, { end_time: e.target.value })} disabled={!s.is_working_day} /></div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div><div className="text-[11px] text-muted-foreground">{t("startTime")}</div><Input type="time" value={s.start_time} onChange={(e) => update(i, { start_time: e.target.value })} disabled={!s.is_working_day} /></div>
+                    <div><div className="text-[11px] text-muted-foreground">{t("endTime")}</div><Input type="time" value={s.end_time} onChange={(e) => update(i, { end_time: e.target.value })} disabled={!s.is_working_day} /></div>
+                  </div>
                   <div>
                     <div className="text-[11px] text-muted-foreground">{t("room")}</div>
                     <Input list={`detailed-rooms-${i}`} value={s.room ?? ""} disabled={!s.is_working_day} placeholder="—" onChange={(e) => update(i, { room: e.target.value || null })} />

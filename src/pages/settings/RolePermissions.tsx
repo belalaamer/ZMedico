@@ -141,22 +141,22 @@ export default function RolePermissions() {
             )}
           </div>
         </div>
-        <div className="rounded-md border border-border bg-muted/30 p-3 text-sm flex gap-2">
-          <Info className="size-4 mt-0.5 text-muted-foreground shrink-0" />
-          <p className="text-muted-foreground">
+        <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm flex gap-2">
+          <Info className="size-4 mt-0.5 text-primary shrink-0" />
+          <p className="text-foreground/80">
             {lang === "ar"
               ? "هذه المصفوفة توثّق صلاحيات كل دور. التطبيق الفعلي للصلاحيات يتم على مستوى قاعدة البيانات عبر سياسات RLS وجدول user_roles. لتغيير دور مستخدم استخدم إدارة المستخدمين."
               : "This matrix documents the intended access for each role. Effective access is enforced server-side via RLS policies and the user_roles table. To change a user's role, use User Management."}
           </p>
         </div>
-        <Card className="p-4 space-y-4">
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
-            <div className="w-full md:w-72">
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">
+        <Card className="p-0 shadow-card overflow-hidden">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 p-4 bg-muted/40 border-b border-border">
+            <div className="w-full md:w-80">
+              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block uppercase tracking-wider">
                 {lang === "ar" ? "الدور" : "Role"}
               </label>
               <Select value={selectedRole} onValueChange={setSelectedRole}>
-                <SelectTrigger className="h-10 w-full capitalize">
+                <SelectTrigger className="h-10 w-full capitalize bg-background">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -166,67 +166,71 @@ export default function RolePermissions() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="text-xs text-muted-foreground">
+            <div className="text-xs text-muted-foreground md:text-end">
               {lang === "ar"
                 ? "اختر دورًا ثم فعّل/عطّل الأذونات لكل وحدة."
                 : "Pick a role, then toggle permissions per module."}
             </div>
           </div>
 
-          <div className="rounded-md border border-border overflow-x-auto max-h-[70vh] overflow-y-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/60 sticky top-0 z-10">
-                <tr>
-                  <th className="text-start p-3 font-medium min-w-[180px] sticky start-0 bg-muted/60 z-20">
-                    {t("moduleName")}
-                  </th>
-                  {ACTIONS.map(a => (
-                    <th key={a} className="p-3 text-center font-medium capitalize whitespace-nowrap">
-                      {a}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {MODULES.map((m, idx) => (
-                  <tr
-                    key={m}
-                    className={"border-t border-border " + (idx % 2 === 1 ? "bg-muted/20" : "")}
-                  >
-                    <td className="p-3 font-medium sticky start-0 bg-inherit">
-                      {MODULE_LABELS[m]?.[lang === "ar" ? "ar" : "en"] ?? m.replace("_", " ")}
-                    </td>
-                    {ACTIONS.map(a => {
-                      const allowed = !!matrix[selectedRole]?.[m]?.includes(a);
-                      const isSoftCancel =
-                        selectedRole === "receptionist" && m === "appointments" && a === "delete";
-                      return (
-                        <td key={a} className="p-3 text-center align-middle">
-                          <div className="flex flex-col items-center gap-1">
-                            <Checkbox
-                              checked={allowed}
-                              disabled={!canEditMatrix || loading}
-                              onCheckedChange={() => toggle(selectedRole, m, a)}
-                              aria-label={`${m} ${a}`}
-                            />
-                            {isSoftCancel && (
-                              <span
-                                className="text-[10px] text-muted-foreground"
-                                title={lang === "ar"
-                                  ? "للحذف على مستوى المستقبلين يتم تنفيذ إلغاء ناعم"
-                                  : "Receptionist delete performs a soft-cancel"}
-                              >
-                                {lang === "ar" ? "إلغاء ناعم" : "soft-cancel"}
-                              </span>
-                            )}
-                          </div>
+          <div className="p-4">
+            <div className="rounded-lg overflow-hidden border border-border">
+              <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 z-10 backdrop-blur bg-background/90 border-b border-border">
+                    <tr>
+                      <th className="text-start p-3 font-semibold min-w-[180px] sticky start-0 bg-background/90 z-20 uppercase tracking-wider text-xs text-muted-foreground">
+                        {t("moduleName")}
+                      </th>
+                      {ACTIONS.map(a => (
+                        <th key={a} className="p-3 text-center font-semibold capitalize whitespace-nowrap uppercase tracking-wider text-xs text-muted-foreground">
+                          {a}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {MODULES.map((m) => (
+                      <tr
+                        key={m}
+                        className="border-t border-border hover:bg-muted/30 transition-colors"
+                      >
+                        <td className="p-3 font-medium sticky start-0 bg-background">
+                          {MODULE_LABELS[m]?.[lang === "ar" ? "ar" : "en"] ?? m.replace("_", " ")}
                         </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        {ACTIONS.map(a => {
+                          const allowed = !!matrix[selectedRole]?.[m]?.includes(a);
+                          const isSoftCancel =
+                            selectedRole === "receptionist" && m === "appointments" && a === "delete";
+                          return (
+                            <td key={a} className="p-3 text-center align-middle">
+                              <div className="flex flex-col items-center justify-center gap-1">
+                                <Checkbox
+                                  checked={allowed}
+                                  disabled={!canEditMatrix || loading}
+                                  onCheckedChange={() => toggle(selectedRole, m, a)}
+                                  aria-label={`${m} ${a}`}
+                                />
+                                {isSoftCancel && (
+                                  <span
+                                    className="text-[9px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-sm mt-1 uppercase tracking-wider"
+                                    title={lang === "ar"
+                                      ? "للحذف على مستوى المستقبلين يتم تنفيذ إلغاء ناعم"
+                                      : "Receptionist delete performs a soft-cancel"}
+                                  >
+                                    {lang === "ar" ? "إلغاء ناعم" : "soft-cancel"}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </Card>
       </div>

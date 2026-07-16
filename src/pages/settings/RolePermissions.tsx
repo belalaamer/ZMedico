@@ -4,6 +4,8 @@ import SettingsLayout from "./SettingsLayout";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useI18n } from "@/contexts/I18nContext";
 import { ShieldCheck, Info, Save, RotateCcw, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,6 +51,7 @@ export default function RolePermissions() {
   const [original, setOriginal] = useState<Matrix>(() => JSON.parse(JSON.stringify(DEFAULT)));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<string>(ROLES[0]);
 
   const load = async () => {
     setLoading(true);
@@ -146,58 +149,85 @@ export default function RolePermissions() {
               : "This matrix documents the intended access for each role. Effective access is enforced server-side via RLS policies and the user_roles table. To change a user's role, use User Management."}
           </p>
         </div>
-        <Card className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50"><tr>
-              <th className="text-start p-3">{t("moduleName")}</th>
-              {ROLES.map(r => <th key={r} className="p-3 text-center capitalize">{r}</th>)}
-            </tr></thead>
-            <tbody>
-              {MODULES.map(m => (
-                <tr key={m} className="border-t">
-                  <td className="p-3 font-medium">{MODULE_LABELS[m]?.[lang === "ar" ? "ar" : "en"] ?? m.replace("_"," ")}</td>
+        <Card className="p-4 space-y-4">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+            <div className="w-full md:w-72">
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                {lang === "ar" ? "الدور" : "Role"}
+              </label>
+              <Select value={selectedRole} onValueChange={setSelectedRole}>
+                <SelectTrigger className="h-10 w-full capitalize">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
                   {ROLES.map(r => (
-                    <td key={r} className="p-3 align-top">
-                      <div className="flex flex-wrap gap-1 justify-center">
-                        {ACTIONS.map(a => {
-                          const allowed = matrix[r]?.[m]?.includes(a);
-                          // Receptionist 'delete' on appointments is enforced as a soft-cancel
-                          // (status = cancelled) in the UI/triggers. Surface that semantically.
-                          const actionLabel =
-                            (r === "receptionist" && m === "appointments" && a === "delete")
-                              ? (lang === "ar" ? "إلغاء" : "cancel")
-                              : a;
-                          return (
-                            <button
-                              type="button"
-                              key={a}
-                              onClick={() => toggle(r, m, a)}
-                              disabled={!canEditMatrix || loading}
-                              className={
-                                "transition " +
-                                (canEditMatrix ? "cursor-pointer hover:scale-105" : "cursor-default")
-                              }
-                              aria-pressed={allowed}
-                              title={a === "delete" && r === "receptionist" && m === "appointments"
-                                ? (lang === "ar" ? "للحذف على مستوى المستقبلين يتم تنفيذ إلغاء ناعم" : "Receptionist delete performs a soft-cancel")
-                                : undefined}
-                            >
-                              <Badge
-                                variant={allowed ? "default" : "outline"}
-                                className={allowed ? "" : "opacity-40"}
-                              >
-                                {actionLabel}
-                              </Badge>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </td>
+                    <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {lang === "ar"
+                ? "اختر دورًا ثم فعّل/عطّل الأذونات لكل وحدة."
+                : "Pick a role, then toggle permissions per module."}
+            </div>
+          </div>
+
+          <div className="rounded-md border border-border overflow-x-auto max-h-[70vh] overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/60 sticky top-0 z-10">
+                <tr>
+                  <th className="text-start p-3 font-medium min-w-[180px] sticky start-0 bg-muted/60 z-20">
+                    {t("moduleName")}
+                  </th>
+                  {ACTIONS.map(a => (
+                    <th key={a} className="p-3 text-center font-medium capitalize whitespace-nowrap">
+                      {a}
+                    </th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {MODULES.map((m, idx) => (
+                  <tr
+                    key={m}
+                    className={"border-t border-border " + (idx % 2 === 1 ? "bg-muted/20" : "")}
+                  >
+                    <td className="p-3 font-medium sticky start-0 bg-inherit">
+                      {MODULE_LABELS[m]?.[lang === "ar" ? "ar" : "en"] ?? m.replace("_", " ")}
+                    </td>
+                    {ACTIONS.map(a => {
+                      const allowed = !!matrix[selectedRole]?.[m]?.includes(a);
+                      const isSoftCancel =
+                        selectedRole === "receptionist" && m === "appointments" && a === "delete";
+                      return (
+                        <td key={a} className="p-3 text-center align-middle">
+                          <div className="flex flex-col items-center gap-1">
+                            <Checkbox
+                              checked={allowed}
+                              disabled={!canEditMatrix || loading}
+                              onCheckedChange={() => toggle(selectedRole, m, a)}
+                              aria-label={`${m} ${a}`}
+                            />
+                            {isSoftCancel && (
+                              <span
+                                className="text-[10px] text-muted-foreground"
+                                title={lang === "ar"
+                                  ? "للحذف على مستوى المستقبلين يتم تنفيذ إلغاء ناعم"
+                                  : "Receptionist delete performs a soft-cancel"}
+                              >
+                                {lang === "ar" ? "إلغاء ناعم" : "soft-cancel"}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </Card>
       </div>
     </SettingsLayout>

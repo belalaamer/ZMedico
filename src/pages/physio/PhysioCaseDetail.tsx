@@ -499,64 +499,106 @@ function SessionDialog({ open, setOpen, caseId, nextNumber, defaultTherapistId, 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground"><Plus className="me-2 size-4" />Log session</Button></DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Log physio session</DialogTitle></DialogHeader>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div><Label>Session #</Label><Input type="number" value={form.session_number} onChange={e => setForm({ ...form, session_number: e.target.value })} /></div>
-          <div><Label>Date</Label><Input type="date" value={form.session_date} onChange={e => setForm({ ...form, session_date: e.target.value })} /></div>
-          <div className="md:col-span-2">
-            <Label>Link to appointment (optional)</Label>
-            <Select value={form.appointment_id || "_none"} onValueChange={v => {
-              const aid = v === "_none" ? "" : v;
-              const appt = (appointments ?? []).find((a: any) => a.id === aid);
-              setForm((f: any) => ({
-                ...f, appointment_id: aid,
-                session_date: appt ? new Date(appt.scheduled_at).toISOString().slice(0, 10) : f.session_date,
-              }));
-            }}>
-              <SelectTrigger><SelectValue placeholder="Standalone session" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="_none">— Standalone —</SelectItem>
-                {(appointments ?? []).slice(0, 50).map((a: any) => (
-                  <SelectItem key={a.id} value={a.id}>{new Date(a.scheduled_at).toLocaleString()} · {a.status}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Therapist</Label>
-            <Select value={form.therapist_id || "_none"} onValueChange={v => setForm({ ...form, therapist_id: v === "_none" ? "" : v })}>
-              <SelectTrigger><SelectValue placeholder="Therapist" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="_none">—</SelectItem>
-                {therapists.map((s: any) => <SelectItem key={s.id} value={s.id}>{`${s.first_name_en ?? ""} ${s.last_name_en ?? ""}`.trim() || s.id.slice(0,8)}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Attendance</Label>
-            <Select value={form.attendance} onValueChange={v => setForm({ ...form, attendance: v })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="scheduled">Scheduled</SelectItem>
-                <SelectItem value="done">Done</SelectItem>
-                <SelectItem value="missed">Missed</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div><Label>Pain (0–10)</Label><Input type="number" min={0} max={10} value={form.pain_level} onChange={e => setForm({ ...form, pain_level: e.target.value })} /></div>
-          <div><Label>Symptom change</Label><Input value={form.symptom_change} onChange={e => setForm({ ...form, symptom_change: e.target.value })} /></div>
-          <div className="md:col-span-2"><Label>Interventions / exercises performed</Label><Textarea rows={2} value={form.interventions} onChange={e => setForm({ ...form, interventions: e.target.value })} /></div>
-          <div className="md:col-span-2"><Label>Progress note</Label><Textarea rows={2} value={form.progress_note} onChange={e => setForm({ ...form, progress_note: e.target.value })} /></div>
-          <div><Label>Mobility / ROM</Label><Input value={form.mobility_note} onChange={e => setForm({ ...form, mobility_note: e.target.value })} /></div>
-          <div><Label>Strength / function</Label><Input value={form.strength_note} onChange={e => setForm({ ...form, strength_note: e.target.value })} /></div>
-          <div><Label>Adherence</Label><Input value={form.adherence} onChange={e => setForm({ ...form, adherence: e.target.value })} /></div>
-          <div><Label>Home exercise</Label><Input value={form.home_exercise} onChange={e => setForm({ ...form, home_exercise: e.target.value })} /></div>
-          <div className="md:col-span-2"><Label>Therapist assessment</Label><Textarea rows={2} value={form.therapist_assessment} onChange={e => setForm({ ...form, therapist_assessment: e.target.value })} /></div>
-          <div><Label>Next session recommendation</Label><Input value={form.next_recommendation} onChange={e => setForm({ ...form, next_recommendation: e.target.value })} /></div>
-          <div><Label>Plan for next review</Label><Input value={form.next_review_plan} onChange={e => setForm({ ...form, next_review_plan: e.target.value })} /></div>
-        </div>
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><ClipboardList className="size-5 text-primary" />Log physio session</DialogTitle>
+        </DialogHeader>
+        <Tabs defaultValue="soap" className="mt-2">
+          <TabsList className="grid grid-cols-2 w-full">
+            <TabsTrigger value="soap"><FileText className="me-2 size-4" />S.O.A.P. Notes</TabsTrigger>
+            <TabsTrigger value="admin"><Calendar className="me-2 size-4" />Admin / Log</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="soap" className="space-y-4 mt-4">
+            <fieldset className="rounded-lg border border-border p-4 space-y-3">
+              <legend className="px-2 text-xs font-semibold uppercase tracking-wide text-primary">Subjective</legend>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1.5"><Label>Pain (0–10)</Label><Input type="number" min={0} max={10} value={form.pain_level} onChange={e => setForm({ ...form, pain_level: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>Symptom change</Label><Input value={form.symptom_change} onChange={e => setForm({ ...form, symptom_change: e.target.value })} /></div>
+                <div className="space-y-1.5 md:col-span-2"><Label>Adherence</Label><Input value={form.adherence} onChange={e => setForm({ ...form, adherence: e.target.value })} /></div>
+              </div>
+            </fieldset>
+
+            <fieldset className="rounded-lg border border-border p-4 space-y-3">
+              <legend className="px-2 text-xs font-semibold uppercase tracking-wide text-primary">Objective</legend>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1.5"><Label>Mobility / ROM</Label><Input value={form.mobility_note} onChange={e => setForm({ ...form, mobility_note: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>Strength / function</Label><Input value={form.strength_note} onChange={e => setForm({ ...form, strength_note: e.target.value })} /></div>
+              </div>
+            </fieldset>
+
+            <fieldset className="rounded-lg border border-border p-4 space-y-3">
+              <legend className="px-2 text-xs font-semibold uppercase tracking-wide text-primary">Assessment</legend>
+              <div className="grid grid-cols-1 gap-3">
+                <div className="space-y-1.5"><Label>Therapist assessment</Label><Textarea rows={2} value={form.therapist_assessment} onChange={e => setForm({ ...form, therapist_assessment: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>Progress note</Label><Textarea rows={2} value={form.progress_note} onChange={e => setForm({ ...form, progress_note: e.target.value })} /></div>
+              </div>
+            </fieldset>
+
+            <fieldset className="rounded-lg border border-border p-4 space-y-3">
+              <legend className="px-2 text-xs font-semibold uppercase tracking-wide text-primary">Plan</legend>
+              <div className="grid grid-cols-1 gap-3">
+                <div className="space-y-1.5"><Label>Interventions / exercises performed</Label><Textarea rows={2} value={form.interventions} onChange={e => setForm({ ...form, interventions: e.target.value })} /></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1.5"><Label>Home exercise</Label><Input value={form.home_exercise} onChange={e => setForm({ ...form, home_exercise: e.target.value })} /></div>
+                  <div className="space-y-1.5"><Label>Next session recommendation</Label><Input value={form.next_recommendation} onChange={e => setForm({ ...form, next_recommendation: e.target.value })} /></div>
+                </div>
+                <div className="space-y-1.5"><Label>Plan for next review</Label><Input value={form.next_review_plan} onChange={e => setForm({ ...form, next_review_plan: e.target.value })} /></div>
+              </div>
+            </fieldset>
+          </TabsContent>
+
+          <TabsContent value="admin" className="mt-4">
+            <fieldset className="rounded-lg border border-border p-4 space-y-3">
+              <legend className="px-2 text-xs font-semibold uppercase tracking-wide text-primary">Session log</legend>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1.5"><Label>Session #</Label><Input type="number" value={form.session_number} onChange={e => setForm({ ...form, session_number: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>Date</Label><Input type="date" value={form.session_date} onChange={e => setForm({ ...form, session_date: e.target.value })} /></div>
+                <div className="space-y-1.5">
+                  <Label>Therapist</Label>
+                  <Select value={form.therapist_id || "_none"} onValueChange={v => setForm({ ...form, therapist_id: v === "_none" ? "" : v })}>
+                    <SelectTrigger><SelectValue placeholder="Therapist" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_none">—</SelectItem>
+                      {therapists.map((s: any) => <SelectItem key={s.id} value={s.id}>{`${s.first_name_en ?? ""} ${s.last_name_en ?? ""}`.trim() || s.id.slice(0,8)}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Attendance</Label>
+                  <Select value={form.attendance} onValueChange={v => setForm({ ...form, attendance: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="scheduled">Scheduled</SelectItem>
+                      <SelectItem value="done">Done</SelectItem>
+                      <SelectItem value="missed">Missed</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5 md:col-span-2">
+                  <Label>Link to appointment (optional)</Label>
+                  <Select value={form.appointment_id || "_none"} onValueChange={v => {
+                    const aid = v === "_none" ? "" : v;
+                    const appt = (appointments ?? []).find((a: any) => a.id === aid);
+                    setForm((f: any) => ({
+                      ...f, appointment_id: aid,
+                      session_date: appt ? new Date(appt.scheduled_at).toISOString().slice(0, 10) : f.session_date,
+                    }));
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="Standalone session" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_none">— Standalone —</SelectItem>
+                      {(appointments ?? []).slice(0, 50).map((a: any) => (
+                        <SelectItem key={a.id} value={a.id}>{new Date(a.scheduled_at).toLocaleString()} · {a.status}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </fieldset>
+          </TabsContent>
+        </Tabs>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
           <Button onClick={save} className="gradient-primary text-primary-foreground">Save</Button>

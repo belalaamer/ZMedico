@@ -450,8 +450,8 @@ export default function Dashboard() {
         </Card>
       ) : (
         <>
-          <section>
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">{lang === "ar" ? "اليوم" : "Today"}</h2>
+          <section className="space-y-3">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{lang === "ar" ? "الماليات والخزينة — اليوم" : "Financials & Treasury — Today"}</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
             <StatCard
               label={t("todayAppointments")} value={todayAppts}
@@ -501,8 +501,8 @@ export default function Dashboard() {
           </div>
           </section>
 
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{lang === "ar" ? "هذا الأسبوع" : "This week"}</h2>
-
+          <section className="space-y-3 pt-2 border-t border-border/40">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{lang === "ar" ? "الاتجاهات — هذا الأسبوع" : "Trends — This week"}</h2>
           <div className="grid lg:grid-cols-3 gap-4">
             <Card className="p-5 shadow-card border-border/60 lg:col-span-2">
               <div className="text-sm font-medium mb-3">{t("revenueLast7Days")}</div>
@@ -542,8 +542,10 @@ export default function Dashboard() {
               )}
             </Card>
           </div>
+          </section>
 
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{lang === "ar" ? "هذا الشهر / النطاق" : "This month / range"}</h2>
+          <section className="space-y-3 pt-2 border-t border-border/40">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{lang === "ar" ? "الاتجاهات — هذا الشهر / النطاق" : "Trends — This month / range"}</h2>
           <div className="grid lg:grid-cols-2 gap-4">
             <Card className="p-5 shadow-card border-border/60">
               <div className="text-sm font-medium mb-3">{t("patientsByAge")}</div>

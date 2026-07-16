@@ -271,10 +271,10 @@ export default function PatientsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="min-w-[200px]">{t("patient") || "Patient"}</TableHead>
-                  <TableHead className="hidden md:table-cell">{t("contact") || "Contact"}</TableHead>
+                  <TableHead className="min-w-[200px]">{lang === "ar" ? "المريض" : "Patient"}</TableHead>
+                  <TableHead className="hidden md:table-cell">{lang === "ar" ? "التواصل" : "Contact"}</TableHead>
                   <TableHead className="hidden lg:table-cell">{lang === "ar" ? "الحالة المالية" : "Financial Status"}</TableHead>
-                  <TableHead className="w-[60px] text-end">{t("actions") || ""}</TableHead>
+                  <TableHead className="w-[60px] text-end"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

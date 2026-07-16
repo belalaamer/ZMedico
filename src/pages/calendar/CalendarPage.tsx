@@ -78,6 +78,17 @@ const statusBlock: Record<Appt["status"], string> = {
   departed:    "bg-muted border-border text-muted-foreground",
 };
 
+// Left-accent border color per status — used to make blocks pop on the grid.
+const statusAccent: Record<Appt["status"], string> = {
+  scheduled:   "border-l-primary",
+  confirmed:   "border-l-emerald-500",
+  in_progress: "border-l-amber-500",
+  completed:   "border-l-emerald-600",
+  cancelled:   "border-l-destructive",
+  no_show:     "border-l-destructive",
+  departed:    "border-l-muted-foreground",
+};
+
 // Default fallback when a branch has no working hours configured.
 const DEFAULT_DAY_START_HOUR = 0;
 const DEFAULT_DAY_END_HOUR = 24; // exclusive
@@ -586,24 +597,25 @@ export default function CalendarPage() {
       id={`appt-${a.id}`}
       onClick={(e) => { e.stopPropagation(); navigate(`/appointments/${a.id}`); }}
       className={cn(
-        "absolute rounded-md border text-start px-2 py-1 overflow-hidden shadow-sm",
+        "absolute rounded-md border border-l-4 text-start px-2 py-1 overflow-hidden shadow-sm",
         "hover:shadow-md hover:z-20 hover:scale-[1.01] transition-all",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
         statusBlock[a.status],
+        statusAccent[a.status],
         highlightId === a.id && "ring-2 ring-primary shadow-lg z-20",
         lanes > 1 && "ring-1 ring-background/60",
       )}
       style={blockStyle(a, lane, lanes)}
       title={`${fullName(a.patients!)} · ${timeStr(new Date(a.scheduled_at))}`}
     >
-      <div className="text-[11px] font-semibold leading-tight truncate">
-        {timeStr(new Date(a.scheduled_at))}
-      </div>
-      <div className="text-[11px] leading-tight truncate">
+      <div className="text-xs font-bold leading-tight truncate">
         {fullName(a.patients!)}
       </div>
+      <div className="text-[11px] leading-tight truncate text-muted-foreground">
+        {timeStr(new Date(a.scheduled_at))}
+      </div>
       {(a.procedure || a.room) && (
-        <div className="text-[10px] opacity-75 truncate">
+        <div className="text-[10px] leading-tight truncate text-muted-foreground/90">
           {a.procedure || "—"}{a.room ? ` · ${a.room}` : ""}
         </div>
       )}
@@ -718,16 +730,16 @@ export default function CalendarPage() {
             if (view === "month") setDate(new Date(date.getFullYear(), date.getMonth() + 1, 1));
             else setDate(addDays(date, view === "week" ? 7 : 1));
           }}><ChevronRight className="size-4 rtl:rotate-180" /></Button>
-          <Sheet open={miniOpen} onOpenChange={setMiniOpen}>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="lg:hidden" aria-label={lang === "ar" ? "التقويم" : "Calendar"}>
-                <CalendarRange className="size-4" />
+          <Popover open={miniOpen} onOpenChange={setMiniOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="icon" aria-label={lang === "ar" ? "التقويم" : "Calendar"}>
+                <CalendarDays className="size-4" />
               </Button>
-            </SheetTrigger>
-            <SheetContent side={lang === "ar" ? "left" : "right"} className="w-[88vw] sm:w-[360px] p-4 overflow-y-auto">
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-[320px] p-0">
               {sidebarContent}
-            </SheetContent>
-          </Sheet>
+            </PopoverContent>
+          </Popover>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button className="gradient-primary text-primary-foreground hidden md:inline-flex" onClick={openNew}><Plus className="me-2 size-4" />{t("newAppointment")}</Button>
@@ -980,7 +992,7 @@ export default function CalendarPage() {
         )}
       </Card>
 
-      <div className="grid lg:grid-cols-[1fr,300px] gap-4">
+      <div className="grid grid-cols-1 gap-4">
         {view === "month" ? (
           <Card className="shadow-card p-3">
             <div className="grid grid-cols-7 gap-1 text-center text-[11px] text-muted-foreground mb-2">
@@ -1165,121 +1177,6 @@ export default function CalendarPage() {
           )}
         </Card>
         )}
-
-        {/* Sidebar: mini month + agenda (desktop only) */}
-        <div className="space-y-4 hidden lg:block">
-          <Card className="p-4 shadow-card">
-            <div className="flex items-center justify-between mb-3">
-              <button onClick={() => setMonthCursor(new Date(monthCursor.getFullYear(), monthCursor.getMonth() - 1, 1))}
-                className="size-7 inline-flex items-center justify-center rounded hover:bg-muted">
-                <ChevronLeft className="size-4 rtl:rotate-180" />
-              </button>
-              <div className="text-sm font-semibold">
-                {monthCursor.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", { month: "long", year: "numeric" })}
-              </div>
-              <button onClick={() => setMonthCursor(new Date(monthCursor.getFullYear(), monthCursor.getMonth() + 1, 1))}
-                className="size-7 inline-flex items-center justify-center rounded hover:bg-muted">
-                <ChevronRight className="size-4 rtl:rotate-180" />
-              </button>
-            </div>
-            <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-muted-foreground mb-1">
-              {["S","M","T","W","T","F","S"].map((d, i) => <div key={i}>{d}</div>)}
-            </div>
-            <div className="grid grid-cols-7 gap-1 text-center text-xs">
-              {monthGrid.map((d, i) => {
-                if (!d) return <div key={i} />;
-                const active = sameDay(d, date);
-                const today = sameDay(d, new Date());
-                const count = monthDots[d.toDateString()] ?? 0;
-                return (
-                  <button key={i} onClick={() => setDate(d)}
-                    className={`aspect-square rounded-lg relative flex flex-col items-center justify-center
-                      ${active ? "gradient-primary text-primary-foreground" : today ? "ring-1 ring-primary text-primary" : "hover:bg-muted"}`}>
-                    <span className="font-medium">{d.getDate()}</span>
-                    {count > 0 && (
-                      <span className={`absolute bottom-1 size-1 rounded-full ${active ? "bg-primary-foreground" : "bg-primary"}`} />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </Card>
-
-          <Card className="p-4 shadow-card">
-            <div className="text-sm font-semibold mb-3 inline-flex items-center gap-2">
-              <Clock className="size-4" /> {lang === "ar" ? "أجندة اليوم" : "Today's agenda"}
-            </div>
-            {filteredItems.filter((a) => sameDay(new Date(a.scheduled_at), date)).length === 0 ? (
-              <div className="text-xs text-muted-foreground py-4 text-center">{t("noAppointments")}</div>
-            ) : (
-              <div className="space-y-2 max-h-[40vh] overflow-auto">
-                {filteredItems.filter((a) => sameDay(new Date(a.scheduled_at), date)).map((a) => {
-                  const p = a.patients!;
-                  return (
-                    <div key={a.id} className="flex items-start gap-2 p-2 rounded-lg hover:bg-muted/40 transition-colors">
-                      <div className="w-1 self-stretch rounded-full gradient-primary shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="text-xs font-mono tabular-nums text-muted-foreground">{timeStr(new Date(a.scheduled_at))}</div>
-                          <Select value={a.status} onValueChange={(v) => changeStatus(a, v as Appt["status"])}>
-                            <SelectTrigger className={`h-6 px-2 py-0 text-[10px] w-auto gap-1 ${statusClass[a.status]}`}>
-                              <SelectValue>{statusLabel(a.status, t)}</SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="scheduled">{t("statusScheduled")}</SelectItem>
-                              <SelectItem value="confirmed">{t("statusConfirmed")}</SelectItem>
-                              <SelectItem value="in_progress">{t("statusInProgress")}</SelectItem>
-                              <SelectItem value="completed">{t("statusCompleted")}</SelectItem>
-                              <SelectItem value="cancelled">{t("statusCancelled")}</SelectItem>
-                              <SelectItem value="no_show">{t("statusNoShow")}</SelectItem>
-                              <SelectItem value="departed">{t("statusDeparted")}</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/appointments/${a.id}`)}
-                          className="text-sm font-medium break-words leading-snug mt-0.5 text-start hover:underline"
-                        >
-                          {fullName(p)}
-                        </button>
-                        <div className="text-[11px] text-muted-foreground truncate">{a.procedure || "—"}</div>
-                        <div className="flex items-center gap-1 mt-1 -ms-1">
-                          {nextStatus(a.status) && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 px-2 text-[11px] gap-1"
-                              onClick={() => changeStatus(a, nextStatus(a.status)!)}
-                              title={nextStatusLabel(a.status) ?? undefined}
-                            >
-                              <ArrowRight className="size-3.5" />
-                              {nextStatusLabel(a.status)}
-                            </Button>
-                          )}
-                          <Button variant="ghost" size="icon" className="size-7" title={t("sendReminder")} onClick={() => sendReminderNow(a)}>
-                            <Send className="size-3.5" />
-                          </Button>
-                          <RowActions
-                            onEdit={() => openEdit(a)}
-                            onDelete={() => cancelAppointment(a)}
-                            deleteAsCancel
-                            deleteLabel={lang === "ar" ? "إلغاء الموعد" : "Cancel appointment"}
-                            deleteTitle={lang === "ar" ? "إلغاء الموعد" : "Cancel appointment?"}
-                            deleteDescription={lang === "ar"
-                              ? "سيتم تعليم الموعد كملغي مع الاحتفاظ به في السجل والتقارير."
-                              : "The appointment will be marked as cancelled and kept for history and reports."}
-                            deleteConfirmLabel={lang === "ar" ? "إلغاء الموعد" : "Cancel appointment"}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </Card>
-        </div>
       </div>
       <Fab ariaLabel={t("newAppointment")} onClick={openNew}>
         <Plus className="size-6" />

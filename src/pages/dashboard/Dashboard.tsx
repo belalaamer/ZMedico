@@ -376,13 +376,14 @@ export default function Dashboard() {
   };
 
   return (
+    <PullToRefresh onRefresh={run}>
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
+      <div className="flex items-start md:items-center justify-between gap-4 flex-wrap">
+        <div className="min-w-0">
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("dashboard")}</h1>
           <p className="text-sm text-muted-foreground mt-1">{t("tagline")}</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="hidden md:flex gap-2 flex-wrap">
           <Button asChild><Link to="/patients">{t("addPatient")}</Link></Button>
           <Button asChild variant="outline"><Link to="/calendar">{t("newAppointment")}</Link></Button>
           <Button asChild variant="outline"><Link to="/invoices">{t("createInvoice")}</Link></Button>
@@ -390,12 +391,30 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Mobile quick actions — scrollable pill row */}
+      <div className="md:hidden -mx-4 px-4 overflow-x-auto">
+        <div className="flex gap-2 w-max pb-1">
+          <Button asChild size="sm" className="rounded-full whitespace-nowrap">
+            <Link to="/patients"><UserPlus className="size-4 me-1" />{t("addPatient")}</Link>
+          </Button>
+          <Button asChild size="sm" variant="outline" className="rounded-full whitespace-nowrap">
+            <Link to="/calendar"><CalendarCheck className="size-4 me-1" />{t("newAppointment")}</Link>
+          </Button>
+          <Button asChild size="sm" variant="outline" className="rounded-full whitespace-nowrap">
+            <Link to="/invoices"><Receipt className="size-4 me-1" />{t("createInvoice")}</Link>
+          </Button>
+          <Button asChild size="sm" variant="outline" className="rounded-full whitespace-nowrap">
+            <Link to="/reports"><FileText className="size-4 me-1" />{t("viewAllReports")}</Link>
+          </Button>
+        </div>
+      </div>
+
       {/* Date range filter */}
-      <Card className="p-3 shadow-card border-border/60 flex flex-wrap items-end gap-3">
-        <div className="min-w-[160px]">
+      <Card className="p-3 shadow-card border-border/60 flex flex-col md:flex-row md:flex-wrap md:items-end gap-3">
+        <div className="w-full md:w-auto md:min-w-[160px]">
           <div className="text-[11px] text-muted-foreground mb-1">{t("customRange")}</div>
           <Select value={rangePreset} onValueChange={(v) => applyPreset(v as any)}>
-            <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-9 w-full md:w-auto"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="7d">{t("last7Days")}</SelectItem>
               <SelectItem value="30d">{t("last30Days")}</SelectItem>
@@ -404,14 +423,14 @@ export default function Dashboard() {
             </SelectContent>
           </Select>
         </div>
-        <div>
+        <div className="w-full md:w-auto">
           <div className="text-[11px] text-muted-foreground mb-1">{t("fromDate")}</div>
-          <Input type="date" className="h-9 w-40" value={rangeStart}
+          <Input type="date" className="h-9 w-full md:w-40" value={rangeStart}
             onChange={(e) => { setRangeStart(e.target.value); setRangePreset("custom"); }} />
         </div>
-        <div>
+        <div className="w-full md:w-auto">
           <div className="text-[11px] text-muted-foreground mb-1">{t("toDate")}</div>
-          <Input type="date" className="h-9 w-40" value={rangeEnd}
+          <Input type="date" className="h-9 w-full md:w-40" value={rangeEnd}
             onChange={(e) => { setRangeEnd(e.target.value); setRangePreset("custom"); }} />
         </div>
       </Card>

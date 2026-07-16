@@ -355,7 +355,7 @@ export default function Dashboard() {
         )}
       </>
     );
-    const baseCls = "p-4 shadow-card border-border/60 transition-shadow";
+    const baseCls = "p-3 md:p-4 shadow-card border-border/60 transition-shadow";
     if (to && !loading) {
       const ariaLabel = typeof label === "string"
         ? (value !== undefined && value !== null && value !== "" ? `${label}: ${value}` : label)

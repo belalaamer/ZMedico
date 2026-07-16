@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -184,12 +185,12 @@ export default function Staff() {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("staffDirectory")}</h1>
           <p className="text-sm text-muted-foreground mt-1">{filtered.length}</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="relative w-64"><Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" /><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("search")} className="ps-9" /></div>
-          <Select value={filterDept} onValueChange={setFilterDept}><SelectTrigger className="w-40"><SelectValue placeholder={t("department")} /></SelectTrigger>
+        <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
+          <div className="relative w-full md:w-64"><Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" /><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("search")} className="ps-9" /></div>
+          <Select value={filterDept} onValueChange={setFilterDept}><SelectTrigger className="w-full md:w-40"><SelectValue placeholder={t("department")} /></SelectTrigger>
             <SelectContent><SelectItem value="all">{t("filterAll") || "All"}</SelectItem>{depts.map((d) => <SelectItem key={d.id} value={d.id}>{lang === "ar" ? d.name_ar : d.name_en}</SelectItem>)}</SelectContent>
           </Select>
-          <Select value={filterStatus} onValueChange={setFilterStatus}><SelectTrigger className="w-32"><SelectValue placeholder={t("status")} /></SelectTrigger>
+          <Select value={filterStatus} onValueChange={setFilterStatus}><SelectTrigger className="w-full md:w-32"><SelectValue placeholder={t("status")} /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">{t("filterAll") || "All"}</SelectItem>
               <SelectItem value="active">{t("statusActive")}</SelectItem>
@@ -199,88 +200,116 @@ export default function Staff() {
             </SelectContent>
           </Select>
           <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setEditingId(null); }}>
-            <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground"><Plus className="me-2 size-4" />{t("addStaff")}</Button></DialogTrigger>
+            <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground w-full md:w-auto"><Plus className="me-2 size-4" />{t("addStaff")}</Button></DialogTrigger>
             <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
               <DialogHeader><DialogTitle>{editingId ? t("edit") : t("newStaff")}</DialogTitle></DialogHeader>
-              {!editingId && <div className="flex gap-2 mb-2">
-                <Button type="button" size="sm" variant={mode === "new" ? "default" : "outline"} onClick={() => setMode("new")}>+ New user</Button>
-                <Button type="button" size="sm" variant={mode === "existing" ? "default" : "outline"} onClick={() => setMode("existing")}>Existing user</Button>
-              </div>}
-              {createdInfo && (
-                <Card className="p-3 mb-2 border-success/40 bg-success/5 text-sm">
-                  <div className="font-medium">User created ✓</div>
-                  <div className="mt-1 flex items-center gap-2 flex-wrap">
-                    <span className="text-muted-foreground">Email:</span><span className="font-mono">{createdInfo.email}</span>
-                    <span className="text-muted-foreground ms-3">Password:</span><span className="font-mono">{createdInfo.password}</span>
-                    <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(createdInfo.password); toast.success("Copied"); }}><Copy className="size-3" /></Button>
-                  </div>
-                </Card>
-              )}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {editingId ? null : mode === "existing" ? (
-                  <div className="space-y-2 sm:col-span-2"><Label>{t("fullName")}</Label>
-                    <Select value={form.profile_id} onValueChange={(v) => setForm({ ...form, profile_id: v })}>
-                      <SelectTrigger><SelectValue placeholder={t("selectStaff")} /></SelectTrigger>
-                      <SelectContent>{availableProfiles.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name ?? p.email}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                ) : (
-                  <>
-                    <div className="space-y-2"><Label>{t("fullName")}</Label>
-                      <Input value={newUser.full_name} onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })} placeholder="Ahmed Ali" />
-                    </div>
-                    <div className="space-y-2"><Label>Email</Label>
-                      <Input type="email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} placeholder="user@example.com" />
-                    </div>
-                    <div className="space-y-2"><Label>Role</Label>
-                      <Select value={newUser.role} onValueChange={(v) => setNewUser({ ...newUser, role: v })}>
+              <Tabs defaultValue="identity" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
+                  <TabsTrigger value="identity">Identity & Access</TabsTrigger>
+                  <TabsTrigger value="employment">Employment</TabsTrigger>
+                  <TabsTrigger value="payroll">Payroll & Leaves</TabsTrigger>
+                  <TabsTrigger value="personal">Emergency</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="identity" className="mt-4 space-y-3">
+                  {!editingId && <div className="flex gap-2">
+                    <Button type="button" size="sm" variant={mode === "new" ? "default" : "outline"} onClick={() => setMode("new")}>+ New user</Button>
+                    <Button type="button" size="sm" variant={mode === "existing" ? "default" : "outline"} onClick={() => setMode("existing")}>Existing user</Button>
+                  </div>}
+                  {createdInfo && (
+                    <Card className="p-3 border-success/40 bg-success/5 text-sm">
+                      <div className="font-medium">User created ✓</div>
+                      <div className="mt-1 flex items-center gap-2 flex-wrap">
+                        <span className="text-muted-foreground">Email:</span><span className="font-mono truncate">{createdInfo.email}</span>
+                        <span className="text-muted-foreground ms-3">Password:</span><span className="font-mono">{createdInfo.password}</span>
+                        <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(createdInfo.password); toast.success("Copied"); }}><Copy className="size-3" /></Button>
+                      </div>
+                    </Card>
+                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {editingId ? null : mode === "existing" ? (
+                      <div className="space-y-2 sm:col-span-2"><Label>{t("fullName")}</Label>
+                        <Select value={form.profile_id} onValueChange={(v) => setForm({ ...form, profile_id: v })}>
+                          <SelectTrigger><SelectValue placeholder={t("selectStaff")} /></SelectTrigger>
+                          <SelectContent>{availableProfiles.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name ?? p.email}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="space-y-2"><Label>{t("fullName")}</Label>
+                          <Input value={newUser.full_name} onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })} placeholder="Ahmed Ali" />
+                        </div>
+                        <div className="space-y-2"><Label>Email</Label>
+                          <Input type="email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} placeholder="user@example.com" />
+                        </div>
+                        <div className="space-y-2"><Label>Role</Label>
+                          <Select value={newUser.role} onValueChange={(v) => setNewUser({ ...newUser, role: v })}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2"><Label>Password (optional)</Label>
+                          <Input value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} placeholder="Auto-generated if empty" />
+                        </div>
+                      </>
+                    )}
+                    <div className="space-y-2 sm:col-span-2"><Label>{t("branch")}</Label>
+                      <Select value={form.branch_id || "none"} onValueChange={(v) => setForm({ ...form, branch_id: v === "none" ? "" : v })}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>)}</SelectContent>
+                        <SelectContent><SelectItem value="none">— {t("none")} —</SelectItem>{branches.map((b) => <SelectItem key={b.id} value={b.id}>{lang === "ar" ? b.name_ar : b.name_en}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
-                    <div className="space-y-2"><Label>Password (optional)</Label>
-                      <Input value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} placeholder="Auto-generated if empty" />
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="employment" className="mt-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-2"><Label>{t("position")}</Label>
+                      <JobRoleSelect value={form.position_id} onChange={(v) => setForm({ ...form, position_id: v ?? "" })} />
                     </div>
-                  </>
-                )}
-                <div className="space-y-2"><Label>{t("position")}</Label>
-                  <JobRoleSelect value={form.position_id} onChange={(v) => setForm({ ...form, position_id: v ?? "" })} />
-                </div>
-                <div className="space-y-2"><Label>{t("department")}</Label>
-                  <Select value={form.department_id || "none"} onValueChange={(v) => setForm({ ...form, department_id: v === "none" ? "" : v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent><SelectItem value="none">— {t("none")} —</SelectItem>{depts.map((d) => <SelectItem key={d.id} value={d.id}>{lang === "ar" ? d.name_ar : d.name_en}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2"><Label>{t("branch")}</Label>
-                  <Select value={form.branch_id || "none"} onValueChange={(v) => setForm({ ...form, branch_id: v === "none" ? "" : v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent><SelectItem value="none">— {t("none")} —</SelectItem>{branches.map((b) => <SelectItem key={b.id} value={b.id}>{lang === "ar" ? b.name_ar : b.name_en}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2"><Label>{t("hireDate")}</Label><Input type="date" value={form.hire_date} onChange={(e) => setForm({ ...form, hire_date: e.target.value })} /></div>
-                <div className="space-y-2"><Label>{t("contractType")}</Label>
-                  <Select value={form.contract_type} onValueChange={(v) => setForm({ ...form, contract_type: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="full_time">{t("fullTime")}</SelectItem>
-                      <SelectItem value="part_time">{t("partTime")}</SelectItem>
-                      <SelectItem value="contract">{t("contract")}</SelectItem>
-                      <SelectItem value="freelance">{t("freelance")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2"><Label>{t("salary")}</Label><Input type="number" value={form.salary} onChange={(e) => setForm({ ...form, salary: e.target.value })} /></div>
-                <div className="space-y-2"><Label>{t("commissionPercent")}</Label><Input type="number" step="0.01" min="0" max="100" value={form.commission_percent} onChange={(e) => setForm({ ...form, commission_percent: e.target.value })} /></div>
-                <div className="space-y-2"><Label>{t("weeklyHours")}</Label><Input type="number" value={form.working_hours_per_week} onChange={(e) => setForm({ ...form, working_hours_per_week: e.target.value })} /></div>
-                <div className="space-y-2"><Label>{t("bankName")}</Label><Input value={form.bank_name} onChange={(e) => setForm({ ...form, bank_name: e.target.value })} /></div>
-                <div className="space-y-2"><Label>{t("bankAccount")}</Label><Input value={form.bank_account} onChange={(e) => setForm({ ...form, bank_account: e.target.value })} /></div>
-                <div className="space-y-2"><Label>{t("nationalId")}</Label><Input value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} /></div>
-                <div className="space-y-2"><Label>{t("dob")}</Label><Input type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} /></div>
-                <div className="space-y-2"><Label>{t("emergencyContact")}</Label><Input value={form.emergency_contact_name} onChange={(e) => setForm({ ...form, emergency_contact_name: e.target.value })} /></div>
-                <div className="space-y-2"><Label>{t("emergencyPhone")}</Label><Input value={form.emergency_contact_phone} onChange={(e) => setForm({ ...form, emergency_contact_phone: e.target.value })} /></div>
-                <div className="space-y-2 sm:col-span-2"><Label>{t("address")}</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
-              </div>
+                    <div className="space-y-2"><Label>{t("department")}</Label>
+                      <Select value={form.department_id || "none"} onValueChange={(v) => setForm({ ...form, department_id: v === "none" ? "" : v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectItem value="none">— {t("none")} —</SelectItem>{depts.map((d) => <SelectItem key={d.id} value={d.id}>{lang === "ar" ? d.name_ar : d.name_en}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2"><Label>{t("hireDate")}</Label><Input type="date" value={form.hire_date} onChange={(e) => setForm({ ...form, hire_date: e.target.value })} /></div>
+                    <div className="space-y-2"><Label>{t("contractType")}</Label>
+                      <Select value={form.contract_type} onValueChange={(v) => setForm({ ...form, contract_type: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="full_time">{t("fullTime")}</SelectItem>
+                          <SelectItem value="part_time">{t("partTime")}</SelectItem>
+                          <SelectItem value="contract">{t("contract")}</SelectItem>
+                          <SelectItem value="freelance">{t("freelance")}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2"><Label>{t("weeklyHours")}</Label><Input type="number" value={form.working_hours_per_week} onChange={(e) => setForm({ ...form, working_hours_per_week: e.target.value })} /></div>
+                    <div className="space-y-2"><Label>{t("nationalId")}</Label><Input value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} /></div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="payroll" className="mt-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-2"><Label>{t("salary")}</Label><Input type="number" value={form.salary} onChange={(e) => setForm({ ...form, salary: e.target.value })} /></div>
+                    <div className="space-y-2"><Label>{t("commissionPercent")}</Label><Input type="number" step="0.01" min="0" max="100" value={form.commission_percent} onChange={(e) => setForm({ ...form, commission_percent: e.target.value })} /></div>
+                    <div className="space-y-2"><Label>{t("bankName")}</Label><Input value={form.bank_name} onChange={(e) => setForm({ ...form, bank_name: e.target.value })} /></div>
+                    <div className="space-y-2"><Label>{t("bankAccount")}</Label><Input value={form.bank_account} onChange={(e) => setForm({ ...form, bank_account: e.target.value })} /></div>
+                    <div className="space-y-2"><Label>Annual Leave</Label><Input type="number" value={form.annual_leave_balance} onChange={(e) => setForm({ ...form, annual_leave_balance: e.target.value })} /></div>
+                    <div className="space-y-2"><Label>Sick Leave</Label><Input type="number" value={form.sick_leave_balance} onChange={(e) => setForm({ ...form, sick_leave_balance: e.target.value })} /></div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="personal" className="mt-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-2"><Label>{t("dob")}</Label><Input type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} /></div>
+                    <div className="space-y-2 sm:col-span-2"><Label>{t("address")}</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
+                    <div className="space-y-2"><Label>{t("emergencyContact")}</Label><Input value={form.emergency_contact_name} onChange={(e) => setForm({ ...form, emergency_contact_name: e.target.value })} /></div>
+                    <div className="space-y-2"><Label>{t("emergencyPhone")}</Label><Input value={form.emergency_contact_phone} onChange={(e) => setForm({ ...form, emergency_contact_phone: e.target.value })} /></div>
+                  </div>
+                </TabsContent>
+              </Tabs>
               <DialogFooter>
                 <Button variant="ghost" onClick={() => { setOpen(false); setCreatedInfo(null); }}>{t("cancel")}</Button>
                 <Button className="gradient-primary text-primary-foreground" onClick={save} disabled={creatingUser}>{creatingUser ? "..." : t("save")}</Button>

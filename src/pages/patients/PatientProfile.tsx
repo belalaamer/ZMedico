@@ -246,6 +246,9 @@ export default function PatientProfile() {
           <TabsTrigger value="overview">{t("overview")}</TabsTrigger>
           <TabsTrigger value="timeline">{t("timelineTab")}</TabsTrigger>
           <TabsTrigger value="clinical">{lang === "ar" ? "السريري" : "Clinical"}</TabsTrigger>
+          <Can module="medical_records" action="view">
+            <TabsTrigger value="physio">{lang === "ar" ? "العلاج الطبيعي" : "Physiotherapy"}</TabsTrigger>
+          </Can>
           {authz.can("invoices.view") && (
             <TabsTrigger value="financial">{lang === "ar" ? "المالي" : "Financial"}</TabsTrigger>
           )}
@@ -333,61 +336,102 @@ export default function PatientProfile() {
               <PatientTreatmentPlans patientId={patient.id} />
             </Can>
           )}
+        </TabsContent>
 
-          <Can module="medical_records" action="view">
-            <section className="space-y-2 mt-6">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-                  <Activity className="size-4" />{lang === "ar" ? "العلاج الطبيعي" : "Physiotherapy"}
-                </h3>
-                <div className="flex items-center gap-1">
+        <TabsContent value="physio" className="mt-4">
+          <Can module="medical_records" action="view" fallback={<div className="text-center text-muted-foreground py-10">{lang === "ar" ? "لا تملك صلاحية الوصول" : "Access denied"}</div>}>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <Activity className="size-5 text-primary" />{lang === "ar" ? "العلاج الطبيعي" : "Physiotherapy"}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">{lang === "ar" ? "حالات وجلسات ومتابعات المريض" : "Cases, sessions and follow-ups for this patient"}</p>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
                   {activePhysioCaseId && (
-                    <Button asChild variant="ghost" size="sm">
+                    <Button asChild variant="outline" size="sm">
                       <Link to={`/physio/${activePhysioCaseId}`}>{lang === "ar" ? "افتح الحالة النشطة" : "Open active case"}</Link>
                     </Button>
                   )}
-                  <Can module="medical_records" action="create">
-                    <Button asChild variant="ghost" size="sm">
-                      <Link to={`/physio?patient=${patient.id}&new=1`}>{lang === "ar" ? "حالة جديدة" : "New case"}</Link>
-                    </Button>
-                  </Can>
                   <Button asChild variant="ghost" size="sm">
                     <Link to="/physio">{lang === "ar" ? "كل الحالات" : "All cases"}</Link>
                   </Button>
+                  <Can module="medical_records" action="create">
+                    <Button
+                      asChild
+                      size="sm"
+                      className={physioCases.length === 0 ? "gradient-primary text-primary-foreground" : ""}
+                      variant={physioCases.length === 0 ? "default" : "outline"}
+                    >
+                      <Link to={`/physio?patient=${patient.id}&new=1`}>
+                        <Activity className="me-2 size-4" />{lang === "ar" ? "حالة جديدة" : "New case"}
+                      </Link>
+                    </Button>
+                  </Can>
                 </div>
               </div>
+
+              {physioStats && (
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  <Card className="p-3 shadow-card border-l-4 border-l-primary bg-primary/5">
+                    <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{lang === "ar" ? "نشطة" : "Active"}</div>
+                    <div className="text-2xl font-bold tabular-nums">{physioStats.active}</div>
+                  </Card>
+                  <Card className="p-3 shadow-card border-l-4 border-l-emerald-500 bg-emerald-500/5">
+                    <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{lang === "ar" ? "آخر جلسة" : "Last session"}</div>
+                    <div className="text-sm font-semibold">{physioStats.lastSession ? formatDate(physioStats.lastSession, lang) : "—"}</div>
+                  </Card>
+                  <Card className="p-3 shadow-card border-l-4 border-l-sky-500 bg-sky-500/5">
+                    <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{lang === "ar" ? "آخر تقييم" : "Last reassessment"}</div>
+                    <div className="text-sm font-semibold">{physioStats.lastReassessment ? formatDate(physioStats.lastReassessment, lang) : "—"}</div>
+                  </Card>
+                  <Card className="p-3 shadow-card border-l-4 border-l-amber-500 bg-amber-500/5">
+                    <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{lang === "ar" ? "متابعة قادمة" : "Next follow-up"}</div>
+                    <div className="text-sm font-semibold">{physioStats.nextFollowup ? formatDate(physioStats.nextFollowup, lang) : "—"}</div>
+                  </Card>
+                  <Card className={`p-3 shadow-card border-l-4 ${physioStats.overdueFollowup ? "border-l-destructive bg-destructive/5" : "border-l-muted bg-muted/30"}`}>
+                    <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{lang === "ar" ? "متأخرة" : "Overdue"}</div>
+                    <div className={`text-sm font-semibold ${physioStats.overdueFollowup ? "text-destructive" : ""}`}>
+                      {physioStats.overdueFollowup ? formatDate(physioStats.overdueFollowup, lang) : "—"}
+                    </div>
+                  </Card>
+                </div>
+              )}
+
               <Card className="shadow-card overflow-hidden">
-                {physioStats && (physioStats.active > 0 || physioStats.lastSession || physioStats.nextFollowup || physioStats.overdueFollowup) && (
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-2 p-3 border-b border-border text-xs">
-                    <div><div className="text-muted-foreground">{lang === "ar" ? "نشطة" : "Active"}</div><div className="font-semibold text-sm">{physioStats.active}</div></div>
-                    <div><div className="text-muted-foreground">{lang === "ar" ? "آخر جلسة" : "Last session"}</div><div className="font-semibold text-sm">{physioStats.lastSession ? formatDate(physioStats.lastSession, lang) : "—"}</div></div>
-                    <div><div className="text-muted-foreground">{lang === "ar" ? "آخر تقييم" : "Last reassessment"}</div><div className="font-semibold text-sm">{physioStats.lastReassessment ? formatDate(physioStats.lastReassessment, lang) : "—"}</div></div>
-                    <div><div className="text-muted-foreground">{lang === "ar" ? "متابعة قادمة" : "Next follow-up"}</div>
-                      <div className="font-semibold text-sm">{physioStats.nextFollowup ? formatDate(physioStats.nextFollowup, lang) : "—"}</div>
-                    </div>
-                    <div><div className="text-muted-foreground">{lang === "ar" ? "متأخرة" : "Overdue"}</div>
-                      <div className={`font-semibold text-sm ${physioStats.overdueFollowup ? "text-destructive" : ""}`}>
-                        {physioStats.overdueFollowup ? formatDate(physioStats.overdueFollowup, lang) : "—"}
-                      </div>
-                    </div>
-                  </div>
-                )}
                 {physioCases.length === 0 ? (
-                  <div className="p-6 text-center text-sm text-muted-foreground">{lang === "ar" ? "لا توجد حالات علاج طبيعي" : "No physiotherapy cases."}</div>
+                  <div className="p-10 text-center space-y-3">
+                    <div className="mx-auto size-12 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                      <Activity className="size-6" />
+                    </div>
+                    <div className="text-sm text-muted-foreground">{lang === "ar" ? "لا توجد حالات علاج طبيعي بعد" : "No physiotherapy cases yet."}</div>
+                    <Can module="medical_records" action="create">
+                      <Button asChild className="gradient-primary text-primary-foreground">
+                        <Link to={`/physio?patient=${patient.id}&new=1`}>
+                          <Activity className="me-2 size-4" />{lang === "ar" ? "إنشاء حالة جديدة" : "Create new case"}
+                        </Link>
+                      </Button>
+                    </Can>
+                  </div>
                 ) : (
                   <div className="divide-y divide-border">
                     {physioCases.map((pc) => (
-                      <Link key={pc.id} to={`/physio/${pc.id}`} className="flex items-center gap-3 p-3 hover:bg-muted/40">
-                        <Activity className="size-4 text-muted-foreground" />
-                        <div className="flex-1 min-w-0 text-sm truncate">{pc.diagnosis || "—"}</div>
-                        <div className="text-xs text-muted-foreground">{formatDate(pc.start_date, lang)}</div>
-                        <Badge variant="outline" className="text-[10px]">{pc.status}</Badge>
+                      <Link key={pc.id} to={`/physio/${pc.id}`} className="flex items-center gap-3 p-4 hover:bg-muted/40 transition-colors">
+                        <div className="size-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                          <Activity className="size-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{pc.diagnosis || "—"}</div>
+                          <div className="text-xs text-muted-foreground">{formatDate(pc.start_date, lang)}</div>
+                        </div>
+                        <Badge variant="outline" className="text-[10px] capitalize">{pc.status}</Badge>
                       </Link>
                     ))}
                   </div>
                 )}
               </Card>
-            </section>
+            </div>
           </Can>
         </TabsContent>
 

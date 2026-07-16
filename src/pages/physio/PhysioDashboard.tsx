@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Activity, Calendar, AlertCircle, TrendingUp, Users } from "lucide-react";
+import { Activity, Calendar, AlertCircle, TrendingUp, Users, ChevronRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -119,7 +119,7 @@ export default function PhysioDashboard() {
               {Object.entries(byTherapist).sort((a, b) => b[1] - a[1]).map(([k, v]) => (
                 <div key={k} className="flex items-center gap-2 text-sm">
                   <div className="flex-1 truncate">{k === "_none" ? (lang === "ar" ? "غير محدد" : "Unassigned") : (therapistMap[k] || k.slice(0, 8))}</div>
-                  <div className="h-2 flex-1 bg-muted rounded overflow-hidden"><div className="h-full bg-primary" style={{ width: `${(v * 100) / active.length}%` }} /></div>
+                  <div className="h-2.5 flex-1 bg-secondary rounded-full overflow-hidden"><div className="h-full bg-primary rounded-full transition-all" style={{ width: `${(v * 100) / active.length}%` }} /></div>
                   <div className="w-8 text-right text-muted-foreground">{v}</div>
                 </div>
               ))}
@@ -144,19 +144,23 @@ export default function PhysioDashboard() {
             <table className="w-full text-sm">
               <thead className="text-xs text-muted-foreground">
                 <tr>
-                  <th className="text-start py-2">{lang === "ar" ? "المعالج" : "Therapist"}</th>
-                  <th className="text-end py-2">{lang === "ar" ? "نشطة" : "Active"}</th>
-                  <th className="text-end py-2">{lang === "ar" ? "جلسات تمت" : "Sessions done"}</th>
-                  <th className="text-end py-2">{lang === "ar" ? "متابعات متأخرة" : "Overdue follow-ups"}</th>
+                  <th className="text-start py-3">{lang === "ar" ? "المعالج" : "Therapist"}</th>
+                  <th className="text-end py-3">{lang === "ar" ? "نشطة" : "Active"}</th>
+                  <th className="text-end py-3">{lang === "ar" ? "جلسات تمت" : "Sessions done"}</th>
+                  <th className="text-end py-3">{lang === "ar" ? "متابعات متأخرة" : "Overdue follow-ups"}</th>
                 </tr>
               </thead>
               <tbody>
                 {workloadRows.map(([k, w]) => (
-                  <tr key={k} className="border-t border-border">
-                    <td className="py-2">{k === "_none" ? (lang === "ar" ? "غير محدد" : "Unassigned") : (therapistMap[k] || k.slice(0, 8))}</td>
-                    <td className="text-end">{w.active}</td>
-                    <td className="text-end">{w.done}</td>
-                    <td className={`text-end ${w.overdue > 0 ? "text-destructive font-semibold" : ""}`}>{w.overdue}</td>
+                  <tr key={k} className="border-t border-border hover:bg-muted/30 transition-colors">
+                    <td className="py-3 font-medium">{k === "_none" ? (lang === "ar" ? "غير محدد" : "Unassigned") : (therapistMap[k] || k.slice(0, 8))}</td>
+                    <td className="text-end py-3">{w.active}</td>
+                    <td className="text-end py-3">{w.done}</td>
+                    <td className="text-end py-3">
+                      {w.overdue > 0
+                        ? <Badge variant="destructive">{w.overdue}</Badge>
+                        : <span className="text-muted-foreground">{w.overdue}</span>}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -166,13 +170,18 @@ export default function PhysioDashboard() {
       </Card>
 
       {overdueFollowups.length > 0 && (
-        <Card className="p-4">
-          <h3 className="text-sm font-semibold mb-3 flex items-center gap-2"><AlertCircle className="size-4 text-destructive" />{lang === "ar" ? "متابعات متأخرة" : "Overdue follow-ups"}</h3>
+        <Card className="overflow-hidden border-destructive/40">
+          <div className="flex items-center gap-2 px-4 py-3 bg-destructive/10 border-b border-destructive/30">
+            <AlertCircle className="size-4 text-destructive" />
+            <h3 className="text-sm font-semibold text-destructive">{lang === "ar" ? "متابعات متأخرة" : "Overdue follow-ups"}</h3>
+            <Badge variant="destructive" className="ms-auto">{overdueFollowups.length}</Badge>
+          </div>
           <div className="divide-y divide-border">
             {overdueFollowups.slice(0, 10).map(c => (
-              <Link key={c.id} to={`/physio/${c.id}`} className="flex items-center gap-3 py-2 hover:bg-muted/40">
+              <Link key={c.id} to={`/physio/${c.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors group">
                 <div className="flex-1 text-sm truncate">{patientName(c.patients)} · {c.diagnosis || "—"}</div>
                 <Badge variant="outline" className="status-cancelled">{lang === "ar" ? "حتى" : "due"} {formatDate(c.followup_due_date, lang)}</Badge>
+                <ChevronRight className="size-4 text-muted-foreground group-hover:text-foreground transition-colors" />
               </Link>
             ))}
           </div>
@@ -184,9 +193,12 @@ export default function PhysioDashboard() {
 
 function Kpi({ icon, label, value, accent }: { icon: React.ReactNode; label: string; value: number | string; accent?: boolean }) {
   return (
-    <Card className={`p-4 ${accent ? "border-destructive/40" : ""}`}>
-      <div className="text-xs text-muted-foreground flex items-center gap-1">{icon}{label}</div>
-      <div className={`text-2xl font-bold mt-1 ${accent ? "text-destructive" : ""}`}>{value}</div>
+    <Card className={`p-4 transition-all hover:shadow-md hover:-translate-y-0.5 ${accent ? "border-destructive/40" : ""}`}>
+      <div className="flex items-center gap-2">
+        <div className={`p-2 rounded-lg ${accent ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"}`}>{icon}</div>
+        <div className="text-xs text-muted-foreground">{label}</div>
+      </div>
+      <div className={`text-2xl font-bold mt-2 ${accent ? "text-destructive" : ""}`}>{value}</div>
     </Card>
   );
 }

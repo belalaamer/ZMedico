@@ -348,7 +348,7 @@ export default function Dashboard() {
             <Icon className="size-4" />
           </div>
         </div>
-        <div className="mt-3 text-2xl font-bold tabular-nums">{loading ? <Skeleton className="h-7 w-24" /> : value}</div>
+        <div className="mt-3 text-xl md:text-2xl font-bold tabular-nums truncate">{loading ? <Skeleton className="h-7 w-24" /> : value}</div>
         {sub && <div className="text-[11px] text-muted-foreground mt-1">{loading ? <Skeleton className="h-3 w-20" /> : sub}</div>}
         {subValue !== undefined && !loading && (
           <div className="text-[11px] text-muted-foreground mt-1 tabular-nums">{subValue}</div>

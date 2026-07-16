@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import SettingsLayout from "./SettingsLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, UserPlus, Trash2, Copy, KeyRound, AlertTriangle, Lock, Users } from "lucide-react";
+import { Search, UserPlus, Trash2, Copy, KeyRound, AlertTriangle, Lock, Users, MoreHorizontal, Pencil } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useBranch } from "@/contexts/BranchContext";
 import { Link2, Link2Off } from "lucide-react";
@@ -21,6 +21,14 @@ import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ListSkeleton } from "@/components/ListSkeleton";
+import { TablePager } from "@/components/TablePager";
 import { toast } from "sonner";
 
 const ROLES = ["admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr", "staff"] as const;
@@ -108,6 +116,13 @@ export default function UserManagement() {
   const [pickedStaffId, setPickedStaffId] = useState<string>("");
   const [pickedRole, setPickedRole] = useState<Role>("staff");
   const [linking, setLinking] = useState(false);
+
+  // UI-only local state for the enterprise table view.
+  const [isLoading, setIsLoading] = useState(true);
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [linkFilter, setLinkFilter] = useState<"all" | "linked" | "unlinked">("all");
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 10;
 
   const openLinkPicker = async (u: any, mode: "link" | "replace") => {
     setLinkTarget(u);
@@ -252,6 +267,7 @@ export default function UserManagement() {
       sb[key] = { branch_id: s.branch_id ?? null, employee_id: s.employee_id ?? null } as StaffLink;
     });
     setStaffLinks(sb);
+    setIsLoading(false);
   };
   useEffect(() => { load(); }, []);
 
@@ -434,7 +450,30 @@ export default function UserManagement() {
     setResetTarget(null);
   };
 
-  const filtered = users.filter(u => !q || (u.full_name ?? "").toLowerCase().includes(q.toLowerCase()) || (u.email ?? "").toLowerCase().includes(q.toLowerCase()));
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return users.filter((u) => {
+      if (needle) {
+        const hay = `${u.full_name ?? ""} ${u.email ?? ""}`.toLowerCase();
+        if (!hay.includes(needle)) return false;
+      }
+      if (roleFilter !== "all") {
+        const rs = roles[u.id] ?? [];
+        if (!rs.includes(roleFilter)) return false;
+      }
+      if (linkFilter !== "all") {
+        const linked = !!staffLinks[u.id]?.branch_id;
+        if (linkFilter === "linked" && !linked) return false;
+        if (linkFilter === "unlinked" && linked) return false;
+      }
+      return true;
+    });
+  }, [users, roles, staffLinks, q, roleFilter, linkFilter]);
+
+  useEffect(() => { setPage(0); }, [q, roleFilter, linkFilter]);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount - 1);
+  const paged = filtered.slice(currentPage * PAGE_SIZE, currentPage * PAGE_SIZE + PAGE_SIZE);
 
   return (
     <SettingsLayout>
@@ -442,10 +481,6 @@ export default function UserManagement() {
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <h1 className="text-2xl font-bold">{t("userManagement")}</h1>
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="relative w-64">
-              <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-              <Input className="ps-9" placeholder={t("search")} value={q} onChange={e => setQ(e.target.value)} />
-            </div>
             <Button onClick={() => setOpen(true)} className="gradient-primary text-primary-foreground">
               <UserPlus className="me-2 size-4" />
               {lang === "ar" ? "دعوة مستخدم" : "Invite user"}
@@ -456,88 +491,168 @@ export default function UserManagement() {
             </Button>
           </div>
         </div>
-        <Card className="overflow-hidden"><div className="divide-y">
-          {filtered.map(u => (
-            <div key={u.id} className="flex items-center gap-3 p-3">
-              <div className="size-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold">{(u.full_name ?? u.email ?? "?").slice(0,1).toUpperCase()}</div>
-              <div className="flex-1 min-w-0">
-                <div className="font-medium truncate">{u.full_name ?? "—"}</div>
-                <div className="text-xs text-muted-foreground truncate">{u.email}</div>
-              </div>
-              <div className="flex gap-1 flex-wrap items-center">
-                {(roles[u.id] ?? []).map(r => <Badge key={r} variant="outline" className="capitalize">{r}</Badge>)}
-                {staffLinks[u.id]?.branch_id ? (
-                  <Badge variant="outline" className="gap-1 text-primary">
-                    <Link2 className="size-3" />
-                    {lang === "ar" ? "مربوط" : "Linked"}
-                  </Badge>
-                ) : (
-                  <Badge variant="secondary" className="gap-1">
-                    {lang === "ar" ? "غير مربوط" : "Unlinked"}
-                  </Badge>
-                )}
-                {(roles[u.id] ?? []).includes("manager") && !staffLinks[u.id]?.branch_id && (
-                  <Badge variant="destructive" className="gap-1">
-                    <AlertTriangle className="size-3" />
-                    {lang === "ar" ? "بدون فرع" : "No branch"}
-                  </Badge>
-                )}
-              </div>
-              <Button size="sm" variant="outline" onClick={() => openEdit(u)}>{t("edit")}</Button>
-              {!staffLinks[u.id]?.branch_id && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-primary"
-                  title={lang === "ar" ? "ربط بموظف من دليل الموظفين" : "Link to an employee from the staff directory"}
-                  onClick={() => openLinkPicker(u, "link")}
-                >
-                  <Link2 className="me-1 size-4" />
-                  {lang === "ar" ? "ربط" : "Link"}
-                </Button>
-              )}
-              {staffLinks[u.id]?.branch_id && currentUserId !== u.id && (
-                <>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    title={lang === "ar" ? "استبدال الموظف المربوط" : "Replace linked employee"}
-                    onClick={() => openLinkPicker(u, "replace")}
-                  >
-                    <Users className="size-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    title={lang === "ar" ? "فك الربط بسجل الموظف" : "Unlink from employee record"}
-                    onClick={() => setUnlinkTarget(u)}
-                  >
-                    <Link2Off className="size-4" />
-                  </Button>
-                </>
-              )}
-              <Button
-                size="sm"
-                variant="outline"
-                title={lang === "ar" ? "إعادة تعيين كلمة المرور" : "Reset password"}
-                onClick={() => { setRPassword(""); setResetTarget(u); }}
-              >
-                <Lock className="size-4" />
-              </Button>
-              {currentUserId !== u.id && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-destructive hover:text-destructive"
-                  onClick={() => setDeleteTarget(u)}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              )}
-            </div>
-          ))}
-          {filtered.length === 0 && <div className="p-8 text-center text-muted-foreground">{t("noData")}</div>}
-        </div></Card>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-[220px] max-w-sm">
+            <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <Input className="ps-9" placeholder={t("search")} value={q} onChange={(e) => setQ(e.target.value)} />
+          </div>
+          <Select value={roleFilter} onValueChange={setRoleFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder={lang === "ar" ? "الدور" : "Role"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{lang === "ar" ? "كل الأدوار" : "All roles"}</SelectItem>
+              {ROLES.map((r) => (
+                <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={linkFilter} onValueChange={(v) => setLinkFilter(v as any)}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder={lang === "ar" ? "الربط" : "Link status"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{lang === "ar" ? "الكل" : "All"}</SelectItem>
+              <SelectItem value="linked">{lang === "ar" ? "مربوط" : "Linked"}</SelectItem>
+              <SelectItem value="unlinked">{lang === "ar" ? "غير مربوط" : "Unlinked"}</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="ms-auto text-xs text-muted-foreground tabular-nums">
+            {filtered.length} {lang === "ar" ? "مستخدم" : "users"}
+          </div>
+        </div>
+
+        <Card className="overflow-hidden">
+          {isLoading ? (
+            <ListSkeleton rows={6} />
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{lang === "ar" ? "المستخدم" : "User"}</TableHead>
+                    <TableHead>{lang === "ar" ? "الأدوار" : "Roles"}</TableHead>
+                    <TableHead>{lang === "ar" ? "الربط / الفرع" : "Branch / Link"}</TableHead>
+                    <TableHead className="w-[64px] text-end">{lang === "ar" ? "إجراءات" : "Actions"}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paged.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4} className="p-10 text-center text-muted-foreground">
+                        {t("noData")}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {paged.map((u) => {
+                    const userRoles = roles[u.id] ?? [];
+                    const linked = !!staffLinks[u.id]?.branch_id;
+                    const isSelf = currentUserId === u.id;
+                    return (
+                      <TableRow key={u.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="size-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold shrink-0">
+                              {(u.full_name ?? u.email ?? "?").slice(0, 1).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-medium truncate">{u.full_name ?? "—"}</div>
+                              <div className="text-xs text-muted-foreground truncate">{u.email}</div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {userRoles.length === 0 && (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                            {userRoles.map((r) => (
+                              <Badge key={r} variant="outline" className="capitalize">{r}</Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1 items-center">
+                            {linked ? (
+                              <Badge variant="outline" className="gap-1 text-primary">
+                                <Link2 className="size-3" />
+                                {lang === "ar" ? "مربوط" : "Linked"}
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="gap-1">
+                                {lang === "ar" ? "غير مربوط" : "Unlinked"}
+                              </Badge>
+                            )}
+                            {userRoles.includes("manager") && !linked && (
+                              <Badge variant="destructive" className="gap-1">
+                                <AlertTriangle className="size-3" />
+                                {lang === "ar" ? "بدون فرع" : "No branch"}
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-end">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" aria-label="actions">
+                                <MoreHorizontal className="size-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openEdit(u)}>
+                                <Pencil className="me-2 size-4" />
+                                {t("edit")}
+                              </DropdownMenuItem>
+                              {!linked && (
+                                <DropdownMenuItem onClick={() => openLinkPicker(u, "link")}>
+                                  <Link2 className="me-2 size-4" />
+                                  {lang === "ar" ? "ربط بموظف" : "Link to employee"}
+                                </DropdownMenuItem>
+                              )}
+                              {linked && !isSelf && (
+                                <>
+                                  <DropdownMenuItem onClick={() => openLinkPicker(u, "replace")}>
+                                    <Users className="me-2 size-4" />
+                                    {lang === "ar" ? "استبدال الموظف" : "Replace employee"}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => setUnlinkTarget(u)}>
+                                    <Link2Off className="me-2 size-4" />
+                                    {lang === "ar" ? "فك الربط" : "Unlink"}
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => { setRPassword(""); setResetTarget(u); }}>
+                                <Lock className="me-2 size-4" />
+                                {lang === "ar" ? "إعادة تعيين كلمة المرور" : "Reset password"}
+                              </DropdownMenuItem>
+                              {!isSelf && (
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={() => setDeleteTarget(u)}
+                                >
+                                  <Trash2 className="me-2 size-4" />
+                                  {t("delete")}
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+              <TablePager
+                page={currentPage}
+                pageSize={PAGE_SIZE}
+                total={filtered.length}
+                onPageChange={setPage}
+              />
+            </>
+          )}
+        </Card>
 
         <div className="space-y-2">
           <h2 className="text-lg font-semibold">{lang === "ar" ? "الدعوات المعلقة" : "Pending invites"}</h2>

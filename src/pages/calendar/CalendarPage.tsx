@@ -992,7 +992,7 @@ export default function CalendarPage() {
         )}
       </Card>
 
-      <div className="grid lg:grid-cols-[1fr,300px] gap-4">
+      <div className="grid grid-cols-1 gap-4">
         {view === "month" ? (
           <Card className="shadow-card p-3">
             <div className="grid grid-cols-7 gap-1 text-center text-[11px] text-muted-foreground mb-2">

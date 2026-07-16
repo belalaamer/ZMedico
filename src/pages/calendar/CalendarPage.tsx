@@ -78,6 +78,17 @@ const statusBlock: Record<Appt["status"], string> = {
   departed:    "bg-muted border-border text-muted-foreground",
 };
 
+// Left-accent border color per status — used to make blocks pop on the grid.
+const statusAccent: Record<Appt["status"], string> = {
+  scheduled:   "border-l-primary",
+  confirmed:   "border-l-emerald-500",
+  in_progress: "border-l-amber-500",
+  completed:   "border-l-emerald-600",
+  cancelled:   "border-l-destructive",
+  no_show:     "border-l-destructive",
+  departed:    "border-l-muted-foreground",
+};
+
 // Default fallback when a branch has no working hours configured.
 const DEFAULT_DAY_START_HOUR = 0;
 const DEFAULT_DAY_END_HOUR = 24; // exclusive

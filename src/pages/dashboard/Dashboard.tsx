@@ -8,6 +8,7 @@ import { Link } from "react-router-dom";
 import {
   Wallet, Receipt, CalendarCheck, FileText, Clock, Users, UserPlus, Stethoscope, Inbox, Landmark, ArrowDownUp,
 } from "lucide-react";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import {
@@ -347,14 +348,14 @@ export default function Dashboard() {
             <Icon className="size-4" />
           </div>
         </div>
-        <div className="mt-3 text-2xl font-bold tabular-nums">{loading ? <Skeleton className="h-7 w-24" /> : value}</div>
+        <div className="mt-3 text-xl md:text-2xl font-bold tabular-nums truncate">{loading ? <Skeleton className="h-7 w-24" /> : value}</div>
         {sub && <div className="text-[11px] text-muted-foreground mt-1">{loading ? <Skeleton className="h-3 w-20" /> : sub}</div>}
         {subValue !== undefined && !loading && (
           <div className="text-[11px] text-muted-foreground mt-1 tabular-nums">{subValue}</div>
         )}
       </>
     );
-    const baseCls = "p-4 shadow-card border-border/60 transition-shadow";
+    const baseCls = "p-3 md:p-4 shadow-card border-border/60 transition-shadow";
     if (to && !loading) {
       const ariaLabel = typeof label === "string"
         ? (value !== undefined && value !== null && value !== "" ? `${label}: ${value}` : label)
@@ -375,13 +376,14 @@ export default function Dashboard() {
   };
 
   return (
+    <PullToRefresh onRefresh={run}>
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
+      <div className="flex items-start md:items-center justify-between gap-4 flex-wrap">
+        <div className="min-w-0">
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("dashboard")}</h1>
           <p className="text-sm text-muted-foreground mt-1">{t("tagline")}</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="hidden md:flex gap-2 flex-wrap">
           <Button asChild><Link to="/patients">{t("addPatient")}</Link></Button>
           <Button asChild variant="outline"><Link to="/calendar">{t("newAppointment")}</Link></Button>
           <Button asChild variant="outline"><Link to="/invoices">{t("createInvoice")}</Link></Button>
@@ -389,12 +391,30 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Mobile quick actions — scrollable pill row */}
+      <div className="md:hidden -mx-4 px-4 overflow-x-auto">
+        <div className="flex gap-2 w-max pb-1">
+          <Button asChild size="sm" className="rounded-full whitespace-nowrap">
+            <Link to="/patients"><UserPlus className="size-4 me-1" />{t("addPatient")}</Link>
+          </Button>
+          <Button asChild size="sm" variant="outline" className="rounded-full whitespace-nowrap">
+            <Link to="/calendar"><CalendarCheck className="size-4 me-1" />{t("newAppointment")}</Link>
+          </Button>
+          <Button asChild size="sm" variant="outline" className="rounded-full whitespace-nowrap">
+            <Link to="/invoices"><Receipt className="size-4 me-1" />{t("createInvoice")}</Link>
+          </Button>
+          <Button asChild size="sm" variant="outline" className="rounded-full whitespace-nowrap">
+            <Link to="/reports"><FileText className="size-4 me-1" />{t("viewAllReports")}</Link>
+          </Button>
+        </div>
+      </div>
+
       {/* Date range filter */}
-      <Card className="p-3 shadow-card border-border/60 flex flex-wrap items-end gap-3">
-        <div className="min-w-[160px]">
+      <Card className="p-3 shadow-card border-border/60 flex flex-col md:flex-row md:flex-wrap md:items-end gap-3">
+        <div className="w-full md:w-auto md:min-w-[160px]">
           <div className="text-[11px] text-muted-foreground mb-1">{t("customRange")}</div>
           <Select value={rangePreset} onValueChange={(v) => applyPreset(v as any)}>
-            <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-9 w-full md:w-auto"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="7d">{t("last7Days")}</SelectItem>
               <SelectItem value="30d">{t("last30Days")}</SelectItem>
@@ -403,14 +423,14 @@ export default function Dashboard() {
             </SelectContent>
           </Select>
         </div>
-        <div>
+        <div className="w-full md:w-auto">
           <div className="text-[11px] text-muted-foreground mb-1">{t("fromDate")}</div>
-          <Input type="date" className="h-9 w-40" value={rangeStart}
+          <Input type="date" className="h-9 w-full md:w-40" value={rangeStart}
             onChange={(e) => { setRangeStart(e.target.value); setRangePreset("custom"); }} />
         </div>
-        <div>
+        <div className="w-full md:w-auto">
           <div className="text-[11px] text-muted-foreground mb-1">{t("toDate")}</div>
-          <Input type="date" className="h-9 w-40" value={rangeEnd}
+          <Input type="date" className="h-9 w-full md:w-40" value={rangeEnd}
             onChange={(e) => { setRangeEnd(e.target.value); setRangePreset("custom"); }} />
         </div>
       </Card>
@@ -430,8 +450,8 @@ export default function Dashboard() {
         </Card>
       ) : (
         <>
-          <section>
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">{lang === "ar" ? "اليوم" : "Today"}</h2>
+          <section className="space-y-3">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{lang === "ar" ? "الماليات والخزينة — اليوم" : "Financials & Treasury — Today"}</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
             <StatCard
               label={t("todayAppointments")} value={todayAppts}
@@ -481,8 +501,8 @@ export default function Dashboard() {
           </div>
           </section>
 
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{lang === "ar" ? "هذا الأسبوع" : "This week"}</h2>
-
+          <section className="space-y-3 pt-2 border-t border-border/40">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{lang === "ar" ? "الاتجاهات — هذا الأسبوع" : "Trends — This week"}</h2>
           <div className="grid lg:grid-cols-3 gap-4">
             <Card className="p-5 shadow-card border-border/60 lg:col-span-2">
               <div className="text-sm font-medium mb-3">{t("revenueLast7Days")}</div>
@@ -522,8 +542,10 @@ export default function Dashboard() {
               )}
             </Card>
           </div>
+          </section>
 
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{lang === "ar" ? "هذا الشهر / النطاق" : "This month / range"}</h2>
+          <section className="space-y-3 pt-2 border-t border-border/40">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{lang === "ar" ? "الاتجاهات — هذا الشهر / النطاق" : "Trends — This month / range"}</h2>
           <div className="grid lg:grid-cols-2 gap-4">
             <Card className="p-5 shadow-card border-border/60">
               <div className="text-sm font-medium mb-3">{t("patientsByAge")}</div>
@@ -611,6 +633,10 @@ export default function Dashboard() {
             </Card>
           </div>
 
+          </section>
+
+          <section className="space-y-3 pt-2 border-t border-border/40">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{lang === "ar" ? "العمليات اليومية — أحدث النشاط" : "Daily operations — Recent activity"}</h2>
           <div className="grid lg:grid-cols-3 gap-4">
             <Card className="p-5 shadow-card border-border/60">
               <div className="flex items-center justify-between mb-3">
@@ -678,8 +704,10 @@ export default function Dashboard() {
               }
             </Card>
           </div>
+          </section>
         </>
       )}
     </div>
+    </PullToRefresh>
   );
 }

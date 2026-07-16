@@ -633,6 +633,10 @@ export default function Dashboard() {
             </Card>
           </div>
 
+          </section>
+
+          <section className="space-y-3 pt-2 border-t border-border/40">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{lang === "ar" ? "العمليات اليومية — أحدث النشاط" : "Daily operations — Recent activity"}</h2>
           <div className="grid lg:grid-cols-3 gap-4">
             <Card className="p-5 shadow-card border-border/60">
               <div className="flex items-center justify-between mb-3">
@@ -700,8 +704,10 @@ export default function Dashboard() {
               }
             </Card>
           </div>
+          </section>
         </>
       )}
     </div>
+    </PullToRefresh>
   );
 }

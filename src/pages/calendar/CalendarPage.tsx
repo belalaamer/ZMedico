@@ -730,16 +730,16 @@ export default function CalendarPage() {
             if (view === "month") setDate(new Date(date.getFullYear(), date.getMonth() + 1, 1));
             else setDate(addDays(date, view === "week" ? 7 : 1));
           }}><ChevronRight className="size-4 rtl:rotate-180" /></Button>
-          <Sheet open={miniOpen} onOpenChange={setMiniOpen}>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="lg:hidden" aria-label={lang === "ar" ? "التقويم" : "Calendar"}>
-                <CalendarRange className="size-4" />
+          <Popover open={miniOpen} onOpenChange={setMiniOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="icon" aria-label={lang === "ar" ? "التقويم" : "Calendar"}>
+                <CalendarDays className="size-4" />
               </Button>
-            </SheetTrigger>
-            <SheetContent side={lang === "ar" ? "left" : "right"} className="w-[88vw] sm:w-[360px] p-4 overflow-y-auto">
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-[320px] p-0">
               {sidebarContent}
-            </SheetContent>
-          </Sheet>
+            </PopoverContent>
+          </Popover>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button className="gradient-primary text-primary-foreground hidden md:inline-flex" onClick={openNew}><Plus className="me-2 size-4" />{t("newAppointment")}</Button>

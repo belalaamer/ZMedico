@@ -597,24 +597,25 @@ export default function CalendarPage() {
       id={`appt-${a.id}`}
       onClick={(e) => { e.stopPropagation(); navigate(`/appointments/${a.id}`); }}
       className={cn(
-        "absolute rounded-md border text-start px-2 py-1 overflow-hidden shadow-sm",
+        "absolute rounded-md border border-l-4 text-start px-2 py-1 overflow-hidden shadow-sm",
         "hover:shadow-md hover:z-20 hover:scale-[1.01] transition-all",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
         statusBlock[a.status],
+        statusAccent[a.status],
         highlightId === a.id && "ring-2 ring-primary shadow-lg z-20",
         lanes > 1 && "ring-1 ring-background/60",
       )}
       style={blockStyle(a, lane, lanes)}
       title={`${fullName(a.patients!)} · ${timeStr(new Date(a.scheduled_at))}`}
     >
-      <div className="text-[11px] font-semibold leading-tight truncate">
-        {timeStr(new Date(a.scheduled_at))}
-      </div>
-      <div className="text-[11px] leading-tight truncate">
+      <div className="text-xs font-bold leading-tight truncate">
         {fullName(a.patients!)}
       </div>
+      <div className="text-[11px] leading-tight truncate text-muted-foreground">
+        {timeStr(new Date(a.scheduled_at))}
+      </div>
       {(a.procedure || a.room) && (
-        <div className="text-[10px] opacity-75 truncate">
+        <div className="text-[10px] leading-tight truncate text-muted-foreground/90">
           {a.procedure || "—"}{a.room ? ` · ${a.room}` : ""}
         </div>
       )}

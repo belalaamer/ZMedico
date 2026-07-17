@@ -1999,6 +1999,7 @@ export type Database = {
           created_by: string | null
           deleted_at: string | null
           discount: number
+          doctor_id: string | null
           due_date: string | null
           id: string
           insurance_company_id: string | null
@@ -2026,6 +2027,7 @@ export type Database = {
           created_by?: string | null
           deleted_at?: string | null
           discount?: number
+          doctor_id?: string | null
           due_date?: string | null
           id?: string
           insurance_company_id?: string | null
@@ -2053,6 +2055,7 @@ export type Database = {
           created_by?: string | null
           deleted_at?: string | null
           discount?: number
+          doctor_id?: string | null
           due_date?: string | null
           id?: string
           insurance_company_id?: string | null
@@ -2075,6 +2078,13 @@ export type Database = {
             columns: ["branch_id"]
             isOneToOne: false
             referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_doctor_id_fkey"
+            columns: ["doctor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {

@@ -378,7 +378,7 @@ export default function Staff() {
             </Link>
           </Card>
         ))}
-        {filtered.length === 0 && <Card className="p-10 col-span-full text-center text-muted-foreground">{t("noStaff") || "No staff members found."}</Card>}
+        {filtered.length === 0 && <Card className="p-10 col-span-full text-center text-muted-foreground">No staff members found.</Card>}
       </div>
     </div>
   );

@@ -6,9 +6,48 @@ import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { formatMoney, formatDate } from "@/lib/format";
-import { ReportFilterBar, ReportPageHeader, StatCard } from "./_shared";
+import { ReportFilterBar, ReportPageHeader } from "./_shared";
 import { defaultDateRange, exportReportPDF, exportReportExcel, ageBucket, CHART_COLORS } from "@/lib/reportExport";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, PieChart, Pie, Cell, Legend } from "recharts";
+import { DollarSign, CheckCircle2, Clock, TrendingUp, Users, AlertTriangle, Receipt, Wallet, TrendingDown, PiggyBank } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+type Tone = "primary" | "success" | "warning" | "destructive" | "sky" | "muted";
+
+const toneStyles: Record<Tone, { wrap: string; icon: string; value: string }> = {
+  primary:     { wrap: "bg-primary/5 border-primary/20",           icon: "bg-primary/10 text-primary",                       value: "text-foreground" },
+  success:     { wrap: "bg-emerald-500/5 border-emerald-500/20",   icon: "bg-emerald-500/10 text-emerald-600",               value: "text-emerald-600" },
+  warning:     { wrap: "bg-amber-500/5 border-amber-500/20",       icon: "bg-amber-500/10 text-amber-600",                   value: "text-amber-600" },
+  destructive: { wrap: "bg-destructive/5 border-destructive/20",   icon: "bg-destructive/10 text-destructive",               value: "text-destructive" },
+  sky:         { wrap: "bg-sky-500/5 border-sky-500/20",           icon: "bg-sky-500/10 text-sky-600",                       value: "text-sky-600" },
+  muted:       { wrap: "bg-muted/40 border-border",                icon: "bg-muted text-muted-foreground",                   value: "text-foreground" },
+};
+
+function KpiCard({
+  label, value, tone = "primary", icon: Icon, hero = false, sublabel,
+}: { label: string; value: string; tone?: Tone; icon?: any; hero?: boolean; sublabel?: string }) {
+  const s = toneStyles[tone];
+  return (
+    <Card className={cn("border shadow-sm transition-all hover:shadow-md", s.wrap)}>
+      <CardContent className={cn("flex items-center gap-4", hero ? "p-6" : "p-5")}>
+        {Icon && (
+          <div className={cn("shrink-0 rounded-xl flex items-center justify-center", s.icon, hero ? "w-14 h-14" : "w-11 h-11")}>
+            <Icon className={hero ? "w-7 h-7" : "w-5 h-5"} />
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
+          <div className={cn("tabular-nums font-black leading-tight mt-1", s.value, hero ? "text-4xl md:text-5xl" : "text-2xl")}>
+            {value}
+          </div>
+          {sublabel && <div className="text-xs text-muted-foreground mt-1">{sublabel}</div>}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+const stickyHead = "sticky top-0 bg-muted/80 backdrop-blur z-10 border-b";
 
 export default function FinancialReports() {
   const { t, lang } = useI18n();
@@ -18,15 +57,15 @@ export default function FinancialReports() {
   const [end, setEnd] = useState(dr.end);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <ReportPageHeader title={t("financialReports")} />
       <Tabs defaultValue="revenue">
-        <TabsList className="flex-wrap">
-          <TabsTrigger value="revenue">{t("revenueReport")}</TabsTrigger>
-          <TabsTrigger value="collection">{t("collectionReport")}</TabsTrigger>
-          <TabsTrigger value="outstanding">{t("outstandingReport")}</TabsTrigger>
-          <TabsTrigger value="expense">{t("expenseReport")}</TabsTrigger>
-          <TabsTrigger value="pl">{t("profitLoss")}</TabsTrigger>
+        <TabsList className="flex-wrap bg-muted/50 p-1 rounded-xl h-auto gap-1">
+          <TabsTrigger value="revenue" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-foreground font-medium">{t("revenueReport")}</TabsTrigger>
+          <TabsTrigger value="collection" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-foreground font-medium">{t("collectionReport")}</TabsTrigger>
+          <TabsTrigger value="outstanding" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-foreground font-medium">{t("outstandingReport")}</TabsTrigger>
+          <TabsTrigger value="expense" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-foreground font-medium">{t("expenseReport")}</TabsTrigger>
+          <TabsTrigger value="pl" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-foreground font-medium">{t("profitLoss")}</TabsTrigger>
         </TabsList>
         <TabsContent value="revenue"><RevenueTab start={start} end={end} setStart={setStart} setEnd={setEnd} branchId={currentBranchId} lang={lang} t={t} /></TabsContent>
         <TabsContent value="collection"><CollectionTab start={start} end={end} setStart={setStart} setEnd={setEnd} branchId={currentBranchId} lang={lang} t={t} /></TabsContent>
@@ -80,11 +119,11 @@ function RevenueTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
         onPdf={() => exportReportPDF({ title: t("revenueReport"), subtitle: `${start} → ${end}`, columns: cols, rows: exportRows, summary, lang })}
         onExcel={() => exportReportExcel({ title: t("revenueReport"), columns: cols, rows: exportRows, summary })} />
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <StatCard label={t("totalRevenue")} value={formatMoney(total, lang)} />
-        <StatCard label={t("paid")} value={formatMoney(paid, lang)} />
-        <StatCard label={t("pending")} value={formatMoney(total - paid, lang)} />
+        <KpiCard label={t("totalRevenue")} value={formatMoney(total, lang)} tone="primary" icon={DollarSign} />
+        <KpiCard label={t("paid")} value={formatMoney(paid, lang)} tone="success" icon={CheckCircle2} />
+        <KpiCard label={t("pending")} value={formatMoney(total - paid, lang)} tone="warning" icon={Clock} />
       </div>
-      <Card><CardContent className="pt-6">
+      <Card className="shadow-sm"><CardContent className="pt-6">
         <div className="text-sm font-medium mb-2">{t("revenueTrend")}</div>
         <div style={{ width: "100%", height: 240 }}>
           <ResponsiveContainer><LineChart data={trend}>
@@ -94,20 +133,20 @@ function RevenueTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
           </LineChart></ResponsiveContainer>
         </div>
       </CardContent></Card>
-      <Card><CardContent className="pt-6 overflow-x-auto">
-        <Table><TableHeader><TableRow>
+      <Card className="shadow-sm"><CardContent className="pt-6 overflow-x-auto max-h-[560px]">
+        <Table><TableHeader><TableRow className={stickyHead}>
           <TableHead>{t("date")}</TableHead><TableHead>{t("invoice")}</TableHead>
           <TableHead>{t("patient")}</TableHead><TableHead>{t("status")}</TableHead>
           <TableHead className="text-end">{t("amount")}</TableHead>
         </TableRow></TableHeader>
         <TableBody>
           {rows.map((r) => (
-            <TableRow key={r.id}>
+            <TableRow key={r.id} className="hover:bg-muted/40 transition-colors">
               <TableCell>{formatDate(r.invoice_date, lang)}</TableCell>
               <TableCell className="font-mono text-xs">{r.invoice_number}</TableCell>
               <TableCell>{lang === "ar" ? `${r.patients?.first_name_ar ?? ""} ${r.patients?.last_name_ar ?? ""}` : `${r.patients?.first_name_en ?? ""} ${r.patients?.last_name_en ?? ""}`}</TableCell>
               <TableCell><span className="text-xs px-2 py-0.5 rounded bg-muted">{r.status}</span></TableCell>
-              <TableCell className="text-end">{formatMoney(r.total, lang)}</TableCell>
+              <TableCell className="text-end tabular-nums font-semibold">{formatMoney(r.total, lang)}</TableCell>
             </TableRow>
           ))}
           {!rows.length && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">{t("noData")}</TableCell></TableRow>}
@@ -179,8 +218,8 @@ function CollectionTab({ start, end, setStart, setEnd, branchId, lang, t }: any)
       <ReportFilterBar module="reports_finance" start={start} end={end} setStart={setStart} setEnd={setEnd}
         onPdf={() => exportReportPDF({ title: t("collectionReport"), subtitle: `${start} → ${end}`, columns: customerCols, rows: customerRows, summary: [{ label: t("totalCollected"), value: formatMoney(total, lang) }], lang })}
         onExcel={() => exportReportExcel({ title: t("collectionReport"), columns: customerCols, rows: customerRows, summary: [{ label: t("totalCollected"), value: formatMoney(total, lang) }] })} />
-      <StatCard label={t("totalCollected")} value={formatMoney(total, lang)} />
-      <Card><CardContent className="pt-6">
+      <KpiCard label={t("totalCollected")} value={formatMoney(total, lang)} tone="success" icon={Wallet} hero />
+      <Card className="shadow-sm"><CardContent className="pt-6">
         <div className="text-sm font-medium mb-2">{t("byMethod")}</div>
         <div style={{ width: "100%", height: 260 }}>
           <ResponsiveContainer><PieChart>
@@ -190,28 +229,28 @@ function CollectionTab({ start, end, setStart, setEnd, branchId, lang, t }: any)
           </PieChart></ResponsiveContainer>
         </div>
       </CardContent></Card>
-      <Card><CardContent className="pt-6 overflow-x-auto">
-        <Table><TableHeader><TableRow>
+      <Card className="shadow-sm"><CardContent className="pt-6 overflow-x-auto">
+        <Table><TableHeader><TableRow className={stickyHead}>
           <TableHead>{t("method")}</TableHead><TableHead>{t("count")}</TableHead><TableHead className="text-end">{t("amount")}</TableHead>
         </TableRow></TableHeader>
         <TableBody>{grouped.map((g) => (
-          <TableRow key={g.method}><TableCell className="capitalize">{(t(g.method as any) ?? g.method)}</TableCell><TableCell>{g.count}</TableCell><TableCell className="text-end">{formatMoney(g.amount, lang)}</TableCell></TableRow>
+          <TableRow key={g.method} className="hover:bg-muted/40 transition-colors"><TableCell className="capitalize font-medium">{(t(g.method as any) ?? g.method)}</TableCell><TableCell className="tabular-nums">{g.count}</TableCell><TableCell className="text-end tabular-nums font-semibold">{formatMoney(g.amount, lang)}</TableCell></TableRow>
         ))}{!grouped.length && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">{t("noData")}</TableCell></TableRow>}</TableBody></Table>
       </CardContent></Card>
-      <Card><CardContent className="pt-6 overflow-x-auto">
+      <Card className="shadow-sm"><CardContent className="pt-6 overflow-x-auto max-h-[560px]">
         <div className="text-sm font-medium mb-3">{lang === "ar" ? "حسب العميل" : "By Customer"}</div>
-        <Table><TableHeader><TableRow>
+        <Table><TableHeader><TableRow className={stickyHead}>
           <TableHead>{t("patient")}</TableHead>
           <TableHead>{t("method")}</TableHead>
           <TableHead className="text-end">{t("amount")}</TableHead>
         </TableRow></TableHeader>
         <TableBody>{byCustomer.map((c, i) => (
-          <TableRow key={i}>
-            <TableCell>{c.name}{c.code ? <span className="text-xs text-muted-foreground ms-1">#{c.code}</span> : null}</TableCell>
+          <TableRow key={i} className="hover:bg-muted/40 transition-colors">
+            <TableCell className="font-medium">{c.name}{c.code ? <span className="text-xs text-muted-foreground ms-1">#{c.code}</span> : null}</TableCell>
             <TableCell className="text-xs">{c.methodsList.map((x, j) => (
               <span key={j} className="inline-block me-2">{(t(x.m as any) ?? x.m)}: <span className="font-medium tabular-nums">{formatMoney(x.a, lang)}</span></span>
             ))}</TableCell>
-            <TableCell className="text-end font-semibold tabular-nums">{formatMoney(c.total, lang)}</TableCell>
+            <TableCell className="text-end font-bold tabular-nums text-primary">{formatMoney(c.total, lang)}</TableCell>
           </TableRow>
         ))}{!byCustomer.length && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">{t("noData")}</TableCell></TableRow>}</TableBody></Table>
       </CardContent></Card>
@@ -253,26 +292,36 @@ function OutstandingTab({ branchId, lang, t }: any) {
 
   return (
     <div className="space-y-4 mt-4">
-      <Card><CardContent className="pt-6 flex justify-end gap-2">
+      <Card className="shadow-sm"><CardContent className="pt-6 flex justify-end gap-2">
         <button className="text-sm underline" onClick={() => exportReportPDF({ title: t("outstandingReport"), columns: cols, rows: expRows, summary: [{ label: t("totalOutstanding"), value: formatMoney(total, lang) }], lang })}>PDF</button>
         <button className="text-sm underline" onClick={() => exportReportExcel({ title: t("outstandingReport"), columns: cols, rows: expRows })}>Excel</button>
       </CardContent></Card>
+      <KpiCard label={t("totalOutstanding")} value={formatMoney(total, lang)} tone="destructive" icon={AlertTriangle} hero
+        sublabel={lang === "ar" ? "الإجمالي المستحق حالياً" : "Total currently owed"} />
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {buckets.map((b) => <StatCard key={b.bucket} label={b.bucket} value={formatMoney(b.amount, lang)} />)}
+        {buckets.map((b, i) => {
+          const tones: Tone[] = ["success", "sky", "warning", "destructive"];
+          return <KpiCard key={b.bucket} label={b.bucket} value={formatMoney(b.amount, lang)} tone={tones[i]} />;
+        })}
       </div>
-      <StatCard label={t("totalOutstanding")} value={formatMoney(total, lang)} />
-      <Card><CardContent className="pt-6 overflow-x-auto">
-        <Table><TableHeader><TableRow>
+      <Card className="shadow-sm"><CardContent className="pt-6 overflow-x-auto max-h-[560px]">
+        <Table><TableHeader><TableRow className={stickyHead}>
           <TableHead>{t("invoice")}</TableHead><TableHead>{t("patient")}</TableHead>
           <TableHead>{t("ageDays")}</TableHead><TableHead>{t("ageBucket")}</TableHead>
           <TableHead className="text-end">{t("amount")}</TableHead>
         </TableRow></TableHeader>
         <TableBody>{enriched.map((e) => (
-          <TableRow key={e.id}>
+          <TableRow key={e.id} className="hover:bg-muted/40 transition-colors">
             <TableCell className="font-mono text-xs">{e.invoice_number}</TableCell>
-            <TableCell>{lang === "ar" ? `${e.patients?.first_name_ar ?? ""} ${e.patients?.last_name_ar ?? ""}` : `${e.patients?.first_name_en ?? ""} ${e.patients?.last_name_en ?? ""}`}</TableCell>
-            <TableCell>{e.age}</TableCell><TableCell>{e.bucket}</TableCell>
-            <TableCell className="text-end">{formatMoney(e.outstanding, lang)}</TableCell>
+            <TableCell className="font-medium">{lang === "ar" ? `${e.patients?.first_name_ar ?? ""} ${e.patients?.last_name_ar ?? ""}` : `${e.patients?.first_name_en ?? ""} ${e.patients?.last_name_en ?? ""}`}</TableCell>
+            <TableCell className="tabular-nums">{e.age}</TableCell>
+            <TableCell><span className={cn("text-xs px-2 py-0.5 rounded-full font-medium",
+              e.bucket === "0-30" && "bg-emerald-500/10 text-emerald-600",
+              e.bucket === "31-60" && "bg-sky-500/10 text-sky-600",
+              e.bucket === "61-90" && "bg-amber-500/10 text-amber-600",
+              e.bucket === "90+" && "bg-destructive/10 text-destructive",
+            )}>{e.bucket}</span></TableCell>
+            <TableCell className="text-end tabular-nums font-bold text-destructive">{formatMoney(e.outstanding, lang)}</TableCell>
           </TableRow>
         ))}{!enriched.length && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">{t("noData")}</TableCell></TableRow>}</TableBody></Table>
       </CardContent></Card>
@@ -309,25 +358,25 @@ function ExpenseTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
       <ReportFilterBar module="reports_finance" start={start} end={end} setStart={setStart} setEnd={setEnd}
         onPdf={() => exportReportPDF({ title: t("expenseReport"), subtitle: `${start} → ${end}`, columns: cols, rows: expRows, summary: [{ label: t("totalExpenses"), value: formatMoney(total, lang) }], lang })}
         onExcel={() => exportReportExcel({ title: t("expenseReport"), columns: cols, rows: expRows })} />
-      <StatCard label={t("totalExpenses")} value={formatMoney(total, lang)} />
-      <Card><CardContent className="pt-6">
-        <div className="text-sm font-medium mb-2">{t("byCategory")}</div>
-        <div style={{ width: "100%", height: 260 }}>
+      <KpiCard label={t("totalExpenses")} value={formatMoney(total, lang)} tone="warning" icon={Receipt} hero />
+      <Card className="shadow-sm"><CardContent className="pt-6">
+        <div className="text-sm font-medium mb-2 text-center">{t("byCategory")}</div>
+        <div style={{ width: "100%", height: 280 }} className="mx-auto">
           <ResponsiveContainer><BarChart data={byCat}>
             <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="category" /><YAxis /><Tooltip />
             <Bar dataKey="amount" fill={CHART_COLORS[1]} />
           </BarChart></ResponsiveContainer>
         </div>
       </CardContent></Card>
-      <Card><CardContent className="pt-6 overflow-x-auto">
-        <Table><TableHeader><TableRow>
+      <Card className="shadow-sm"><CardContent className="pt-6 overflow-x-auto max-h-[560px]">
+        <Table><TableHeader><TableRow className={stickyHead}>
           <TableHead>{t("date")}</TableHead><TableHead>{t("category")}</TableHead><TableHead className="text-end">{t("amount")}</TableHead>
         </TableRow></TableHeader>
         <TableBody>{rows.map((r: any) => (
-          <TableRow key={r.id}>
+          <TableRow key={r.id} className="hover:bg-muted/40 transition-colors">
             <TableCell>{formatDate(r.expense_date, lang)}</TableCell>
-            <TableCell>{lang === "ar" ? (r.expense_categories?.name_ar ?? "—") : (r.expense_categories?.name_en ?? "—")}</TableCell>
-            <TableCell className="text-end">{formatMoney(r.amount, lang)}</TableCell>
+            <TableCell className="font-medium">{lang === "ar" ? (r.expense_categories?.name_ar ?? "—") : (r.expense_categories?.name_en ?? "—")}</TableCell>
+            <TableCell className="text-end tabular-nums font-semibold">{formatMoney(r.amount, lang)}</TableCell>
           </TableRow>
         ))}{!rows.length && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">{t("noData")}</TableCell></TableRow>}</TableBody></Table>
       </CardContent></Card>
@@ -376,14 +425,54 @@ function PLTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
       <ReportFilterBar module="reports_finance" start={start} end={end} setStart={setStart} setEnd={setEnd}
         onPdf={() => exportReportPDF({ title: t("profitLoss"), subtitle: `${start} → ${end}`, columns: cols, rows: expRows, lang })}
         onExcel={() => exportReportExcel({ title: t("profitLoss"), columns: cols, rows: expRows })} />
-      <Card><CardContent className="pt-6">
+      <Card className={cn("border-2 shadow-lg", net >= 0 ? "bg-emerald-500/10 border-emerald-500/30" : "bg-destructive/10 border-destructive/30")}>
+        <CardContent className="p-6 flex items-center gap-5">
+          <div className={cn("shrink-0 w-16 h-16 rounded-2xl flex items-center justify-center",
+            net >= 0 ? "bg-emerald-500/20 text-emerald-600" : "bg-destructive/20 text-destructive")}>
+            {net >= 0 ? <PiggyBank className="w-8 h-8" /> : <TrendingDown className="w-8 h-8" />}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              {net >= 0 ? (lang === "ar" ? "صافي الربح" : "Net Profit") : (lang === "ar" ? "صافي الخسارة" : "Net Loss")}
+            </div>
+            <div className={cn("text-4xl md:text-5xl font-black tabular-nums leading-tight mt-1",
+              net >= 0 ? "text-emerald-600" : "text-destructive")}>
+              {formatMoney(net, lang)}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">{start} → {end}</div>
+          </div>
+        </CardContent>
+      </Card>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <KpiCard label={t("totalRevenue")} value={formatMoney(revenue, lang)} tone="success" icon={TrendingUp} />
+        <KpiCard label={t("cogs")} value={formatMoney(cogs, lang)} tone="muted" icon={Receipt} />
+        <KpiCard label={t("totalExpenses")} value={formatMoney(expenses, lang)} tone="warning" icon={Wallet} />
+      </div>
+      <Card className="shadow-sm"><CardContent className="pt-6">
         <Table>
           <TableBody>
-            <TableRow><TableCell className="font-medium">{t("totalRevenue")}</TableCell><TableCell className="text-end">{formatMoney(revenue, lang)}</TableCell></TableRow>
-            <TableRow><TableCell className="text-muted-foreground">{t("cogs")}</TableCell><TableCell className="text-end">({formatMoney(cogs, lang)})</TableCell></TableRow>
-            <TableRow className="border-t-2"><TableCell className="font-semibold">{t("grossProfit")}</TableCell><TableCell className="text-end font-semibold">{formatMoney(gross, lang)}</TableCell></TableRow>
-            <TableRow><TableCell className="text-muted-foreground">{t("totalExpenses")}</TableCell><TableCell className="text-end">({formatMoney(expenses, lang)})</TableCell></TableRow>
-            <TableRow className="border-t-2"><TableCell className="font-bold text-base">{t("netProfit")}</TableCell><TableCell className={`text-end font-bold text-base ${net >= 0 ? "text-green-600" : "text-destructive"}`}>{formatMoney(net, lang)}</TableCell></TableRow>
+            <TableRow className="hover:bg-transparent">
+              <TableCell className="font-semibold text-foreground">{t("totalRevenue")}</TableCell>
+              <TableCell className="text-end tabular-nums font-semibold text-emerald-600">{formatMoney(revenue, lang)}</TableCell>
+            </TableRow>
+            <TableRow className="hover:bg-transparent">
+              <TableCell className="ps-8 text-muted-foreground italic">− {t("cogs")}</TableCell>
+              <TableCell className="text-end tabular-nums text-muted-foreground italic">({formatMoney(cogs, lang)})</TableCell>
+            </TableRow>
+            <TableRow className="border-t-2 border-foreground/30 hover:bg-muted/30">
+              <TableCell className="font-bold uppercase text-xs tracking-wide">{t("grossProfit")}</TableCell>
+              <TableCell className="text-end font-bold tabular-nums">{formatMoney(gross, lang)}</TableCell>
+            </TableRow>
+            <TableRow className="hover:bg-transparent">
+              <TableCell className="ps-8 text-muted-foreground italic">− {t("totalExpenses")}</TableCell>
+              <TableCell className="text-end tabular-nums text-muted-foreground italic">({formatMoney(expenses, lang)})</TableCell>
+            </TableRow>
+            <TableRow className="border-t-4 border-double border-foreground/50 hover:bg-transparent">
+              <TableCell className="font-black text-base uppercase tracking-wider">{t("netProfit")}</TableCell>
+              <TableCell className={cn("text-end font-black text-lg tabular-nums", net >= 0 ? "text-emerald-600" : "text-destructive")}>
+                {formatMoney(net, lang)}
+              </TableCell>
+            </TableRow>
           </TableBody>
         </Table>
       </CardContent></Card>

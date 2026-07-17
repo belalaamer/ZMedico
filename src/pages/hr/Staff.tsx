@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useDataSync } from "@/lib/dataSync";
 import { Link } from "react-router-dom";
-import { Plus, Search, User } from "lucide-react";
+import { Plus, Search, User, MoreHorizontal, Edit3, Trash2, Briefcase, Building2, Banknote, Copy } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,14 +10,13 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
-import { RowActions } from "@/components/RowActions";
 import { useNavigate } from "react-router-dom";
-import { Copy } from "lucide-react";
 import JobRoleSelect from "@/components/JobRoleSelect";
 
 const ROLES = ["admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr", "staff"] as const;

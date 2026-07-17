@@ -7,8 +7,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { formatMoney } from "@/lib/format";
-import { ReportPageHeader, ReportFilterBar, StatCard } from "./_shared";
+import { ReportPageHeader, ReportFilterBar } from "./_shared";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
+import { Wallet, TrendingUp, Award } from "lucide-react";
 
 export default function DoctorCommissions() {
   const { t, lang } = useI18n();
@@ -105,45 +106,75 @@ export default function DoctorCommissions() {
       } />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard label={t("baseAmount")} value={formatMoney(totals.base, lang)} />
-        <StatCard label={t("collectedAmount")} value={formatMoney(totals.collected, lang)} />
-        <StatCard label={t("commissionAmount")} value={formatMoney(totals.commission, lang)} />
+        <Card className="shadow-card hover:shadow-elegant transition-all">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t("baseAmount")}</div>
+              <div className="size-9 rounded-lg bg-muted flex items-center justify-center">
+                <Wallet className="size-4 text-muted-foreground" />
+              </div>
+            </div>
+            <div className="text-2xl font-bold tabular-nums mt-3">{formatMoney(totals.base, lang)}</div>
+          </CardContent>
+        </Card>
+        <Card className="shadow-card hover:shadow-elegant transition-all">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t("collectedAmount")}</div>
+              <div className="size-9 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                <TrendingUp className="size-4 text-emerald-600" />
+              </div>
+            </div>
+            <div className="text-2xl font-bold tabular-nums mt-3">{formatMoney(totals.collected, lang)}</div>
+          </CardContent>
+        </Card>
+        <Card className="shadow-elegant bg-primary/5 border-primary/20">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-semibold text-primary uppercase tracking-wide">{t("commissionAmount")}</div>
+              <div className="size-9 rounded-lg bg-primary/15 flex items-center justify-center">
+                <Award className="size-4 text-primary" />
+              </div>
+            </div>
+            <div className="text-3xl font-black tabular-nums mt-3 text-primary">{formatMoney(totals.commission, lang)}</div>
+          </CardContent>
+        </Card>
       </div>
 
-      <Card>
-        <CardContent className="pt-6 overflow-x-auto">
+      <Card className="shadow-card overflow-hidden">
+        <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-muted/40 text-xs uppercase">
+            <thead className="text-xs uppercase tracking-wide">
               <tr>
-                <th className="text-start p-2">{lang === "ar" ? "الطبيب" : "Doctor"}</th>
-                <th className="text-start p-2">{lang === "ar" ? "المريض" : "Patient"}</th>
-                <th className="text-start p-2">{lang === "ar" ? "الإجراء" : "Procedure"}</th>
-                <th className="text-end p-2">%</th>
-                <th className="text-end p-2">{t("baseAmount")}</th>
-                <th className="text-end p-2">{t("collectedAmount")}</th>
-                <th className="text-end p-2">{t("commissionAmount")}</th>
-                <th className="p-2">{t("commissionStatus")}</th>
+                <th className="sticky top-0 bg-muted/80 backdrop-blur z-10 border-b border-border text-start p-3 font-semibold text-muted-foreground">{lang === "ar" ? "الطبيب" : "Doctor"}</th>
+                <th className="sticky top-0 bg-muted/80 backdrop-blur z-10 border-b border-border text-start p-3 font-semibold text-muted-foreground">{lang === "ar" ? "المريض" : "Patient"}</th>
+                <th className="sticky top-0 bg-muted/80 backdrop-blur z-10 border-b border-border text-start p-3 font-semibold text-muted-foreground">{lang === "ar" ? "الإجراء" : "Procedure"}</th>
+                <th className="sticky top-0 bg-muted/80 backdrop-blur z-10 border-b border-border text-end p-3 font-semibold text-muted-foreground">%</th>
+                <th className="sticky top-0 bg-muted/80 backdrop-blur z-10 border-b border-border text-end p-3 font-semibold text-muted-foreground">{t("baseAmount")}</th>
+                <th className="sticky top-0 bg-muted/80 backdrop-blur z-10 border-b border-border text-end p-3 font-semibold text-muted-foreground">{t("collectedAmount")}</th>
+                <th className="sticky top-0 bg-muted/80 backdrop-blur z-10 border-b border-border text-end p-3 font-semibold text-primary">{t("commissionAmount")}</th>
+                <th className="sticky top-0 bg-muted/80 backdrop-blur z-10 border-b border-border text-center p-3 font-semibold text-muted-foreground">{t("commissionStatus")}</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id} className="border-t border-border">
-                  <td className="p-2">{doctorName(r.doctor_id)}</td>
-                  <td className="p-2">{patientName(r.patients)}</td>
-                  <td className="p-2">{lang === "ar" ? (r.procedures?.name_ar || r.procedures?.name_en) : (r.procedures?.name_en || r.procedures?.name_ar) || "—"}</td>
-                  <td className="p-2 text-end tabular-nums">{Number(r.commission_percent).toFixed(2)}%</td>
-                  <td className="p-2 text-end tabular-nums">{formatMoney(r.base_amount, lang)}</td>
-                  <td className="p-2 text-end tabular-nums">{formatMoney(r.collected_amount, lang)}</td>
-                  <td className="p-2 text-end tabular-nums font-medium text-primary">{formatMoney(r.commission_amount, lang)}</td>
-                  <td className="p-2"><Badge variant="outline" className={statusColor(r.status)}>{r.status}</Badge></td>
+                <tr key={r.id} className="border-t border-border hover:bg-muted/40 transition-colors">
+                  <td className="p-3 font-semibold text-foreground">{doctorName(r.doctor_id)}</td>
+                  <td className="p-3 font-medium text-foreground">{patientName(r.patients)}</td>
+                  <td className="p-3 text-muted-foreground">{lang === "ar" ? (r.procedures?.name_ar || r.procedures?.name_en) : (r.procedures?.name_en || r.procedures?.name_ar) || "—"}</td>
+                  <td className="p-3 text-end tabular-nums text-xs text-muted-foreground">{Number(r.commission_percent).toFixed(2)}%</td>
+                  <td className="p-3 text-end tabular-nums">{formatMoney(r.base_amount, lang)}</td>
+                  <td className="p-3 text-end tabular-nums">{formatMoney(r.collected_amount, lang)}</td>
+                  <td className="p-3 text-end tabular-nums font-bold text-primary">{formatMoney(r.commission_amount, lang)}</td>
+                  <td className="p-3 text-center"><Badge variant="outline" className={statusColor(r.status)}>{r.status}</Badge></td>
                 </tr>
               ))}
               {rows.length === 0 && (
-                <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">{t("noResults") || "No results"}</td></tr>
+                <tr><td colSpan={8} className="p-10 text-center text-muted-foreground">{t("noResults") || "No results"}</td></tr>
               )}
             </tbody>
           </table>
-        </CardContent>
+        </div>
       </Card>
     </div>
   );

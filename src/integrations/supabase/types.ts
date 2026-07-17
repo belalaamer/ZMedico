@@ -6815,6 +6815,10 @@ export type Database = {
         Args: { _plan: string }
         Returns: boolean
       }
+      void_invoice_financials: {
+        Args: { _invoice_id: string; _user_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       addon_status: "active" | "cancelled"

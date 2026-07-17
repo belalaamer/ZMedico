@@ -1,13 +1,16 @@
-import { defineConfig } from "vite";
+import { defineConfig, type PluginOption } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
-const isDev = process.env.NODE_ENV !== "production";
+const plugins: PluginOption[] = [react()];
+if (process.env.NODE_ENV === "development") {
+  plugins.push(componentTagger());
+}
 
 export default defineConfig({
-  plugins: [react(), isDev && componentTagger()].filter(Boolean),
+  plugins: plugins,
   server: {
     host: "::",
     port: 8080,

@@ -352,8 +352,9 @@ Deno.serve(async (req) => {
       if (!patientCache.has(r.patient_id)) {
         const { data } = await supabase
           .from("patients")
-          .select("phone,email")
+          .select("phone,email,deleted_at")
           .eq("id", r.patient_id)
+          .is("deleted_at", null)
           .maybeSingle();
         patientCache.set(r.patient_id, {
           phone: (data as any)?.phone ?? null,

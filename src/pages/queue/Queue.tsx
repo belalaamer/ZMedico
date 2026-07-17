@@ -175,8 +175,9 @@ export default function QueuePage() {
     const to = endOfDay(new Date()).toISOString();
     let q: any = supabase
       .from("appointments")
-      .select("id,patient_id,doctor_id,branch_id,room,scheduled_at,status,procedure,priority,checked_in_at,started_at,is_walk_in,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)")
+      .select("id,patient_id,doctor_id,branch_id,room,scheduled_at,status,procedure,priority,checked_in_at,started_at,is_walk_in,patients!inner(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code,deleted_at)")
       .is("deleted_at", null)
+      .is("patients.deleted_at", null)
       .gte("scheduled_at", from)
       .lte("scheduled_at", to);
     if (currentBranchId) q = q.eq("branch_id", currentBranchId);

@@ -102,7 +102,7 @@ export type Database = {
       }
       appointments: {
         Row: {
-          branch_id: string | null
+          branch_id: string
           checked_in_at: string | null
           created_at: string
           deleted_at: string | null
@@ -121,7 +121,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          branch_id?: string | null
+          branch_id: string
           checked_in_at?: string | null
           created_at?: string
           deleted_at?: string | null
@@ -140,7 +140,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          branch_id?: string | null
+          branch_id?: string
           checked_in_at?: string | null
           created_at?: string
           deleted_at?: string | null
@@ -1989,7 +1989,7 @@ export type Database = {
       }
       invoices: {
         Row: {
-          branch_id: string | null
+          branch_id: string
           claim_amount: number
           claim_number: string | null
           claim_resolved_at: string | null
@@ -2017,7 +2017,7 @@ export type Database = {
           voided_at: string | null
         }
         Insert: {
-          branch_id?: string | null
+          branch_id: string
           claim_amount?: number
           claim_number?: string | null
           claim_resolved_at?: string | null
@@ -2045,7 +2045,7 @@ export type Database = {
           voided_at?: string | null
         }
         Update: {
-          branch_id?: string | null
+          branch_id?: string
           claim_amount?: number
           claim_number?: string | null
           claim_resolved_at?: string | null
@@ -2345,7 +2345,7 @@ export type Database = {
       medical_records: {
         Row: {
           appointment_id: string | null
-          branch_id: string | null
+          branch_id: string
           chief_complaint_ar: string | null
           chief_complaint_en: string | null
           created_at: string
@@ -2366,7 +2366,7 @@ export type Database = {
         }
         Insert: {
           appointment_id?: string | null
-          branch_id?: string | null
+          branch_id: string
           chief_complaint_ar?: string | null
           chief_complaint_en?: string | null
           created_at?: string
@@ -2387,7 +2387,7 @@ export type Database = {
         }
         Update: {
           appointment_id?: string | null
-          branch_id?: string | null
+          branch_id?: string
           chief_complaint_ar?: string | null
           chief_complaint_en?: string | null
           created_at?: string
@@ -6577,6 +6577,36 @@ export type Database = {
           _type: Database["public"]["Enums"]["treasury_tx_type"]
         }
         Returns: string
+      }
+      admin_override_medical_record: {
+        Args: { _admin_id: string; _new_notes: string; _record_id: string }
+        Returns: {
+          appointment_id: string | null
+          branch_id: string
+          chief_complaint_ar: string | null
+          chief_complaint_en: string | null
+          created_at: string
+          deleted_at: string | null
+          doctor_id: string | null
+          follow_up_date: string | null
+          id: string
+          notes_ar: string | null
+          notes_en: string | null
+          patient_id: string
+          present_illness_ar: string | null
+          present_illness_en: string | null
+          specialty_id: string | null
+          status: Database["public"]["Enums"]["medical_record_status"]
+          updated_at: string
+          visit_date: string
+          visit_type: Database["public"]["Enums"]["visit_type"]
+        }
+        SetofOptions: {
+          from: "*"
+          to: "medical_records"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       apply_coupon_code: {
         Args: { _code: string; _subtotal: number }

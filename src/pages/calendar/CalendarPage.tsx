@@ -256,9 +256,10 @@ export default function CalendarPage() {
     const start = rangeStart.toISOString();
     const end = rangeEnd.toISOString();
     let q = supabase.from("appointments")
-      .select("*, patients!inner(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)")
+      .select("*, patients!inner(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code,deleted_at)")
       .gte("scheduled_at", start).lt("scheduled_at", end)
       .is("deleted_at", null)
+      .is("patients.deleted_at", null)
       .order("scheduled_at", { ascending: true });
     if (currentBranchId) q = q.eq("branch_id", currentBranchId);
     const { data, error } = await q;

@@ -456,7 +456,17 @@ function ProceduresTab({ record, specialty, catalog, items, reload, userId }: an
     setSelected(null); setSearch(""); setTooth(""); setQty("1"); setNotes("");
     reload();
   };
-  const remove = async (id: string) => { await supabase.from("record_procedures").delete().eq("id", id); reload(); };
+  const remove = async (id: string) => {
+    const { error } = await supabase.from("record_procedures").delete().eq("id", id);
+    if (error) {
+      const msg = /already been billed/i.test(error.message)
+        ? "Cannot delete a procedure that has already been billed."
+        : error.message;
+      toast.error(msg);
+      return;
+    }
+    reload();
+  };
 
   return (
     <div className="space-y-4">

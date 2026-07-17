@@ -6884,6 +6884,13 @@ export type Database = {
           id: string
         }[]
       }
+      list_therapists: {
+        Args: { _branch_id: string }
+        Returns: {
+          full_name: string
+          id: string
+        }[]
+      }
       merge_staff_position: {
         Args: { source_id: string; target_id: string }
         Returns: undefined

@@ -67,29 +67,35 @@ export default function GeneralSettings() {
 
   return (
     <SettingsLayout>
-      <div className="space-y-6 pb-24">
-        <div className="flex items-center justify-between flex-wrap gap-3 sticky top-0 z-20 bg-background/80 backdrop-blur-md py-3 -mx-1 px-1 border-b">
-          <h1 className="text-2xl font-bold">{t("clinicProfile")}</h1>
+      <div className="pb-24">
+        <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-xl border-b border-border/60 py-4 px-6 -mx-1 flex justify-between items-center flex-wrap gap-3 shadow-sm mb-6">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">{t("clinicProfile")}</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {lang === "ar" ? "إدارة معلومات ومظهر العيادة" : "Manage your clinic identity and public information."}
+            </p>
+          </div>
           <div className="flex items-center gap-2 flex-wrap">
             <Select value={branchId} onValueChange={setBranchId}>
               <SelectTrigger className="w-56"><SelectValue placeholder={t("branch")} /></SelectTrigger>
               <SelectContent>{branches.map(b => <SelectItem key={b.id} value={b.id}>{lang === "ar" ? b.name_ar : b.name_en}</SelectItem>)}</SelectContent>
             </Select>
-            <Button className="gradient-primary text-primary-foreground" onClick={save}>{t("save")}</Button>
+            <Button className="gradient-primary text-primary-foreground shadow-md hover:shadow-lg transition-all" onClick={save}>{t("save")}</Button>
           </div>
         </div>
 
-        <Card>
+        <div className="space-y-6 px-1">
+        <Card className="shadow-sm border-border/50">
           <CardHeader>
             <CardTitle>{lang === "ar" ? "الهوية والعلامة التجارية" : "Brand & Identity"}</CardTitle>
             <CardDescription>{lang === "ar" ? "اسم العيادة، الشعار، ووصف موجز" : "Clinic names, logo, and tagline used across the platform."}</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex items-center gap-5 flex-wrap p-4 rounded-lg border bg-muted/30">
+          <CardContent className="space-y-8">
+            <div className="flex items-center gap-5 flex-wrap p-6 rounded-xl border-2 border-dashed border-muted-foreground/30 hover:border-primary/50 transition-colors bg-muted/20">
               {form.logo_url ? (
-                <img src={form.logo_url} alt="logo" className="h-24 w-24 object-contain rounded-lg border bg-white p-2 shadow-sm" />
+                <img src={form.logo_url} alt="logo" className="h-24 w-24 object-contain rounded-lg border bg-background p-2 shadow-sm" />
               ) : (
-                <div className="h-24 w-24 rounded-lg border bg-background flex items-center justify-center text-muted-foreground">
+                <div className="h-24 w-24 rounded-lg border border-dashed bg-background flex items-center justify-center text-muted-foreground">
                   <ImageIcon className="h-8 w-8" />
                 </div>
               )}
@@ -113,80 +119,80 @@ export default function GeneralSettings() {
               </div>
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground">{lang === "ar" ? "أو الصق رابط صورة" : "Or paste an image URL"}</Label>
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">{lang === "ar" ? "أو الصق رابط صورة" : "Or paste an image URL"}</Label>
               <Input
-                className="mt-1"
                 placeholder="https://..."
                 value={form.logo_url?.startsWith("data:") ? "" : (form.logo_url ?? "")}
                 onChange={e => setForm({ ...form, logo_url: e.target.value })}
               />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div><Label>{t("nameEn2")}</Label><Input value={form.clinic_name_en} onChange={e => setForm({ ...form, clinic_name_en: e.target.value })} /></div>
-              <div><Label>{t("nameAr2")}</Label><Input dir="rtl" value={form.clinic_name_ar} onChange={e => setForm({ ...form, clinic_name_ar: e.target.value })} /></div>
-              <div><Label>{t("tagline2")} (EN)</Label><Input value={form.tagline_en ?? ""} onChange={e => setForm({ ...form, tagline_en: e.target.value })} /></div>
-              <div><Label>{t("tagline2")} (AR)</Label><Input dir="rtl" value={form.tagline_ar ?? ""} onChange={e => setForm({ ...form, tagline_ar: e.target.value })} /></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div><Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">{t("nameEn2")}</Label><Input value={form.clinic_name_en} onChange={e => setForm({ ...form, clinic_name_en: e.target.value })} /></div>
+              <div><Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">{t("nameAr2")}</Label><Input dir="rtl" value={form.clinic_name_ar} onChange={e => setForm({ ...form, clinic_name_ar: e.target.value })} /></div>
+              <div><Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">{t("tagline2")} (EN)</Label><Input value={form.tagline_en ?? ""} onChange={e => setForm({ ...form, tagline_en: e.target.value })} /></div>
+              <div><Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">{t("tagline2")} (AR)</Label><Input dir="rtl" value={form.tagline_ar ?? ""} onChange={e => setForm({ ...form, tagline_ar: e.target.value })} /></div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="shadow-sm border-border/50">
           <CardHeader>
             <CardTitle>{lang === "ar" ? "التواصل والموقع" : "Contact & Location"}</CardTitle>
             <CardDescription>{lang === "ar" ? "معلومات الاتصال والعنوان" : "How patients and partners reach your clinic."}</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div><Label>{t("phone")}</Label><Input value={form.phone ?? ""} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
-              <div><Label>{t("email")}</Label><Input value={form.email ?? ""} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
-              <div className="md:col-span-2"><Label>{t("address")} (AR)</Label><Textarea dir="rtl" value={form.address_ar ?? ""} onChange={e => setForm({ ...form, address_ar: e.target.value })} /></div>
-              <div><Label>{t("city")}</Label><Input value={form.city ?? ""} onChange={e => setForm({ ...form, city: e.target.value })} /></div>
-              <div><Label>Country</Label><Input value={form.country ?? ""} onChange={e => setForm({ ...form, country: e.target.value })} /></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div><Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">{t("phone")}</Label><Input value={form.phone ?? ""} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
+              <div><Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">{t("email")}</Label><Input value={form.email ?? ""} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
+              <div className="md:col-span-2"><Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">{t("address")} (AR)</Label><Textarea dir="rtl" value={form.address_ar ?? ""} onChange={e => setForm({ ...form, address_ar: e.target.value })} /></div>
+              <div><Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">{t("city")}</Label><Input value={form.city ?? ""} onChange={e => setForm({ ...form, city: e.target.value })} /></div>
+              <div><Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">Country</Label><Input value={form.country ?? ""} onChange={e => setForm({ ...form, country: e.target.value })} /></div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="shadow-sm border-border/50">
           <CardHeader>
             <CardTitle>{lang === "ar" ? "ساعات العمل" : "Operating Hours"}</CardTitle>
             <CardDescription>{lang === "ar" ? "أوقات فتح وإغلاق العيادة" : "Default open and close times for this branch."}</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div><Label>{t("workingHours")} Start</Label><Input type="time" value={form.working_hours_start} onChange={e => setForm({ ...form, working_hours_start: e.target.value })} /></div>
-              <div><Label>{t("workingHours")} End</Label><Input type="time" value={form.working_hours_end} onChange={e => setForm({ ...form, working_hours_end: e.target.value })} /></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div><Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">{t("workingHours")} Start</Label><Input type="time" value={form.working_hours_start} onChange={e => setForm({ ...form, working_hours_start: e.target.value })} /></div>
+              <div><Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">{t("workingHours")} End</Label><Input type="time" value={form.working_hours_end} onChange={e => setForm({ ...form, working_hours_end: e.target.value })} /></div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="shadow-sm border-border/50">
           <CardHeader>
             <CardTitle>{lang === "ar" ? "روابط التواصل الاجتماعي" : "Social Links"}</CardTitle>
             <CardDescription>{lang === "ar" ? "روابط منصات التواصل الرسمية" : "Public profiles displayed on receipts and portals."}</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div><Label>Facebook</Label><Input value={form.social_facebook ?? ""} onChange={e => setForm({ ...form, social_facebook: e.target.value })} /></div>
-              <div><Label>Instagram</Label><Input value={form.social_instagram ?? ""} onChange={e => setForm({ ...form, social_instagram: e.target.value })} /></div>
-              <div><Label>WhatsApp</Label><Input value={form.social_whatsapp ?? ""} onChange={e => setForm({ ...form, social_whatsapp: e.target.value })} /></div>
-              <div><Label>Twitter / X</Label><Input value={form.social_twitter ?? ""} onChange={e => setForm({ ...form, social_twitter: e.target.value })} /></div>
-              <div><Label>YouTube</Label><Input value={form.social_youtube ?? ""} onChange={e => setForm({ ...form, social_youtube: e.target.value })} /></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div><Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">Facebook</Label><Input value={form.social_facebook ?? ""} onChange={e => setForm({ ...form, social_facebook: e.target.value })} /></div>
+              <div><Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">Instagram</Label><Input value={form.social_instagram ?? ""} onChange={e => setForm({ ...form, social_instagram: e.target.value })} /></div>
+              <div><Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">WhatsApp</Label><Input value={form.social_whatsapp ?? ""} onChange={e => setForm({ ...form, social_whatsapp: e.target.value })} /></div>
+              <div><Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">Twitter / X</Label><Input value={form.social_twitter ?? ""} onChange={e => setForm({ ...form, social_twitter: e.target.value })} /></div>
+              <div><Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">YouTube</Label><Input value={form.social_youtube ?? ""} onChange={e => setForm({ ...form, social_youtube: e.target.value })} /></div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="shadow-sm border-border/50">
           <CardHeader>
             <CardTitle>{lang === "ar" ? "الفوترة والمعلومات القانونية" : "Legal & Billing"}</CardTitle>
             <CardDescription>{lang === "ar" ? "الأرقام الضريبية والتجارية للعيادة" : "Registration numbers used on invoices and legal documents."}</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div><Label>{t("taxRegistrationNumber")}</Label><Input value={form.tax_registration_number ?? ""} onChange={e => setForm({ ...form, tax_registration_number: e.target.value })} /></div>
-              <div><Label>{t("commercialRegistrationNumber")}</Label><Input value={form.commercial_registration_number ?? ""} onChange={e => setForm({ ...form, commercial_registration_number: e.target.value })} /></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div><Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">{t("taxRegistrationNumber")}</Label><Input value={form.tax_registration_number ?? ""} onChange={e => setForm({ ...form, tax_registration_number: e.target.value })} /></div>
+              <div><Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">{t("commercialRegistrationNumber")}</Label><Input value={form.commercial_registration_number ?? ""} onChange={e => setForm({ ...form, commercial_registration_number: e.target.value })} /></div>
             </div>
           </CardContent>
         </Card>
+        </div>
 
         <div className="fixed bottom-0 inset-x-0 z-30 border-t bg-background/90 backdrop-blur-md md:hidden">
           <div className="p-3 flex justify-end">

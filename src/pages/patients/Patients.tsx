@@ -25,6 +25,7 @@ import { Fab } from "@/components/ui/fab";
 import { ReferrerPicker } from "./ReferrerPicker";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { TablePager } from "@/components/TablePager";
+import { CreateInvoiceDialog } from "../invoices/CreateInvoiceDialog";
 
 const PAGE_SIZE = 50;
 
@@ -74,6 +75,7 @@ export default function PatientsPage() {
   const [duesByPatient, setDuesByPatient] = useState<Record<string, number>>({});
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
+  const [invoiceForPatient, setInvoiceForPatient] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     name: "", phone: "", phone2: "", email: "",
@@ -333,7 +335,7 @@ export default function PatientsPage() {
                             <DropdownMenuItem onClick={() => navigate(`/calendar?patient_id=${p.id}`)}>
                               <CalendarIcon className="size-4 me-2" /> {lang === "ar" ? "حجز موعد" : "Book Appointment"}
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => navigate(`/invoices/new?patient_id=${p.id}`)}>
+                            <DropdownMenuItem onClick={() => setInvoiceForPatient(p.id)}>
                               <FileText className="size-4 me-2" /> {lang === "ar" ? "إنشاء فاتورة" : "Create Invoice"}
                             </DropdownMenuItem>
                             {authz.can("patients.delete") && (
@@ -384,6 +386,13 @@ export default function PatientsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <CreateInvoiceDialog
+        open={!!invoiceForPatient}
+        onOpenChange={(o) => !o && setInvoiceForPatient(null)}
+        presetPatientId={invoiceForPatient ?? undefined}
+        onSaved={() => setInvoiceForPatient(null)}
+      />
     </div>
     </PullToRefresh>
   );

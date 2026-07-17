@@ -493,7 +493,7 @@ function PrescriptionDialog({
       ]);
       const seen = new Set<string>();
       const merged: any[] = [];
-      for (const row of [...(primary.data ?? []), ...(arabic.data ?? [])]) {
+      for (const row of [...((primary.data ?? []) as any[]), ...((arabic.data ?? []) as any[])]) {
         if (seen.has(row.id)) continue;
         seen.add(row.id);
         merged.push(row);

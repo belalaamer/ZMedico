@@ -28,8 +28,8 @@ function isDigits(q: string): boolean {
 }
 
 function esc(q: string): string {
-  // PostgREST .or() values: escape commas and parens that would break filter parsing
-  return q.replace(/[(),]/g, "\\$&");
+  // Strip PostgREST filter meta-characters to prevent filter injection via .or()
+  return q.replace(/[,()"]/g, "");
 }
 
 export async function searchPatients(

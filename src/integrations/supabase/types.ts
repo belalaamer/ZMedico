@@ -6877,6 +6877,13 @@ export type Database = {
         Returns: boolean
       }
       is_tenant_owner: { Args: { _tenant_id: string }; Returns: boolean }
+      list_doctors: {
+        Args: never
+        Returns: {
+          full_name: string
+          id: string
+        }[]
+      }
       merge_staff_position: {
         Args: { source_id: string; target_id: string }
         Returns: undefined

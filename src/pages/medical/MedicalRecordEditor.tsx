@@ -93,11 +93,30 @@ export default function MedicalRecordEditor() {
   // ============ Overview save ============
   const updateRecord = async (patch: any) => {
     setSaving(true);
-    const { error } = await supabase.from("medical_records").update(patch).eq("id", record.id);
-    setSaving(false);
-    if (error) return toast.error(error.message);
-    toast.success(t("save"));
-    setRecord({ ...record, ...patch });
+    try {
+      const { error } = await supabase.from("medical_records").update(patch).eq("id", record.id);
+      if (error) throw error;
+      toast.success(t("save"));
+      setRecord({ ...record, ...patch });
+    } catch (e: any) {
+      const msg = String(e?.message ?? "");
+      if (/lock|immutab|only.*attending|attending.*doctor|not allowed to edit/i.test(msg)) {
+        toast.error(
+          lang === "ar"
+            ? "هذا السجل مقفل. يُرجى التواصل مع المسؤول لإجراء تعديل."
+            : "This record is locked. Please contact an admin for override.",
+          {
+            description: lang === "ar"
+              ? "لا يمكن تعديل السجلات المكتملة إلا من قِبل الطبيب المعالج خلال فترة السماح."
+              : "Completed records can only be edited by the attending doctor within the grace window.",
+          }
+        );
+      } else {
+        toast.error(msg || (lang === "ar" ? "تعذر الحفظ" : "Save failed"));
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -136,6 +155,22 @@ export default function MedicalRecordEditor() {
           </div>
         </div>
       </Card>
+
+      {record.status !== "draft" && (
+        <Card className="p-3 flex items-start gap-3 border-amber-500/30 bg-amber-500/5">
+          <div className="text-amber-600 dark:text-amber-400 mt-0.5">⚠</div>
+          <div className="text-sm">
+            <div className="font-semibold text-amber-700 dark:text-amber-300">
+              {lang === "ar" ? "سجل مقفل" : "Record locked"}
+            </div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              {lang === "ar"
+                ? "التعديلات مسموحة فقط للطبيب المعالج خلال فترة السماح. لتغييرات لاحقة تواصل مع المسؤول."
+                : "Edits are limited to the attending doctor within the grace window. For later changes, contact an admin for override."}
+            </div>
+          </div>
+        </Card>
+      )}
 
       <Tabs defaultValue="overview">
         <TabsList className="flex-wrap h-auto">
@@ -457,15 +492,33 @@ function ProceduresTab({ record, specialty, catalog, items, reload, userId }: an
     reload();
   };
   const remove = async (id: string) => {
-    const { error } = await supabase.from("record_procedures").delete().eq("id", id);
-    if (error) {
-      const msg = /already been billed/i.test(error.message)
-        ? "Cannot delete a procedure that has already been billed."
-        : error.message;
-      toast.error(msg);
-      return;
+    try {
+      const { error } = await supabase.from("record_procedures").delete().eq("id", id);
+      if (error) throw error;
+      reload();
+    } catch (e: any) {
+      const msg = String(e?.message ?? "");
+      if (/cannot delete.*procedure|already been billed|linked to.*invoice|paid.*invoice/i.test(msg)) {
+        toast.error(
+          lang === "ar"
+            ? "لا يمكن حذف إجراء مرتبط بفاتورة مدفوعة"
+            : "Cannot delete a procedure linked to a paid invoice",
+          {
+            description: lang === "ar"
+              ? "قم بإلغاء الفاتورة أولاً أو تواصل مع المسؤول."
+              : "Cancel or void the invoice first, or contact an admin.",
+          }
+        );
+      } else if (/lock|immutab|attending.*doctor|not allowed/i.test(msg)) {
+        toast.error(
+          lang === "ar"
+            ? "السجل مقفل — يُرجى التواصل مع المسؤول"
+            : "Record is locked — contact an admin for override"
+        );
+      } else {
+        toast.error(msg || (lang === "ar" ? "تعذر الحذف" : "Delete failed"));
+      }
     }
-    reload();
   };
 
   return (

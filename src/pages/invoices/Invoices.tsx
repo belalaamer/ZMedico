@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useDataSync } from "@/lib/dataSync";
+import { useDataSync, notifyDataChange } from "@/lib/dataSync";
 import { Link } from "react-router-dom";
 import { Plus, Search, FileText, CreditCard, AlertCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -106,6 +106,10 @@ export default function Invoices() {
         _user_id: user?.id ?? null,
       });
       if (voidErr) { toast.error(voidErr.message); return; }
+      notifyDataChange("invoices");
+      notifyDataChange("inventory");
+      notifyDataChange("payments");
+      notifyDataChange("doctor_commissions");
     }
     const { error } = await supabase.from("invoices").update({ deleted_at: nowIso } as any).eq("id", i.id);
     if (error) { toast.error(error.message); return; }

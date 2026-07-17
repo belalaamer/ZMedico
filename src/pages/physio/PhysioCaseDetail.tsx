@@ -66,14 +66,18 @@ export default function PhysioCaseDetail() {
       setAppointmentMap(map);
     }
     if (branchId) {
-      const { data: rs } = await supabase.from("user_roles").select("user_id").in("role", ["doctor", "admin"] as any);
-      const ids = Array.from(new Set((rs ?? []).map((r: any) => r.user_id))).filter(Boolean);
-      if (ids.length) {
-        const { data: tps } = await supabase.from("staff_profiles").select("id,first_name_en,last_name_en").eq("branch_id", branchId).in("id", ids).limit(500);
-        setTherapists((tps as any) ?? []);
-      } else {
-        setTherapists([]);
-      }
+      // Branch-scoped therapist lookup via SECURITY DEFINER RPC so non-admin
+      // physio roles (nurse/receptionist) can populate the therapist dropdown.
+      const { data: tps } = await supabase.rpc("list_therapists", { _branch_id: branchId });
+      const list = ((tps ?? []) as any[]).map((t: any) => {
+        const parts = (t.full_name ?? "").trim().split(/\s+/);
+        return {
+          id: t.id,
+          first_name_en: parts[0] ?? "",
+          last_name_en: parts.slice(1).join(" "),
+        };
+      });
+      setTherapists(list);
     }
   };
   useEffect(() => { loadAll(); }, [id]);

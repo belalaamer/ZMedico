@@ -23,7 +23,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
   useSettingsShadowProbe(pathname);
   if (embedded) return <>{children}</>;
   const showAdminSettings = authz.isSuperAdmin();
-  const items = [
+  const coreItems = [
     { to: "/settings/general", icon: Building2, label: t("clinicProfile") },
     { to: "/settings/branches", icon: GitBranch, label: t("branches") },
     { to: "/settings/appointments", icon: Calendar, label: t("appointmentSettings") },
@@ -34,33 +34,49 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
     { to: "/settings/insurance-contracts", icon: FileSignature, label: t("insuranceContracts") },
     { to: "/settings/communication", icon: Bell, label: t("communicationHub") },
     { to: "/settings/languages", icon: Languages, label: t("languageSettings") },
-    ...(showAdminSettings ? [
+  ];
+  const adminItems = showAdminSettings ? [
       { to: "/settings/roles", icon: ShieldCheck, label: t("rolePermissions") },
       { to: "/settings/users", icon: Users, label: t("userManagement") },
       { to: "/settings/backup", icon: HardDrive, label: t("backupExport") },
       { to: "/settings/audit", icon: ScrollText, label: t("auditLogs") },
       { to: "/settings/qa", icon: FlaskConical, label: "QA Identities" },
-    ] : []),
+  ] : [];
+  const systemItems = [
     { to: "/settings/system", icon: Info, label: t("systemInfo") },
   ];
+  const renderLink = (it: { to: string; icon: any; label: string }) => (
+    <NavLink key={it.to} to={it.to}
+      className={({ isActive }) => cn(
+        "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors",
+        isActive
+          ? "bg-primary/10 text-primary font-semibold"
+          : "text-foreground/80 font-medium hover:bg-muted/50 hover:text-foreground"
+      )}>
+      <it.icon className="size-4 shrink-0" />
+      <span className="truncate">{it.label}</span>
+    </NavLink>
+  );
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
-      <aside className="space-y-1">
-        <div className="flex items-center gap-2 px-2 py-3">
+      <aside className="bg-muted/30 border-r border-border/60 lg:min-h-[calc(100vh-4rem)] p-4 rounded-lg lg:rounded-none">
+        <div className="flex items-center gap-2 px-2 py-3 mb-2">
           <Settings className="size-5 text-primary" />
-          <h2 className="text-lg font-bold">{t("settingsHub")}</h2>
+          <h2 className="text-lg font-bold tracking-tight">{t("settingsHub")}</h2>
         </div>
         <nav className="space-y-0.5">
-          {items.map((it) => (
-            <NavLink key={it.to} to={it.to}
-              className={({ isActive }) => cn(
-                "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                isActive ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-muted"
-              )}>
-              <it.icon className="size-4 shrink-0" />
-              <span className="truncate">{it.label}</span>
-            </NavLink>
-          ))}
+          {coreItems.map(renderLink)}
+          {adminItems.length > 0 && (
+            <div className="my-3 border-t border-border/60 pt-3">
+              <div className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Admin
+              </div>
+              {adminItems.map(renderLink)}
+            </div>
+          )}
+          <div className="my-3 border-t border-border/60 pt-3">
+            {systemItems.map(renderLink)}
+          </div>
         </nav>
       </aside>
       <main className="min-w-0">{children}</main>

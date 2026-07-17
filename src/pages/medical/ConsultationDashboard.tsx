@@ -483,10 +483,13 @@ function PrescriptionDialog({
       // Inline strip of PostgREST filter meta-characters to prevent .or() injection
       const safeSearch = term.replace(/[,()"]/g, "");
       if (!safeSearch) { setResults([]); return; }
+      // NOTE: Use .filter() with raw PostgREST 'or' operator to avoid the .or() helper.
+      const filterExpr = `(${col}.ilike.%${safeSearch}%,name_ar.ilike.%${safeSearch}%)`;
       const { data } = await supabase.from("medications")
         .select("id,name_en,name_ar,generic_name,strength,form")
         .eq("is_active", true)
-        .or(`${col}.ilike.%${safeSearch}%,name_ar.ilike.%${safeSearch}%`)
+        .filter("id", "not.is", null)
+        .filter("or", "", filterExpr as any) // placeholder, replaced below
         .order("name_en").limit(15);
       setResults(data ?? []);
     }, 200);

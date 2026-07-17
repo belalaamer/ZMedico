@@ -185,25 +185,12 @@ export default function Staff() {
           <p className="text-sm text-muted-foreground mt-1">{filtered.length}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
-          <div className="relative w-full md:w-64"><Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" /><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("search")} className="ps-9" /></div>
-          <Select value={filterDept} onValueChange={setFilterDept}><SelectTrigger className="w-full md:w-40"><SelectValue placeholder={t("department")} /></SelectTrigger>
-            <SelectContent><SelectItem value="all">{t("filterAll") || "All"}</SelectItem>{depts.map((d) => <SelectItem key={d.id} value={d.id}>{lang === "ar" ? d.name_ar : d.name_en}</SelectItem>)}</SelectContent>
-          </Select>
-          <Select value={filterStatus} onValueChange={setFilterStatus}><SelectTrigger className="w-full md:w-32"><SelectValue placeholder={t("status")} /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("filterAll") || "All"}</SelectItem>
-              <SelectItem value="active">{t("statusActive")}</SelectItem>
-              <SelectItem value="on_leave">{t("statusOnLeave")}</SelectItem>
-              <SelectItem value="terminated">{t("statusTerminated")}</SelectItem>
-              <SelectItem value="suspended">{t("statusSuspended")}</SelectItem>
-            </SelectContent>
-          </Select>
           <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setEditingId(null); }}>
             <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground w-full md:w-auto"><Plus className="me-2 size-4" />{t("addStaff")}</Button></DialogTrigger>
             <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
               <DialogHeader><DialogTitle>{editingId ? t("edit") : t("newStaff")}</DialogTitle></DialogHeader>
               <Tabs defaultValue="identity" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
+                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 bg-muted/50 p-1 rounded-xl">
                   <TabsTrigger value="identity">Identity & Access</TabsTrigger>
                   <TabsTrigger value="employment">Employment</TabsTrigger>
                   <TabsTrigger value="payroll">Payroll & Leaves</TabsTrigger>
@@ -216,14 +203,18 @@ export default function Staff() {
                     <Button type="button" size="sm" variant={mode === "existing" ? "default" : "outline"} onClick={() => setMode("existing")}>Existing user</Button>
                   </div>}
                   {createdInfo && (
-                    <Card className="p-3 border-success/40 bg-success/5 text-sm">
-                      <div className="font-medium">User created ✓</div>
-                      <div className="mt-1 flex items-center gap-2 flex-wrap">
-                        <span className="text-muted-foreground">Email:</span><span className="font-mono truncate">{createdInfo.email}</span>
-                        <span className="text-muted-foreground ms-3">Password:</span><span className="font-mono">{createdInfo.password}</span>
-                        <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(createdInfo.password); toast.success("Copied"); }}><Copy className="size-3" /></Button>
+                    <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 p-4 rounded-lg flex flex-col gap-2 shadow-[0_0_20px_-5px_hsl(var(--success)/0.4)]">
+                      <div className="font-semibold flex items-center gap-2">✓ User created successfully</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+                        <span className="text-emerald-700/70 dark:text-emerald-400/70">Email</span>
+                        <span className="font-mono truncate">{createdInfo.email}</span>
+                        <span className="text-emerald-700/70 dark:text-emerald-400/70">Password</span>
+                        <span className="flex items-center gap-2">
+                          <span className="font-mono text-base font-bold px-2 py-0.5 rounded bg-emerald-500/15">{createdInfo.password}</span>
+                          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => { navigator.clipboard.writeText(createdInfo.password); toast.success("Copied"); }}><Copy className="size-3.5" /></Button>
+                        </span>
                       </div>
-                    </Card>
+                    </div>
                   )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {editingId ? null : mode === "existing" ? (

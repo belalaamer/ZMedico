@@ -16,11 +16,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney, formatDate } from "@/lib/format";
 import { RowActions } from "@/components/RowActions";
+import { Can } from "@/components/Can";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 
 export default function Expenses() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
   const { user } = useAuth();
+  const { authz } = useAuthorization();
+  const canDelete = authz.can("treasury.delete");
   const [items, setItems] = useState<any[]>([]);
   const [cats, setCats] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
@@ -77,9 +81,11 @@ export default function Expenses() {
           <p className="text-sm text-muted-foreground mt-1">{items.length} {t("expenses").toLowerCase()}</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button className="gradient-primary text-primary-foreground"><Plus className="me-2 size-4" />{t("addExpense")}</Button>
-          </DialogTrigger>
+          <Can module="treasury" action="create">
+            <DialogTrigger asChild>
+              <Button className="gradient-primary text-primary-foreground"><Plus className="me-2 size-4" />{t("addExpense")}</Button>
+            </DialogTrigger>
+          </Can>
           <DialogContent>
             <DialogHeader><DialogTitle>{t("addExpense")}</DialogTitle></DialogHeader>
             <div className="space-y-3">
@@ -148,7 +154,7 @@ export default function Expenses() {
                   </Badge>
                 )}
                 <div className="font-semibold tabular-nums text-destructive">- {formatMoney(x.amount, lang)}</div>
-                <RowActions canEdit={false} onDelete={() => softDelete(x)} />
+                <RowActions canEdit={false} onDelete={canDelete ? () => softDelete(x) : undefined} />
               </div>
             ))}
           </div>

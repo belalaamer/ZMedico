@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useUserRole } from "@/hooks/useUserRole";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,7 +41,8 @@ type ExistingMap = Record<string, { id: string; email: string } | null>;
 type CredMap = Record<string, { email: string; password: string } | undefined>;
 
 export default function QAIdentities() {
-  const { isAdmin, loading: roleLoading } = useUserRole();
+  const { authz, loading: roleLoading } = useAuthorization();
+  const isAdmin = authz.isSuperAdmin();
   const [existing, setExisting] = useState<ExistingMap>({});
   const [creds, setCreds] = useState<CredMap>({});
   const [branchId, setBranchId] = useState<string | null>(null);

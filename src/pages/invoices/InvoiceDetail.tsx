@@ -11,6 +11,7 @@ import { formatMoney, formatDate, formatDateTime } from "@/lib/format";
 import { RecordPaymentDialog } from "../payments/RecordPaymentDialog";
 import { generateInvoicePdf } from "@/lib/invoicePdf";
 import { useAuth } from "@/contexts/AuthContext";
+import { Can } from "@/components/Can";
 import { openWhatsApp, invoiceWhatsAppMessage } from "@/lib/whatsapp";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -189,6 +190,7 @@ export default function InvoiceDetail() {
             <MessageCircle className="me-2 size-4"/>WhatsApp
           </Button>
           {inv.status !== "cancelled" && (
+            <Can module="invoices" action="delete">
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="outline"><X className="me-2 size-4" />{t("cancelInvoice")}</Button>
@@ -204,6 +206,7 @@ export default function InvoiceDetail() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+            </Can>
           )}
         </div>
       </div>

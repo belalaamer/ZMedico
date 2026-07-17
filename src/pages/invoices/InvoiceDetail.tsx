@@ -79,34 +79,13 @@ export default function InvoiceDetail() {
   const statusLabel = ({ draft: t("statusDraft"), pending: t("statusPending"), paid: t("statusPaid"), partial: t("statusPartial"), cancelled: t("statusCancelled") } as any)[inv.status];
 
   const cancelInvoice = async () => {
-    // Restore inventory for product items first
-    if (inv.status !== "draft" && inv.branch_id) {
-      const productItems = items.filter((it: any) => it.item_type === "product" && it.product_id);
-      for (const it of productItems) {
-        const qty = Number(it.quantity) || 0;
-        if (qty > 0) {
-          const { error: txErr } = await (supabase as any).rpc("apply_inventory_tx", {
-            _product_id: it.product_id,
-            _branch_id: inv.branch_id,
-            _type: "return",
-            _signed_qty: qty,
-            _unit_cost: null,
-            _ref_type: "invoice_cancel",
-            _ref_id: inv.id,
-            _notes_en: `Cancelled invoice ${inv.invoice_number}`,
-            _notes_ar: `إلغاء فاتورة ${inv.invoice_number}`,
-            _expiry: null,
-            _batch: null,
-            _by: user?.id ?? null,
-          });
-          if (txErr) toast.error(txErr.message);
-        }
-      }
-      if (productItems.length) toast.success(t("inventoryRestored"));
-    }
-    const { error } = await supabase.from("invoices").update({ status: "cancelled" }).eq("id", inv.id);
+    // Atomic void: cancels invoice + soft-deletes payments + restores stock + cancels commissions.
+    const { error } = await (supabase as any).rpc("void_invoice_financials", {
+      _invoice_id: inv.id,
+      _user_id: user?.id ?? null,
+    });
     if (error) { toast.error(error.message); return; }
-    toast.success("Cancelled");
+    toast.success(lang === "ar" ? "تم إلغاء الفاتورة" : "Invoice cancelled");
     load();
   };
 

@@ -37,6 +37,8 @@ export function CreateInvoiceDialog({
   const { user } = useAuth();
   const [products, setProducts] = useState<any[]>([]);
   const [procedures, setProcedures] = useState<any[]>([]);
+  const [doctors, setDoctors] = useState<Array<{ id: string; full_name: string | null }>>([]);
+  const [doctorId, setDoctorId] = useState<string>("");
   const [stocks, setStocks] = useState<Record<string, number>>({});
   const [patientId, setPatientId] = useState<string>(presetPatientId ?? "");
   const [date, setDate] = useState<string>(new Date().toISOString().slice(0,10));
@@ -116,6 +118,13 @@ export function CreateInvoiceDialog({
       .then(({ data }) => setProcedures((data ?? []).filter((p: any) => p.deleted_at == null && p.is_active !== false)));
     supabase.from("insurance_companies").select("id,name_en,name_ar,default_coverage_ratio,is_active").eq("is_active", true).order("name_en")
       .then(({ data }) => setInsuranceCompanies(data ?? []));
+    // Strict doctor list: only profiles with a verified `doctor` role in user_roles.
+    supabase
+      .from("profiles")
+      .select("id, full_name, user_roles!inner(role)")
+      .eq("user_roles.role", "doctor")
+      .order("full_name")
+      .then(({ data }) => setDoctors((data ?? []) as any));
   }, [open, refetchPatients]);
 
   useDataSync(["patients"], () => {
@@ -302,6 +311,7 @@ export function CreateInvoiceDialog({
       subtotal, discount: discount + couponDiscount, tax,
       status, notes: notes || null,
       created_by: user?.id ?? null,
+      doctor_id: doctorId || null,
       insurance_company_id: insuranceCompanyId || null,
       claim_amount: insuranceCompanyId ? claimAmount : 0,
     };
@@ -413,7 +423,7 @@ export function CreateInvoiceDialog({
       );
     }
     setItems([{ item_type: "service", description_en: "", description_ar: "", quantity: 1, unit_price: 0 }]);
-    setDiscountPct(0); setTaxPct(0); setNotes(""); setPatientId("");
+    setDiscountPct(0); setTaxPct(0); setNotes(""); setPatientId(""); setDoctorId("");
     setInsuranceCompanyId(""); setCoverageRatio(0);
     setActiveContract(null); setLineCoverage([]); setManualOverride(false); setManualClaim(0);
     setCouponCode(""); setCouponInfo(null);

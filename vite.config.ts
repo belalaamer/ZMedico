@@ -4,10 +4,13 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
-const isDev = process.env.NODE_ENV !== "production";
+const plugins = [react()];
+if (process.env.NODE_ENV === "development") {
+  plugins.push(componentTagger());
+}
 
 export default defineConfig({
-  plugins: [react(), isDev && componentTagger()].filter(Boolean),
+  plugins: plugins,
   server: {
     host: "::",
     port: 8080,

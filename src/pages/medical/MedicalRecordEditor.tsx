@@ -93,11 +93,30 @@ export default function MedicalRecordEditor() {
   // ============ Overview save ============
   const updateRecord = async (patch: any) => {
     setSaving(true);
-    const { error } = await supabase.from("medical_records").update(patch).eq("id", record.id);
-    setSaving(false);
-    if (error) return toast.error(error.message);
-    toast.success(t("save"));
-    setRecord({ ...record, ...patch });
+    try {
+      const { error } = await supabase.from("medical_records").update(patch).eq("id", record.id);
+      if (error) throw error;
+      toast.success(t("save"));
+      setRecord({ ...record, ...patch });
+    } catch (e: any) {
+      const msg = String(e?.message ?? "");
+      if (/lock|immutab|only.*attending|attending.*doctor|not allowed to edit/i.test(msg)) {
+        toast.error(
+          lang === "ar"
+            ? "هذا السجل مقفل. يُرجى التواصل مع المسؤول لإجراء تعديل."
+            : "This record is locked. Please contact an admin for override.",
+          {
+            description: lang === "ar"
+              ? "لا يمكن تعديل السجلات المكتملة إلا من قِبل الطبيب المعالج خلال فترة السماح."
+              : "Completed records can only be edited by the attending doctor within the grace window.",
+          }
+        );
+      } else {
+        toast.error(msg || (lang === "ar" ? "تعذر الحفظ" : "Save failed"));
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (

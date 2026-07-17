@@ -147,7 +147,7 @@ function AppContent() {
                 </ProtectedRoute>
               }
             >
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/" element={<PermissionRoute adminOnly><Dashboard /></PermissionRoute>} />
               <Route path="/patients" element={<PermissionRoute><PatientsPage /></PermissionRoute>} />
               <Route path="/patients/:id" element={<PermissionRoute><PatientProfile /></PermissionRoute>} />
               <Route path="/calendar" element={<PermissionRoute><CalendarPage /></PermissionRoute>} />
@@ -217,8 +217,8 @@ function AppContent() {
               <Route path="/branches" element={<PermissionRoute><Branches /></PermissionRoute>} />
               <Route path="/branches/dashboard" element={<PermissionRoute><BranchDashboard /></PermissionRoute>} />
               <Route path="/settings/branches" element={<PermissionRoute><Branches /></PermissionRoute>} />
-              <Route path="/settings" element={<PermissionRoute><GeneralSettings /></PermissionRoute>} />
-              <Route path="/settings/general" element={<PermissionRoute><GeneralSettings /></PermissionRoute>} />
+              <Route path="/settings" element={<PermissionRoute adminOnly><GeneralSettings /></PermissionRoute>} />
+              <Route path="/settings/general" element={<PermissionRoute adminOnly><GeneralSettings /></PermissionRoute>} />
               <Route path="/settings/appointments" element={<PermissionRoute adminOnly><AppointmentSettings /></PermissionRoute>} />
               <Route path="/settings/invoices" element={<PermissionRoute adminOnly><InvoiceSettings /></PermissionRoute>} />
               <Route path="/settings/payments" element={<PermissionRoute adminOnly><PaymentMethodsPage /></PermissionRoute>} />
@@ -239,7 +239,7 @@ function AppContent() {
               <Route path="/settings/backup" element={<PermissionRoute adminOnly><BackupExport /></PermissionRoute>} />
               <Route path="/settings/audit" element={<PermissionRoute adminOnly><AuditLogs /></PermissionRoute>} />
               <Route path="/settings/audit-logs" element={<Navigate to="/settings/audit" replace />} />
-              <Route path="/settings/system" element={<PermissionRoute><SystemInfo /></PermissionRoute>} />
+              <Route path="/settings/system" element={<PermissionRoute adminOnly><SystemInfo /></PermissionRoute>} />
               <Route path="/settings/system-info" element={<Navigate to="/settings/system" replace />} />
               <Route path="/settings/qa" element={<PermissionRoute adminOnly><QAIdentities /></PermissionRoute>} />
               <Route path="/commissions" element={<Navigate to="/reports/commissions" replace />} />

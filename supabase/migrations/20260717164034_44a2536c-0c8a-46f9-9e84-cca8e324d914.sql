@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "ns_select_admin" ON public.notification_settings;

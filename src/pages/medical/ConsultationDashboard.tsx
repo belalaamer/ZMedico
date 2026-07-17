@@ -483,12 +483,23 @@ function PrescriptionDialog({
       // Inline strip of PostgREST filter meta-characters to prevent .or() injection
       const safeSearch = term.replace(/[,()"]/g, "");
       if (!safeSearch) { setResults([]); return; }
-      const { data } = await supabase.from("medications")
+      // Avoid the .or() helper by running two sanitized ilike queries in parallel and merging.
+      const base = () => supabase.from("medications")
         .select("id,name_en,name_ar,generic_name,strength,form")
-        .eq("is_active", true)
-        .or(`${col}.ilike.%${safeSearch}%,name_ar.ilike.%${safeSearch}%`)
-        .order("name_en").limit(15);
-      setResults(data ?? []);
+        .eq("is_active", true);
+      const [primary, arabic] = await Promise.all([
+        base().ilike(col, `%${safeSearch}%`).order("name_en").limit(15),
+        base().ilike("name_ar", `%${safeSearch}%`).order("name_en").limit(15),
+      ]);
+      const seen = new Set<string>();
+      const merged: any[] = [];
+      for (const row of [...((primary.data ?? []) as any[]), ...((arabic.data ?? []) as any[])]) {
+        if (seen.has(row.id)) continue;
+        seen.add(row.id);
+        merged.push(row);
+        if (merged.length >= 15) break;
+      }
+      setResults(merged);
     }, 200);
     return () => clearTimeout(handle);
   }, [q, searchMode]);

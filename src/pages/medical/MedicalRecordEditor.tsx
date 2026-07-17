@@ -156,6 +156,22 @@ export default function MedicalRecordEditor() {
         </div>
       </Card>
 
+      {record.status !== "draft" && (
+        <Card className="p-3 flex items-start gap-3 border-amber-500/30 bg-amber-500/5">
+          <div className="text-amber-600 dark:text-amber-400 mt-0.5">⚠</div>
+          <div className="text-sm">
+            <div className="font-semibold text-amber-700 dark:text-amber-300">
+              {lang === "ar" ? "سجل مقفل" : "Record locked"}
+            </div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              {lang === "ar"
+                ? "التعديلات مسموحة فقط للطبيب المعالج خلال فترة السماح. لتغييرات لاحقة تواصل مع المسؤول."
+                : "Edits are limited to the attending doctor within the grace window. For later changes, contact an admin for override."}
+            </div>
+          </div>
+        </Card>
+      )}
+
       <Tabs defaultValue="overview">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="overview">{t("overviewTab")}</TabsTrigger>

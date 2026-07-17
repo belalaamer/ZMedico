@@ -8,6 +8,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney, formatDate, formatDateTime } from "@/lib/format";
+import { notifyDataChange } from "@/lib/dataSync";
 import { RecordPaymentDialog } from "../payments/RecordPaymentDialog";
 import { generateInvoicePdf } from "@/lib/invoicePdf";
 import { useAuth } from "@/contexts/AuthContext";
@@ -85,6 +86,10 @@ export default function InvoiceDetail() {
       _user_id: user?.id ?? null,
     });
     if (error) { toast.error(error.message); return; }
+    notifyDataChange("invoices");
+    notifyDataChange("inventory");
+    notifyDataChange("payments");
+    notifyDataChange("doctor_commissions");
     toast.success(lang === "ar" ? "تم إلغاء الفاتورة" : "Invoice cancelled");
     load();
   };

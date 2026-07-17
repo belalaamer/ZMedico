@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ListSkeleton } from "@/components/ListSkeleton";
-import { ArrowLeft, ExternalLink, Stethoscope, User as UserIcon, MapPin, Clock, ScrollText } from "lucide-react";
+import { ArrowLeft, ExternalLink, Stethoscope, User as UserIcon, MapPin, Clock, ScrollText, Receipt, CheckCircle2 } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { CreateInvoiceDialog } from "@/pages/invoices/CreateInvoiceDialog";
 
 const SAFE_KEYS = ["status", "doctor_id", "room", "priority", "is_walk_in", "checked_in_at", "started_at"];
 const QUEUE_ACTIONS = [
@@ -33,12 +35,16 @@ function diff(o: any, n: any) {
 
 export default function AppointmentDetailPage() {
   const { t, lang } = useI18n();
+  const nav = useNavigate();
+  const { user } = useAuth();
   const { appointmentId } = useParams<{ appointmentId: string }>();
   const [loading, setLoading] = useState(true);
   const [appt, setAppt] = useState<any | null>(null);
   const [logs, setLogs] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [record, setRecord] = useState<{ id: string } | null>(null);
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const [starting, setStarting] = useState(false);
 
   useEffect(() => {
     if (!appointmentId) return;
@@ -119,7 +125,7 @@ export default function AppointmentDetailPage() {
             <p className="text-xs sm:text-sm text-muted-foreground">{patientName} · {fmt(appt.scheduled_at)}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button asChild variant="outline" size="sm" className="h-9">
             <Link to={`/patients/${appt.patient_id}`}><UserIcon className="size-4 me-1" />{t("openChart")}</Link>
           </Button>
@@ -128,8 +134,70 @@ export default function AppointmentDetailPage() {
               <Link to={`/medical/consultation/${record.id}`}><Stethoscope className="size-4 me-1" />{t("openConsultation")}</Link>
             </Button>
           )}
+          {appt.status === "completed" && !record && (
+            <Button
+              size="sm"
+              className="h-9 gradient-primary text-primary-foreground"
+              disabled={starting}
+              onClick={async () => {
+                setStarting(true);
+                try {
+                  const { data, error } = await supabase
+                    .from("medical_records")
+                    .insert({
+                      patient_id: appt.patient_id,
+                      appointment_id: appt.id,
+                      branch_id: appt.branch_id,
+                      doctor_id: appt.doctor_id ?? user?.id ?? null,
+                      visit_date: new Date().toISOString().slice(0, 10),
+                      visit_type: "consultation",
+                      status: "draft",
+                      created_by: user?.id ?? null,
+                    } as any)
+                    .select("id")
+                    .single();
+                  if (error) throw error;
+                  nav(`/medical/records/${data.id}`);
+                } catch (e: any) {
+                  toast.error(e?.message ?? (lang === "ar" ? "تعذر بدء الاستشارة" : "Could not start consultation"));
+                } finally {
+                  setStarting(false);
+                }
+              }}
+            >
+              <Stethoscope className="size-4 me-1" />
+              {lang === "ar" ? "بدء الاستشارة" : "Start Consultation"}
+            </Button>
+          )}
+          {appt.status === "completed" && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-9 border-primary/30 text-primary hover:bg-primary/10"
+              onClick={() => setInvoiceOpen(true)}
+            >
+              <Receipt className="size-4 me-1" />
+              {lang === "ar" ? "إنشاء فاتورة" : "Generate Invoice"}
+            </Button>
+          )}
         </div>
       </header>
+
+      {appt.status === "completed" && (
+        <Card className="p-4 flex items-start gap-3 border-emerald-500/30 bg-emerald-500/5">
+          <CheckCircle2 className="size-5 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0" />
+          <div className="text-sm">
+            <div className="font-semibold text-emerald-700 dark:text-emerald-300">
+              {lang === "ar" ? "الموعد مكتمل — الخطوات التالية" : "Appointment completed — next steps"}
+            </div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              {lang === "ar"
+                ? "تابع مباشرة إلى السجل الطبي أو إصدار الفاتورة."
+                : "Continue directly to the medical record or issue the invoice."}
+            </div>
+          </div>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="p-4 space-y-3 lg:col-span-1">
@@ -176,6 +244,13 @@ export default function AppointmentDetailPage() {
           )}
         </Card>
       </div>
+
+      <CreateInvoiceDialog
+        open={invoiceOpen}
+        onOpenChange={setInvoiceOpen}
+        presetPatientId={appt.patient_id}
+        onSaved={() => setInvoiceOpen(false)}
+      />
     </div>
   );
 }

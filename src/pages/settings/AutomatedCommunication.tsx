@@ -45,7 +45,8 @@ export default function AutomatedCommunication() {
     (async () => {
       const [{ data: tpls }, { data: ns }] = await Promise.all([
         supabase.from("communication_templates").select("*").eq("branch_id", branchId),
-        supabase.from("notification_settings")
+        // Read via the safe view — secret credentials are DB-blocked for browser clients.
+        (supabase as any).from("safe_notification_settings")
           .select("winback_enabled,winback_inactive_days").eq("branch_id", branchId).maybeSingle(),
       ]);
       setTemplates((tpls ?? []) as Tpl[]);

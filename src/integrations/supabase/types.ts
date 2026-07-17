@@ -6318,6 +6318,125 @@ export type Database = {
       }
     }
     Views: {
+      safe_notification_settings: {
+        Row: {
+          birthday_discount_percentage: number | null
+          branch_id: string | null
+          created_at: string | null
+          email_sender_address: string | null
+          email_sender_name: string | null
+          follow_up_days_after: number | null
+          id: string | null
+          meta_phone_number_id: string | null
+          reminder_channel:
+            | Database["public"]["Enums"]["notification_channel"]
+            | null
+          send_appointment_cancellation: boolean | null
+          send_appointment_confirmation: boolean | null
+          send_appointment_reminders: boolean | null
+          send_birthday_greeting: boolean | null
+          send_follow_up_reminder: boolean | null
+          send_invoice_notification: boolean | null
+          send_payment_receipt: boolean | null
+          sms_api_url: string | null
+          sms_enabled: boolean | null
+          sms_provider: Database["public"]["Enums"]["sms_provider"] | null
+          sms_sender_id: string | null
+          twilio_account_sid: string | null
+          twilio_from_sms: string | null
+          twilio_from_whatsapp: string | null
+          updated_at: string | null
+          whatsapp_api_url: string | null
+          whatsapp_business_number: string | null
+          whatsapp_enabled: boolean | null
+          whatsapp_provider:
+            | Database["public"]["Enums"]["whatsapp_provider"]
+            | null
+          winback_enabled: boolean | null
+          winback_inactive_days: number | null
+        }
+        Insert: {
+          birthday_discount_percentage?: number | null
+          branch_id?: string | null
+          created_at?: string | null
+          email_sender_address?: string | null
+          email_sender_name?: string | null
+          follow_up_days_after?: number | null
+          id?: string | null
+          meta_phone_number_id?: string | null
+          reminder_channel?:
+            | Database["public"]["Enums"]["notification_channel"]
+            | null
+          send_appointment_cancellation?: boolean | null
+          send_appointment_confirmation?: boolean | null
+          send_appointment_reminders?: boolean | null
+          send_birthday_greeting?: boolean | null
+          send_follow_up_reminder?: boolean | null
+          send_invoice_notification?: boolean | null
+          send_payment_receipt?: boolean | null
+          sms_api_url?: string | null
+          sms_enabled?: boolean | null
+          sms_provider?: Database["public"]["Enums"]["sms_provider"] | null
+          sms_sender_id?: string | null
+          twilio_account_sid?: string | null
+          twilio_from_sms?: string | null
+          twilio_from_whatsapp?: string | null
+          updated_at?: string | null
+          whatsapp_api_url?: string | null
+          whatsapp_business_number?: string | null
+          whatsapp_enabled?: boolean | null
+          whatsapp_provider?:
+            | Database["public"]["Enums"]["whatsapp_provider"]
+            | null
+          winback_enabled?: boolean | null
+          winback_inactive_days?: number | null
+        }
+        Update: {
+          birthday_discount_percentage?: number | null
+          branch_id?: string | null
+          created_at?: string | null
+          email_sender_address?: string | null
+          email_sender_name?: string | null
+          follow_up_days_after?: number | null
+          id?: string | null
+          meta_phone_number_id?: string | null
+          reminder_channel?:
+            | Database["public"]["Enums"]["notification_channel"]
+            | null
+          send_appointment_cancellation?: boolean | null
+          send_appointment_confirmation?: boolean | null
+          send_appointment_reminders?: boolean | null
+          send_birthday_greeting?: boolean | null
+          send_follow_up_reminder?: boolean | null
+          send_invoice_notification?: boolean | null
+          send_payment_receipt?: boolean | null
+          sms_api_url?: string | null
+          sms_enabled?: boolean | null
+          sms_provider?: Database["public"]["Enums"]["sms_provider"] | null
+          sms_sender_id?: string | null
+          twilio_account_sid?: string | null
+          twilio_from_sms?: string | null
+          twilio_from_whatsapp?: string | null
+          updated_at?: string | null
+          whatsapp_api_url?: string | null
+          whatsapp_business_number?: string | null
+          whatsapp_enabled?: boolean | null
+          whatsapp_provider?:
+            | Database["public"]["Enums"]["whatsapp_provider"]
+            | null
+          winback_enabled?: boolean | null
+          winback_inactive_days?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_settings_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: true
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staff_profiles_directory: {
         Row: {
           branch_id: string | null

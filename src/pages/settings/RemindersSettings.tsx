@@ -54,7 +54,9 @@ export default function RemindersSettings() {
   useEffect(() => {
     if (!branchId) return;
     (async () => {
-      const { data: ns } = await supabase.from("notification_settings")
+      // Read via the safe view — secret credentials are unreadable to the
+      // browser at the DB layer (column-level GRANT on the base table).
+      const { data: ns } = await (supabase as any).from("safe_notification_settings")
         .select("whatsapp_enabled,sms_enabled,whatsapp_provider,sms_provider,meta_phone_number_id,twilio_account_sid,twilio_from_whatsapp,twilio_from_sms,whatsapp_api_url,sms_api_url,whatsapp_business_number,sms_sender_id")
         .eq("branch_id", branchId).maybeSingle();
       const { data: appt } = await supabase.from("appointment_settings")

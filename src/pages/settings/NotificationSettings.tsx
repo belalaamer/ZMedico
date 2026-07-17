@@ -26,11 +26,13 @@ export default function NotificationSettings() {
   });
   useEffect(() => {
     if (!branchId) return;
-    // Never fetch sensitive credentials (whatsapp_api_key, sms_api_key) into the browser.
-    // We only fetch non-sensitive columns and surface a "configured" indicator for keys.
-    supabase
-      .from("notification_settings")
-      .select("id,branch_id,send_appointment_reminders,reminder_channel,send_appointment_confirmation,send_appointment_cancellation,send_invoice_notification,send_payment_receipt,send_birthday_greeting,birthday_discount_percentage,send_follow_up_reminder,follow_up_days_after,email_sender_name,email_sender_address,sms_sender_id,whatsapp_business_number,whatsapp_api_url,sms_api_url")
+    // Reads go through the safe view — the base table's secret columns
+    // (whatsapp_api_key, sms_api_key, twilio_auth_token) are unreadable to the
+    // browser client at the DB level (column-level GRANT). Writes still target
+    // the base table via upsert below.
+    (supabase as any)
+      .from("safe_notification_settings")
+      .select("*")
       .eq("branch_id", branchId)
       .maybeSingle()
       .then(({ data }) => {

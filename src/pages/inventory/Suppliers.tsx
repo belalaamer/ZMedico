@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Search, Edit3, Phone, Mail, Power, Truck } from "lucide-react";
+import { Plus, Search, Edit3, Phone, Mail, Power, Truck, MoreHorizontal, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,10 +7,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { RowActions } from "@/components/RowActions";
 
 type Supplier = any;
 
@@ -24,6 +30,7 @@ export default function Suppliers() {
   const [form, setForm] = useState({
     name: "", contact_person: "", phone: "", email: "", address: "", tax_number: "", notes: "",
   });
+  const [deleteTarget, setDeleteTarget] = useState<Supplier | null>(null);
 
   const load = async () => {
     const { data } = await supabase.from("suppliers").select("*").is("deleted_at", null).order("name_en");
@@ -88,10 +95,12 @@ export default function Suppliers() {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("suppliers")}</h1>
           <p className="text-sm text-muted-foreground mt-1">{filtered.length}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="relative w-64">
-            <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("search")} className="ps-9" />
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1 bg-card border border-border shadow-sm rounded-lg p-1.5">
+            <div className="relative w-64">
+              <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("search")} className="ps-9 border-0 shadow-none focus-visible:ring-1" />
+            </div>
           </div>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -123,28 +132,79 @@ export default function Suppliers() {
         ) : (
           <div className="divide-y divide-border">
             {filtered.map((s) => (
-              <div key={s.id} className="flex items-center gap-4 p-4">
+              <div key={s.id} className="flex items-center gap-4 p-4 hover:bg-muted/40 transition-colors">
                 <div className="size-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center"><Truck className="size-5" /></div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <div className="font-medium truncate">{lang === "ar" ? s.name_ar : s.name_en}</div>
                     <Badge variant="outline" className={s.is_active ? "status-completed" : "status-departed"}>{s.is_active ? t("active") : t("inactive")}</Badge>
                   </div>
-                  <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
-                    {s.contact_person && <span>{s.contact_person}</span>}
-                    {s.phone && <span className="flex items-center gap-1"><Phone className="size-3" />{s.phone}</span>}
-                    {s.email && <span className="flex items-center gap-1"><Mail className="size-3" />{s.email}</span>}
+                  <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
+                    {s.contact_person && <span className="font-medium">{s.contact_person}</span>}
+                    {s.phone && (
+                      <span className="inline-flex items-center gap-1 bg-muted/60 rounded-md px-2 py-0.5">
+                        <Phone className="size-3 text-blue-500" />
+                        <span className="tabular-nums">{s.phone}</span>
+                      </span>
+                    )}
+                    {s.email && (
+                      <span className="inline-flex items-center gap-1 bg-muted/60 rounded-md px-2 py-0.5">
+                        <Mail className="size-3 text-amber-500" />
+                        <span className="truncate max-w-[220px]">{s.email}</span>
+                      </span>
+                    )}
                   </div>
                 </div>
                 <Badge variant="outline" className="text-[10px]">{counts[s.id] ?? 0} {t("productsCount")}</Badge>
-                <Button variant="ghost" size="icon" onClick={() => openEdit(s)}><Edit3 className="size-4" /></Button>
-                <Button variant="ghost" size="icon" onClick={() => toggleActive(s)}><Power className="size-4" /></Button>
-                <RowActions onEdit={() => openEdit(s)} onDelete={() => softDelete(s)} />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" aria-label="actions">
+                      <MoreHorizontal className="size-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => openEdit(s)}>
+                      <Edit3 className="me-2 size-4" />{t("edit")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => toggleActive(s)}>
+                      <Power className="me-2 size-4" />{s.is_active ? t("inactive") : t("active")}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={() => setDeleteTarget(s)}
+                    >
+                      <Trash2 className="me-2 size-4" />{t("delete")}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             ))}
           </div>
         )}
       </Card>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("confirmDelete")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {lang === "ar"
+                ? "هل أنت متأكد من حذف هذا المورد؟ لا يمكن التراجع عن هذا الإجراء."
+                : "Are you sure you want to delete this supplier? This action cannot be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => { if (deleteTarget) { await softDelete(deleteTarget); setDeleteTarget(null); } }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {t("delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -40,37 +40,95 @@ export default function ReportsDashboard() {
   }, [currentBranchId]);
 
   const links = [
-    { to: "/reports/financial", icon: DollarSign, label: t("financialReports") },
-    { to: "/reports/operational", icon: BarChart3, label: t("operationalReports") },
-    { to: "/reports/medical", icon: Stethoscope, label: t("medicalReports") },
-    { to: "/reports/hr", icon: Briefcase, label: t("hrReports") },
-    { to: "/reports/inventory", icon: Boxes, label: t("inventoryReports") },
-    { to: "/reports/scheduled", icon: ClipboardList, label: t("scheduledReports") },
-    { to: "/reports/commissions", icon: Percent, label: t("doctorCommissions") },
-    { to: "/reports/doctor-performance", icon: Award, label: t("doctorPerformance") },
-    { to: "/physio/reports", icon: Activity, label: lang === "ar" ? "تقارير العلاج الطبيعي" : "Physiotherapy Reports" },
+    { to: "/reports/financial", icon: DollarSign, label: t("financialReports"), desc: lang === "ar" ? "الإيرادات والمصروفات والتدفقات النقدية" : "Revenue, expenses, and cash flow" },
+    { to: "/reports/operational", icon: BarChart3, label: t("operationalReports"), desc: lang === "ar" ? "أداء العيادة والإنتاجية اليومية" : "Clinic performance and daily productivity" },
+    { to: "/reports/medical", icon: Stethoscope, label: t("medicalReports"), desc: lang === "ar" ? "التشخيصات والعلاجات والنتائج السريرية" : "Diagnoses, treatments, and clinical outcomes" },
+    { to: "/reports/hr", icon: Briefcase, label: t("hrReports"), desc: lang === "ar" ? "الحضور والرواتب وأداء الموظفين" : "Attendance, payroll, and staff performance" },
+    { to: "/reports/inventory", icon: Boxes, label: t("inventoryReports"), desc: lang === "ar" ? "المخزون والحركة وتنبيهات النفاد" : "Stock levels, movement, and low-stock alerts" },
+    { to: "/reports/scheduled", icon: ClipboardList, label: t("scheduledReports"), desc: lang === "ar" ? "التقارير المجدولة والمهام الدورية" : "Automated recurring report deliveries" },
+    { to: "/reports/commissions", icon: Percent, label: t("doctorCommissions"), desc: lang === "ar" ? "حساب عمولات الأطباء والمستحقات" : "Doctor commission calculations and payouts" },
+    { to: "/reports/doctor-performance", icon: Award, label: t("doctorPerformance"), desc: lang === "ar" ? "مؤشرات أداء الأطباء والإنتاجية" : "Doctor productivity and performance KPIs" },
+    { to: "/physio/reports", icon: Activity, label: lang === "ar" ? "تقارير العلاج الطبيعي" : "Physiotherapy Reports", desc: lang === "ar" ? "جلسات العلاج الطبيعي وتقدم المرضى" : "Therapy sessions and patient progress" },
+  ];
+
+  const kpis = [
+    {
+      label: t("revenueThisMonth"),
+      value: formatMoney(stats.revenue, lang),
+      icon: DollarSign,
+      iconWrap: "bg-emerald-500/10 text-emerald-600",
+      accent: "from-emerald-500/5 to-transparent",
+    },
+    {
+      label: t("patientsThisMonth"),
+      value: stats.patients,
+      icon: Users,
+      iconWrap: "bg-primary/10 text-primary",
+      accent: "from-primary/5 to-transparent",
+    },
+    {
+      label: t("appointmentsThisMonth"),
+      value: stats.appts,
+      icon: CalendarDays,
+      iconWrap: "bg-sky-500/10 text-sky-600",
+      accent: "from-sky-500/5 to-transparent",
+    },
+    {
+      label: t("pendingInvoices"),
+      value: stats.pending,
+      icon: FileWarning,
+      iconWrap: "bg-warning/15 text-warning-foreground",
+      accent: "from-warning/10 to-transparent",
+    },
   ];
 
   return (
     <div className="space-y-6">
       <ReportPageHeader title={t("reportsDashboard")} />
+      <p className="text-sm text-muted-foreground -mt-4">
+        {lang === "ar" ? "نظرة عامة على الشهر الحالي" : "Current month overview"}
+      </p>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label={t("revenueThisMonth")} value={formatMoney(stats.revenue, lang)} />
-        <StatCard label={t("patientsThisMonth")} value={stats.patients} />
-        <StatCard label={t("appointmentsThisMonth")} value={stats.appts} />
-        <StatCard label={t("pendingInvoices")} value={stats.pending} />
+        {kpis.map((k) => (
+          <Card key={k.label} className={`relative overflow-hidden bg-gradient-to-br ${k.accent} border-border/60`}>
+            <CardContent className="pt-6 pb-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    {k.label}
+                  </div>
+                  <div className="mt-2 text-3xl font-black tabular-nums leading-tight truncate">
+                    {k.value}
+                  </div>
+                </div>
+                <div className={`size-11 shrink-0 rounded-xl flex items-center justify-center ${k.iconWrap}`}>
+                  <k.icon className="size-5" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
+
       <div>
         <h2 className="text-lg font-semibold mb-3">{t("quickReports")}</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {links.map((l) => (
-            <Link key={l.to} to={l.to}>
-              <Card className="hover:shadow-md transition-shadow cursor-pointer">
-                <CardContent className="pt-6 flex items-center gap-3">
-                  <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Link key={l.to} to={l.to} className="group">
+              <Card className="h-full cursor-pointer border-border/60 hover:-translate-y-1 hover:shadow-elegant hover:border-primary/30 transition-all duration-300">
+                <CardContent className="pt-6 pb-5 flex items-start gap-4">
+                  <div className="size-12 shrink-0 rounded-xl bg-primary/5 border border-primary/10 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
                     <l.icon className="size-5 text-primary" />
                   </div>
-                  <div className="font-medium">{l.label}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-base leading-tight group-hover:text-primary transition-colors">
+                      {l.label}
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                      {l.desc}
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </Link>

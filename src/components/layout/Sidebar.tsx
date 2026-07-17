@@ -145,14 +145,14 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
   const toggle = (k: string) => setOpenMap(m => ({ ...m, [k]: !m[k] }));
 
   return (
-    <div className="flex w-full h-full flex-col bg-card text-foreground">
-      <div className="h-16 flex items-center gap-3 px-5 border-b border-border">
-        <div className="size-9 rounded-xl bg-primary/10 flex items-center justify-center">
-          <Stethoscope className="size-5 text-primary" />
+    <div className="flex w-full h-full flex-col bg-sidebar text-sidebar-foreground">
+      <div className="h-16 flex items-center gap-3 px-5 border-b border-sidebar-border">
+        <div className="size-9 rounded-xl bg-sidebar-accent flex items-center justify-center">
+          <Stethoscope className="size-5 text-sidebar-accent-foreground" />
         </div>
         <div>
-          <div className="text-base font-bold text-foreground leading-tight">{t("appName")}</div>
-          <div className="text-[11px] text-muted-foreground">{t("tagline")}</div>
+          <div className="text-base font-bold text-sidebar-primary leading-tight">{t("appName")}</div>
+          <div className="text-[11px] text-sidebar-foreground/70">{t("tagline")}</div>
         </div>
       </div>
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -164,8 +164,8 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
             cn(
               "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
               isActive
-                ? "bg-primary/10 text-primary font-semibold border-l-2 border-primary rounded-l-none"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground font-medium"
+                ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold border-l-2 border-sidebar-primary rounded-l-none"
+                : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground font-medium"
             )
           }
         >
@@ -182,7 +182,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
                 onClick={() => toggle(g.key)}
                 aria-expanded={isOpen}
                 aria-controls={`group-${g.key}`}
-                className="w-full flex items-center gap-2 px-2 py-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground/70 hover:text-foreground transition-colors"
+                className="w-full flex items-center gap-2 px-2 py-1.5 text-[11px] font-bold uppercase tracking-wider text-sidebar-foreground/60 hover:text-sidebar-accent-foreground transition-colors"
               >
                 <g.icon className="size-3.5 shrink-0 opacity-70" />
                 <span className="flex-1 truncate text-start">{g.label}</span>
@@ -215,8 +215,8 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
                         className={({ isActive }) => cn(
                           "flex items-center gap-2.5 px-3 py-2 rounded-md text-[13px] transition-colors duration-150",
                           isActive
-                            ? "bg-primary/10 text-primary font-semibold border-l-2 border-primary rounded-l-none"
-                            : "text-muted-foreground hover:bg-muted hover:text-foreground font-medium"
+                            ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold border-l-2 border-sidebar-primary rounded-l-none"
+                            : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground font-medium"
                         )}>
                         <it.icon className="size-4 shrink-0" />
                         <span className="flex-1 truncate">{it.label}</span>
@@ -232,7 +232,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
           );
         })}
       </nav>
-      <div className="p-4 text-[11px] text-muted-foreground border-t border-border">
+      <div className="p-4 text-[11px] text-sidebar-foreground/60 border-t border-sidebar-border">
         v1.0 · {lang.toUpperCase()}
       </div>
     </div>
@@ -247,7 +247,7 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="hidden md:flex w-64 shrink-0 flex-col border-e border-border bg-card h-dvh sticky top-0">
+    <aside className="hidden md:flex w-64 shrink-0 flex-col border-e border-sidebar-border bg-sidebar h-dvh sticky top-0">
       <SidebarContent />
     </aside>
   );

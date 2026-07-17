@@ -435,7 +435,7 @@ export function CreateInvoiceDialog({
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{t("newInvoice")}</DialogTitle></DialogHeader>
 
-        <div className="grid sm:grid-cols-2 gap-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div className="space-y-2">
             <Label>{t("patientName")}</Label>
             <Combobox
@@ -450,6 +450,25 @@ export function CreateInvoiceDialog({
           <div className="space-y-2">
             <Label>{t("invoiceDate")}</Label>
             <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>
+              {lang === "ar" ? "الطبيب المعالج" : "Attending Doctor"}
+              <span className="ms-1 text-xs text-muted-foreground">
+                ({lang === "ar" ? "اختياري" : "Optional"})
+              </span>
+            </Label>
+            <Combobox
+              value={doctorId || "__none__"}
+              onChange={(v) => setDoctorId(v === "__none__" ? "" : v)}
+              options={[
+                { value: "__none__", label: lang === "ar" ? "بدون طبيب / بيع عام" : "No Doctor / General Sale" },
+                ...doctors.map((d) => ({ value: d.id, label: d.full_name || "—" })),
+              ]}
+              placeholder={lang === "ar" ? "اختر الطبيب" : "Select doctor"}
+              searchPlaceholder={lang === "ar" ? "ابحث عن طبيب..." : "Search doctor..."}
+              emptyText={lang === "ar" ? "لا يوجد أطباء" : "No doctors found"}
+            />
           </div>
         </div>
 

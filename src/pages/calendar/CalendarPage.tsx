@@ -273,11 +273,13 @@ export default function CalendarPage() {
   // Load doctor options for filter
   useEffect(() => {
     (async () => {
-      const { data: roles } = await supabase.from("user_roles").select("user_id").eq("role", "doctor");
-      const ids = (roles ?? []).map((r: any) => r.user_id);
-      if (!ids.length) { setDoctors([]); return; }
-      const { data: profs } = await supabase.from("profiles").select("id, full_name").in("id", ids);
-      const list = (profs ?? []).map((p: any) => ({ id: p.id, full_name: p.full_name ?? p.id.slice(0, 8) }));
+      // Use SECURITY DEFINER RPC so non-admin roles can populate the doctor filter
+      // without direct SELECT on user_roles (which restricts to own row).
+      const { data } = await supabase.rpc("list_doctors");
+      const list = ((data ?? []) as any[]).map((p: any) => ({
+        id: p.id,
+        full_name: p.full_name ?? p.id.slice(0, 8),
+      }));
       list.sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
       setDoctors(list);
     })();

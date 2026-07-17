@@ -476,15 +476,33 @@ function ProceduresTab({ record, specialty, catalog, items, reload, userId }: an
     reload();
   };
   const remove = async (id: string) => {
-    const { error } = await supabase.from("record_procedures").delete().eq("id", id);
-    if (error) {
-      const msg = /already been billed/i.test(error.message)
-        ? "Cannot delete a procedure that has already been billed."
-        : error.message;
-      toast.error(msg);
-      return;
+    try {
+      const { error } = await supabase.from("record_procedures").delete().eq("id", id);
+      if (error) throw error;
+      reload();
+    } catch (e: any) {
+      const msg = String(e?.message ?? "");
+      if (/cannot delete.*procedure|already been billed|linked to.*invoice|paid.*invoice/i.test(msg)) {
+        toast.error(
+          lang === "ar"
+            ? "لا يمكن حذف إجراء مرتبط بفاتورة مدفوعة"
+            : "Cannot delete a procedure linked to a paid invoice",
+          {
+            description: lang === "ar"
+              ? "قم بإلغاء الفاتورة أولاً أو تواصل مع المسؤول."
+              : "Cancel or void the invoice first, or contact an admin.",
+          }
+        );
+      } else if (/lock|immutab|attending.*doctor|not allowed/i.test(msg)) {
+        toast.error(
+          lang === "ar"
+            ? "السجل مقفل — يُرجى التواصل مع المسؤول"
+            : "Record is locked — contact an admin for override"
+        );
+      } else {
+        toast.error(msg || (lang === "ar" ? "تعذر الحذف" : "Delete failed"));
+      }
     }
-    reload();
   };
 
   return (

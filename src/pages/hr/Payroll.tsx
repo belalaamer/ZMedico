@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, FileText, DollarSign, ListChecks, AlertCircle } from "lucide-react";
+import { Plus, FileText, DollarSign, ListChecks, AlertCircle, MoreHorizontal, Trash2, Wallet, Clock, CheckCircle2, Printer, PlusCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,13 +9,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
-import { RowActions } from "@/components/RowActions";
 
 const now = new Date();
 
@@ -35,6 +41,7 @@ export default function Payroll() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [commByStaff, setCommByStaff] = useState<Record<string, number>>({});
   const [commAttached, setCommAttached] = useState<Record<string, boolean>>({});
+  const [confirmDelete, setConfirmDelete] = useState<any | null>(null);
 
   const load = async () => {
     let q = supabase.from("payroll").select("*").eq("period_year", year).eq("period_month", month);
@@ -166,60 +173,162 @@ export default function Payroll() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("payroll")}</h1>
+      </div>
+
+      <div className="bg-card border shadow-sm rounded-lg p-2 flex flex-wrap items-center gap-3">
+        <Button asChild variant="outline" size="sm">
+          <Link to="/hr/pending-commissions"><AlertCircle className="me-2 size-4" />{t("pendingCommissions")}</Link>
+        </Button>
+        <div className="h-6 w-px bg-border mx-1 hidden sm:block" />
         <div className="flex items-center gap-2">
-          <Button asChild variant="outline" size="sm"><Link to="/hr/pending-commissions"><AlertCircle className="me-2 size-4" />{t("pendingCommissions")}</Link></Button>
           <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
-            <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-28 bg-muted/50 border-0"><SelectValue /></SelectTrigger>
             <SelectContent>{[now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1].map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
           </Select>
           <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
-            <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-28 bg-muted/50 border-0"><SelectValue /></SelectTrigger>
             <SelectContent>{Array.from({ length: 12 }, (_, i) => <SelectItem key={i+1} value={String(i+1)}>{String(i+1).padStart(2,"0")}</SelectItem>)}</SelectContent>
           </Select>
-          <Button className="gradient-primary text-primary-foreground" onClick={generate}><Plus className="me-2 size-4" />{t("generatePayroll")}</Button>
+        </div>
+        <div className="ms-auto">
+          <Button className="gradient-primary text-primary-foreground" onClick={generate}>
+            <Plus className="me-2 size-4" />{t("generatePayroll")}
+          </Button>
         </div>
       </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <StatCard label={t("netSalary")} value={formatMoney(total, lang)} icon={<DollarSign className="size-4" />} />
-        <StatCard label={t("statusPending")} value={pendingCount} />
-        <StatCard label={t("statusPaid")} value={paidCount} />
+        <KpiCard
+          label={t("netSalary")}
+          value={formatMoney(total, lang)}
+          icon={<Wallet className="size-5" />}
+          tint="bg-primary/10 text-primary"
+          hero
+        />
+        <KpiCard
+          label={t("statusPending")}
+          value={pendingCount}
+          icon={<Clock className="size-5" />}
+          tint="bg-amber-500/10 text-amber-600 dark:text-amber-400"
+        />
+        <KpiCard
+          label={t("statusPaid")}
+          value={paidCount}
+          icon={<CheckCircle2 className="size-5" />}
+          tint="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+        />
       </div>
-      <Card className="shadow-card overflow-hidden">
-        {items.length === 0 ? <div className="p-10 text-center text-muted-foreground">—</div> : (
-          <div className="divide-y divide-border">
-            {items.map((p) => (
-              <div key={p.id} className="p-3">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">{profName(p.staff_id)}</div>
-                    <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5">
-                      <span>{t("baseSalary")}: <span className="tabular-nums">{formatMoney(p.base_salary, lang)}</span></span>
-                      <span className="text-primary">{t("commissions")}: <span className="tabular-nums font-medium">{formatMoney(commByStaff[p.id] ?? 0, lang)}</span></span>
-                      <span>{t("bonuses")}: <span className="tabular-nums">{formatMoney(
-                        commAttached[p.id]
-                          ? Math.max(0, Number(p.bonuses || 0) - Number(commByStaff[p.id] ?? 0))
-                          : Number(p.bonuses || 0),
-                        lang
-                      )}</span></span>
-                      <span>{t("deductions")}: <span className="tabular-nums">{formatMoney(p.deductions, lang)}</span></span>
+
+      {items.length === 0 ? (
+        <Card className="p-16 text-center shadow-card">
+          <Wallet className="size-10 mx-auto text-muted-foreground/50 mb-3" />
+          <div className="text-sm text-muted-foreground">
+            {lang === "ar" ? "لا توجد سجلات رواتب لهذه الفترة" : "No payroll records for this period"}
+          </div>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {items.map((p) => {
+            const commissions = commByStaff[p.id] ?? 0;
+            const bonusOnly = commAttached[p.id]
+              ? Math.max(0, Number(p.bonuses || 0) - Number(commissions))
+              : Number(p.bonuses || 0);
+            const statusLabel = t(`status${p.status.charAt(0).toUpperCase()}${p.status.slice(1)}` as any);
+            const statusTint =
+              p.status === "paid"
+                ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"
+                : p.status === "approved"
+                ? "bg-sky-500/10 text-sky-600 border-sky-500/20 dark:text-sky-400"
+                : "bg-muted text-muted-foreground border-border";
+            return (
+              <div
+                key={p.id}
+                className="bg-card border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-start gap-4 flex-wrap">
+                  <div className="flex-1 min-w-[240px]">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="text-base font-semibold truncate">{profName(p.staff_id)}</div>
+                      <Badge variant="outline" className={`text-[10px] uppercase tracking-wide ${statusTint}`}>
+                        {statusLabel}
+                      </Badge>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                      <LedgerPart label={t("baseSalary")} value={formatMoney(p.base_salary, lang)} />
+                      <Op sign="+" />
+                      <LedgerPart
+                        label={t("commissions")}
+                        value={formatMoney(commissions, lang)}
+                        tone="add"
+                      />
+                      <Op sign="+" />
+                      <LedgerPart label={t("bonuses")} value={formatMoney(bonusOnly, lang)} tone="add" />
+                      <Op sign="−" />
+                      <LedgerPart label={t("deductions")} value={formatMoney(p.deductions, lang)} tone="sub" />
                     </div>
                   </div>
-                  <Badge variant="outline" className="text-base">{formatMoney(p.net_salary, lang)}</Badge>
-                  <Badge variant="outline" className={p.status === "paid" ? "status-completed" : p.status === "approved" ? "status-confirmed" : ""}>{t(`status${p.status.charAt(0).toUpperCase()}${p.status.slice(1)}` as any)}</Badge>
-                  <Button size="sm" variant="outline" onClick={() => setOpenAdj(p.id)}>{t("addAdjustment")}</Button>
-                  <Button size="sm" variant="outline" onClick={() => openCommissionDetails(p)}>
-                    <ListChecks className="size-4 me-1" />{lang === "ar" ? "تفاصيل العمولات" : "Commission details"}
-                  </Button>
-                  {p.status === "draft" && <Button size="sm" onClick={() => setStatus(p.id, "approved")}>{t("approve")}</Button>}
-                  {p.status === "approved" && <Button size="sm" className="gradient-primary text-primary-foreground" onClick={() => setStatus(p.id, "paid")}>{t("markAsPaid")}</Button>}
-                  <Button size="sm" variant="ghost" onClick={() => window.print()}><FileText className="size-4" /></Button>
-                  <RowActions canEdit={false} onDelete={() => remove(p)} />
+
+                  <div className="text-end">
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("netSalary")}</div>
+                    <div className="text-2xl font-black text-primary tabular-nums leading-tight">
+                      {formatMoney(p.net_salary, lang)}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {p.status === "draft" && (
+                      <Button size="sm" onClick={() => setStatus(p.id, "approved")}>
+                        <CheckCircle2 className="me-2 size-4" />{t("approve")}
+                      </Button>
+                    )}
+                    {p.status === "approved" && (
+                      <Button
+                        size="sm"
+                        className="gradient-primary text-primary-foreground"
+                        onClick={() => setStatus(p.id, "paid")}
+                      >
+                        <Wallet className="me-2 size-4" />{t("markAsPaid")}
+                      </Button>
+                    )}
+                    {p.status === "paid" && (
+                      <Button size="sm" variant="ghost" onClick={() => window.print()}>
+                        <Printer className="me-2 size-4" />{lang === "ar" ? "طباعة" : "Print"}
+                      </Button>
+                    )}
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button size="icon" variant="ghost" aria-label="more">
+                          <MoreHorizontal className="size-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuItem onClick={() => setOpenAdj(p.id)}>
+                          <PlusCircle className="me-2 size-4" />{t("addAdjustment")}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => openCommissionDetails(p)}>
+                          <ListChecks className="me-2 size-4" />
+                          {lang === "ar" ? "تفاصيل العمولات" : "Commission details"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => window.print()}>
+                          <FileText className="me-2 size-4" />{lang === "ar" ? "طباعة" : "Print"}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => setConfirmDelete(p)}
+                        >
+                          <Trash2 className="me-2 size-4" />{t("delete")}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </Card>
+            );
+          })}
+        </div>
+      )}
 
       <Dialog open={!!openAdj} onOpenChange={(o) => !o && setOpenAdj(null)}>
         <DialogContent>
@@ -254,7 +363,7 @@ export default function Payroll() {
               {openDetails && <span className="ms-2 text-sm text-muted-foreground font-normal">— {profName(openDetails.staff_id)}</span>}
             </DialogTitle>
           </DialogHeader>
-          <div className="overflow-x-auto">
+          <div className="overflow-auto max-h-[65vh] rounded-md border">
             {detailLoading ? (
               <div className="p-6 text-center text-muted-foreground text-sm">…</div>
             ) : detailRows.length === 0 ? (
@@ -263,7 +372,7 @@ export default function Payroll() {
               </div>
             ) : (
               <table className="w-full text-sm">
-                <thead className="bg-muted/40 text-xs uppercase">
+                <thead className="sticky top-0 bg-muted/80 backdrop-blur z-10 text-xs uppercase border-b">
                   <tr>
                     <th className="text-start p-2">{lang === "ar" ? "الإجراء" : "Procedure"}</th>
                     <th className="text-start p-2">{lang === "ar" ? "المريض" : "Patient"}</th>
@@ -312,15 +421,69 @@ export default function Payroll() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("confirmDelete")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {lang === "ar"
+                ? "هل أنت متأكد من حذف هذا السجل؟ لا يمكن التراجع عن هذا الإجراء."
+                : "Are you sure you want to delete this record? This action cannot be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => { const p = confirmDelete; setConfirmDelete(null); if (p) await remove(p); }}
+            >
+              {t("delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
 
-function StatCard({ label, value, icon }: { label: string; value: any; icon?: React.ReactNode }) {
+function KpiCard({
+  label, value, icon, tint, hero,
+}: { label: string; value: any; icon?: React.ReactNode; tint?: string; hero?: boolean }) {
   return (
-    <Card className="p-4 shadow-card">
-      <div className="text-xs text-muted-foreground flex items-center gap-1">{icon}{label}</div>
-      <div className="text-xl font-bold mt-1">{value}</div>
+    <Card className="p-5 shadow-card hover:shadow-md transition-shadow">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">{label}</div>
+          <div className={`mt-1 tabular-nums font-bold leading-tight ${hero ? "text-3xl md:text-4xl text-primary" : "text-2xl"}`}>
+            {value}
+          </div>
+        </div>
+        {icon && (
+          <div className={`p-2.5 rounded-lg ${tint ?? "bg-muted text-muted-foreground"}`}>
+            {icon}
+          </div>
+        )}
+      </div>
     </Card>
   );
+}
+
+function LedgerPart({ label, value, tone }: { label: string; value: string; tone?: "add" | "sub" }) {
+  const color =
+    tone === "add"
+      ? "text-emerald-600 dark:text-emerald-400"
+      : tone === "sub"
+      ? "text-destructive"
+      : "text-foreground";
+  return (
+    <span className="inline-flex items-baseline gap-1 rounded-md bg-muted/50 px-2 py-1">
+      <span className="text-muted-foreground">{label}</span>
+      <span className={`tabular-nums font-semibold ${color}`}>{value}</span>
+    </span>
+  );
+}
+
+function Op({ sign }: { sign: string }) {
+  return <span className="text-muted-foreground/60 font-mono text-sm">{sign}</span>;
 }

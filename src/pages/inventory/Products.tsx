@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDataSync } from "@/lib/dataSync";
-import { Plus, Search, Package, Edit3, Power, Copy, Upload, X } from "lucide-react";
+import { Plus, Search, Package, Edit3, Power, Copy, Upload, X, MoreHorizontal, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,12 +11,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
-import { RowActions } from "@/components/RowActions";
 
 const UNITS = ["piece", "box", "bottle", "session", "ml", "g"];
 
@@ -45,6 +51,7 @@ export default function Products() {
   const [edit, setEdit] = useState<Product | null>(null);
   const [form, setForm] = useState(emptyForm());
   const [uploading, setUploading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
 
   const handleImageUpload = async (file: File) => {
     if (!file) return;
@@ -189,25 +196,27 @@ export default function Products() {
           <p className="text-sm text-muted-foreground mt-1">{filtered.length}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="relative w-56">
-            <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("search")} className="ps-9" />
+          <div className="flex items-center gap-1 bg-card border border-border shadow-sm rounded-lg p-1.5">
+            <div className="relative w-56">
+              <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("search")} className="ps-9 border-0 shadow-none focus-visible:ring-1" />
+            </div>
+            <Select value={catFilter} onValueChange={setCatFilter}>
+              <SelectTrigger className="w-44 border-0 shadow-none focus:ring-1"><SelectValue placeholder={t("category")} /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("category")}: {t("none")}</SelectItem>
+                {cats.map((c) => <SelectItem key={c.id} value={c.id}>{lang === "ar" ? c.name_ar : c.name_en}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={activeFilter} onValueChange={setActiveFilter}>
+              <SelectTrigger className="w-32 border-0 shadow-none focus:ring-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("status")}</SelectItem>
+                <SelectItem value="active">{t("active")}</SelectItem>
+                <SelectItem value="inactive">{t("inactive")}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <Select value={catFilter} onValueChange={setCatFilter}>
-            <SelectTrigger className="w-44"><SelectValue placeholder={t("category")} /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("category")}: {t("none")}</SelectItem>
-              {cats.map((c) => <SelectItem key={c.id} value={c.id}>{lang === "ar" ? c.name_ar : c.name_en}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={activeFilter} onValueChange={setActiveFilter}>
-            <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("status")}</SelectItem>
-              <SelectItem value="active">{t("active")}</SelectItem>
-              <SelectItem value="inactive">{t("inactive")}</SelectItem>
-            </SelectContent>
-          </Select>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button className="gradient-primary text-primary-foreground" onClick={openNew}><Plus className="me-2 size-4" />{t("addProduct")}</Button>
@@ -247,10 +256,10 @@ export default function Products() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2 sm:col-span-2">
+                <div className="space-y-2 sm:col-span-2 bg-muted/30 border border-border/60 rounded-lg p-3">
                   <Label>{t("productImage")}</Label>
                   <div className="flex items-center gap-3">
-                    <div className="size-20 rounded-lg bg-muted flex items-center justify-center overflow-hidden border border-border shrink-0">
+                    <div className="size-20 rounded-lg bg-background flex items-center justify-center overflow-hidden border border-border shrink-0 shadow-sm">
                       {form.image_url ? <img src={form.image_url} alt="" className="size-full object-cover" /> : <Package className="size-7 text-muted-foreground" />}
                     </div>
                     <div className="flex-1 space-y-2">
@@ -299,8 +308,8 @@ export default function Products() {
               const st = stockStatus(p);
               const cat = cats.find((c) => c.id === p.category_id);
               return (
-                <div key={p.id} className="flex items-center gap-4 p-4">
-                  <div className="size-12 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
+                <div key={p.id} className="flex items-center gap-4 p-4 hover:bg-muted/30 transition-colors">
+                  <div className="size-12 rounded-lg bg-muted flex items-center justify-center overflow-hidden border border-border/50 shadow-sm shrink-0">
                     {p.image_url ? <img src={p.image_url} alt={p.name_en} className="size-full object-cover" /> : <Package className="size-5 text-muted-foreground" />}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -315,24 +324,68 @@ export default function Products() {
                     </div>
                   </div>
                   <div className="text-end text-sm">
-                    <div className="text-muted-foreground text-[11px]">{t("costPrice")} / {t("sellingPrice")}</div>
-                    <div className="tabular-nums">{formatMoney(p.cost_price, lang)} / <span className="font-semibold text-primary">{formatMoney(p.selling_price, lang)}</span></div>
+                    <div className="text-muted-foreground text-[11px]">{t("sellingPrice")}</div>
+                    <div className="text-base font-bold text-primary tabular-nums">{formatMoney(p.selling_price, lang)}</div>
+                    <div className="text-[11px] text-muted-foreground tabular-nums">{t("costPrice")}: {formatMoney(p.cost_price, lang)}</div>
                   </div>
                   <div className="text-end">
                     <div className="text-[11px] text-muted-foreground">{t("stock")}</div>
                     <div className="font-semibold tabular-nums">{stocks[p.id] ?? 0}</div>
                   </div>
                   <Badge variant="outline" className={st.cls}>{st.label}</Badge>
-                  <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Edit3 className="size-4" /></Button>
-                  <Button variant="ghost" size="icon" onClick={() => duplicate(p)}><Copy className="size-4" /></Button>
-                  <Button variant="ghost" size="icon" onClick={() => toggleActive(p)}><Power className="size-4" /></Button>
-                  <RowActions onEdit={() => openEdit(p)} onDelete={() => softDelete(p)} />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" aria-label="actions">
+                        <MoreHorizontal className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => openEdit(p)}>
+                        <Edit3 className="me-2 size-4" />{t("edit")}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => duplicate(p)}>
+                        <Copy className="me-2 size-4" />{t("duplicate") ?? "Duplicate"}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => toggleActive(p)}>
+                        <Power className="me-2 size-4" />{p.is_active ? t("inactive") : t("active")}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => setDeleteTarget(p)}
+                      >
+                        <Trash2 className="me-2 size-4" />{t("delete")}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               );
             })}
           </div>
         )}
       </Card>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("confirmDelete")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {lang === "ar"
+                ? "هل أنت متأكد من حذف هذا المنتج؟ لا يمكن التراجع عن هذا الإجراء."
+                : "Are you sure you want to delete this product? This action cannot be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => { if (deleteTarget) { await softDelete(deleteTarget); setDeleteTarget(null); } }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {t("delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

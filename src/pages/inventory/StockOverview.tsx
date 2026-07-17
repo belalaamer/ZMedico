@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Package, AlertTriangle, XCircle, Wallet, Plus, ArrowLeftRight } from "lucide-react";
+import { Package, AlertTriangle, XCircle, Wallet, Plus, ArrowLeftRight, ArrowRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -167,12 +167,16 @@ export default function StockOverview() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: t("totalProducts"), value: totalProducts, icon: Package, tone: "from-primary to-primary-glow", money: false },
-          { label: t("lowStock"), value: lowCount, icon: AlertTriangle, tone: "from-warning to-warning", money: false, click: () => setStatusFilter("low") },
-          { label: t("outOfStock"), value: outCount, icon: XCircle, tone: "from-destructive to-destructive", money: false, click: () => setStatusFilter("out") },
-          { label: t("inventoryValue"), value: totalValue, icon: Wallet, tone: "from-success to-success", money: true },
+          { label: t("totalProducts"), value: totalProducts, icon: Package, tone: "from-primary to-primary-glow", money: false, key: "all", click: () => setStatusFilter("all") },
+          { label: t("lowStock"), value: lowCount, icon: AlertTriangle, tone: "from-warning to-warning", money: false, key: "low", click: () => setStatusFilter("low") },
+          { label: t("outOfStock"), value: outCount, icon: XCircle, tone: "from-destructive to-destructive", money: false, key: "out", click: () => setStatusFilter("out") },
+          { label: t("inventoryValue"), value: totalValue, icon: Wallet, tone: "from-success to-success", money: true, key: null },
         ].map((m: any) => (
-          <Card key={m.label} className={`p-4 shadow-card ${m.click ? "cursor-pointer hover:shadow-elegant" : ""}`} onClick={m.click}>
+          <Card
+            key={m.label}
+            className={`p-4 shadow-card transition-all ${m.click ? "cursor-pointer hover:shadow-elegant" : ""} ${m.key && statusFilter === m.key ? "ring-2 ring-primary bg-primary/5" : ""}`}
+            onClick={m.click}
+          >
             <div className="flex items-start justify-between">
               <div className="text-xs font-medium text-muted-foreground">{m.label}</div>
               <div className={`size-8 rounded-lg bg-gradient-to-br ${m.tone} text-white flex items-center justify-center`}><m.icon className="size-4" /></div>
@@ -201,7 +205,7 @@ export default function StockOverview() {
             })()}
           </div>
         </div>
-        <div className="grid grid-cols-12 gap-2 bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
+        <div className="sticky top-0 z-10 backdrop-blur bg-background/90 border-b border-border grid grid-cols-12 gap-2 px-4 py-2 text-xs font-medium text-muted-foreground">
           <div className="col-span-4">{t("description")}</div>
           <div className="col-span-2">{t("branch")}</div>
           <div className="col-span-1 text-end">{t("stock")}</div>
@@ -219,7 +223,7 @@ export default function StockOverview() {
                 : r.quantity <= r.product.min_stock_level ? { l: t("lowStock"), c: "status-progress" }
                 : { l: t("inStock"), c: "status-completed" };
               return (
-                <div key={i} className="grid grid-cols-12 gap-2 px-4 py-2 text-sm items-center">
+                <div key={i} className="grid grid-cols-12 gap-2 px-4 py-2 text-sm items-center hover:bg-muted/40 transition-colors">
                   <div className="col-span-4 min-w-0">
                     <div className="font-medium truncate">{lang === "ar" ? r.product.name_ar : r.product.name_en}</div>
                     <div className="text-[11px] text-muted-foreground">{r.product.sku}</div>
@@ -310,15 +314,18 @@ export default function StockOverview() {
                 <SelectContent>{products.map((p) => <SelectItem key={p.id} value={p.id}>{p.sku} · {lang === "ar" ? p.name_ar : p.name_en}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
+            <div className="flex items-end gap-2 bg-muted/30 border border-border/60 rounded-lg p-3">
+              <div className="flex-1 space-y-2">
                 <Label>{t("fromBranch")}</Label>
                 <Select value={tr.from_branch} onValueChange={(v) => setTr({ ...tr, from_branch: v })}>
                   <SelectTrigger><SelectValue placeholder={t("selectBranch")} /></SelectTrigger>
                   <SelectContent>{branches.map((b) => <SelectItem key={b.id} value={b.id}>{lang === "ar" ? b.name_ar : b.name_en}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
+              <div className="pb-2 shrink-0 text-muted-foreground">
+                <ArrowRight className="size-5 rtl:rotate-180" />
+              </div>
+              <div className="flex-1 space-y-2">
                 <Label>{t("toBranch")}</Label>
                 <Select value={tr.to_branch} onValueChange={(v) => setTr({ ...tr, to_branch: v })}>
                   <SelectTrigger><SelectValue placeholder={t("selectBranch")} /></SelectTrigger>

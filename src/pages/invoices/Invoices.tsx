@@ -115,27 +115,34 @@ export default function Invoices() {
           <p className="text-sm text-muted-foreground mt-1">{invoiceCountLabel(filtered.length, lang)}</p>
         </div>
         <div className="flex gap-2 items-center flex-wrap">
-          <div className="relative w-56">
-            <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("search")} className="ps-9" />
+          <div className="flex items-center gap-2 bg-card border shadow-sm rounded-lg p-2">
+            <div className="relative w-56">
+              <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("search")} className="ps-9 border-0 shadow-none focus-visible:ring-1 bg-transparent" />
+            </div>
+            <div className="h-6 w-px bg-border" />
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[150px] border-0 shadow-none bg-transparent focus:ring-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("status")}</SelectItem>
+                <SelectItem value="draft">{t("statusDraft")}</SelectItem>
+                <SelectItem value="pending">{t("statusPending")}</SelectItem>
+                <SelectItem value="partial">{t("statusPartial")}</SelectItem>
+                <SelectItem value="paid">{t("statusPaid")}</SelectItem>
+                <SelectItem value="cancelled">{t("statusCancelled")}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("status")}</SelectItem>
-              <SelectItem value="draft">{t("statusDraft")}</SelectItem>
-              <SelectItem value="pending">{t("statusPending")}</SelectItem>
-              <SelectItem value="partial">{t("statusPartial")}</SelectItem>
-              <SelectItem value="paid">{t("statusPaid")}</SelectItem>
-              <SelectItem value="cancelled">{t("statusCancelled")}</SelectItem>
-            </SelectContent>
-          </Select>
           <Can permission="invoices.create">
             <Button className="gradient-primary text-primary-foreground hidden sm:inline-flex" onClick={() => setOpen(true)}>
               <Plus className="me-2 size-4" />{t("newInvoice")}
             </Button>
           </Can>
-          <Button variant="outline" className="hidden sm:inline-flex" onClick={() => navigate("/invoices/outstanding")}>
+          <Button
+            variant="outline"
+            className="hidden sm:inline-flex text-warning border-warning/30 hover:bg-warning/10 hover:text-warning"
+            onClick={() => navigate("/invoices/outstanding")}
+          >
             <AlertCircle className="me-2 size-4" />{t("outstandingDebts")}
           </Button>
         </div>
@@ -153,10 +160,17 @@ export default function Invoices() {
               const name = lang === "ar"
                 ? `${p.first_name_ar ?? p.first_name_en} ${p.last_name_ar ?? p.last_name_en ?? ""}`.trim()
                 : `${p.first_name_en} ${p.last_name_en ?? ""}`.trim();
+              const iconClass =
+                i.status === "paid" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                : i.status === "partial" || i.status === "pending" ? "bg-warning/10 text-warning"
+                : i.status === "cancelled" ? "bg-muted text-muted-foreground"
+                : "bg-primary/10 text-primary";
+              const remaining = Number(i.total) - Number(i.paid_amount);
+              const showRemaining = (i.status === "partial" || i.status === "pending") && remaining > 0;
               return (
                 <div key={i.id} className="flex items-center gap-4 p-4 hover:bg-muted/40 transition-colors">
                   <Link to={`/invoices/${i.id}`} className="flex items-center gap-4 flex-1 min-w-0">
-                  <div className="size-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                  <div className={`size-10 rounded-lg flex items-center justify-center shrink-0 ${iconClass}`}>
                     <FileText className="size-5" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -166,11 +180,17 @@ export default function Invoices() {
                     </div>
                     <div className="text-xs text-muted-foreground truncate">{name} · {formatDate(i.invoice_date, lang)}</div>
                   </div>
-                  <div className="text-end">
-                    <div className="font-semibold tabular-nums">{formatMoney(i.total, lang)}</div>
-                    <div className="text-[11px] text-muted-foreground tabular-nums">{t("paid")}: {formatMoney(i.paid_amount, lang)}</div>
+                  <div className="text-end shrink-0">
+                    <div className="text-lg font-bold tabular-nums leading-tight">{formatMoney(i.total, lang)}</div>
+                    {showRemaining ? (
+                      <div className="text-[11px] font-semibold text-warning tabular-nums mt-0.5">
+                        {lang === "ar" ? "المتبقي" : "Remaining"}: {formatMoney(remaining, lang)}
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-muted-foreground tabular-nums mt-0.5">{t("paid")}: {formatMoney(i.paid_amount, lang)}</div>
+                    )}
                   </div>
-                  <Badge variant="outline" className={statusClass[i.status]}>{statusLabel(i.status)}</Badge>
+                  <Badge variant="outline" className={`${statusClass[i.status]} shrink-0`}>{statusLabel(i.status)}</Badge>
                   </Link>
                   <RowActions
                     onEdit={() => navigate(`/invoices/${i.id}`)}

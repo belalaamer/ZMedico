@@ -86,7 +86,7 @@ export default function Payroll() {
   const profName = (sid: string) => profiles.find((p) => p.id === sid)?.full_name ?? sid;
 
   const generate = async () => {
-    if (!canEdit) { toast.error(t("accessDenied") || "Not permitted"); return; }
+    if (!canEdit) { toast.error("Not permitted"); return; }
     if (!currentBranchId) { toast.error(t("errSelectBranchFirst")); return; }
     const existing = new Set(items.map((i) => i.staff_id));
     const candidates = staff.filter((s) => !existing.has(s.id));
@@ -117,7 +117,7 @@ export default function Payroll() {
   };
 
   const setStatus = async (id: string, status: "draft" | "approved" | "paid") => {
-    if (!canEdit) { toast.error(t("accessDenied") || "Not permitted"); return; }
+    if (!canEdit) { toast.error("Not permitted"); return; }
     const patch: any = { status };
     if (status === "paid") { patch.paid_at = new Date().toISOString(); patch.paid_by = user?.id; }
     const { error } = await supabase.from("payroll").update(patch).eq("id", id);
@@ -126,7 +126,7 @@ export default function Payroll() {
   };
 
   const remove = async (p: any) => {
-    if (!canDelete) { toast.error(t("accessDenied") || "Not permitted"); return; }
+    if (!canDelete) { toast.error("Not permitted"); return; }
     await supabase.from("salary_adjustments").delete().eq("payroll_id", p.id);
     const { error } = await supabase.from("payroll").delete().eq("id", p.id);
     if (error) { toast.error(error.message); return; }
@@ -202,7 +202,7 @@ export default function Payroll() {
             className="gradient-primary text-primary-foreground"
             onClick={generate}
             disabled={!canEdit}
-            title={!canEdit ? (t("accessDenied") || "Not permitted") : undefined}
+            title={!canEdit ? ("Not permitted") : undefined}
           >
             <Plus className="me-2 size-4" />{t("generatePayroll")}
           </Button>

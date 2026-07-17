@@ -96,12 +96,18 @@ export default function Invoices() {
       toast.error(lang === "ar" ? "يمكن حذف المسودات فقط" : "Only draft invoices can be deleted");
       return;
     }
-    const now = new Date().toISOString();
-    // Admin: also soft-delete linked payments so totals stay consistent
-    if (canOverride) {
-      await supabase.from("payments").update({ deleted_at: now } as any).eq("invoice_id", i.id).is("deleted_at", null);
+    const nowIso = new Date().toISOString();
+    // For non-draft admin deletes: fully void first (cancels invoice, soft-deletes
+    // payments, restores inventory, cancels commissions) then soft-delete the row.
+    if (i.status !== "draft" && canOverride) {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error: voidErr } = await (supabase as any).rpc("void_invoice_financials", {
+        _invoice_id: i.id,
+        _user_id: user?.id ?? null,
+      });
+      if (voidErr) { toast.error(voidErr.message); return; }
     }
-    const { error } = await supabase.from("invoices").update({ deleted_at: now } as any).eq("id", i.id);
+    const { error } = await supabase.from("invoices").update({ deleted_at: nowIso } as any).eq("id", i.id);
     if (error) { toast.error(error.message); return; }
     toast.success(t("delete")); load();
   };

@@ -92,15 +92,56 @@ export default function Payroll() {
     const candidates = staff.filter((s) => !existing.has(s.id));
     const missing = candidates.filter((s) => !s.branch_id && !currentBranchId);
     if (missing.length) { toast.error(t("errStaffNoBranch")); return; }
-    const rows = candidates.map((s) => ({
-      staff_id: s.id,
-      branch_id: s.branch_id ?? currentBranchId,
-      period_month: month, period_year: year,
-      base_salary: s.salary, working_days: 22, actual_working_days: 22,
-      overtime_hours: 0, overtime_amount: 0, bonuses: 0, deductions: 0, leave_deductions: 0,
-      net_salary: s.salary, status: "draft" as const, created_by: user?.id,
-    }));
-    if (rows.length === 0) { toast.info("All staff already in payroll"); return; }
+    if (candidates.length === 0) { toast.info("All staff already in payroll"); return; }
+
+    // Pull attendance for the target period to compute real absences per staff.
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0); // last day of month
+    const totalDaysInMonth = endDate.getDate();
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+
+    const staffIds = candidates.map((s) => s.id);
+    const { data: att, error: attErr } = await supabase
+      .from("attendance")
+      .select("staff_id,status,date")
+      .in("staff_id", staffIds)
+      .gte("date", iso(startDate))
+      .lte("date", iso(endDate));
+    if (attErr) { toast.error(attErr.message); return; }
+
+    // Count unpaid-absence days per staff (absent OR on_leave treated as unpaid unless leave system says otherwise).
+    const absentDays: Record<string, number> = {};
+    (att ?? []).forEach((r: any) => {
+      if (r.status === "absent" || r.status === "on_leave") {
+        absentDays[r.staff_id] = (absentDays[r.staff_id] ?? 0) + 1;
+      } else if (r.status === "half_day") {
+        absentDays[r.staff_id] = (absentDays[r.staff_id] ?? 0) + 0.5;
+      }
+    });
+
+    const rows = candidates.map((s) => {
+      const absent = absentDays[s.id] ?? 0;
+      const base = Number(s.salary) || 0;
+      const perDiem = base / 30;
+      const leave_deductions = Number((perDiem * absent).toFixed(2));
+      const actual_working_days = Math.max(0, totalDaysInMonth - absent);
+      const net_salary = Number((base - leave_deductions).toFixed(2));
+      return {
+        staff_id: s.id,
+        branch_id: s.branch_id ?? currentBranchId,
+        period_month: month, period_year: year,
+        base_salary: base,
+        working_days: totalDaysInMonth,
+        actual_working_days,
+        overtime_hours: 0, overtime_amount: 0,
+        bonuses: 0, deductions: 0,
+        leave_deductions,
+        net_salary,
+        status: "draft" as const,
+        created_by: user?.id,
+      };
+    });
+
     const { error } = await supabase.from("payroll").insert(rows);
     if (error) return toast.error(error.message);
     toast.success(`+${rows.length}`); load();

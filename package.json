@@ -5,13 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && rm -f vite.config.ts",
+    "build": "tsc && vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "deploy": "bun run build && npx wrangler pages deploy dist --project-name=zmedico-app"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

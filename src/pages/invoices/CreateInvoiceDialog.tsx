@@ -118,13 +118,9 @@ export function CreateInvoiceDialog({
       .then(({ data }) => setProcedures((data ?? []).filter((p: any) => p.deleted_at == null && p.is_active !== false)));
     supabase.from("insurance_companies").select("id,name_en,name_ar,default_coverage_ratio,is_active").eq("is_active", true).order("name_en")
       .then(({ data }) => setInsuranceCompanies(data ?? []));
-    // Strict doctor list: only profiles with a verified `doctor` role in user_roles.
-    supabase
-      .from("profiles")
-      .select("id, full_name, user_roles!inner(role)")
-      .eq("user_roles.role", "doctor")
-      .order("full_name")
-      .then(({ data }) => setDoctors((data ?? []) as any));
+    // Strict doctor list via SECURITY DEFINER RPC so non-admin staff (e.g. Front Desk)
+    // can see doctors without needing SELECT on other users' user_roles rows.
+    supabase.rpc("list_doctors").then(({ data }) => setDoctors((data ?? []) as any));
   }, [open, refetchPatients]);
 
   useDataSync(["patients"], () => {

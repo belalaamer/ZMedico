@@ -99,14 +99,26 @@ function DoctorTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
   const [data, setData] = useState<any[]>([]);
   useEffect(() => {
     (async () => {
-      let mq = supabase.from("medical_records").select("doctor_id, profiles!medical_records_doctor_id_fkey(full_name)").gte("visit_date", start).lte("visit_date", end);
+      // Strict role verification: fetch only users with the "doctor" role.
+      const { data: doctorRoleRows } = await supabase
+        .from("user_roles")
+        .select("user_id, profiles!user_roles_user_id_fkey(id, full_name)")
+        .eq("role", "doctor");
+      const counts = new Map<string, { name: string; count: number; revenue: number }>();
+      (doctorRoleRows ?? []).forEach((r: any) => {
+        const id = r.user_id;
+        const name = r.profiles?.full_name ?? "—";
+        if (id) counts.set(id, { name, count: 0, revenue: 0 });
+      });
+
+      let mq = supabase.from("medical_records").select("doctor_id").gte("visit_date", start).lte("visit_date", end);
       if (branchId) mq = mq.eq("branch_id", branchId);
       const { data: recs } = await mq;
-      const counts = new Map<string, { name: string; count: number; revenue: number }>();
       (recs ?? []).forEach((r: any) => {
         if (!r.doctor_id) return;
-        const cur = counts.get(r.doctor_id) ?? { name: r.profiles?.full_name ?? "—", count: 0, revenue: 0 };
-        cur.count += 1; counts.set(r.doctor_id, cur);
+        const cur = counts.get(r.doctor_id);
+        if (!cur) return; // skip non-doctors
+        cur.count += 1;
       });
       // revenue from invoices linked by created_by ≈ doctor (approx)
       let iq = supabase.from("invoices").select("created_by, total").is("deleted_at", null).gte("invoice_date", start).lte("invoice_date", end);
@@ -114,7 +126,9 @@ function DoctorTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
       const { data: invs } = await iq;
       (invs ?? []).forEach((i: any) => {
         if (!i.created_by) return;
-        const cur = counts.get(i.created_by); if (cur) cur.revenue += Number(i.total || 0);
+        const cur = counts.get(i.created_by);
+        if (!cur) return; // skip invoices not created by a verified doctor
+        cur.revenue += Number(i.total || 0);
       });
       setData(Array.from(counts.entries()).map(([id, v]) => ({ id, ...v })));
     })();

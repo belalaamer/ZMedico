@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "deploy": "bun run build && npx wrangler pages deploy dist --project-name=zmedico-app"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

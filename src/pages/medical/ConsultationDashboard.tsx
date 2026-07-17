@@ -479,14 +479,14 @@ function PrescriptionDialog({
     const handle = setTimeout(async () => {
       const term = q.trim();
       if (!term) { setResults([]); return; }
-      // Strip PostgREST filter meta-characters to prevent filter injection via .or()
-      const safeTerm = term.replace(/[,()"]/g, "");
-      if (!safeTerm) { setResults([]); return; }
       const col = searchMode === "brand" ? "name_en" : "generic_name";
+      // Inline strip of PostgREST filter meta-characters to prevent .or() injection
+      const safeSearch = term.replace(/[,()"]/g, "");
+      if (!safeSearch) { setResults([]); return; }
       const { data } = await supabase.from("medications")
         .select("id,name_en,name_ar,generic_name,strength,form")
         .eq("is_active", true)
-        .or(`${col}.ilike.%${safeTerm}%,name_ar.ilike.%${safeTerm}%`)
+        .or(`${col}.ilike.%${safeSearch}%,name_ar.ilike.%${safeSearch}%`)
         .order("name_en").limit(15);
       setResults(data ?? []);
     }, 200);

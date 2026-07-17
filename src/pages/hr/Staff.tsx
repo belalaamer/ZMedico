@@ -308,24 +308,77 @@ export default function Staff() {
           </Dialog>
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div className="bg-card border shadow-sm rounded-lg p-2 flex flex-wrap gap-2 items-center">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("search")} className="ps-9 border-0 bg-transparent focus-visible:ring-1" />
+        </div>
+        <Select value={filterDept} onValueChange={setFilterDept}>
+          <SelectTrigger className="w-full sm:w-44"><SelectValue placeholder={t("department")} /></SelectTrigger>
+          <SelectContent><SelectItem value="all">{t("filterAll") || "All"}</SelectItem>{depts.map((d) => <SelectItem key={d.id} value={d.id}>{lang === "ar" ? d.name_ar : d.name_en}</SelectItem>)}</SelectContent>
+        </Select>
+        <Select value={filterStatus} onValueChange={setFilterStatus}>
+          <SelectTrigger className="w-full sm:w-36"><SelectValue placeholder={t("status")} /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t("filterAll") || "All"}</SelectItem>
+            <SelectItem value="active">{t("statusActive")}</SelectItem>
+            <SelectItem value="on_leave">{t("statusOnLeave")}</SelectItem>
+            <SelectItem value="terminated">{t("statusTerminated")}</SelectItem>
+            <SelectItem value="suspended">{t("statusSuspended")}</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.map((s) => (
-          <Card key={s.id} className="p-4 shadow-card hover:shadow-elegant transition-shadow flex items-center gap-3">
-            <Link to={`/hr/staff/${s.id}`} className="flex items-center gap-3 flex-1 min-w-0">
-              <div className="size-12 rounded-full bg-primary/10 text-primary flex items-center justify-center overflow-hidden">
-                {s.profile_image_url ? <img src={s.profile_image_url} alt="" className="w-full h-full object-cover" /> : <User className="size-6" />}
+          <Card key={s.id} className="relative p-5 shadow-card hover:shadow-elegant hover:-translate-y-0.5 transition-all duration-200 group">
+            <Badge
+              variant="outline"
+              className={`absolute top-3 end-3 ${s.status === "active" ? "status-completed" : "status-departed"}`}
+            >
+              {statusLabel(s.status, t)}
+            </Badge>
+            <div className="absolute bottom-3 end-3 opacity-0 group-hover:opacity-100 transition-opacity">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="size-8" onClick={(e) => e.stopPropagation()}>
+                    <MoreHorizontal className="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => openEdit(s)}>
+                    <Edit3 className="size-4 me-2" /> {t("edit")}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => softDelete(s)} className="text-destructive focus:text-destructive">
+                    <Trash2 className="size-4 me-2" /> {t("delete")}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            <Link to={`/hr/staff/${s.id}`} className="flex items-start gap-4 min-w-0">
+              <div className="size-16 shrink-0 rounded-full bg-primary/10 text-primary flex items-center justify-center overflow-hidden ring-2 ring-primary/10 ring-offset-2 ring-offset-card">
+                {s.profile_image_url ? <img src={s.profile_image_url} alt="" className="w-full h-full object-cover" /> : <User className="size-7" />}
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-medium truncate">{profName(s.id)}</div>
-                <div className="text-xs text-muted-foreground truncate">{s.employee_id} · {posName(s.position_id)}</div>
-                <div className="text-[11px] text-muted-foreground truncate">{deptName(s.department_id)} · {formatMoney(s.salary, lang, s.salary_currency)}</div>
+              <div className="flex-1 min-w-0 pe-16">
+                <div className="text-lg font-semibold truncate leading-tight">{profName(s.id)}</div>
+                <div className="text-xs text-muted-foreground font-mono mt-0.5">{s.employee_id}</div>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-muted text-foreground/80">
+                    <Briefcase className="size-3 text-primary" /> {posName(s.position_id)}
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-muted text-foreground/80">
+                    <Building2 className="size-3 text-primary" /> {deptName(s.department_id)}
+                  </span>
+                </div>
+                <div className="mt-2 flex items-center gap-1.5 text-sm font-medium text-foreground">
+                  <Banknote className="size-4 text-emerald-500" />
+                  <span className="tabular-nums">{formatMoney(s.salary, lang, s.salary_currency)}</span>
+                </div>
               </div>
-              <Badge variant="outline" className={s.status === "active" ? "status-completed" : "status-departed"}>{statusLabel(s.status, t)}</Badge>
             </Link>
-            <RowActions onEdit={() => openEdit(s)} onDelete={() => softDelete(s)} />
           </Card>
         ))}
-        {filtered.length === 0 && <Card className="p-10 col-span-full text-center text-muted-foreground">{t("noPatients")}</Card>}
+        {filtered.length === 0 && <Card className="p-10 col-span-full text-center text-muted-foreground">{t("noStaff") || "No staff members found."}</Card>}
       </div>
     </div>
   );

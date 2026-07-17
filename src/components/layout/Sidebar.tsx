@@ -1,0 +1,254 @@
+import { NavLink, useLocation } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap, FolderOpen, Briefcase, UserCog, Clock, CalendarDays, DollarSign, Star, PieChart, Target, Ticket, ListChecks, ChevronDown, Wallet } from "lucide-react";
+import { useI18n } from "@/contexts/I18nContext";
+import { supabase } from "@/integrations/supabase/client";
+import { subscribeResilient } from "@/lib/realtime";
+import { useBranch } from "@/contexts/BranchContext";
+import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
+
+type NavItem = { to: string; icon: any; label: string; end?: boolean; badge?: number };
+
+export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {}) {
+  const { t, lang } = useI18n();
+  const { currentBranchId } = useBranch();
+  const { pathname } = useLocation();
+  const [alertCount, setAlertCount] = useState(0);
+  const { authz } = useAuthorization();
+
+  useEffect(() => {
+    const refresh = () => {
+      let q2 = supabase.from("stock_alerts").select("*", { count: "exact", head: true }).eq("is_resolved", false);
+      if (currentBranchId) q2 = q2.eq("branch_id", currentBranchId);
+      q2.then(({ count }) => setAlertCount(count ?? 0));
+    };
+    refresh();
+    return subscribeResilient({
+      name: `inv-alerts:${currentBranchId ?? "all"}`,
+      bind: (ch) => ch.on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "stock_alerts" },
+        () => refresh()
+      ),
+      onReconnect: () => refresh(),
+    });
+  }, [currentBranchId]);
+
+  const dashboardItem: NavItem = { to: "/", icon: LayoutDashboard, label: t("dashboard"), end: true };
+
+  const groups: { key: string; label: string; icon: any; items: NavItem[]; badge?: number }[] = useMemo(() => [
+    {
+      key: "front_desk",
+      label: lang === "ar" ? "الاستقبال" : "Front Desk",
+      icon: CalendarDays,
+      items: [
+        authz.can("appointments.view") && { to: "/calendar", icon: Calendar, label: t("calendar") },
+        authz.can("appointments.view") && { to: "/queue", icon: ListChecks, label: t("queue") },
+        authz.can("patients.view") && { to: "/patients", icon: Users, label: t("patients") },
+        authz.can("appointments.view") && { to: "/reminders", icon: Bell, label: t("notifications") },
+      ].filter(Boolean) as NavItem[],
+    },
+    {
+      key: "clinical",
+      label: lang === "ar" ? "السريري والطبي" : "Clinical & Medical",
+      icon: Stethoscope,
+      items: [
+        authz.can("medical_records.view") && { to: "/medical/records", icon: FileText, label: t("medicalRecords") },
+        authz.can("medical_records.view") && { to: "/medical/quick-consult", icon: Zap, label: t("quickConsult") },
+        authz.can("medical_records.view") && { to: "/medical/prescriptions", icon: Pill, label: t("prescriptions") },
+        authz.can("medical_records.view") && { to: "/medical/documents", icon: FolderOpen, label: t("documentsCenter") },
+      ].filter(Boolean) as NavItem[],
+    },
+    {
+      key: "physio",
+      label: lang === "ar" ? "العلاج الطبيعي" : "Physiotherapy",
+      icon: Activity,
+      items: [
+        authz.can("medical_records.view") && { to: "/physio", icon: Activity, label: lang === "ar" ? "الحالات" : "Cases" },
+        authz.can("medical_records.view") && { to: "/physio/dashboard", icon: BarChart3, label: lang === "ar" ? "لوحة العلاج الطبيعي" : "Physio Dashboard" },
+        authz.can("medical_records.view") && { to: "/physio/reports", icon: FileText, label: lang === "ar" ? "التقارير" : "Reports" },
+        authz.can("medical_records.view") && { to: "/physio/followups", icon: ListChecks, label: lang === "ar" ? "المتابعات" : "Follow-ups" },
+      ].filter(Boolean) as NavItem[],
+    },
+    {
+      key: "finance",
+      label: lang === "ar" ? "المالية" : "Finance",
+      icon: Wallet,
+      items: [
+        authz.can("invoices.view") && { to: "/invoices", icon: FileText, label: t("invoices") },
+        authz.can("invoices.view") && { to: "/payments", icon: CreditCard, label: t("payments") },
+        authz.can("treasury.view") && { to: "/treasury", icon: Banknote, label: t("treasury") },
+        authz.can("treasury.view") && { to: "/expenses", icon: Receipt, label: t("expenses") },
+        authz.can("reports.view") && { to: "/reports", icon: PieChart, label: t("reports") },
+      ].filter(Boolean) as NavItem[],
+    },
+    {
+      key: "inventory",
+      label: t("inventoryHub"),
+      icon: Boxes,
+      badge: alertCount,
+      items: !authz.can("inventory.view") ? [] : [
+        { to: "/inventory/stock", icon: BarChart3, label: t("stockOverview") },
+        { to: "/inventory/products", icon: Package, label: t("products") },
+        { to: "/inventory/categories", icon: FolderTree, label: t("categories") },
+        { to: "/inventory/suppliers", icon: Truck, label: t("suppliers") },
+        { to: "/inventory/purchase-orders", icon: ClipboardList, label: t("purchaseOrders") },
+        { to: "/inventory/alerts", icon: AlertTriangle, label: t("alerts"), badge: alertCount },
+      ],
+    },
+    {
+      key: "hr",
+      label: lang === "ar" ? "الموارد البشرية" : "HR & Staff",
+      icon: UserCog,
+      items: !authz.can("hr.view") ? [] : [
+        { to: "/hr/staff", icon: UserCog, label: t("staffDirectory") },
+        { to: "/hr/departments", icon: Building2, label: t("departments") },
+        { to: "/hr/positions", icon: Briefcase, label: t("positions") },
+        { to: "/hr/schedules", icon: CalendarDays, label: t("schedules") },
+        { to: "/hr/attendance", icon: Clock, label: t("attendance") },
+        { to: "/hr/leaves", icon: FileText, label: t("leaves") },
+        { to: "/hr/payroll", icon: DollarSign, label: t("payroll") },
+        { to: "/hr/performance", icon: Star, label: t("performance") },
+        { to: "/hr/target-bonuses", icon: Target, label: lang === "ar" ? "أهداف ومكافآت" : "Target Bonuses" },
+      ],
+    },
+    {
+      key: "setup",
+      label: lang === "ar" ? "الإعداد والإدارة" : "Setup & Admin",
+      icon: Settings,
+      items: [
+        authz.can("medical_records.view") && { to: "/medical/specialties", icon: Stethoscope, label: t("specialties") },
+        authz.can("medical_records.view") && { to: "/medical/diagnoses", icon: HeartPulse, label: t("diagnoses") },
+        authz.can("medical_records.view") && { to: "/medical/medications", icon: Pill, label: t("medications") },
+        authz.can("medical_records.view") && authz.isSuperAdmin() && { to: "/medical/procedures", icon: Activity, label: t("proceduresCatalog") },
+        authz.can("coupons.view") && { to: "/coupons", icon: Ticket, label: lang === "ar" ? "الكوبونات" : "Coupons" },
+        authz.isSuperAdmin() && { to: "/branches", icon: Building2, label: t("branches") },
+        authz.can("settings.view") && { to: "/settings", icon: Settings, label: t("settings") },
+      ].filter(Boolean) as NavItem[],
+    },
+  ].filter(g => g.items.length > 0), [t, lang, authz, alertCount]);
+
+  const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
+  const activeGroupKey = useMemo(() => {
+    return groups.find(g => g.items.some(it => pathname === it.to || pathname.startsWith(it.to + "/")))?.key ?? null;
+  }, [groups, pathname]);
+
+  useEffect(() => {
+    if (!activeGroupKey) return;
+    setOpenMap(prev => {
+      if (prev[activeGroupKey]) return prev;
+      return { ...prev, [activeGroupKey]: true };
+    });
+  }, [pathname, activeGroupKey]);
+  const toggle = (k: string) => setOpenMap(m => ({ ...m, [k]: !m[k] }));
+
+  return (
+    <div className="flex w-full h-full flex-col bg-card text-foreground">
+      <div className="h-16 flex items-center gap-3 px-5 border-b border-border">
+        <div className="size-9 rounded-xl bg-primary/10 flex items-center justify-center">
+          <Stethoscope className="size-5 text-primary" />
+        </div>
+        <div>
+          <div className="text-base font-bold text-foreground leading-tight">{t("appName")}</div>
+          <div className="text-[11px] text-muted-foreground">{t("tagline")}</div>
+        </div>
+      </div>
+      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <NavLink
+          to={dashboardItem.to}
+          end
+          onClick={onNavigate}
+          className={({ isActive }) =>
+            cn(
+              "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
+              isActive
+                ? "bg-primary/10 text-primary font-semibold border-l-2 border-primary rounded-l-none"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground font-medium"
+            )
+          }
+        >
+          <LayoutDashboard className="size-[18px] shrink-0" />
+          <span className="flex-1 truncate">{dashboardItem.label}</span>
+        </NavLink>
+
+        {groups.map((g) => {
+          const isOpen = !!openMap[g.key];
+          return (
+            <div key={g.key} className="space-y-1">
+              <button
+                type="button"
+                onClick={() => toggle(g.key)}
+                aria-expanded={isOpen}
+                aria-controls={`group-${g.key}`}
+                className="w-full flex items-center gap-2 px-2 py-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground/70 hover:text-foreground transition-colors"
+              >
+                <g.icon className="size-3.5 shrink-0 opacity-70" />
+                <span className="flex-1 truncate text-start">{g.label}</span>
+                {g.badge && g.badge > 0 ? (
+                  <span className="bg-destructive text-destructive-foreground text-[10px] rounded-full px-1.5 py-0.5 font-bold">{g.badge}</span>
+                ) : null}
+                <ChevronDown
+                  aria-hidden
+                  className={cn(
+                    "size-3.5 shrink-0 opacity-60 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                    isOpen ? "rotate-180" : "rotate-0"
+                  )}
+                />
+              </button>
+              <div
+                id={`group-${g.key}`}
+                role="region"
+                aria-hidden={!isOpen}
+                className={cn(
+                  "grid transition-[grid-template-rows,opacity] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                  isOpen
+                    ? "grid-rows-[1fr] opacity-100 duration-300"
+                    : "grid-rows-[0fr] opacity-0 duration-200"
+                )}
+              >
+                <div className="overflow-hidden min-h-0">
+                  <div className="space-y-0.5 pt-1">
+                    {g.items.map((it) => (
+                      <NavLink key={it.to} to={it.to} onClick={onNavigate} tabIndex={isOpen ? 0 : -1}
+                        className={({ isActive }) => cn(
+                          "flex items-center gap-2.5 px-3 py-2 rounded-md text-[13px] transition-colors duration-150",
+                          isActive
+                            ? "bg-primary/10 text-primary font-semibold border-l-2 border-primary rounded-l-none"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground font-medium"
+                        )}>
+                        <it.icon className="size-4 shrink-0" />
+                        <span className="flex-1 truncate">{it.label}</span>
+                        {it.badge && it.badge > 0 ? (
+                          <span className="bg-destructive text-destructive-foreground text-[10px] rounded-full px-1.5 py-0.5 font-bold">{it.badge}</span>
+                        ) : null}
+                      </NavLink>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </nav>
+      <div className="p-4 text-[11px] text-muted-foreground border-t border-border">
+        v1.0 · {lang.toUpperCase()}
+      </div>
+    </div>
+  );
+}
+
+export function Sidebar() {
+  const isMobile = useIsMobile();
+
+  if (isMobile) {
+    return null;
+  }
+
+  return (
+    <aside className="hidden md:flex w-64 shrink-0 flex-col border-e border-border bg-card h-dvh sticky top-0">
+      <SidebarContent />
+    </aside>
+  );
+}

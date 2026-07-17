@@ -19,6 +19,7 @@ import {
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBranch } from "@/contexts/BranchContext";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
@@ -29,6 +30,9 @@ export default function Payroll() {
   const { t, lang } = useI18n();
   const { user } = useAuth();
   const { currentBranchId } = useBranch();
+  const { authz } = useAuthorization();
+  const canEdit = authz.can("hr.edit");
+  const canDelete = authz.can("hr.delete");
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [items, setItems] = useState<any[]>([]);
@@ -82,6 +86,7 @@ export default function Payroll() {
   const profName = (sid: string) => profiles.find((p) => p.id === sid)?.full_name ?? sid;
 
   const generate = async () => {
+    if (!canEdit) { toast.error(t("accessDenied") || "Not permitted"); return; }
     if (!currentBranchId) { toast.error(t("errSelectBranchFirst")); return; }
     const existing = new Set(items.map((i) => i.staff_id));
     const candidates = staff.filter((s) => !existing.has(s.id));
@@ -112,6 +117,7 @@ export default function Payroll() {
   };
 
   const setStatus = async (id: string, status: "draft" | "approved" | "paid") => {
+    if (!canEdit) { toast.error(t("accessDenied") || "Not permitted"); return; }
     const patch: any = { status };
     if (status === "paid") { patch.paid_at = new Date().toISOString(); patch.paid_by = user?.id; }
     const { error } = await supabase.from("payroll").update(patch).eq("id", id);
@@ -120,6 +126,7 @@ export default function Payroll() {
   };
 
   const remove = async (p: any) => {
+    if (!canDelete) { toast.error(t("accessDenied") || "Not permitted"); return; }
     await supabase.from("salary_adjustments").delete().eq("payroll_id", p.id);
     const { error } = await supabase.from("payroll").delete().eq("id", p.id);
     if (error) { toast.error(error.message); return; }
@@ -191,7 +198,12 @@ export default function Payroll() {
           </Select>
         </div>
         <div className="ms-auto">
-          <Button className="gradient-primary text-primary-foreground" onClick={generate}>
+          <Button
+            className="gradient-primary text-primary-foreground"
+            onClick={generate}
+            disabled={!canEdit}
+            title={!canEdit ? (t("accessDenied") || "Not permitted") : undefined}
+          >
             <Plus className="me-2 size-4" />{t("generatePayroll")}
           </Button>
         </div>
@@ -276,12 +288,12 @@ export default function Payroll() {
                   </div>
 
                   <div className="flex items-center gap-1.5">
-                    {p.status === "draft" && (
+                    {p.status === "draft" && canEdit && (
                       <Button size="sm" onClick={() => setStatus(p.id, "approved")}>
                         <CheckCircle2 className="me-2 size-4" />{t("approve")}
                       </Button>
                     )}
-                    {p.status === "approved" && (
+                    {p.status === "approved" && canEdit && (
                       <Button
                         size="sm"
                         className="gradient-primary text-primary-foreground"
@@ -313,13 +325,17 @@ export default function Payroll() {
                         <DropdownMenuItem onClick={() => window.print()}>
                           <FileText className="me-2 size-4" />{lang === "ar" ? "طباعة" : "Print"}
                         </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={() => setConfirmDelete(p)}
-                        >
-                          <Trash2 className="me-2 size-4" />{t("delete")}
-                        </DropdownMenuItem>
+                        {canDelete && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => setConfirmDelete(p)}
+                            >
+                              <Trash2 className="me-2 size-4" />{t("delete")}
+                            </DropdownMenuItem>
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>

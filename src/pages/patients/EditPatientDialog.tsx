@@ -27,14 +27,12 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
 
   useEffect(() => {
     (async () => {
-      const { data: roles } = await supabase.from("user_roles").select("user_id").eq("role", "doctor");
-      const doctorIds = (roles ?? []).map((r: any) => r.user_id);
-      if (!doctorIds.length) { setDoctors([]); return; }
-      const { data: staff } = await supabase.from("staff_profiles").select("id").in("id", doctorIds).eq("status", "active");
-      const ids = (staff ?? []).map((s: any) => s.id);
-      if (!ids.length) { setDoctors([]); return; }
-      const { data: profs } = await supabase.from("profiles").select("id, full_name").in("id", ids);
-      const list = (profs ?? []).map((p: any) => ({ id: p.id, full_name: p.full_name ?? p.id.slice(0, 8) }));
+      // Fetch via SECURITY DEFINER RPC so front-desk/nurse roles (no SELECT on user_roles) can load doctors.
+      const { data } = await supabase.rpc("list_doctors");
+      const list = ((data ?? []) as any[]).map((p: any) => ({
+        id: p.id,
+        full_name: p.full_name ?? p.id.slice(0, 8),
+      }));
       list.sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
       setDoctors(list);
     })();

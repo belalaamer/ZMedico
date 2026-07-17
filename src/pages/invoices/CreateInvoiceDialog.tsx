@@ -66,7 +66,7 @@ export function CreateInvoiceDialog({
     if (insuranceCompanyId || couponInfo || (Number(taxPct) || 0) > 0) setShowAdvanced(true);
   }, [insuranceCompanyId, couponInfo, taxPct]);
 
-  useEffect(() => { setPatientId(presetPatientId ?? ""); }, [presetPatientId, open]);
+  useEffect(() => { setPatientId(presetPatientId ?? ""); setDoctorId(""); }, [presetPatientId, open]);
 
   const { data: patientRows = [], refetch: refetchPatients } = useQuery({
     queryKey: ["patients-for-invoice"],

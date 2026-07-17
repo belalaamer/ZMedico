@@ -122,28 +122,30 @@ export default function PurchaseOrders() {
           <p className="text-sm text-muted-foreground mt-1">{filtered.length}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="relative w-44">
-            <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("poNumber")} className="ps-9" />
+          <div className="flex items-center gap-1 bg-card border border-border shadow-sm rounded-lg p-1.5">
+            <div className="relative w-44">
+              <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("poNumber")} className="ps-9 border-0 shadow-none focus-visible:ring-1" />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-32 border-0 shadow-none focus:ring-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("status")}</SelectItem>
+                <SelectItem value="draft">{t("statusDraft")}</SelectItem>
+                <SelectItem value="pending">{t("statusPending")}</SelectItem>
+                <SelectItem value="partial">{t("statusPartial")}</SelectItem>
+                <SelectItem value="received">{t("statusReceived")}</SelectItem>
+                <SelectItem value="cancelled">{t("statusCancelled")}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={supFilter} onValueChange={setSupFilter}>
+              <SelectTrigger className="w-44 border-0 shadow-none focus:ring-1"><SelectValue placeholder={t("supplier")} /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("supplier")}</SelectItem>
+                {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{lang === "ar" ? s.name_ar : s.name_en}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("status")}</SelectItem>
-              <SelectItem value="draft">{t("statusDraft")}</SelectItem>
-              <SelectItem value="pending">{t("statusPending")}</SelectItem>
-              <SelectItem value="partial">{t("statusPartial")}</SelectItem>
-              <SelectItem value="received">{t("statusReceived")}</SelectItem>
-              <SelectItem value="cancelled">{t("statusCancelled")}</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={supFilter} onValueChange={setSupFilter}>
-            <SelectTrigger className="w-44"><SelectValue placeholder={t("supplier")} /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("supplier")}</SelectItem>
-              {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{lang === "ar" ? s.name_ar : s.name_en}</SelectItem>)}
-            </SelectContent>
-          </Select>
           <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
             <DialogTrigger asChild>
               <Button className="gradient-primary text-primary-foreground"><Plus className="me-2 size-4" />{t("newPO")}</Button>
@@ -162,7 +164,7 @@ export default function PurchaseOrders() {
                 <div className="space-y-2"><Label>{t("expectedDate")}</Label><Input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} /></div>
               </div>
               <div className="border border-border rounded-lg overflow-hidden">
-                <div className="grid grid-cols-12 gap-2 bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground">
+                <div className="grid grid-cols-12 gap-2 bg-muted/50 rounded-t-md px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   <div className="col-span-6">{t("description")}</div>
                   <div className="col-span-2 text-end">{t("quantity")}</div>
                   <div className="col-span-2 text-end">{t("unitPrice")}</div>
@@ -170,7 +172,7 @@ export default function PurchaseOrders() {
                   <div className="col-span-1"></div>
                 </div>
                 {lines.map((l, i) => (
-                  <div key={i} className="grid grid-cols-12 gap-2 px-3 py-2 border-t border-border items-center">
+                  <div key={i} className="grid grid-cols-12 gap-2 px-3 py-2 border-t border-border items-center hover:bg-muted/20 transition-colors">
                     <div className="col-span-6">
                       <Select value={l.product_id} onValueChange={(v) => {
                         const prod = products.find((p) => p.id === v);
@@ -192,14 +194,17 @@ export default function PurchaseOrders() {
               </div>
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="space-y-2"><Label>{t("notes")}</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={1000} rows={3} /></div>
-                <div className="space-y-2 text-sm">
+                <div className="space-y-2 text-sm bg-muted/30 border border-border/60 rounded-lg p-3">
                   <div className="flex items-center justify-between"><span className="text-muted-foreground">{t("subtotal")}</span><span className="font-medium tabular-nums">{formatMoney(subtotal, lang)}</span></div>
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-muted-foreground">{t("tax")} %</span>
-                    <Input className="w-24 text-end" type="number" min={0} max={100} step="0.1" value={taxPct} onChange={(e) => setTaxPct(Number(e.target.value))} />
+                    <Input className="w-24 text-end h-8" type="number" min={0} max={100} step="0.1" value={taxPct} onChange={(e) => setTaxPct(Number(e.target.value))} />
                     <span className="font-medium tabular-nums w-28 text-end">+ {formatMoney(tax, lang)}</span>
                   </div>
-                  <div className="flex items-center justify-between border-t border-border pt-2 text-base font-bold"><span>{t("total")}</span><span className="tabular-nums text-primary">{formatMoney(total, lang)}</span></div>
+                  <div className="flex items-center justify-between bg-primary/5 border border-primary/20 rounded-md px-3 py-2 mt-2 text-lg font-extrabold">
+                    <span>{t("total")}</span>
+                    <span className="tabular-nums text-primary">{formatMoney(total, lang)}</span>
+                  </div>
                 </div>
               </div>
               <DialogFooter>
@@ -220,11 +225,11 @@ export default function PurchaseOrders() {
             {filtered.map((po) => {
               const statusLabel = ({ draft: t("statusDraft"), pending: t("statusPending"), partial: t("statusPartial"), received: t("statusReceived"), cancelled: t("statusCancelled") } as any)[po.status];
               return (
-                <div key={po.id} className="flex items-center gap-4 p-4 hover:bg-muted/40">
+                <div key={po.id} className="flex items-center gap-4 p-4 hover:bg-muted/40 transition-colors">
                   <Link to={`/inventory/purchase-orders/${po.id}`} className="flex items-center gap-4 flex-1 min-w-0">
                   <div className="size-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center"><ClipboardList className="size-5" /></div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium">{po.po_number}</div>
+                    <div className="font-bold text-base">{po.po_number}</div>
                     <div className="text-xs text-muted-foreground">{lang === "ar" ? po.suppliers?.name_ar : po.suppliers?.name_en} · {formatDate(po.order_date, lang)}</div>
                   </div>
                   {po.expected_date && <div className="text-xs text-muted-foreground"><div>{t("expectedDate")}</div><div>{formatDate(po.expected_date, lang)}</div></div>}

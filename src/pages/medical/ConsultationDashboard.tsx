@@ -480,8 +480,9 @@ function PrescriptionDialog({
       const term = q.trim();
       if (!term) { setResults([]); return; }
       const col = searchMode === "brand" ? "name_en" : "generic_name";
-      // Inline strip of PostgREST filter meta-characters to prevent .or() injection
-      const safeSearch = term.replace(/[,()"]/g, "");
+      // Defense-in-depth: strip PostgREST filter meta-characters AND SQL LIKE
+      // wildcards so the ilike pattern below cannot be steered by user input.
+      const safeSearch = term.replace(/[,()"'*\\%_]/g, "").slice(0, 60);
       if (!safeSearch) { setResults([]); return; }
       // Avoid the .or() helper by running two sanitized ilike queries in parallel and merging.
       const base = () => supabase.from("medications")

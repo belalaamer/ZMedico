@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { withTimeout } from "@/lib/withTimeout";
 
-export type AppRole = "admin" | "manager" | "doctor" | "receptionist" | "hr" | "accountant" | "staff" | string;
+export type AppRole = "system_owner" | "admin" | "manager" | "doctor" | "receptionist" | "hr" | "accountant" | "staff" | string;
 
 export function useUserRole() {
   const { user } = useAuth();
@@ -48,6 +48,8 @@ export function useUserRole() {
     return () => { active = false; };
   }, [user?.id]);
 
-  const isAdmin = roles.includes("admin");
-  return { roles, isAdmin, loading };
+  const isSystemOwner = roles.includes("system_owner");
+  // System owners have god-mode and implicitly satisfy every admin gate.
+  const isAdmin = isSystemOwner || roles.includes("admin");
+  return { roles, isAdmin, isSystemOwner, loading };
 }

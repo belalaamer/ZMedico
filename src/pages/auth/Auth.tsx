@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { z } from "zod";
 import { Stethoscope, Globe } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,13 +14,11 @@ import { useI18n } from "@/contexts/I18nContext";
 import { toast } from "sonner";
 import { hasPersistedAuthSession, persistAuthSessionForPreview } from "@/lib/authSessionPersistence";
 
-const credSchema = z.object({
-  email: z.string().trim().email().max(255),
-  password: z.string().min(6).max(128),
-  fullName: z.string().trim().min(1).max(100).optional(),
-});
-
 const AUTH_DEBUG_PREFIX = "[auth-debug]";
+
+function isValidEmailAddress(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 255;
+}
 
 function safeRedirectPath(value?: string | null) {
   if (!value) return "/";
@@ -77,16 +74,50 @@ export default function AuthPage() {
     nav(from, { replace: true });
   }, [authLoading, from, nav, user]);
 
-  const handleSignIn = async (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const parsed = credSchema.safeParse({ email, password });
-    if (!parsed.success) { toast.error("Invalid email or password"); return; }
+
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+    const submittedEmail = String(formData.get("email") ?? "");
+    const submittedPassword = String(formData.get("password") ?? "");
+
+    setEmail(submittedEmail);
+    setPassword(submittedPassword);
+
+    if (!isValidEmailAddress(submittedEmail) || submittedPassword.length < 6 || submittedPassword.length > 128) {
+      toast.error("Invalid email or password");
+      return;
+    }
+
+    const credentials = {
+      email: submittedEmail,
+      password: submittedPassword,
+    };
+
     setLoading(true);
-    console.info(AUTH_DEBUG_PREFIX, "password sign-in started", { redirectAfterLogin: from });
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: parsed.data.email,
-      password: parsed.data.password,
+    console.info(AUTH_DEBUG_PREFIX, "password sign-in started", {
+      redirectAfterLogin: from,
+      client: {
+        hasAuthClient: Boolean(supabase?.auth),
+        storage: "browser-localStorage",
+        environment: import.meta.env.PROD ? "production" : "development",
+      },
+      payload: {
+        email: credentials.email,
+        passwordLength: credentials.password.length,
+        passwordFirstCharCode: credentials.password.length ? credentials.password.charCodeAt(0) : null,
+        passwordLastCharCode: credentials.password.length ? credentials.password.charCodeAt(credentials.password.length - 1) : null,
+      },
     });
+    console.log(AUTH_DEBUG_PREFIX, "signInWithPassword payload", {
+      email: credentials.email,
+      password: "[redacted]",
+      passwordLength: credentials.password.length,
+    });
+
+    const { data, error } = await supabase.auth.signInWithPassword(credentials);
+
     setLoading(false);
     console.info(AUTH_DEBUG_PREFIX, "password sign-in completed", {
       hasSession: Boolean(data.session),
@@ -170,11 +201,11 @@ export default function AuthPage() {
               <form onSubmit={handleSignIn} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="email">{t("email")}</Label>
-                    <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                    <Input id="email" name="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="password">{t("password")}</Label>
-                    <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                    <Input id="password" name="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
                   </div>
                   <Button type="submit" className="w-full gradient-primary text-primary-foreground hover:opacity-95" disabled={loading}>
                     {t("signIn")}

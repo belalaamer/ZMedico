@@ -31,7 +31,7 @@ import { ListSkeleton } from "@/components/ListSkeleton";
 import { TablePager } from "@/components/TablePager";
 import { toast } from "sonner";
 
-const ROLES = ["admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr", "staff"] as const;
+const ROLES = ["system_owner", "admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr", "staff"] as const;
 type Role = typeof ROLES[number];
 
 type StaffLink = { branch_id: string | null; employee_id: string | null };

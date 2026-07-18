@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDataSync } from "@/lib/dataSync";
-import { Plus, Search, Pencil, Trash2, Building2, Star, MapPin, ListChecks, Users, ScrollText, CalendarDays, Clock, LayoutDashboard } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Building2, Star, MapPin, ListChecks, Users, ScrollText, CalendarDays, Clock, LayoutDashboard, Archive, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { useBranch } from "@/contexts/BranchContext";
@@ -45,6 +46,7 @@ const empty = {
 export default function Branches() {
   const { t, lang } = useI18n();
   const { user } = useAuth();
+  const { isSystemOwner } = useUserRole();
   const { toast } = useToast();
   const { currentBranchId } = useBranch();
   const [items, setItems] = useState<Branch[]>([]);
@@ -54,6 +56,8 @@ export default function Branches() {
   const [form, setForm] = useState({ ...empty });
   const [editId, setEditId] = useState<string | null>(null);
   const [delId, setDelId] = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [forceMode, setForceMode] = useState(false);
   const [locBranch, setLocBranch] = useState<Branch | null>(null);
   const [locCenter, setLocCenter] = useState<{ lat: number; lon: number } | null>(null);
   const [locRadius, setLocRadius] = useState(100);
@@ -165,10 +169,51 @@ export default function Branches() {
 
   const remove = async () => {
     if (!delId) return;
-    const { error } = await supabase.from("branches").delete().eq("id", delId);
-    if (error) toast({ title: error.message, variant: "destructive" });
-    else toast({ title: t("deleted") });
-    setDelId(null); load();
+    setDeleteBusy(true);
+    try {
+      // First attempt: plain delete (works when no dependent data).
+      const { error } = await supabase.from("branches").delete().eq("id", delId);
+      if (!error) {
+        toast({ title: t("deleted") });
+        setDelId(null); setForceMode(false); load();
+        return;
+      }
+      // FK violation → offer force-cascade (system_owner only) or archive.
+      const msg = (error.message || "").toLowerCase();
+      const isFk = msg.includes("foreign key") || msg.includes("violates") || (error as any).code === "23503";
+      if (isFk && !forceMode) {
+        setForceMode(true);
+        toast({
+          title: lang === "ar" ? "لا يمكن الحذف — يوجد بيانات مرتبطة" : "Can't delete — this branch has linked data",
+          description: lang === "ar" ? "اختر الأرشفة أو الحذف الإجباري (لمالك النظام فقط)." : "Choose Archive or Force Delete (system owner only).",
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({ title: error.message, variant: "destructive" });
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
+  const archiveBranch = async () => {
+    if (!delId) return;
+    setDeleteBusy(true);
+    const { error } = await supabase.rpc("admin_archive_branch" as any, { _branch_id: delId });
+    setDeleteBusy(false);
+    if (error) { toast({ title: error.message, variant: "destructive" }); return; }
+    toast({ title: lang === "ar" ? "تمت الأرشفة" : "Branch archived" });
+    setDelId(null); setForceMode(false); load();
+  };
+
+  const forceDeleteBranch = async () => {
+    if (!delId) return;
+    setDeleteBusy(true);
+    const { error } = await supabase.rpc("admin_force_delete_branch" as any, { _branch_id: delId });
+    setDeleteBusy(false);
+    if (error) { toast({ title: error.message, variant: "destructive" }); return; }
+    toast({ title: lang === "ar" ? "تم الحذف نهائيًا" : "Branch and all linked data deleted" });
+    setDelId(null); setForceMode(false); load();
   };
 
   const openLocation = (b: Branch) => {
@@ -470,12 +515,41 @@ export default function Branches() {
       <AlertDialog open={!!delId} onOpenChange={(o) => !o && setDelId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("confirmDelete") ?? "Delete?"}</AlertDialogTitle>
-            <AlertDialogDescription>{t("actionIrreversible") ?? "This action cannot be undone."}</AlertDialogDescription>
+            <AlertDialogTitle className="flex items-center gap-2">
+              {forceMode && <AlertTriangle className="size-5 text-destructive" />}
+              {forceMode
+                ? (lang === "ar" ? "الفرع يحتوي على بيانات" : "This branch has linked data")
+                : (t("confirmDelete") ?? "Delete?")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {forceMode
+                ? (lang === "ar"
+                    ? "اختر الأرشفة لإخفاء الفرع مع الحفاظ على البيانات، أو الحذف الإجباري لإزالة الفرع وجميع البيانات المرتبطة به نهائيًا."
+                    : "Archive to hide this branch while keeping its data, or Force Delete to permanently remove the branch and every record linked to it.")
+                : (t("actionIrreversible") ?? "This action cannot be undone.")}
+            </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
-            <AlertDialogAction onClick={remove}>{t("delete")}</AlertDialogAction>
+          <AlertDialogFooter className="flex-wrap gap-2">
+            <AlertDialogCancel onClick={() => setForceMode(false)} disabled={deleteBusy}>{t("cancel")}</AlertDialogCancel>
+            {forceMode ? (
+              <>
+                <Button variant="outline" onClick={archiveBranch} disabled={deleteBusy}>
+                  <Archive className="size-4 me-1" />
+                  {lang === "ar" ? "أرشفة" : "Archive"}
+                </Button>
+                {isSystemOwner && (
+                  <Button variant="destructive" onClick={forceDeleteBranch} disabled={deleteBusy}>
+                    {deleteBusy ? <Loader2 className="size-4 animate-spin me-1" /> : <Trash2 className="size-4 me-1" />}
+                    {lang === "ar" ? "حذف إجباري" : "Force Delete"}
+                  </Button>
+                )}
+              </>
+            ) : (
+              <AlertDialogAction onClick={remove} disabled={deleteBusy}>
+                {deleteBusy ? <Loader2 className="size-4 animate-spin me-1" /> : null}
+                {t("delete")}
+              </AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

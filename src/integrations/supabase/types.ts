@@ -6700,6 +6700,8 @@ export type Database = {
         }
         Returns: string
       }
+      admin_archive_branch: { Args: { _branch_id: string }; Returns: Json }
+      admin_force_delete_branch: { Args: { _branch_id: string }; Returns: Json }
       admin_override_medical_record: {
         Args: { _admin_id: string; _new_notes: string; _record_id: string }
         Returns: {

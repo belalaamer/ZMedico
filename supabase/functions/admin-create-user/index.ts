@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Invalid email" }, 400);
     }
     const allowedRoles = [
-      "admin", "manager", "doctor", "nurse",
+      "system_owner", "admin", "manager", "doctor", "nurse",
       "receptionist", "accountant", "hr", "staff",
     ];
     if (!allowedRoles.includes(role)) {
@@ -75,6 +75,7 @@ Deno.serve(async (req) => {
     }
 
     const rolesRequiringBranch = ["manager", "doctor", "nurse", "receptionist", "accountant", "staff"];
+    // system_owner and admin are cross-branch identities and do not require a branch assignment.
     if (rolesRequiringBranch.includes(role) && !branch_id) {
       return jsonResponse({ error: `Branch is required for role: ${role}` }, 400);
     }

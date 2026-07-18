@@ -94,6 +94,10 @@ export default function Staff() {
         return;
       }
       profileId = (data as any).user_id;
+      if (!(data as any).password) {
+        toast.error("User was created, but the server did not return a login password. Reset the password from User Management.");
+        return;
+      }
       setCreatedInfo({ email: (data as any).email, password: (data as any).password });
     }
 

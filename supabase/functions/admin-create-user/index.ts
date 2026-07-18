@@ -1,11 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 import { corsHeaders, corsPreflight, jsonResponse } from "../_shared/cors.ts";
 
-// Generates a cryptographically strong random string used ONLY internally to
-// satisfy Supabase's `createUser({ password })` argument. The value is never
-// returned to the caller, never logged, and never persisted anywhere the
-// admin surface can read. Sprint 1 hardening removed plaintext password
-// responses in favour of a recovery-link flow (see docs/security).
+// Generates a cryptographically strong temporary password. It is only returned
+// once in the admin response so the admin can hand it to the new staff member.
 function genInternalPassword(len = 32) {
   const chars =
     "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
@@ -54,10 +51,8 @@ Deno.serve(async (req) => {
     const full_name = body.full_name ? String(body.full_name).trim() : null;
     const role = String(body.role ?? "staff");
     const branch_id = body.branch_id ? String(body.branch_id) : null;
-    // If the admin supplied an explicit password, use it so the new user can
-    // log in immediately with those credentials. Otherwise generate an
-    // internal random password and surface a recovery link the user can use
-    // to set their own password.
+    // If the admin supplied an explicit password, use it. Otherwise generate a
+    // temporary password. In both cases the account can sign in immediately.
     const suppliedPassword = typeof body.password === "string" && body.password.trim().length >= 6
       ? body.password.trim()
       : null;
@@ -87,9 +82,7 @@ Deno.serve(async (req) => {
       { onConflict: "email" },
     );
 
-    // Create the auth user with email pre-confirmed. The password used here
-    // is a locally generated random value that is discarded immediately;
-    // the caller receives a recovery link to set the real password.
+    // Create the auth user with email pre-confirmed and a real password.
     const { data: created, error: createErr } =
       await admin.auth.admin.createUser({
         email,
@@ -173,40 +166,13 @@ Deno.serve(async (req) => {
     // Consume invite if still present
     await admin.from("allowed_signup_emails").delete().eq("email", email);
 
-    // If the admin supplied the password, the account is ready to use with
-    // those credentials — echo the email + password back so the admin can
-    // hand them off. Otherwise generate a one-time recovery link so the
-    // user can set their own password.
-    if (suppliedPassword) {
-      return jsonResponse({
-        success: true,
-        user_id: created.user.id,
-        email,
-        role,
-        password: suppliedPassword,
-      });
-    }
-
-    let action_link: string | null = null;
-    let action_link_expires_at: string | null = null;
-    try {
-      const { data: linkData } = await admin.auth.admin.generateLink({
-        type: "recovery",
-        email,
-      });
-      action_link = (linkData as any)?.properties?.action_link ?? null;
-      action_link_expires_at = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-    } catch {
-      /* non-fatal: user is created, admin can reset later */
-    }
-
     return jsonResponse({
       success: true,
       user_id: created.user.id,
       email,
       role,
-      action_link,
-      action_link_expires_at,
+      password: initialPassword,
+      password_was_generated: !suppliedPassword,
     });
   } catch (e) {
     return jsonResponse(

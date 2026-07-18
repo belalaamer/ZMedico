@@ -94,11 +94,11 @@ export default function ReportsDashboard() {
           <Card key={k.label} className={`relative overflow-hidden bg-gradient-to-br ${k.accent} border-border/60`}>
             <CardContent className="pt-6 pb-5">
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     {k.label}
                   </div>
-                  <div className="mt-2 text-3xl font-black tabular-nums leading-tight truncate">
+                  <div className="mt-2 text-2xl sm:text-3xl font-black tabular-nums leading-tight break-words">
                     {k.value}
                   </div>
                 </div>

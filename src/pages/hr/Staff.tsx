@@ -19,7 +19,10 @@ import { formatMoney } from "@/lib/format";
 import { useNavigate } from "react-router-dom";
 import JobRoleSelect from "@/components/JobRoleSelect";
 
-const ROLES = ["admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr", "staff"] as const;
+// Operational roles only. Administrative roles (`admin`, `system_owner`) are
+// intentionally excluded — they must be granted exclusively via the User
+// Management module, never through Staff creation.
+const ROLES = ["manager", "doctor", "nurse", "receptionist", "accountant", "hr", "staff"] as const;
 
 export function statusLabel(s: string, t: (k: any) => string) {
   const map: Record<string, string> = { active: "statusActive", on_leave: "statusOnLeave", terminated: "statusTerminated", suspended: "statusSuspended" };

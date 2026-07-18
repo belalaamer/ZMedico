@@ -83,7 +83,10 @@ export default function AuthPage() {
     if (!parsed.success) { toast.error("Invalid email or password"); return; }
     setLoading(true);
     console.info(AUTH_DEBUG_PREFIX, "password sign-in started", { redirectAfterLogin: from });
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: parsed.data.email,
+      password: parsed.data.password,
+    });
     setLoading(false);
     console.info(AUTH_DEBUG_PREFIX, "password sign-in completed", {
       hasSession: Boolean(data.session),

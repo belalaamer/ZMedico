@@ -53,7 +53,8 @@ Deno.serve(async (req) => {
       : null;
     const nextPassword = suppliedPassword ?? genTemporaryPassword(32);
 
-    // Look up email for the target user; generateLink requires an email.
+    // Look up email for the target user so the admin UI can display it with
+    // the one-time password returned below.
     const { data: target, error: getErr } =
       await admin.auth.admin.getUserById(user_id);
     if (getErr || !target?.user?.email) {

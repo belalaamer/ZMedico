@@ -101,7 +101,12 @@ export default function QAIdentities() {
       toast.error((data as any)?.error ?? error?.message ?? "Failed");
       return;
     }
-    const info = data as { email: string; password: string };
+    const info = data as { email: string; password?: string };
+    if (!info.password) {
+      toast.error(`Provisioned ${acc.email}, but no login password was returned`);
+      await load();
+      return;
+    }
     setCreds((c) => ({ ...c, [acc.email]: { email: info.email, password: info.password } }));
     toast.success(`Provisioned ${acc.email}`);
     await load();
@@ -126,7 +131,11 @@ export default function QAIdentities() {
       toast.error((data as any)?.error ?? error?.message ?? "Failed");
       return;
     }
-    const info = data as { email: string; password: string };
+    const info = data as { email: string; password?: string };
+    if (!info.password) {
+      toast.error(`Reset ${acc.email}, but no login password was returned`);
+      return;
+    }
     setCreds((c) => ({ ...c, [acc.email]: { email: info.email ?? acc.email, password: info.password } }));
     toast.success(`Reset password for ${acc.email}`);
   };

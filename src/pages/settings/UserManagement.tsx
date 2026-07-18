@@ -388,7 +388,16 @@ export default function UserManagement() {
       toast.error(msg);
       return; // keep modal open on failure
     }
-    const info = data as { email: string; password: string };
+    const info = data as { email: string; password?: string; action_link?: string };
+    if (!info.password) {
+      toast.error(
+        info.action_link
+          ? (lang === "ar" ? "تم إنشاء رابط تعيين كلمة مرور بدلاً من كلمة مرور مباشرة. استخدم إعادة التعيين إذا لزم." : "A password setup link was created instead of a direct password. Use reset if needed.")
+          : (lang === "ar" ? "لم يرجع الخادم كلمة مرور للمستخدم الجديد." : "The server did not return a password for the new user."),
+      );
+      await load();
+      return;
+    }
     setCreatedInfo({ email: info.email, password: info.password });
     setCEmail(""); setCName(""); setCRole("staff"); setCPassword(""); setCBranch(""); setCLinkedStaffId("");
     setCreateOpen(false);
@@ -444,7 +453,15 @@ export default function UserManagement() {
       toast.error(msg);
       return;
     }
-    const info = data as { email: string; password: string };
+    const info = data as { email: string; password?: string; action_link?: string };
+    if (!info.password) {
+      toast.error(
+        info.action_link
+          ? (lang === "ar" ? "تم إنشاء رابط استرداد بدلاً من كلمة مرور مباشرة." : "A recovery link was created instead of a direct password.")
+          : (lang === "ar" ? "لم يرجع الخادم كلمة مرور جديدة." : "The server did not return a new password."),
+      );
+      return;
+    }
     setResetInfo({ email: info.email ?? resetTarget.email, password: info.password });
     setRPassword("");
     setResetTarget(null);

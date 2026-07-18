@@ -1,6 +1,16 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 import { corsPreflight, jsonResponse } from "../_shared/cors.ts";
 
+function genTemporaryPassword(len = 32) {
+  const chars =
+    "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
+  let out = "";
+  const buf = new Uint8Array(len);
+  crypto.getRandomValues(buf);
+  for (let i = 0; i < len; i++) out += chars[buf[i] % chars.length];
+  return out;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return corsPreflight();
@@ -38,12 +48,13 @@ Deno.serve(async (req) => {
     if (!user_id) {
       return jsonResponse({ error: "user_id required" }, 400);
     }
-    // Sprint 1 hardening: admin-initiated password reset no longer accepts
-    // or returns plaintext passwords. The target user receives a one-time
-    // recovery link and sets their own password. Any inbound `password`
-    // field is intentionally ignored.
+    const suppliedPassword = typeof body.password === "string" && body.password.trim().length >= 6
+      ? body.password.trim()
+      : null;
+    const nextPassword = suppliedPassword ?? genTemporaryPassword(32);
 
-    // Look up email for the target user; generateLink requires an email.
+    // Look up email for the target user so the admin UI can display it with
+    // the one-time password returned below.
     const { data: target, error: getErr } =
       await admin.auth.admin.getUserById(user_id);
     if (getErr || !target?.user?.email) {
@@ -53,24 +64,20 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { data: linkData, error: linkErr } =
-      await admin.auth.admin.generateLink({
-        type: "recovery",
-        email: target.user.email,
-      });
-    if (linkErr) {
-      return jsonResponse({ error: linkErr.message }, 400);
+    const { error: updateErr } = await admin.auth.admin.updateUserById(user_id, {
+      password: nextPassword,
+      email_confirm: true,
+    });
+    if (updateErr) {
+      return jsonResponse({ error: updateErr.message }, 400);
     }
-
-    const action_link =
-      (linkData as any)?.properties?.action_link ?? null;
 
     return jsonResponse({
       success: true,
       user_id,
       email: target.user.email,
-      action_link,
-      action_link_expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      password: nextPassword,
+      password_was_generated: !suppliedPassword,
     });
   } catch (e) {
     return jsonResponse(

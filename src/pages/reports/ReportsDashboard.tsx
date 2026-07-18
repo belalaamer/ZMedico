@@ -98,7 +98,7 @@ export default function ReportsDashboard() {
                   <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     {k.label}
                   </div>
-                  <div className="mt-2 text-2xl sm:text-3xl font-black tabular-nums leading-tight break-words">
+                  <div className="mt-2 text-2xl sm:text-3xl font-black tabular-nums leading-tight whitespace-nowrap truncate">
                     {k.value}
                   </div>
                 </div>

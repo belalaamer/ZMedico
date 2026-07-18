@@ -1,4 +1,4 @@
-export const ROLES = ["admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr", "staff"] as const;
+export const ROLES = ["system_owner", "admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr", "staff"] as const;
 export const MODULES = [
   "patients",
   "appointments",

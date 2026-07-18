@@ -14,7 +14,7 @@ const I18nContext = createContext<Ctx | null>(null);
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(() => {
     const stored = (typeof window !== "undefined" && localStorage.getItem("zmedico.lang")) as Lang | null;
-    return stored ?? "ar";
+    return stored ?? "en";
   });
 
   const dir = lang === "ar" ? "rtl" : "ltr";

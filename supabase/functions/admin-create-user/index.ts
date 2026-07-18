@@ -54,9 +54,14 @@ Deno.serve(async (req) => {
     const full_name = body.full_name ? String(body.full_name).trim() : null;
     const role = String(body.role ?? "staff");
     const branch_id = body.branch_id ? String(body.branch_id) : null;
-    // Internal-only initial password. Never returned to the caller; the
-    // account is activated through a recovery link (see below).
-    const internalPassword = genInternalPassword(32);
+    // If the admin supplied an explicit password, use it so the new user can
+    // log in immediately with those credentials. Otherwise generate an
+    // internal random password and surface a recovery link the user can use
+    // to set their own password.
+    const suppliedPassword = typeof body.password === "string" && body.password.trim().length >= 6
+      ? body.password.trim()
+      : null;
+    const initialPassword = suppliedPassword ?? genInternalPassword(32);
 
     if (!email || !email.includes("@")) {
       return jsonResponse({ error: "Invalid email" }, 400);
@@ -87,7 +92,7 @@ Deno.serve(async (req) => {
     const { data: created, error: createErr } =
       await admin.auth.admin.createUser({
         email,
-        password: internalPassword,
+        password: initialPassword,
         email_confirm: true,
         user_metadata: { full_name: full_name ?? undefined },
       });
@@ -167,10 +172,20 @@ Deno.serve(async (req) => {
     // Consume invite if still present
     await admin.from("allowed_signup_emails").delete().eq("email", email);
 
-    // Generate a one-time recovery link so the new user can set their own
-    // password. We never return the internal password. If link generation
-    // fails we still report success — the admin can trigger a reset via
-    // admin-reset-password.
+    // If the admin supplied the password, the account is ready to use with
+    // those credentials — echo the email + password back so the admin can
+    // hand them off. Otherwise generate a one-time recovery link so the
+    // user can set their own password.
+    if (suppliedPassword) {
+      return jsonResponse({
+        success: true,
+        user_id: created.user.id,
+        email,
+        role,
+        password: suppliedPassword,
+      });
+    }
+
     let action_link: string | null = null;
     let action_link_expires_at: string | null = null;
     try {
@@ -178,10 +193,7 @@ Deno.serve(async (req) => {
         type: "recovery",
         email,
       });
-      // properties.action_link + properties.email_otp are provided by the
-      // Supabase Admin API. We surface only the link + a rough expiry hint.
       action_link = (linkData as any)?.properties?.action_link ?? null;
-      // Supabase recovery links default to 1h TTL; expose a conservative hint.
       action_link_expires_at = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     } catch {
       /* non-fatal: user is created, admin can reset later */

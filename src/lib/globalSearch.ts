@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { sanitizeSearch } from "@/lib/sanitizeSearch";
 
 export type SearchHit = {
   id: string;
@@ -27,10 +28,11 @@ function isDigits(q: string): boolean {
   return /^\d+$/.test(q);
 }
 
-function esc(q: string): string {
-  // Strip PostgREST filter meta-characters to prevent filter injection via .or()
-  return q.replace(/[,()"]/g, "");
-}
+// PostgREST filter-injection sanitizer. Delegates to the shared helper so
+// every search surface (globalSearch, medication search, etc.) applies the
+// exact same rule: strip filter meta-chars + LIKE wildcards + single quotes,
+// then cap at 60 chars.
+const esc = sanitizeSearch;
 
 export async function searchPatients(
   q: string,

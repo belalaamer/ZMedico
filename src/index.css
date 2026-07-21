@@ -139,6 +139,18 @@ All colors MUST be HSL.
 
 html { font-family: "Inter", system-ui, sans-serif; }
 
+/* Hide the injected "Edit with Lovable" badge on published deployments */
+#lovable-badge,
+a[href*="lovable.dev"][class*="badge" i],
+a[href*="lovable.dev/projects"],
+a[aria-label*="Lovable" i],
+iframe[src*="lovable.dev"][title*="badge" i] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 /* RTL-aware logical spacing helpers already supported by Tailwind via [dir] */
 [dir="rtl"] .lucide { transform: scaleX(1); }
 

@@ -27,3 +27,10 @@ dist-ssr
 tests/playwright/.auth/
 playwright-report/
 test-results/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example

@@ -1,0 +1,50 @@
+name: Send due reminders
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: reminders
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Send due reminders
+        run: |
+          set -euo pipefail
+          RESP=$(curl -s -w "\n%{http_code}" -X POST \
+            "https://rqcmnfzfytyyicelvifk.supabase.co/functions/v1/send-reminder" \
+            -H "Authorization: Bearer ${{ secrets.SEND_REMINDER_CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d '{"due_only": true}')
+          CODE=$(echo "$RESP" | tail -n1)
+          BODY=$(echo "$RESP" | sed '$d')
+          echo "HTTP $CODE"
+          echo "$BODY"
+          if [ "$CODE" != "200" ]; then
+            echo "send-reminder failed"
+            exit 1
+          fi
+
+  winback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event_name == 'schedule' && startsWith(github.event.schedule, '*/15')
+    steps:
+      - name: Enqueue win-back (once daily at 02:00 UTC)
+        run: |
+          set -euo pipefail
+          HOUR=$(date -u +%H); MIN=$(date -u +%M)
+          if [ "$HOUR" != "02" ] || [ "$MIN" -ge 15 ]; then
+            echo "Not the 02:00 UTC window - skipping."
+            exit 0
+          fi
+          curl -s -f -X POST \
+            "https://rqcmnfzfytyyicelvifk.supabase.co/functions/v1/enqueue-winback" \
+            -H "Authorization: Bearer ${{ secrets.SEND_REMINDER_CRON_SECRET }}" \
+            -H "Content-Type: application/json" -d '{}'

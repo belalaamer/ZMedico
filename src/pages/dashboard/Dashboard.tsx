@@ -157,9 +157,9 @@ export default function Dashboard() {
           .is("deleted_at", null)
           .gte("scheduled_at", rs.toISOString()).lte("scheduled_at", re.toISOString())
           .not("doctor_id", "is", null)),
-        supabase.from("invoice_items").select("description_en,description_ar,quantity,total,invoice:invoices!inner(branch_id,issue_date,deleted_at)")
+        supabase.from("invoice_items").select("description_en,description_ar,quantity,total,invoice:invoices!inner(branch_id,invoice_date,deleted_at)")
           .is("invoice.deleted_at", null)
-          .gte("invoice.issue_date", rangeStart).lte("invoice.issue_date", rangeEnd),
+          .gte("invoice.invoice_date", rangeStart).lte("invoice.invoice_date", rangeEnd),
       ]);
 
       // Treasury (mirrors Treasury page: filter by treasury_id for this branch,

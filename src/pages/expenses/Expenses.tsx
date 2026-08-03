@@ -36,7 +36,8 @@ export default function Expenses() {
   const load = async () => {
     let q = supabase.from("expenses").select("*, expense_categories(name_en,name_ar)").is("deleted_at", null).order("expense_date", { ascending: false }).limit(200);
     if (currentBranchId) q = q.eq("branch_id", currentBranchId);
-    const { data } = await q;
+    const { data, error } = await q;
+    if (error) { toast.error(error.message); return; }
     setItems(data ?? []);
   };
   useEffect(() => {

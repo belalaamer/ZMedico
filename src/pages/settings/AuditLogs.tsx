@@ -14,7 +14,7 @@ import { ListSkeleton } from "@/components/ListSkeleton";
 import { TablePager } from "@/components/TablePager";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Info } from "lucide-react";
+import { Info, AlertTriangle } from "lucide-react";
 
 const PAGE_SIZE = 10;
 
@@ -61,20 +61,43 @@ export default function AuditLogs() {
   const { t, lang } = useI18n();
   const [items, setItems] = useState<AuditRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [actionFilter, setActionFilter] = useState<string>("all");
   const [entityFilter, setEntityFilter] = useState<string>("all");
   const [page, setPage] = useState(0);
 
   useEffect(() => {
+    let active = true;
     setIsLoading(true);
+    setLoadError(null);
+
     (supabase as any).from("audit_logs")
       .select("id,action,entity_type,entity_id,created_at,user_id, profiles(full_name, email)")
       .order("created_at", { ascending: false }).limit(100)
-      .then(({ data }: any) => {
-        setItems((data ?? []) as AuditRow[]);
+      .then(({ data, error }: any) => {
+        if (!active) return;
+        // Previously the `error` field was ignored entirely. A permission
+        // denial (RLS or a missing GRANT) then rendered as an empty table,
+        // which is exactly how the July 2026 outage stayed invisible.
+        if (error) {
+          setLoadError(error.message ?? "Unknown error");
+          setItems([]);
+        } else {
+          setItems((data ?? []) as AuditRow[]);
+        }
+        setIsLoading(false);
+      })
+      // Previously there was no .catch(), so a rejected promise left the
+      // spinner running forever with no explanation.
+      .catch((err: any) => {
+        if (!active) return;
+        setLoadError(err?.message ?? "Request failed");
+        setItems([]);
         setIsLoading(false);
       });
+
+    return () => { active = false; };
   }, []);
 
   const entityTypes = useMemo(() => {
@@ -117,6 +140,18 @@ export default function AuditLogs() {
               : "The audit log is append-only — entries cannot be edited or deleted. This view shows the latest 100 events for fast review; the full history is retained in the database."}
           </p>
         </div>
+
+        {loadError && (
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm flex gap-2">
+            <AlertTriangle className="size-4 mt-0.5 text-destructive shrink-0" />
+            <div className="min-w-0">
+              <p className="font-medium text-destructive">
+                {lang === "ar" ? "تعذّر تحميل سجل التدقيق" : "Could not load the audit log"}
+              </p>
+              <p className="text-muted-foreground break-words">{loadError}</p>
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
           <Input
@@ -211,7 +246,9 @@ export default function AuditLogs() {
                     {pageRows.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={5} className="p-8 text-center text-muted-foreground">
-                          {t("noData")}
+                          {loadError
+                            ? (lang === "ar" ? "لم يتم تحميل البيانات بسبب خطأ" : "Data could not be loaded due to an error")
+                            : t("noData")}
                         </TableCell>
                       </TableRow>
                     )}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Trash2, Plus } from "lucide-react";
 import { ChevronDown } from "lucide-react";
@@ -54,6 +54,7 @@ export function CreateInvoiceDialog({
   const [manualClaim, setManualClaim] = useState<number>(0);
   const [items, setItems] = useState<Item[]>([{ item_type: "service", description_en: "", description_ar: "", quantity: 1, unit_price: 0 }]);
   const [saving, setSaving] = useState(false);
+  const submittingRef = useRef(false);
   const [patientProcedures, setPatientProcedures] = useState<any[]>([]);
   const [selectedProcIds, setSelectedProcIds] = useState<Record<string, boolean>>({});
   const [couponCode, setCouponCode] = useState("");
@@ -85,14 +86,6 @@ export function CreateInvoiceDialog({
       }
 
       const rows = (data ?? []).filter((p: any) => p.deleted_at == null);
-      console.log("[CreateInvoiceDialog] patients fetched", {
-        count: rows.length,
-        patients: rows.map((p: any) => ({
-          id: p.id,
-          name: `${p.first_name_en ?? ""} ${p.last_name_en ?? ""}`.trim(),
-          deleted_at: p.deleted_at,
-        })),
-      });
       return rows;
     },
     refetchOnMount: "always",
@@ -110,7 +103,6 @@ export function CreateInvoiceDialog({
 
   useEffect(() => {
     if (!open) return;
-    console.log("Dialog opened, refetching patients...");
     void refetchPatients();
     supabase.from("products").select("id,sku,name_en,name_ar,selling_price,min_stock_level").eq("is_active", true).is("deleted_at", null).order("name_en").limit(1000)
       .then(({ data }) => setProducts(data ?? []));
@@ -124,13 +116,8 @@ export function CreateInvoiceDialog({
   }, [open, refetchPatients]);
 
   useDataSync(["patients"], () => {
-    console.log("Patient data changed, refetching...");
     void refetchPatients();
   });
-
-  useEffect(() => {
-    console.log("[CreateInvoiceDialog] patient options count", patients.length);
-  }, [patients]);
 
   useEffect(() => {
     if (!open) return;
@@ -297,8 +284,10 @@ export function CreateInvoiceDialog({
   };
 
   const save = async (status: "draft" | "pending") => {
-    if (!patientId) { toast.error(t("selectPatient")); return; }
-    if (items.length === 0 || items.every((it) => !it.description_en)) { toast.error("Add at least one item"); return; }
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    if (!patientId) { toast.error(t("selectPatient")); submittingRef.current = false; return; }
+    if (items.length === 0 || items.every((it) => !it.description_en)) { toast.error("Add at least one item"); submittingRef.current = false; return; }
     setSaving(true);
     const invoicePayload: Record<string, unknown> = {
       patient_id: patientId,
@@ -321,7 +310,7 @@ export function CreateInvoiceDialog({
       .insert(invoicePayload as any, { defaultToNull: false })
       .select("id, invoice_number")
       .single();
-    if (error || !inv) { setSaving(false); toast.error(error?.message ?? "Failed"); return; }
+    if (error || !inv) { setSaving(false); submittingRef.current = false; toast.error(error?.message ?? "Failed"); return; }
 
     if (couponInfo) {
       await (supabase as any).from("coupon_redemptions").insert({
@@ -379,7 +368,7 @@ export function CreateInvoiceDialog({
       }));
     if (rows.length) {
       const { error: e2 } = await supabase.from("invoice_items").insert(rows as any);
-      if (e2) { setSaving(false); toast.error(e2.message); return; }
+      if (e2) { setSaving(false); submittingRef.current = false; toast.error(e2.message); return; }
     }
 
     // Auto-deduct inventory for product items (non-cancelled invoices)
@@ -409,6 +398,7 @@ export function CreateInvoiceDialog({
     }
 
     setSaving(false);
+    submittingRef.current = false;
     {
       const num = String(inv.invoice_number ?? "");
       const isTemp = !num || /^TMP[-_]/i.test(num);

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NumberInput } from "@/components/ui/number-input";
@@ -37,6 +37,7 @@ export function RecordPaymentDialog({
   const [ref, setRef] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const submittingRef = useRef(false);
   const [split, setSplit] = useState(false);
   const [method2, setMethod2] = useState<Method>("wallet");
   const [amount2, setAmount2] = useState<number>(0);
@@ -127,29 +128,31 @@ export function RecordPaymentDialog({
   useDataSync(["patients"], () => { if (!patientId) loadPatients(); });
 
   const save = async () => {
-    if (!pid) { toast.error(t("selectPatient")); return; }
-    if (!amount || amount <= 0) { toast.error("Amount required"); return; }
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    if (!pid) { toast.error(t("selectPatient")); submittingRef.current = false; return; }
+    if (!amount || amount <= 0) { toast.error("Amount required"); submittingRef.current = false; return; }
     if (isTopup) {
       if (method === "wallet" || (split && method2 === "wallet")) {
-        toast.error(t("walletTopupCannotUseWallet")); return;
+        toast.error(t("walletTopupCannotUseWallet")); submittingRef.current = false; return;
       }
     } else {
       const walletInvolved = method === "wallet" || (split && method2 === "wallet");
       if (walletInvolved && walletBalanceLoading) {
-        toast.error(t("walletBalanceLoading")); return;
+        toast.error(t("walletBalanceLoading")); submittingRef.current = false; return;
       }
       // Validate wallet usage against current balance.
       const walletSpend = (method === "wallet" ? Number(amount) : 0) + (split && method2 === "wallet" ? Number(amount2) : 0);
       if (walletSpend > walletBalance + 0.009) {
-        toast.error(t("walletInsufficient")); return;
+        toast.error(t("walletInsufficient")); submittingRef.current = false; return;
       }
     }
     if (split) {
-      if (method === method2) { toast.error(t("bothMethodsRequired")); return; }
-      if (!amount2 || amount2 <= 0) { toast.error(t("bothMethodsRequired")); return; }
+      if (method === method2) { toast.error(t("bothMethodsRequired")); submittingRef.current = false; return; }
+      if (!amount2 || amount2 <= 0) { toast.error(t("bothMethodsRequired")); submittingRef.current = false; return; }
       const sum = +(Number(amount) + Number(amount2)).toFixed(2);
       const cap = remaining > 0 ? remaining : (defaultAmount ?? 0);
-      if (cap > 0 && sum > cap + 0.009) { toast.error(t("splitSumExceeds")); return; }
+      if (cap > 0 && sum > cap + 0.009) { toast.error(t("splitSumExceeds")); submittingRef.current = false; return; }
     }
     setSaving(true);
     const base = {
@@ -166,6 +169,7 @@ export function RecordPaymentDialog({
     if (split) rows.push({ ...base, amount: amount2, payment_method: method2 });
     const { error } = await supabase.from("payments").insert(rows as any);
     setSaving(false);
+    submittingRef.current = false;
     if (error) {
       const walletInvolved = method === "wallet" || (split && method2 === "wallet");
       const code = (error as any).code as string | undefined;

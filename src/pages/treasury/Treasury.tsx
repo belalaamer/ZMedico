@@ -32,12 +32,14 @@ export default function Treasury() {
   const load = async () => {
     let tq = supabase.from("treasury").select("*").is("deleted_at", null).order("created_at");
     if (currentBranchId) tq = tq.eq("branch_id", currentBranchId);
-    const { data: trs } = await tq;
+    const { data: trs, error: trsError } = await tq;
+    if (trsError) { toast.error(trsError.message); return; }
     setTreasuries(trs ?? []);
 
     const ids = (trs ?? []).map((t: any) => t.id);
     if (ids.length) {
-      const { data: tx } = await supabase.from("treasury_transactions").select("*").in("treasury_id", ids).order("created_at", { ascending: false }).limit(100);
+      const { data: tx, error: txError } = await supabase.from("treasury_transactions").select("*").in("treasury_id", ids).order("created_at", { ascending: false }).limit(100);
+      if (txError) { toast.error(txError.message); return; }
       // Hide expense rows that have been reversed, and hide the reversal rows themselves
       const reversedIds = new Set(
         (tx ?? [])
@@ -52,7 +54,8 @@ export default function Treasury() {
       setTxs(visible);
 
       const startISO = new Date(new Date().setHours(0,0,0,0)).toISOString();
-      const { data: tt } = await supabase.from("treasury_transactions").select("transaction_type,amount,reference_type,reference_id,created_at").in("treasury_id", ids).gte("created_at", startISO);
+      const { data: tt, error: ttError } = await supabase.from("treasury_transactions").select("transaction_type,amount,reference_type,reference_id,created_at").in("treasury_id", ids).gte("created_at", startISO);
+      if (ttError) { toast.error(ttError.message); return; }
       const reversedToday = new Set(
         (tt ?? [])
           .filter((r: any) => r.reference_type === "expense_reversal" && r.reference_id)

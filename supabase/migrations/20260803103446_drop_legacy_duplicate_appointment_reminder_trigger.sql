@@ -1,0 +1,28 @@
+-- Remove the legacy duplicate reminder trigger.
+--
+-- Two generations of the reminder system fired on the SAME event
+-- (AFTER INSERT ON public.appointments):
+--
+--   1) appointment_create_reminders -> tg_appointment_create_reminders  [LEGACY]
+--      Hardcoded EN/AR strings, timing from appointment_settings (default 24h +
+--      2h), channel from notification_settings.reminder_channel (default
+--      'email'). Ignores communication_templates entirely.
+--
+--   2) appt_enqueue_on_insert -> trg_appt_after_insert                  [CURRENT]
+--      Delegates to enqueue_appointment_reminders(), which renders
+--      communication_templates with {{placeholder}} substitution and populates
+--      event_type / template_key / payload / destination_* -- the contract the
+--      send-reminder and enqueue-winback Edge Functions expect.
+--
+-- Verified live: booking one appointment produced 4 reminders instead of 2.
+-- Once delivery is enabled every patient would receive DUPLICATE messages --
+-- one from the seeded Arabic template, one legacy English message on a
+-- different channel. After this migration a booking produces exactly 2
+-- template-based reminders (re-verified live).
+--
+-- Reversible: tg_appointment_create_reminders() is intentionally NOT dropped.
+-- Re-create the trigger to restore the old behaviour.
+--
+-- Applied live 2026-08-03 as migration 20260803103446.
+
+DROP TRIGGER IF EXISTS appointment_create_reminders ON public.appointments;

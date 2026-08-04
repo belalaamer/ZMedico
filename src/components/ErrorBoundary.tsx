@@ -1,1 +1,81 @@
-aW1wb3J0IHsgQ29tcG9uZW50LCBSZWFjdE5vZGUgfSBmcm9tICJyZWFjdCI7CmltcG9ydCB7IHJlcG9ydENsaWVudEVycm9yIH0gZnJvbSAiQC9saWIvb2JzZXJ2YWJpbGl0eS9yZXBvcnRFcnJvciI7Cgp0eXBlIFByb3BzID0geyBjaGlsZHJlbjogUmVhY3ROb2RlIH07CnR5cGUgU3RhdGUgPSB7IGVycm9yOiBFcnJvciB8IG51bGwgfTsKCmV4cG9ydCBjbGFzcyBFcnJvckJvdW5kYXJ5IGV4dGVuZHMgQ29tcG9uZW50PFByb3BzLCBTdGF0ZT4gewogIHN0YXRlOiBTdGF0ZSA9IHsgZXJyb3I6IG51bGwgfTsKCiAgc3RhdGljIGdldERlcml2ZWRTdGF0ZUZyb21FcnJvcihlcnJvcjogRXJyb3IpOiBTdGF0ZSB7CiAgICByZXR1cm4geyBlcnJvciB9OwogIH0KCiAgY29tcG9uZW50RGlkQ2F0Y2goZXJyb3I6IEVycm9yLCBpbmZvOiB1bmtub3duKSB7CiAgICAvLyBTdXJmYWNlIGluIGNvbnNvbGUgc28gdGhlIG5leHQgbWVzc2FnZSBjYXB0dXJlcyBpdCB2aWEgcmVhZF9jb25zb2xlX2xvZ3MuCiAgICAvLyBlc2xpbnQtZGlzYWJsZS1uZXh0LWxpbmUgbm8tY29uc29sZQogICAgY29uc29sZS5lcnJvcigiW0Vycm9yQm91bmRhcnldIFJlbmRlciBjcmFzaDoiLCBlcnJvciwgaW5mbyk7CgogICAgLy8gU2VsZi1ob3N0ZWQgREIgbG9nZ2luZy4KICAgIGNvbnN0IGNvbXBvbmVudFN0YWNrID0KICAgICAgaW5mbyAhPSBudWxsICYmCiAgICAgIHR5cGVvZiBpbmZvID09PSAib2JqZWN0IiAmJgogICAgICAiY29tcG9uZW50U3RhY2siIGluIGluZm8gJiYKICAgICAgdHlwZW9mIChpbmZvIGFzIHsgY29tcG9uZW50U3RhY2s6IHVua25vd24gfSkuY29tcG9uZW50U3RhY2sgPT09ICJzdHJpbmciCiAgICAgICAgPyAoaW5mbyBhcyB7IGNvbXBvbmVudFN0YWNrOiBzdHJpbmcgfSkuY29tcG9uZW50U3RhY2sKICAgICAgICA6IHVuZGVmaW5lZDsKCiAgICB2b2lkIHJlcG9ydENsaWVudEVycm9yKHsKICAgICAga2luZDogImJvdW5kYXJ5IiwKICAgICAgbWVzc2FnZTogZXJyb3IubWVzc2FnZSwKICAgICAgc3RhY2s6IGVycm9yLnN0YWNrLAogICAgICBjb21wb25lbnQ6IGNvbXBvbmVudFN0YWNrLAogICAgfSk7CiAgfQoKICBwcml2YXRlIHJlc2V0ID0gKCkgPT4gewogICAgdGhpcy5zZXRTdGF0ZSh7IGVycm9yOiBudWxsIH0pOwogIH07CgogIHByaXZhdGUgcmVsb2FkID0gKCkgPT4gewogICAgd2luZG93LmxvY2F0aW9uLnJlbG9hZCgpOwogIH07CgogIHJlbmRlcigpIHsKICAgIGlmICghdGhpcy5zdGF0ZS5lcnJvcikgcmV0dXJuIHRoaXMucHJvcHMuY2hpbGRyZW47CiAgICByZXR1cm4gKAogICAgICA8ZGl2IGNsYXNzTmFtZT0ibWluLWgtZHZoIGZsZXggaXRlbXMtY2VudGVyIGp1c3RpZnktY2VudGVyIGJnLWJhY2tncm91bmQgcC02Ij4KICAgICAgICA8ZGl2IGNsYXNzTmFtZT0ibWF4LXctbWQgdy1mdWxsIHJvdW5kZWQteGwgYm9yZGVyIGJvcmRlci1ib3JkZXIgYmctY2FyZCBwLTYgc2hhZG93LXNtIj4KICAgICAgICAgIDxoMSBjbGFzc05hbWU9InRleHQtbGcgZm9udC1zZW1pYm9sZCB0ZXh0LWZvcmVncm91bmQgbWItMiI+CiAgICAgICAgICAgIFNvbWV0aGluZyB3ZW50IHdyb25nCiAgICAgICAgICA8L2gxPgogICAgICAgICAgPHAgY2xhc3NOYW1lPSJ0ZXh0LXNtIHRleHQtbXV0ZWQtZm9yZWdyb3VuZCBtYi00Ij4KICAgICAgICAgICAgVGhlIGFwcCBoaXQgYW4gdW5leHBlY3RlZCBlcnJvciB3aGlsZSByZW5kZXJpbmcuIFlvdSBjYW4gdHJ5IGFnYWluIG9yCiAgICAgICAgICAgIHJlbG9hZCB0aGUgcGFnZS4KICAgICAgICAgIDwvcD4KICAgICAgICAgIDxwcmUgY2xhc3NOYW1lPSJ0ZXh0LXhzIGJnLW11dGVkIHRleHQtbXV0ZWQtZm9yZWdyb3VuZCByb3VuZGVkLW1kIHAtMyBvdmVyZmxvdy1hdXRvIG1heC1oLTQwIG1iLTQgd2hpdGVzcGFjZS1wcmUtd3JhcCBicmVhay13b3JkcyI+CiAgICAgICAgICAgIHt0aGlzLnN0YXRlLmVycm9yLm1lc3NhZ2V9CiAgICAgICAgICA8L3ByZT4KICAgICAgICAgIDxkaXYgY2xhc3NOYW1lPSJmbGV4IGdhcC0yIGp1c3RpZnktZW5kIj4KICAgICAgICAgICAgPGJ1dHRvbgogICAgICAgICAgICAgIHR5cGU9ImJ1dHRvbiIKICAgICAgICAgICAgICBvbkNsaWNrPXt0aGlzLnJlc2V0fQogICAgICAgICAgICAgIGNsYXNzTmFtZT0icHgtMyBweS0xLjUgdGV4dC1zbSByb3VuZGVkLW1kIGJvcmRlciBib3JkZXItYm9yZGVyIGhvdmVyOmJnLW11dGVkIgogICAgICAgICAgICA+CiAgICAgICAgICAgICAgVHJ5IGFnYWluCiAgICAgICAgICAgIDwvYnV0dG9uPgogICAgICAgICAgICA8YnV0dG9uCiAgICAgICAgICAgICAgdHlwZT0iYnV0dG9uIgogICAgICAgICAgICAgIG9uQ2xpY2s9e3RoaXMucmVsb2FkfQogICAgICAgICAgICAgIGNsYXNzTmFtZT0icHgtMyBweS0xLjUgdGV4dC1zbSByb3VuZGVkLW1kIGJnLXByaW1hcnkgdGV4dC1wcmltYXJ5LWZvcmVncm91bmQgaG92ZXI6b3BhY2l0eS05MCIKICAgICAgICAgICAgPgogICAgICAgICAgICAgIFJlbG9hZAogICAgICAgICAgICA8L2J1dHRvbj4KICAgICAgICAgIDwvZGl2PgogICAgICAgIDwvZGl2PgogICAgICA8L2Rpdj4KICAgICk7CiAgfQp9CgpleHBvcnQgZGVmYXVsdCBFcnJvckJvdW5kYXJ5Owo=
+import { Component, ReactNode } from "react";
+import { reportClientError } from "@/lib/observability/reportError";
+
+type Props = { children: ReactNode };
+type State = { error: Error | null };
+
+export class ErrorBoundary extends Component<Props, State> {
+  state: State = { error: null };
+
+  static getDerivedStateFromError(error: Error): State {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: unknown) {
+    // Surface in console so the next message captures it via read_console_logs.
+    // eslint-disable-next-line no-console
+    console.error("[ErrorBoundary] Render crash:", error, info);
+
+    // Self-hosted DB logging.
+    const componentStack =
+      info != null &&
+      typeof info === "object" &&
+      "componentStack" in info &&
+      typeof (info as { componentStack: unknown }).componentStack === "string"
+        ? (info as { componentStack: string }).componentStack
+        : undefined;
+
+    void reportClientError({
+      kind: "boundary",
+      message: error.message,
+      stack: error.stack,
+      component: componentStack,
+    });
+  }
+
+  private reset = () => {
+    this.setState({ error: null });
+  };
+
+  private reload = () => {
+    window.location.reload();
+  };
+
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <div className="min-h-dvh flex items-center justify-center bg-background p-6">
+        <div className="max-w-md w-full rounded-xl border border-border bg-card p-6 shadow-sm">
+          <h1 className="text-lg font-semibold text-foreground mb-2">
+            Something went wrong
+          </h1>
+          <p className="text-sm text-muted-foreground mb-4">
+            The app hit an unexpected error while rendering. You can try again or
+            reload the page.
+          </p>
+          <pre className="text-xs bg-muted text-muted-foreground rounded-md p-3 overflow-auto max-h-40 mb-4 whitespace-pre-wrap break-words">
+            {this.state.error.message}
+          </pre>
+          <div className="flex gap-2 justify-end">
+            <button
+              type="button"
+              onClick={this.reset}
+              className="px-3 py-1.5 text-sm rounded-md border border-border hover:bg-muted"
+            >
+              Try again
+            </button>
+            <button
+              type="button"
+              onClick={this.reload}
+              className="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:opacity-90"
+            >
+              Reload
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+}
+
+export default ErrorBoundary;

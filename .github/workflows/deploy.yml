@@ -1,0 +1,49 @@
+name: Deploy to Cloudflare
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - run: bun run build
+
+      - name: Verify build output
+        run: |
+          test -f dist/index.html || { echo "dist/index.html missing"; exit 1; }
+          ls -la dist
+
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          sleep 10
+          for i in 1 2 3 4 5; do
+            code=$(curl -s -o /tmp/b.html -w "%{http_code}" https://zmedico2.belalaamer.workers.dev/ || echo 000)
+            if [ "$code" = "200" ] && grep -q '<div id="root"' /tmp/b.html; then
+              echo "Smoke test passed."; exit 0
+            fi
+            echo "Attempt $i: HTTP $code"; sleep 10
+          done
+          echo "Smoke test FAILED"; exit 1

@@ -90,6 +90,25 @@ invoice and posts to treasury, voiding reverses it, an appointment enqueues
 exactly 2 reminders, invoice numbers carry the branch code) and reconciliation of
 the real books.
 
+### Who changed a patient record
+
+Patient identity, contact and branch changes are audited. To see the history of
+one patient:
+
+```sql
+SELECT created_at, action, user_id,
+       old_values->>'phone'   AS phone_before,
+       new_values->>'phone'   AS phone_after,
+       old_values->>'name_ar' AS name_before,
+       new_values->>'name_ar' AS name_after
+FROM audit_logs
+WHERE entity_type = 'patient' AND entity_id = '<patient-id>'
+ORDER BY created_at DESC;
+```
+
+Clinical detail is deliberately **not** copied here — this answers "who changed
+what", it is not a second copy of the medical record.
+
 ### Books reconciliation
 
 ```sql
@@ -241,6 +260,9 @@ Use a Supabase branch database rather than testing against production:
 | `xlsx@0.18.5` is unmaintained | Used for exports. Has known unpatched advisories. Migrate to `exceljs`. |
 | Authz shadow-mode apparatus | The migration is complete (`VITE_AUTHZ_CANONICAL="true"`). ~33k rows in `authz_shadow_decisions` and the parity test files are now dead weight and can be retired. |
 | Invoice numbers are immutable | Cancelling leaves a permanent gap in the sequence. This is intentional and correct: a reused number is an audit failure. |
+| Patient codes are immutable and gapped | Same reasoning. Soft-deleting a patient used to renumber every other patient, so the code was a display position rather than an identifier. Gaps are expected; do not "tidy" them. |
+| A recorded payment cannot be edited | Amount, method, invoice link, patient, branch and date are frozen at insert. Correct a mistake by voiding the payment and recording a new one. Notes and reference number stay editable. |
+| A paid invoice's amount cannot be changed | Locked as soon as one live payment exists. Void and re-issue instead. An unpaid invoice is still fully editable. |
 | Dependabot major bumps | `vite 6→8`, `tailwind 3→4`, `recharts 2→3` were closed deliberately — each is breaking and there is no test coverage to catch the fallout. |
 
 ---

@@ -1,1 +1,108 @@
-LyoqCiAqIFNlbGYtaG9zdGVkIGJyb3dzZXIgZXJyb3IgY2FwdHVyZS4KICoKICogSW5zZXJ0cyBvbmUgcm93IGludG8gcHVibGljLmNsaWVudF9lcnJvcnMgdmlhIFN1cGFiYXNlLgogKiBEZXNpZ25lZCB0byBiZSBjYWxsZWQgZnJvbSBnbG9iYWwgd2luZG93IGVycm9yIGhhbmRsZXJzIGFuZAogKiBFcnJvckJvdW5kYXJ5LmNvbXBvbmVudERpZENhdGNoLgogKgogKiBTYWZldHkgY29udHJhY3Q6CiAqICAgLSBOZXZlciB0aHJvd3MsIG5ldmVyIHJlamVjdHMgKGFsbCBwYXRocyB3cmFwcGVkIGluIHRyeS9jYXRjaCkuCiAqICAgLSBOZXZlciByZWN1cnNlcyAobW9kdWxlLWxldmVsIGJvb2xlYW4gZ3VhcmQpLgogKiAgIC0gVGhyb3R0bGVzIHJlcGVhdGVkIGZpbmdlcnByaW50cyB3aXRoaW4gNjAgcy4KICogICAtIENhcHMgdG90YWwgaW5zZXJ0cyBwZXIgcGFnZSBsb2FkIGF0IE1BWF9FUlJPUlNfUEVSX1NFU1NJT04uCiAqICAgLSBTa2lwcyBzaWxlbnRseSB3aGVuIG5vIGF1dGhlbnRpY2F0ZWQgc2Vzc2lvbiBleGlzdHMuCiAqICAgLSBUcnVuY2F0ZXMgbWVzc2FnZSAvIHN0YWNrIHRvIHN0YXkgd2l0aGluIERCIENIRUNLIGNvbnN0cmFpbnRzLgogKiAgIC0gTmV2ZXIgbG9ncyB0aGUgVVJMIHF1ZXJ5IHN0cmluZyAocGF0aWVudCBJRHMgbWF5IGFwcGVhciB0aGVyZSkuCiAqLwoKaW1wb3J0IHsgc3VwYWJhc2UgfSBmcm9tICJAL2ludGVncmF0aW9ucy9zdXBhYmFzZS9jbGllbnQiOwppbXBvcnQgeyBnZXRTZXNzaW9uQ29ycmVsYXRpb25JZCB9IGZyb20gIi4vY29ycmVsYXRpb25JZCI7Cgp0eXBlIEVycm9yS2luZCA9ICJlcnJvciIgfCAidW5oYW5kbGVkcmVqZWN0aW9uIiB8ICJib3VuZGFyeSI7CgpleHBvcnQgaW50ZXJmYWNlIFJlcG9ydENsaWVudEVycm9ySW5wdXQgewogIGtpbmQ6IEVycm9yS2luZDsKICBtZXNzYWdlOiBzdHJpbmc7CiAgc3RhY2s/OiBzdHJpbmc7CiAgY29tcG9uZW50Pzogc3RyaW5nOwogIGJyYW5jaF9pZD86IHN0cmluZzsKfQoKLy8g4pSA4pSAIFNhZmV0eSBsaW1pdHMg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACmNvbnN0IE1BWF9NRVNTQUdFX0xFTiA9IDIwMDA7CmNvbnN0IE1BWF9TVEFDS19MRU4gPSA4MDAwOwpjb25zdCBNQVhfRVJST1JTX1BFUl9TRVNTSU9OID0gMjU7CmNvbnN0IFRIUk9UVExFX1dJTkRPV19NUyA9IDYwXzAwMDsKCi8vIOKUgOKUgCBNb2R1bGUtbGV2ZWwgc3RhdGUg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACi8qKiBSZWN1cnNpb24gZ3VhcmQ6IHNldCB0byB0cnVlIHdoaWxlIGFuIGluc2VydCBpcyBpbi1mbGlnaHQuICovCmxldCBfcmVwb3J0aW5nID0gZmFsc2U7CgovKiogUnVubmluZyBjb3VudCBvZiByb3dzIGluc2VydGVkIHRoaXMgcGFnZSBsb2FkLiAqLwpsZXQgX2Vycm9yQ291bnQgPSAwOwoKLyoqIFRocm90dGxlIG1hcDogZmluZ2VycHJpbnQg4oaSIHRpbWVzdGFtcCBvZiBsYXN0IHJlcG9ydC4gKi8KY29uc3QgX3Rocm90dGxlTWFwID0gbmV3IE1hcDxzdHJpbmcsIG51bWJlcj4oKTsKCi8vIOKUgOKUgCBQdWJsaWMgQVBJIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgApleHBvcnQgYXN5bmMgZnVuY3Rpb24gcmVwb3J0Q2xpZW50RXJyb3IoCiAgaW5wdXQ6IFJlcG9ydENsaWVudEVycm9ySW5wdXQKKTogUHJvbWlzZTx2b2lkPiB7CiAgLy8gMS4gUmVjdXJzaW9uIGd1YXJkLgogIGlmIChfcmVwb3J0aW5nKSByZXR1cm47CgogIC8vIDIuIFZvbHVtZSBjYXAuCiAgaWYgKF9lcnJvckNvdW50ID49IE1BWF9FUlJPUlNfUEVSX1NFU1NJT04pIHJldHVybjsKCiAgLy8gV3JhcCBldmVyeXRoaW5nIHNvIGEgYnVnIGhlcmUgbmV2ZXIgcHJvcGFnYXRlcyB0byB0aGUgY2FsbGVyLgogIHRyeSB7CiAgICBfcmVwb3J0aW5nID0gdHJ1ZTsKCiAgICAvLyAzLiBUaHJvdHRsZTogZHJvcCBpZGVudGljYWwgKGtpbmQgKyBmaXJzdCAyMDAgY2hhcnMgb2YgbWVzc2FnZSkgd2l0aGluCiAgICAvLyAgICB0aGUgd2luZG93LgogICAgY29uc3QgZmluZ2VycHJpbnQgPQogICAgICBpbnB1dC5raW5kICsgInwiICsgaW5wdXQubWVzc2FnZS5zbGljZSgwLCAyMDApLnJlcGxhY2UoL1xzKy9nLCAiICIpOwogICAgY29uc3Qgbm93ID0gRGF0ZS5ub3coKTsKICAgIGNvbnN0IGxhc3RTZWVuID0gX3Rocm90dGxlTWFwLmdldChmaW5nZXJwcmludCk7CiAgICBpZiAobGFzdFNlZW4gIT09IHVuZGVmaW5lZCAmJiBub3cgLSBsYXN0U2VlbiA8IFRIUk9UVExFX1dJTkRPV19NUykgewogICAgICByZXR1cm47CiAgICB9CiAgICBfdGhyb3R0bGVNYXAuc2V0KGZpbmdlcnByaW50LCBub3cpOwoKICAgIC8vIDQuIFNlc3Npb24gY2hlY2sg4oCUIHNraXAgaWYgbm8gYXV0aGVudGljYXRlZCB1c2VyIChSTFMgcmVqZWN0cyBhbm9ueW1vdXMpLgogICAgY29uc3QgewogICAgICBkYXRhOiB7IHNlc3Npb24gfSwKICAgIH0gPSBhd2FpdCBzdXBhYmFzZS5hdXRoLmdldFNlc3Npb24oKTsKICAgIGlmICghc2Vzc2lvbikgcmV0dXJuOwogICAgY29uc3QgdXNlcklkID0gc2Vzc2lvbi51c2VyLmlkOwoKICAgIC8vIDUuIFRydW5jYXRlIHRvIHNhdGlzZnkgQ0hFQ0sgY29uc3RyYWludHMuCiAgICBjb25zdCBtZXNzYWdlID0gaW5wdXQubWVzc2FnZS5zbGljZSgwLCBNQVhfTUVTU0FHRV9MRU4pOwogICAgY29uc3Qgc3RhY2sgPSBpbnB1dC5zdGFjayA/IGlucHV0LnN0YWNrLnNsaWNlKDAsIE1BWF9TVEFDS19MRU4pIDogdW5kZWZpbmVkOwoKICAgIC8vIDYuIEJ1aWxkIHRoZSByb3cuICBVUkw6IHBhdGggb25seSDigJQgbmV2ZXIgaW5jbHVkZSBxdWVyeSBzdHJpbmcuCiAgICBjb25zdCByb3cgPSB7CiAgICAgIHVzZXJfaWQ6IHVzZXJJZCwKICAgICAgYnJhbmNoX2lkOiBpbnB1dC5icmFuY2hfaWQgPz8gbnVsbCwKICAgICAga2luZDogaW5wdXQua2luZCwKICAgICAgbWVzc2FnZSwKICAgICAgc3RhY2s6IHN0YWNrID8/IG51bGwsCiAgICAgIHVybDogd2luZG93LmxvY2F0aW9uLnBhdGhuYW1lLAogICAgICBjb21wb25lbnQ6IGlucHV0LmNvbXBvbmVudCA/PyBudWxsLAogICAgICB1c2VyX2FnZW50OiBuYXZpZ2F0b3IudXNlckFnZW50LAogICAgICBhcHBfdmVyc2lvbjoKICAgICAgICAoaW1wb3J0Lm1ldGEgYXMgYW55KT8uZW52Py5WSVRFX0FQUF9WRVJTSU9OID8/IG51bGwsCiAgICAgIGNvcnJlbGF0aW9uX2lkOiBnZXRTZXNzaW9uQ29ycmVsYXRpb25JZCgpLAogICAgfTsKCiAgICAvLyA3LiBJbnNlcnQg4oCUIGlnbm9yZSBhbnkgREIgZXJyb3IgKGNvbnN0cmFpbnQgdmlvbGF0aW9uLCBuZXR3b3JrIGlzc3Vl4oCmKS4KICAgIGF3YWl0IHN1cGFiYXNlLmZyb20oImNsaWVudF9lcnJvcnMiKS5pbnNlcnQocm93KTsKCiAgICAvLyA4LiBJbmNyZW1lbnQgb25seSBvbiBzdWNjZXNzZnVsIHBhdGggdGhyb3VnaCAodGhyb3R0bGUgYWxyZWFkeSBwYXNzZWQpLgogICAgX2Vycm9yQ291bnQrKzsKICB9IGNhdGNoIHsKICAgIC8vIEludGVudGlvbmFsbHkgc3dhbGxvd2VkIOKAlCB0ZWxlbWV0cnkgbXVzdCBuZXZlciBzdXJmYWNlIHRvIHRoZSB1c2VyLgogIH0gZmluYWxseSB7CiAgICBfcmVwb3J0aW5nID0gZmFsc2U7CiAgfQp9Cg==
+/**
+ * Self-hosted browser error capture.
+ *
+ * Inserts one row into public.client_errors via Supabase.
+ * Designed to be called from global window error handlers and
+ * ErrorBoundary.componentDidCatch.
+ *
+ * Safety contract:
+ *   - Never throws, never rejects (all paths wrapped in try/catch).
+ *   - Never recurses (module-level boolean guard).
+ *   - Throttles repeated fingerprints within 60 s.
+ *   - Caps total inserts per page load at MAX_ERRORS_PER_SESSION.
+ *   - Skips silently when no authenticated session exists.
+ *   - Truncates message / stack to stay within DB CHECK constraints.
+ *   - Never logs the URL query string (patient IDs may appear there).
+ */
+
+import { supabase } from "@/integrations/supabase/client";
+import { getSessionCorrelationId } from "./correlationId";
+
+type ErrorKind = "error" | "unhandledrejection" | "boundary";
+
+export interface ReportClientErrorInput {
+  kind: ErrorKind;
+  message: string;
+  stack?: string;
+  component?: string;
+  branch_id?: string;
+}
+
+// ── Safety limits ────────────────────────────────────────────────────────────
+const MAX_MESSAGE_LEN = 2000;
+const MAX_STACK_LEN = 8000;
+const MAX_ERRORS_PER_SESSION = 25;
+const THROTTLE_WINDOW_MS = 60_000;
+
+// ── Module-level state ───────────────────────────────────────────────────────
+/** Recursion guard: set to true while an insert is in-flight. */
+let _reporting = false;
+
+/** Running count of rows inserted this page load. */
+let _errorCount = 0;
+
+/** Throttle map: fingerprint → timestamp of last report. */
+const _throttleMap = new Map<string, number>();
+
+// ── Public API ───────────────────────────────────────────────────────────────
+export async function reportClientError(
+  input: ReportClientErrorInput
+): Promise<void> {
+  // 1. Recursion guard.
+  if (_reporting) return;
+
+  // 2. Volume cap.
+  if (_errorCount >= MAX_ERRORS_PER_SESSION) return;
+
+  // Wrap everything so a bug here never propagates to the caller.
+  try {
+    _reporting = true;
+
+    // 3. Throttle: drop identical (kind + first 200 chars of message) within
+    //    the window.
+    const fingerprint =
+      input.kind + "|" + input.message.slice(0, 200).replace(/\s+/g, " ");
+    const now = Date.now();
+    const lastSeen = _throttleMap.get(fingerprint);
+    if (lastSeen !== undefined && now - lastSeen < THROTTLE_WINDOW_MS) {
+      return;
+    }
+    _throttleMap.set(fingerprint, now);
+
+    // 4. Session check — skip if no authenticated user (RLS rejects anonymous).
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) return;
+    const userId = session.user.id;
+
+    // 5. Truncate to satisfy CHECK constraints.
+    const message = input.message.slice(0, MAX_MESSAGE_LEN);
+    const stack = input.stack ? input.stack.slice(0, MAX_STACK_LEN) : undefined;
+
+    // 6. Build the row.  URL: path only — never include query string.
+    const row = {
+      user_id: userId,
+      branch_id: input.branch_id ?? null,
+      kind: input.kind,
+      message,
+      stack: stack ?? null,
+      url: window.location.pathname,
+      component: input.component ?? null,
+      user_agent: navigator.userAgent,
+      app_version:
+        (import.meta as any)?.env?.VITE_APP_VERSION ?? null,
+      correlation_id: getSessionCorrelationId(),
+    };
+
+    // 7. Insert — ignore any DB error (constraint violation, network issue…).
+    await supabase.from("client_errors").insert(row);
+
+    // 8. Increment only on successful path through (throttle already passed).
+    _errorCount++;
+  } catch {
+    // Intentionally swallowed — telemetry must never surface to the user.
+  } finally {
+    _reporting = false;
+  }
+}

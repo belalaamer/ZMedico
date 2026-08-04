@@ -4,12 +4,13 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ListSkeleton } from "@/components/ListSkeleton";
-import { ArrowLeft, ExternalLink, Stethoscope, User as UserIcon, MapPin, Clock, ScrollText, Receipt, CheckCircle2 } from "lucide-react";
+import { Activity, ArrowLeft, ExternalLink, Stethoscope, User as UserIcon, MapPin, Clock, ScrollText, Receipt, CheckCircle2 } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { CreateInvoiceDialog } from "@/pages/invoices/CreateInvoiceDialog";
+import { Can } from "@/components/Can";
 
 const SAFE_KEYS = ["status", "doctor_id", "room", "priority", "is_walk_in", "checked_in_at", "started_at"];
 const QUEUE_ACTIONS = [
@@ -170,6 +171,21 @@ export default function AppointmentDetailPage() {
             </Button>
           )}
           {appt.status === "completed" && (
+            <Can permission="medical_records.create">
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="h-9 border-primary/30 text-primary hover:bg-primary/10"
+              >
+                <Link to={`/physio?patient=${appt.patient_id}&appointment=${appt.id}&new=1`}>
+                  <Activity className="size-4 me-1" />
+                  {lang === "ar" ? "بدء حالة علاج طبيعي" : "Start Physio Case"}
+                </Link>
+              </Button>
+            </Can>
+          )}
+          {appt.status === "completed" && (
             <Button
               size="sm"
               variant="outline"
@@ -192,8 +208,8 @@ export default function AppointmentDetailPage() {
             </div>
             <div className="text-xs text-muted-foreground mt-0.5">
               {lang === "ar"
-                ? "تابع مباشرة إلى السجل الطبي أو إصدار الفاتورة."
-                : "Continue directly to the medical record or issue the invoice."}
+                ? "تابع مباشرة إلى السجل الطبي أو ابدأ حالة علاج طبيعي أو أصدر الفاتورة."
+                : "Continue to the medical record, start a physio case, or issue the invoice."}
             </div>
           </div>
         </Card>

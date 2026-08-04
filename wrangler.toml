@@ -1,0 +1,32 @@
+# Cloudflare Worker configuration for the ZMedico frontend.
+#
+# This file did not exist in the repo before: every deployment so far was made
+# with wrangler from a local machine, so the deployment configuration lived only
+# on that machine. Committing it makes deployments reproducible by CI and by any
+# future developer.
+#
+# The values below were read from the LIVE worker (account 680731310e517ec8426b771634e0b932)
+# so that a CI deploy produces the same runtime as the current manual deploys:
+#   name                 = zmedico2
+#   compatibility_date   = 2026-07-31
+#   compatibility_flags  = ["nodejs_compat"]
+#   has_assets           = true
+#   has_modules          = false   -> assets-only worker, no server entrypoint
+#   observability        = enabled, logs persisted
+#
+# `vite build` writes to ./dist (Vite's default; vite.config.ts sets no outDir).
+#
+# not_found_handling = "single-page-application" is required: this is a React
+# Router SPA, so any deep link (for example /patients/<id>) must be served
+# index.html rather than a 404.
+
+name = "zmedico2"
+compatibility_date = "2026-07-31"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "./dist"
+not_found_handling = "single-page-application"
+
+[observability]
+enabled = true

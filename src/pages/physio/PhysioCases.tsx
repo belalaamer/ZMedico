@@ -91,9 +91,12 @@ export default function PhysioCases() {
   // Open creation dialog pre-filled when navigated with ?patient=<id>&new=1
   useEffect(() => {
     const pid = searchParams.get("patient");
+    const aid = searchParams.get("appointment");
     const isNew = searchParams.get("new") === "1";
     if (pid && isNew && authz.can("medical_records.create")) {
-      setForm((f: any) => ({ ...f, patient_id: pid }));
+      // aid is set when the case was started from a completed appointment, so
+      // the resulting case records which visit opened the course of treatment.
+      setForm((f: any) => ({ ...f, patient_id: pid, appointment_id: aid || null }));
       setOpen(true);
       const p = new URLSearchParams(searchParams);
       p.delete("new");
@@ -115,6 +118,7 @@ export default function PhysioCases() {
       ...form,
       branch_id: currentBranchId,
       therapist_id: form.therapist_id || null,
+      appointment_id: form.appointment_id || null,
       expected_sessions: Number(form.expected_sessions) || 0,
       created_by: u.user?.id ?? null,
     };
@@ -122,7 +126,7 @@ export default function PhysioCases() {
     if (error) { toast.error(error.message); return; }
     toast.success(t("saved") ?? "Saved");
     setOpen(false);
-    setForm({ ...form, patient_id: "", diagnosis: "", treatment_goal: "", treatment_plan: "", notes: "" });
+    setForm({ ...form, patient_id: "", appointment_id: null, diagnosis: "", treatment_goal: "", treatment_plan: "", notes: "" });
     load();
   };
 

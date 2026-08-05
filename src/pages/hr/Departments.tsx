@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,7 +25,6 @@ export default function Departments() {
   const [open, setOpen] = useState(false);
   const [edit, setE] = useState<Dept | null>(null);
   const [form, setForm] = useState({ name: "", description: "", branch_id: "", manager_id: "" });
-  const [pendingDelete, setPendingDelete] = useState<Dept | null>(null);
 
   const load = async () => {
     const { data } = await supabase.from("departments").select("*").is("deleted_at", null).order("name_en");
@@ -129,35 +127,13 @@ export default function Departments() {
                   <Button variant="ghost" size="icon" onClick={() => toggle(d)}><Power className="size-4" /></Button>
                 </Can>
                 <Can permission="hr.delete">
-                  <RowActions onEdit={() => openEdit(d)} onDelete={() => setPendingDelete(d)} canEdit={false} />
+                  <RowActions onEdit={() => openEdit(d)} onDelete={() => softDelete(d)} />
                 </Can>
               </div>
             ))}
           </div>
         )}
       </Card>
-
-      <AlertDialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{lang === "ar" ? "حذف القسم" : "Delete department"}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {lang === "ar"
-                ? "هل أنت متأكد من حذف هذا القسم؟ لا يمكن التراجع عن هذا الإجراء."
-                : "Are you sure you want to delete this department? This action cannot be undone."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => { if (pendingDelete) { softDelete(pendingDelete); setPendingDelete(null); } }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {t("delete")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

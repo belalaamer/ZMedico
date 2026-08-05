@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -26,7 +25,6 @@ export default function Positions() {
   const [mergeSrc, setMergeSrc] = useState<string>("");
   const [mergeTgt, setMergeTgt] = useState<string>("");
   const [merging, setMerging] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState<any>(null);
 
   const load = async () => {
     const { data } = await supabase.from("staff_positions").select("*").is("deleted_at", null);
@@ -190,7 +188,7 @@ export default function Positions() {
                         <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Edit3 className="size-4" /></Button>
                       </Can>
                       <Can permission="hr.delete">
-                        <RowActions onEdit={() => openEdit(p)} onDelete={() => setPendingDelete(p)} canEdit={false} />
+                        <RowActions onEdit={() => openEdit(p)} onDelete={() => softDelete(p)} />
                       </Can>
                     </div>
                   ))}
@@ -200,28 +198,6 @@ export default function Positions() {
           </div>
         )}
       </Card>
-
-      <AlertDialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{lang === "ar" ? "حذف المنصب" : "Delete position"}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {lang === "ar"
-                ? "هل أنت متأكد من حذف هذا المنصب؟ لا يمكن التراجع عن هذا الإجراء."
-                : "Are you sure you want to delete this position? This action cannot be undone."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => { if (pendingDelete) { softDelete(pendingDelete); setPendingDelete(null); } }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {t("delete")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

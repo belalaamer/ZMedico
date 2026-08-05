@@ -1,4 +1,4 @@
-export const ROLES = ["system_owner", "admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr", "staff"] as const;
+export const ROLES = ["system_owner", "admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr"] as const;
 export const MODULES = [
   "patients",
   "appointments",
@@ -109,10 +109,6 @@ export const DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
     reports_hr: ["view","export"],
     hr: ["view","create","edit","export"],
   },
-  // Staff: schedule visibility only.
-  staff: {
-    appointments: ["view"],
-  },
 };
 
 export function defaultActionsFor(role: string, module: string): string[] {
@@ -121,8 +117,10 @@ export function defaultActionsFor(role: string, module: string): string[] {
 
 // Map route path prefixes to permission modules. Used by PermissionRoute.
 export function moduleForPath(path: string): string | null {
+  // "/" is deliberately absent: the dashboard route is not permission-gated.
   if (path.startsWith("/calendar") || path.startsWith("/reminders")) return "appointments";
   if (path.startsWith("/queue")) return "appointments";
+  if (path.startsWith("/appointments")) return "appointments";
   if (path.startsWith("/physio")) return "medical_records";
   if (path.startsWith("/patients")) return "patients";
   if (path.startsWith("/invoices") || path.startsWith("/payments")) return "invoices";

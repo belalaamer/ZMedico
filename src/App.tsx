@@ -147,7 +147,10 @@ function AppContent() {
                 </ProtectedRoute>
               }
             >
-              <Route path="/" element={<PermissionRoute adminOnly><Dashboard /></PermissionRoute>} />
+              {/* The landing page is reachable by every authenticated user. No single
+                  permission is held by all roles, and row-level security already limits
+                  what each one sees inside it. */}
+              <Route path="/" element={<Dashboard />} />
               <Route path="/patients" element={<PermissionRoute><PatientsPage /></PermissionRoute>} />
               <Route path="/patients/:id" element={<PermissionRoute><PatientProfile /></PermissionRoute>} />
               <Route path="/calendar" element={<PermissionRoute><CalendarPage /></PermissionRoute>} />

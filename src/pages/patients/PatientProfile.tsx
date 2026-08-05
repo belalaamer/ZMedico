@@ -128,7 +128,7 @@ export default function PatientProfile() {
     if (p?.id) {
       if (!phiLogged.current) {
         phiLogged.current = true;
-        logPhiAccess("patient", p.id);
+        logPhiAccess("patient", p.id, { patientId: p.id });
       }
     }
   };

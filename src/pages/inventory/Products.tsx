@@ -23,6 +23,7 @@ import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
+import { Can } from "@/components/Can";
 
 const UNITS = ["piece", "box", "bottle", "session", "ml", "g"];
 
@@ -217,85 +218,87 @@ export default function Products() {
               </SelectContent>
             </Select>
           </div>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button className="gradient-primary text-primary-foreground" onClick={openNew}><Plus className="me-2 size-4" />{t("addProduct")}</Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader><DialogTitle>{edit ? t("editProduct") : t("newProduct")}</DialogTitle></DialogHeader>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-2"><Label>{t("sku")}</Label><Input value={form.sku} placeholder="auto" disabled={!!edit} onChange={(e) => setForm({ ...form, sku: e.target.value })} maxLength={40} /></div>
-                <div className="space-y-2"><Label>{t("barcode")}</Label><Input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} maxLength={80} /></div>
-                <div className="space-y-2 sm:col-span-2"><Label>{t("name")} / الاسم</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={150} /></div>
-                <div className="space-y-2">
-                  <Label>{t("category")}</Label>
-                  <Select value={form.category_id || "none"} onValueChange={(v) => setForm({ ...form, category_id: v === "none" ? "" : v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">— {t("none")} —</SelectItem>
-                      {cats.map((c) => <SelectItem key={c.id} value={c.id}>{lang === "ar" ? c.name_ar : c.name_en}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>{t("supplier")}</Label>
-                  <Select value={form.supplier_id || "none"} onValueChange={(v) => setForm({ ...form, supplier_id: v === "none" ? "" : v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">— {t("none")} —</SelectItem>
-                      {sups.map((s) => <SelectItem key={s.id} value={s.id}>{lang === "ar" ? s.name_ar : s.name_en}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>{t("unit")}</Label>
-                  <Select value={form.unit} onValueChange={(v) => setForm({ ...form, unit: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {UNITS.map((u) => <SelectItem key={u} value={u}>{t(u === "piece" ? "pieces" : u as any)}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2 sm:col-span-2 bg-muted/30 border border-border/60 rounded-lg p-3">
-                  <Label>{t("productImage")}</Label>
-                  <div className="flex items-center gap-3">
-                    <div className="size-20 rounded-lg bg-background flex items-center justify-center overflow-hidden border border-border shrink-0 shadow-sm">
-                      {form.image_url ? <img src={form.image_url} alt="" className="size-full object-cover" /> : <Package className="size-7 text-muted-foreground" />}
-                    </div>
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <label className="inline-flex items-center justify-center gap-2 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent px-3 py-2 cursor-pointer">
-                          <Upload className="size-4" />
-                          {uploading ? "…" : t("uploadImage")}
-                          <input type="file" accept="image/*" className="hidden" disabled={uploading}
-                            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f); e.currentTarget.value = ""; }} />
-                        </label>
-                        {form.image_url && (
-                          <Button type="button" variant="ghost" size="sm" onClick={() => setForm({ ...form, image_url: "" })}>
-                            <X className="me-1 size-4" />{t("removeImage")}
-                          </Button>
-                        )}
+          <Can permission="inventory.create">
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button className="gradient-primary text-primary-foreground" onClick={openNew}><Plus className="me-2 size-4" />{t("addProduct")}</Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader><DialogTitle>{edit ? t("editProduct") : t("newProduct")}</DialogTitle></DialogHeader>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-2"><Label>{t("sku")}</Label><Input value={form.sku} placeholder="auto" disabled={!!edit} onChange={(e) => setForm({ ...form, sku: e.target.value })} maxLength={40} /></div>
+                  <div className="space-y-2"><Label>{t("barcode")}</Label><Input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} maxLength={80} /></div>
+                  <div className="space-y-2 sm:col-span-2"><Label>{t("name")} / الاسم</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={150} /></div>
+                  <div className="space-y-2">
+                    <Label>{t("category")}</Label>
+                    <Select value={form.category_id || "none"} onValueChange={(v) => setForm({ ...form, category_id: v === "none" ? "" : v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— {t("none")} —</SelectItem>
+                        {cats.map((c) => <SelectItem key={c.id} value={c.id}>{lang === "ar" ? c.name_ar : c.name_en}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{t("supplier")}</Label>
+                    <Select value={form.supplier_id || "none"} onValueChange={(v) => setForm({ ...form, supplier_id: v === "none" ? "" : v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— {t("none")} —</SelectItem>
+                        {sups.map((s) => <SelectItem key={s.id} value={s.id}>{lang === "ar" ? s.name_ar : s.name_en}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{t("unit")}</Label>
+                    <Select value={form.unit} onValueChange={(v) => setForm({ ...form, unit: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {UNITS.map((u) => <SelectItem key={u} value={u}>{t(u === "piece" ? "pieces" : u as any)}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2 sm:col-span-2 bg-muted/30 border border-border/60 rounded-lg p-3">
+                    <Label>{t("productImage")}</Label>
+                    <div className="flex items-center gap-3">
+                      <div className="size-20 rounded-lg bg-background flex items-center justify-center overflow-hidden border border-border shrink-0 shadow-sm">
+                        {form.image_url ? <img src={form.image_url} alt="" className="size-full object-cover" /> : <Package className="size-7 text-muted-foreground" />}
                       </div>
-                      <Input value={form.image_url} placeholder={t("imageUrl")} onChange={(e) => setForm({ ...form, image_url: e.target.value })} maxLength={500} />
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <label className="inline-flex items-center justify-center gap-2 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent px-3 py-2 cursor-pointer">
+                            <Upload className="size-4" />
+                            {uploading ? "…" : t("uploadImage")}
+                            <input type="file" accept="image/*" className="hidden" disabled={uploading}
+                              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f); e.currentTarget.value = ""; }} />
+                          </label>
+                          {form.image_url && (
+                            <Button type="button" variant="ghost" size="sm" onClick={() => setForm({ ...form, image_url: "" })}>
+                              <X className="me-1 size-4" />{t("removeImage")}
+                            </Button>
+                          )}
+                        </div>
+                        <Input value={form.image_url} placeholder={t("imageUrl")} onChange={(e) => setForm({ ...form, image_url: e.target.value })} maxLength={500} />
+                      </div>
                     </div>
                   </div>
+                  <div className="space-y-2"><Label>{t("costPrice")}</Label><Input type="number" min={0} step="0.01" value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: Number(e.target.value) })} /></div>
+                  <div className="space-y-2"><Label>{t("sellingPrice")}</Label><Input type="number" min={0} step="0.01" value={form.selling_price} onChange={(e) => setForm({ ...form, selling_price: Number(e.target.value) })} /></div>
+                  <div className="space-y-2"><Label>{t("minStock")}</Label><Input type="number" min={0} value={form.min_stock_level} onChange={(e) => setForm({ ...form, min_stock_level: Number(e.target.value) })} /></div>
+                  <div className="space-y-2"><Label>{t("maxStock")}</Label><Input type="number" min={0} value={form.max_stock_level} onChange={(e) => setForm({ ...form, max_stock_level: e.target.value as any })} /></div>
+                  <div className="space-y-2 sm:col-span-2"><Label>{t("description")}</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} maxLength={500} rows={2} /></div>
+                  <div className="flex items-center justify-between sm:col-span-2 border border-border rounded-lg px-3 py-2">
+                    <Label>{t("expiryTracking")}</Label>
+                    <Switch checked={form.expiry_tracking} onCheckedChange={(v) => setForm({ ...form, expiry_tracking: v })} />
+                  </div>
                 </div>
-                <div className="space-y-2"><Label>{t("costPrice")}</Label><Input type="number" min={0} step="0.01" value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: Number(e.target.value) })} /></div>
-                <div className="space-y-2"><Label>{t("sellingPrice")}</Label><Input type="number" min={0} step="0.01" value={form.selling_price} onChange={(e) => setForm({ ...form, selling_price: Number(e.target.value) })} /></div>
-                <div className="space-y-2"><Label>{t("minStock")}</Label><Input type="number" min={0} value={form.min_stock_level} onChange={(e) => setForm({ ...form, min_stock_level: Number(e.target.value) })} /></div>
-                <div className="space-y-2"><Label>{t("maxStock")}</Label><Input type="number" min={0} value={form.max_stock_level} onChange={(e) => setForm({ ...form, max_stock_level: e.target.value as any })} /></div>
-                <div className="space-y-2 sm:col-span-2"><Label>{t("description")}</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} maxLength={500} rows={2} /></div>
-                <div className="flex items-center justify-between sm:col-span-2 border border-border rounded-lg px-3 py-2">
-                  <Label>{t("expiryTracking")}</Label>
-                  <Switch checked={form.expiry_tracking} onCheckedChange={(v) => setForm({ ...form, expiry_tracking: v })} />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button>
-                <Button className="gradient-primary text-primary-foreground" onClick={save}>{t("save")}</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                <DialogFooter>
+                  <Button variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button>
+                  <Button className="gradient-primary text-primary-foreground" onClick={save}>{t("save")}</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </Can>
         </div>
       </div>
 
@@ -340,22 +343,28 @@ export default function Products() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => openEdit(p)}>
-                        <Edit3 className="me-2 size-4" />{t("edit")}
-                      </DropdownMenuItem>
+                      <Can permission="inventory.edit">
+                        <DropdownMenuItem onClick={() => openEdit(p)}>
+                          <Edit3 className="me-2 size-4" />{t("edit")}
+                        </DropdownMenuItem>
+                      </Can>
                       <DropdownMenuItem onClick={() => duplicate(p)}>
                         <Copy className="me-2 size-4" />{t("duplicate") ?? "Duplicate"}
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => toggleActive(p)}>
-                        <Power className="me-2 size-4" />{p.is_active ? t("inactive") : t("active")}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
-                        onClick={() => setDeleteTarget(p)}
-                      >
-                        <Trash2 className="me-2 size-4" />{t("delete")}
-                      </DropdownMenuItem>
+                      <Can permission="inventory.edit">
+                        <DropdownMenuItem onClick={() => toggleActive(p)}>
+                          <Power className="me-2 size-4" />{p.is_active ? t("inactive") : t("active")}
+                        </DropdownMenuItem>
+                      </Can>
+                      <Can permission="inventory.delete">
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => setDeleteTarget(p)}
+                        >
+                          <Trash2 className="me-2 size-4" />{t("delete")}
+                        </DropdownMenuItem>
+                      </Can>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>

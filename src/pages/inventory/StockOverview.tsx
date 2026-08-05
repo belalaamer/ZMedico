@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { subscribeResilient } from "@/lib/realtime";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
+import { Can } from "@/components/Can";
 
 type Row = { product: any; branch_id: string; quantity: number; reserved: number };
 
@@ -156,12 +157,14 @@ export default function StockOverview() {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("stockOverview")}</h1>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setTrOpen(true)} disabled={branches.length < 2}>
-            <ArrowLeftRight className="me-2 size-4" />{t("transferStock")}
-          </Button>
-          <Button className="gradient-primary text-primary-foreground" onClick={() => setAdjOpen(true)}>
-            <Plus className="me-2 size-4" />{t("adjustStock")}
-          </Button>
+          <Can permission="inventory.tx">
+            <Button variant="outline" onClick={() => setTrOpen(true)} disabled={branches.length < 2}>
+              <ArrowLeftRight className="me-2 size-4" />{t("transferStock")}
+            </Button>
+            <Button className="gradient-primary text-primary-foreground" onClick={() => setAdjOpen(true)}>
+              <Plus className="me-2 size-4" />{t("adjustStock")}
+            </Button>
+          </Can>
         </div>
       </div>
 

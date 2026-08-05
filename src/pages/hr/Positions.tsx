@@ -11,6 +11,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { RowActions } from "@/components/RowActions";
+import { Can } from "@/components/Can";
 
 export default function Positions() {
   const { t, lang } = useI18n();
@@ -107,33 +108,37 @@ export default function Positions() {
             <SelectTrigger className="w-48"><SelectValue placeholder={t("department")} /></SelectTrigger>
             <SelectContent><SelectItem value="all">{t("filterAll") || "All"}</SelectItem>{depts.map((d) => <SelectItem key={d.id} value={d.id}>{lang === "ar" ? d.name_ar : d.name_en}</SelectItem>)}</SelectContent>
           </Select>
-          <Button variant="outline" onClick={() => { setMergeSrc(""); setMergeTgt(""); setMergeOpen(true); }}>
-            <GitMerge className="me-2 size-4" />{lang === "ar" ? "دمج" : "Merge"}
-          </Button>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground" onClick={openNew}><Plus className="me-2 size-4" />{t("addPosition")}</Button></DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader><DialogTitle>{edit ? t("position") : t("newPosition")}</DialogTitle></DialogHeader>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-2 sm:col-span-2"><Label>{t("title")} / المسمى</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} maxLength={120} /></div>
-                <div className="space-y-2 sm:col-span-2"><Label>{t("department")}</Label>
-                  <Select value={form.department_id || "none"} onValueChange={(v) => setForm({ ...form, department_id: v === "none" ? "" : v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent><SelectItem value="none">— {t("none")} —</SelectItem>{depts.map((d) => <SelectItem key={d.id} value={d.id}>{lang === "ar" ? d.name_ar : d.name_en}</SelectItem>)}</SelectContent>
-                  </Select>
+          <Can permission="hr.edit">
+            <Button variant="outline" onClick={() => { setMergeSrc(""); setMergeTgt(""); setMergeOpen(true); }}>
+              <GitMerge className="me-2 size-4" />{lang === "ar" ? "دمج" : "Merge"}
+            </Button>
+          </Can>
+          <Can permission="hr.create">
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground" onClick={openNew}><Plus className="me-2 size-4" />{t("addPosition")}</Button></DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader><DialogTitle>{edit ? t("position") : t("newPosition")}</DialogTitle></DialogHeader>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-2 sm:col-span-2"><Label>{t("title")} / المسمى</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} maxLength={120} /></div>
+                  <div className="space-y-2 sm:col-span-2"><Label>{t("department")}</Label>
+                    <Select value={form.department_id || "none"} onValueChange={(v) => setForm({ ...form, department_id: v === "none" ? "" : v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent><SelectItem value="none">— {t("none")} —</SelectItem>{depts.map((d) => <SelectItem key={d.id} value={d.id}>{lang === "ar" ? d.name_ar : d.name_en}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2"><Label>{lang === "ar" ? "المجموعة" : "Group"}</Label><Input value={form.group_key} placeholder="e.g. medical, admin, support" onChange={(e) => setForm({ ...form, group_key: e.target.value })} maxLength={60} /></div>
+                  <div className="space-y-2"><Label>{lang === "ar" ? "الترتيب" : "Sort order"}</Label><Input type="number" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: e.target.value })} /></div>
+                  <div className="space-y-2"><Label>{t("salaryMin")}</Label><Input type="number" value={form.salary_range_min} onChange={(e) => setForm({ ...form, salary_range_min: e.target.value })} /></div>
+                  <div className="space-y-2"><Label>{t("salaryMax")}</Label><Input type="number" value={form.salary_range_max} onChange={(e) => setForm({ ...form, salary_range_max: e.target.value })} /></div>
+                  <div className="space-y-2 sm:col-span-2"><Label>{t("description")}</Label><Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} maxLength={300} /></div>
                 </div>
-                <div className="space-y-2"><Label>{lang === "ar" ? "المجموعة" : "Group"}</Label><Input value={form.group_key} placeholder="e.g. medical, admin, support" onChange={(e) => setForm({ ...form, group_key: e.target.value })} maxLength={60} /></div>
-                <div className="space-y-2"><Label>{lang === "ar" ? "الترتيب" : "Sort order"}</Label><Input type="number" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: e.target.value })} /></div>
-                <div className="space-y-2"><Label>{t("salaryMin")}</Label><Input type="number" value={form.salary_range_min} onChange={(e) => setForm({ ...form, salary_range_min: e.target.value })} /></div>
-                <div className="space-y-2"><Label>{t("salaryMax")}</Label><Input type="number" value={form.salary_range_max} onChange={(e) => setForm({ ...form, salary_range_max: e.target.value })} /></div>
-                <div className="space-y-2 sm:col-span-2"><Label>{t("description")}</Label><Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} maxLength={300} /></div>
-              </div>
-              <DialogFooter>
-                <Button variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button>
-                <Button className="gradient-primary text-primary-foreground" onClick={save}>{t("save")}</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                <DialogFooter>
+                  <Button variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button>
+                  <Button className="gradient-primary text-primary-foreground" onClick={save}>{t("save")}</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </Can>
           <Dialog open={mergeOpen} onOpenChange={setMergeOpen}>
             <DialogContent className="max-w-lg">
               <DialogHeader><DialogTitle>{lang === "ar" ? "دمج المناصب" : "Merge positions"}</DialogTitle></DialogHeader>
@@ -179,8 +184,12 @@ export default function Positions() {
                         <div className="text-xs text-muted-foreground">{deptName(p.department_id)} · #{p.sort_order ?? 0}</div>
                       </div>
                       {(p.salary_range_min || p.salary_range_max) && <Badge variant="outline">{p.salary_range_min ?? "—"} – {p.salary_range_max ?? "—"}</Badge>}
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Edit3 className="size-4" /></Button>
-                      <RowActions onEdit={() => openEdit(p)} onDelete={() => softDelete(p)} />
+                      <Can permission="hr.edit">
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Edit3 className="size-4" /></Button>
+                      </Can>
+                      <Can permission="hr.delete">
+                        <RowActions onEdit={() => openEdit(p)} onDelete={() => softDelete(p)} />
+                      </Can>
                     </div>
                   ))}
                 </div>

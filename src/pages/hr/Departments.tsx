@@ -12,6 +12,7 @@ import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { RowActions } from "@/components/RowActions";
+import { Can } from "@/components/Can";
 
 type Dept = any;
 
@@ -73,34 +74,36 @@ export default function Departments() {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("departments")}</h1>
           <p className="text-sm text-muted-foreground mt-1">{items.length}</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button className="gradient-primary text-primary-foreground" onClick={openNew}><Plus className="me-2 size-4" />{t("addDepartment")}</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>{edit ? t("editDepartment") : t("newDepartment")}</DialogTitle></DialogHeader>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-2 sm:col-span-2"><Label>{t("name")} / الاسم</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={120} /></div>
-              <div className="space-y-2 sm:col-span-2"><Label>{t("description")}</Label><Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} maxLength={300} /></div>
-              <div className="space-y-2"><Label>{t("branch")}</Label>
-                <Select value={form.branch_id || "none"} onValueChange={(v) => setForm({ ...form, branch_id: v === "none" ? "" : v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="none">— {t("none")} —</SelectItem>{branches.map((b) => <SelectItem key={b.id} value={b.id}>{lang === "ar" ? b.name_ar : b.name_en}</SelectItem>)}</SelectContent>
-                </Select>
+        <Can permission="hr.create">
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button className="gradient-primary text-primary-foreground" onClick={openNew}><Plus className="me-2 size-4" />{t("addDepartment")}</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>{edit ? t("editDepartment") : t("newDepartment")}</DialogTitle></DialogHeader>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2 sm:col-span-2"><Label>{t("name")} / الاسم</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={120} /></div>
+                <div className="space-y-2 sm:col-span-2"><Label>{t("description")}</Label><Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} maxLength={300} /></div>
+                <div className="space-y-2"><Label>{t("branch")}</Label>
+                  <Select value={form.branch_id || "none"} onValueChange={(v) => setForm({ ...form, branch_id: v === "none" ? "" : v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent><SelectItem value="none">— {t("none")} —</SelectItem>{branches.map((b) => <SelectItem key={b.id} value={b.id}>{lang === "ar" ? b.name_ar : b.name_en}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2"><Label>{t("manager")}</Label>
+                  <Select value={form.manager_id || "none"} onValueChange={(v) => setForm({ ...form, manager_id: v === "none" ? "" : v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent><SelectItem value="none">— {t("none")} —</SelectItem>{profiles.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name ?? p.email}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-2"><Label>{t("manager")}</Label>
-                <Select value={form.manager_id || "none"} onValueChange={(v) => setForm({ ...form, manager_id: v === "none" ? "" : v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="none">— {t("none")} —</SelectItem>{profiles.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name ?? p.email}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button>
-              <Button className="gradient-primary text-primary-foreground" onClick={save}>{t("save")}</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button>
+                <Button className="gradient-primary text-primary-foreground" onClick={save}>{t("save")}</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </Can>
       </div>
       <Card className="shadow-card overflow-hidden">
         {items.length === 0 ? <div className="p-10 text-center text-muted-foreground">{t("noDepartments")}</div> : (
@@ -119,9 +122,13 @@ export default function Departments() {
                   </div>
                 </div>
                 <Badge variant="outline">{counts[d.id] ?? 0} {t("staffCount")}</Badge>
-                <Button variant="ghost" size="icon" onClick={() => openEdit(d)}><Edit3 className="size-4" /></Button>
-                <Button variant="ghost" size="icon" onClick={() => toggle(d)}><Power className="size-4" /></Button>
-                <RowActions onEdit={() => openEdit(d)} onDelete={() => softDelete(d)} />
+                <Can permission="hr.edit">
+                  <Button variant="ghost" size="icon" onClick={() => openEdit(d)}><Edit3 className="size-4" /></Button>
+                  <Button variant="ghost" size="icon" onClick={() => toggle(d)}><Power className="size-4" /></Button>
+                </Can>
+                <Can permission="hr.delete">
+                  <RowActions onEdit={() => openEdit(d)} onDelete={() => softDelete(d)} />
+                </Can>
               </div>
             ))}
           </div>

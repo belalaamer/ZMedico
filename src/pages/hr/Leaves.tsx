@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/format";
+import { Can } from "@/components/Can";
 
 function diffDays(a: string, b: string) {
   const d1 = new Date(a), d2 = new Date(b);
@@ -74,6 +75,12 @@ export default function Leaves() {
               <SelectItem value="rejected">{t("statusRejected")}</SelectItem>
             </SelectContent>
           </Select>
+          {/* "Request Leave" is intentionally left unguarded.
+              The database policy lr_insert_self permits any authenticated user
+              to insert a leave request where staff_id = auth.uid().
+              Placing this behind hr.create would prevent ordinary staff
+              (who lack that permission) from submitting their own requests,
+              which is the opposite of the intended self-service behaviour. */}
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground"><Plus className="me-2 size-4" />{t("requestLeave")}</Button></DialogTrigger>
             <DialogContent>
@@ -119,10 +126,12 @@ export default function Leaves() {
                 <Badge variant="outline">{l.total_days} {t("totalDays")}</Badge>
                 <Badge variant="outline" className={l.status === "approved" ? "status-completed" : l.status === "rejected" ? "status-departed" : ""}>{t(`status${l.status.charAt(0).toUpperCase()}${l.status.slice(1)}` as any)}</Badge>
                 {l.status === "pending" && (
-                  <div className="flex items-center gap-1">
-                    <Button size="sm" variant="outline" onClick={() => decide(l.id, "approved")}><Check className="size-4" /></Button>
-                    <Button size="sm" variant="outline" onClick={() => { const r = prompt(t("rejectionReason")) || ""; decide(l.id, "rejected", r); }}><X className="size-4" /></Button>
-                  </div>
+                  <Can permission="hr.edit">
+                    <div className="flex items-center gap-1">
+                      <Button size="sm" variant="outline" onClick={() => decide(l.id, "approved")}><Check className="size-4" /></Button>
+                      <Button size="sm" variant="outline" onClick={() => { const r = prompt(t("rejectionReason")) || ""; decide(l.id, "rejected", r); }}><X className="size-4" /></Button>
+                    </div>
+                  </Can>
                 )}
               </div>
             ))}

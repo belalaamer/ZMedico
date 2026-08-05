@@ -15,6 +15,7 @@ import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Save, Search, CalendarClock, CheckSquare, XSquare } from "lucide-react";
+import { Can } from "@/components/Can";
 
 const DAYS = ["sun","mon","tue","wed","thu","fri","sat"] as const;
 
@@ -251,15 +252,17 @@ export default function Schedules() {
               </Button>
               <Badge variant="secondary" className="font-medium">{selectedIds.length} {lang === "ar" ? "محدد" : "selected"}</Badge>
             </div>
-            <Button
-              className="gradient-primary text-primary-foreground"
-              onClick={confirmApply}
-              disabled={selectedIds.length === 0 || savingPlanner}
-              title={`${branchHours.start} - ${branchHours.end}`}
-            >
-              <CalendarClock className="size-4 me-1.5" />
-              {t("applyToSelected")} ({branchHours.start}-{branchHours.end})
-            </Button>
+            <Can permission="hr.edit">
+              <Button
+                className="gradient-primary text-primary-foreground"
+                onClick={confirmApply}
+                disabled={selectedIds.length === 0 || savingPlanner}
+                title={`${branchHours.start} - ${branchHours.end}`}
+              >
+                <CalendarClock className="size-4 me-1.5" />
+                {t("applyToSelected")} ({branchHours.start}-{branchHours.end})
+              </Button>
+            </Can>
           </Card>
 
           <Card className="shadow-card overflow-x-auto">
@@ -345,24 +348,28 @@ export default function Schedules() {
                                   {roomSuggestions.map((r) => <option key={r} value={r} />)}
                                 </datalist>
                               </div>
-                              <div className="flex justify-end">
-                                <Button size="sm" className="gradient-primary text-primary-foreground" onClick={() => saveCell(s.id)}>
-                                  <Save className="size-3.5 me-1.5" />{t("save")}
-                                </Button>
-                              </div>
+                              <Can permission="hr.edit">
+                                <div className="flex justify-end">
+                                  <Button size="sm" className="gradient-primary text-primary-foreground" onClick={() => saveCell(s.id)}>
+                                    <Save className="size-3.5 me-1.5" />{t("save")}
+                                  </Button>
+                                </div>
+                              </Can>
                             </PopoverContent>
                           </Popover>
                         </td>
                       ))}
                       <td className="p-2">
-                        <Button
-                          size="sm"
-                          variant={dirtyStaff[s.id] ? "default" : "outline"}
-                          className={dirtyStaff[s.id] ? "gradient-primary text-primary-foreground" : ""}
-                          onClick={() => saveCell(s.id)}
-                        >
-                          <Save className="size-3.5 me-1.5" />{t("save")}{dirtyStaff[s.id] ? " •" : ""}
-                        </Button>
+                        <Can permission="hr.edit">
+                          <Button
+                            size="sm"
+                            variant={dirtyStaff[s.id] ? "default" : "outline"}
+                            className={dirtyStaff[s.id] ? "gradient-primary text-primary-foreground" : ""}
+                            onClick={() => saveCell(s.id)}
+                          >
+                            <Save className="size-3.5 me-1.5" />{t("save")}{dirtyStaff[s.id] ? " •" : ""}
+                          </Button>
+                        </Can>
                       </td>
                     </tr>
                   );
@@ -387,19 +394,23 @@ export default function Schedules() {
               <SelectTrigger className="w-full sm:w-64"><SelectValue placeholder={t("selectStaff")} /></SelectTrigger>
               <SelectContent>{staff.map((s) => <SelectItem key={s.id} value={s.id}>{profName(s.id)} · {s.employee_id}</SelectItem>)}</SelectContent>
             </Select>
-            <Button variant="outline" size="sm" onClick={applyBranchHours} disabled={!staffId} title={`${branchHours.start} - ${branchHours.end}`}>
-              <CalendarClock className="size-4 me-1.5" />
-              {lang === "ar" ? `تطبيق ساعات الفرع (${branchHours.start} - ${branchHours.end})` : `Apply branch hours (${branchHours.start} - ${branchHours.end})`}
-            </Button>
+            <Can permission="hr.edit">
+              <Button variant="outline" size="sm" onClick={applyBranchHours} disabled={!staffId} title={`${branchHours.start} - ${branchHours.end}`}>
+                <CalendarClock className="size-4 me-1.5" />
+                {lang === "ar" ? `تطبيق ساعات الفرع (${branchHours.start} - ${branchHours.end})` : `Apply branch hours (${branchHours.start} - ${branchHours.end})`}
+              </Button>
+            </Can>
             {detailedDirty && staffId && (
               <Badge variant="outline" className="text-[11px] border-amber-500 text-amber-600 bg-amber-500/10">
                 {lang === "ar" ? "تغييرات غير محفوظة" : "Unsaved changes"}
               </Badge>
             )}
             <div className="flex-1" />
-            <Button className="gradient-primary text-primary-foreground" onClick={save} disabled={!staffId}>
-              <Save className="size-4 me-1.5" />{t("save")}
-            </Button>
+            <Can permission="hr.edit">
+              <Button className="gradient-primary text-primary-foreground" onClick={save} disabled={!staffId}>
+                <Save className="size-4 me-1.5" />{t("save")}
+              </Button>
+            </Can>
           </Card>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {slots.map((s, i) => (

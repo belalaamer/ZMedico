@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Check, X, Trash2, FileText } from "lucide-react";
 import { Calendar as CalendarIcon } from "lucide-react";
@@ -35,6 +36,8 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
   const [schedSession, setSchedSession] = useState<Session | null>(null);
   const [schedAt, setSchedAt] = useState<string>("");
   const [conflict, setConflict] = useState<{ clash: any; reason: string } | null>(null);
+  const [cancelPlanTarget, setCancelPlanTarget] = useState<Plan | null>(null);
+  const [deletePlanTarget, setDeletePlanTarget] = useState<Plan | null>(null);
 
   const load = async () => {
     const { data } = await (supabase as any)
@@ -199,30 +202,34 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
   };
 
   const cancelPlan = async (p: Plan) => {
-    await (supabase as any).from("treatment_plans").update({ status: "cancelled" }).eq("id", p.id);
+    const { error: err1 } = await (supabase as any).from("treatment_plans").update({ status: "cancelled" }).eq("id", p.id);
+    if (err1) { toast.error(err1.message); return; }
     // Cancel any pending sessions and their linked future appointments
     const pending = (sessionsByPlan[p.id] ?? []).filter((s) => s.status === "pending");
     const apptIds = pending.map((s) => s.appointment_id).filter(Boolean);
     if (apptIds.length) {
-      await (supabase as any)
+      const { error: err2 } = await (supabase as any)
         .from("appointments")
         .update({ status: "cancelled" })
         .in("id", apptIds)
         .gte("scheduled_at", new Date().toISOString());
+      if (err2) { toast.error(err2.message); return; }
     }
     const pendingIds = pending.map((s) => s.id);
     if (pendingIds.length) {
-      await (supabase as any)
+      const { error: err3 } = await (supabase as any)
         .from("treatment_sessions")
         .update({ status: "cancelled" })
         .in("id", pendingIds);
+      if (err3) { toast.error(err3.message); return; }
     }
     toast.success(lang === "ar" ? "تم إلغاء الخطة والمواعيد المرتبطة" : "Plan and linked appointments cancelled");
     load();
   };
 
   const deletePlan = async (p: Plan) => {
-    await (supabase as any).from("treatment_plans").update({ deleted_at: new Date().toISOString() }).eq("id", p.id);
+    const { error } = await (supabase as any).from("treatment_plans").update({ deleted_at: new Date().toISOString() }).eq("id", p.id);
+    if (error) { toast.error(error.message); return; }
     load();
   };
 
@@ -293,8 +300,60 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
                         <Button size="sm" variant="outline"><FileText className="size-4 me-1" />{lang === "ar" ? "الفاتورة" : "Invoice"}</Button>
                       </Link>
                     )}
-                    {p.status === "active" && <Button size="sm" variant="outline" onClick={() => cancelPlan(p)}>{lang === "ar" ? "إلغاء" : "Cancel"}</Button>}
-                    <Button size="sm" variant="ghost" onClick={() => deletePlan(p)}><Trash2 className="size-4 text-destructive" /></Button>
+                    {p.status === "active" && (
+                      <Can permission="treatment_plans.edit">
+                        <AlertDialog open={cancelPlanTarget?.id === p.id} onOpenChange={(o) => { if (!o) setCancelPlanTarget(null); }}>
+                          <AlertDialogTrigger asChild>
+                            <Button size="sm" variant="outline" onClick={() => setCancelPlanTarget(p)}>{lang === "ar" ? "إلغاء" : "Cancel"}</Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>{lang === "ar" ? "إلغاء خطة العلاج" : "Cancel treatment plan"}</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                {lang === "ar"
+                                  ? "هل أنت متأكد من إلغاء هذه الخطة؟ سيتم إلغاء جميع الجلسات والمواعيد المعلقة المرتبطة بها."
+                                  : "Are you sure you want to cancel this plan? All pending sessions and their linked appointments will be cancelled."}
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>{lang === "ar" ? "تراجع" : "Go back"}</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => { const target = cancelPlanTarget; setCancelPlanTarget(null); if (target) cancelPlan(target); }}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                {lang === "ar" ? "إلغاء الخطة" : "Cancel plan"}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </Can>
+                    )}
+                    <Can permission="treatment_plans.delete">
+                      <AlertDialog open={deletePlanTarget?.id === p.id} onOpenChange={(o) => { if (!o) setDeletePlanTarget(null); }}>
+                        <AlertDialogTrigger asChild>
+                          <Button size="sm" variant="ghost" onClick={() => setDeletePlanTarget(p)}><Trash2 className="size-4 text-destructive" /></Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>{lang === "ar" ? "حذف خطة العلاج" : "Delete treatment plan"}</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              {lang === "ar"
+                                ? "هل أنت متأكد من حذف هذه الخطة؟ لا يمكن التراجع عن هذا الإجراء."
+                                : "Are you sure you want to delete this plan? This action cannot be undone."}
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>{lang === "ar" ? "تراجع" : "Go back"}</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => { const target = deletePlanTarget; setDeletePlanTarget(null); if (target) deletePlan(target); }}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              {lang === "ar" ? "حذف" : "Delete"}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </Can>
                   </div>
                 </div>
                 <div>
@@ -326,15 +385,17 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
                         )
                       )}
                       <div className="flex gap-1">
-                        <Button size="sm" variant={s.status === "completed" ? "default" : "outline"} className="h-6 px-2 flex-1" onClick={() => setSessionStatus(s, s.status === "completed" ? "pending" : "completed")}>
-                          <Check className="size-3" />
-                        </Button>
-                        <Button size="sm" variant={s.status === "missed" ? "destructive" : "outline"} className="h-6 px-2 flex-1" onClick={() => setSessionStatus(s, s.status === "missed" ? "pending" : "missed")}>
-                          <X className="size-3" />
-                        </Button>
-                        <Button size="sm" variant="outline" className="h-6 px-2" onClick={() => openSchedule(s)} title={lang === "ar" ? "جدولة" : "Schedule"}>
-                          <CalendarIcon className="size-3" />
-                        </Button>
+                        <Can permission="treatment_plans.edit">
+                          <Button size="sm" variant={s.status === "completed" ? "default" : "outline"} className="h-6 px-2 flex-1" onClick={() => setSessionStatus(s, s.status === "completed" ? "pending" : "completed")}>
+                            <Check className="size-3" />
+                          </Button>
+                          <Button size="sm" variant={s.status === "missed" ? "destructive" : "outline"} className="h-6 px-2 flex-1" onClick={() => setSessionStatus(s, s.status === "missed" ? "pending" : "missed")}>
+                            <X className="size-3" />
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-6 px-2" onClick={() => openSchedule(s)} title={lang === "ar" ? "جدولة" : "Schedule"}>
+                            <CalendarIcon className="size-3" />
+                          </Button>
+                        </Can>
                       </div>
                     </div>
                   ))}

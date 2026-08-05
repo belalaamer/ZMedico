@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Trash2, Plus, Printer, Upload, FileText, Save } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatDate, formatMoney } from "@/lib/format";
 import { generatePrescriptionPdf } from "@/lib/prescriptionPdf";
+import { logPhiAccess } from "@/lib/observability/phiAudit";
 
 type Record = any;
 
@@ -46,6 +47,7 @@ export default function MedicalRecordEditor() {
   const [medsCatalog, setMedsCatalog] = useState<any[]>([]);
   const [docs, setDocs] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
+  const phiLogged = useRef(false);
 
   const load = async () => {
     if (!id) return;
@@ -73,6 +75,11 @@ export default function MedicalRecordEditor() {
       const { data: items } = await supabase.from("prescription_items").select("*, medications(*)").eq("prescription_id", rx[0].id);
       setRxItems(items ?? []);
     } else { setRxItems([]); }
+    // Task B: log PHI access once after data arrives, guarded against re-fires.
+    if (!phiLogged.current) {
+      phiLogged.current = true;
+      logPhiAccess("medical_record", r.id, { patientId: r.patient_id });
+    }
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
 

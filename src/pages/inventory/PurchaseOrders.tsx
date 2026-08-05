@@ -18,6 +18,7 @@ import { formatMoney, formatDate } from "@/lib/format";
 import { RowActions } from "@/components/RowActions";
 import { useNavigate } from "react-router-dom";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
+import { Can } from "@/components/Can";
 
 const statusClass: Record<string, string> = {
   draft: "status-cancelled", pending: "status-review", partial: "status-progress", received: "status-completed", cancelled: "status-departed",
@@ -146,74 +147,76 @@ export default function PurchaseOrders() {
               </SelectContent>
             </Select>
           </div>
-          <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
-            <DialogTrigger asChild>
-              <Button className="gradient-primary text-primary-foreground"><Plus className="me-2 size-4" />{t("newPO")}</Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader><DialogTitle>{t("newPO")}</DialogTitle></DialogHeader>
-              <div className="grid sm:grid-cols-3 gap-3">
-                <div className="space-y-2">
-                  <Label>{t("supplier")}</Label>
-                  <Select value={supplierId} onValueChange={setSupplierId}>
-                    <SelectTrigger><SelectValue placeholder={t("selectSupplier")} /></SelectTrigger>
-                    <SelectContent>{suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{lang === "ar" ? s.name_ar : s.name_en}</SelectItem>)}</SelectContent>
-                  </Select>
+          <Can permission="inventory.create">
+            <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+              <DialogTrigger asChild>
+                <Button className="gradient-primary text-primary-foreground"><Plus className="me-2 size-4" />{t("newPO")}</Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader><DialogTitle>{t("newPO")}</DialogTitle></DialogHeader>
+                <div className="grid sm:grid-cols-3 gap-3">
+                  <div className="space-y-2">
+                    <Label>{t("supplier")}</Label>
+                    <Select value={supplierId} onValueChange={setSupplierId}>
+                      <SelectTrigger><SelectValue placeholder={t("selectSupplier")} /></SelectTrigger>
+                      <SelectContent>{suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{lang === "ar" ? s.name_ar : s.name_en}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2"><Label>{t("orderDate")}</Label><Input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} /></div>
+                  <div className="space-y-2"><Label>{t("expectedDate")}</Label><Input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} /></div>
                 </div>
-                <div className="space-y-2"><Label>{t("orderDate")}</Label><Input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} /></div>
-                <div className="space-y-2"><Label>{t("expectedDate")}</Label><Input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} /></div>
-              </div>
-              <div className="border border-border rounded-lg overflow-hidden">
-                <div className="grid grid-cols-12 gap-2 bg-muted/50 rounded-t-md px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  <div className="col-span-6">{t("description")}</div>
-                  <div className="col-span-2 text-end">{t("quantity")}</div>
-                  <div className="col-span-2 text-end">{t("unitPrice")}</div>
-                  <div className="col-span-1 text-end">{t("total")}</div>
-                  <div className="col-span-1"></div>
-                </div>
-                {lines.map((l, i) => (
-                  <div key={i} className="grid grid-cols-12 gap-2 px-3 py-2 border-t border-border items-center hover:bg-muted/20 transition-colors">
-                    <div className="col-span-6">
-                      <Select value={l.product_id} onValueChange={(v) => {
-                        const prod = products.find((p) => p.id === v);
-                        setLines((arr) => arr.map((x, idx) => idx === i ? { ...x, product_id: v, unit_cost: x.unit_cost || Number(prod?.cost_price ?? 0) } : x));
-                      }}>
-                        <SelectTrigger><SelectValue placeholder={t("selectProduct")} /></SelectTrigger>
-                        <SelectContent>{products.map((p) => <SelectItem key={p.id} value={p.id}>{p.sku} · {lang === "ar" ? p.name_ar : p.name_en}</SelectItem>)}</SelectContent>
-                      </Select>
+                <div className="border border-border rounded-lg overflow-hidden">
+                  <div className="grid grid-cols-12 gap-2 bg-muted/50 rounded-t-md px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    <div className="col-span-6">{t("description")}</div>
+                    <div className="col-span-2 text-end">{t("quantity")}</div>
+                    <div className="col-span-2 text-end">{t("unitPrice")}</div>
+                    <div className="col-span-1 text-end">{t("total")}</div>
+                    <div className="col-span-1"></div>
+                  </div>
+                  {lines.map((l, i) => (
+                    <div key={i} className="grid grid-cols-12 gap-2 px-3 py-2 border-t border-border items-center hover:bg-muted/20 transition-colors">
+                      <div className="col-span-6">
+                        <Select value={l.product_id} onValueChange={(v) => {
+                          const prod = products.find((p) => p.id === v);
+                          setLines((arr) => arr.map((x, idx) => idx === i ? { ...x, product_id: v, unit_cost: x.unit_cost || Number(prod?.cost_price ?? 0) } : x));
+                        }}>
+                          <SelectTrigger><SelectValue placeholder={t("selectProduct")} /></SelectTrigger>
+                          <SelectContent>{products.map((p) => <SelectItem key={p.id} value={p.id}>{p.sku} · {lang === "ar" ? p.name_ar : p.name_en}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                      <Input className="col-span-2 text-end" type="number" min={0} step="0.001" value={l.quantity_ordered} onChange={(e) => setLines((arr) => arr.map((x, idx) => idx === i ? { ...x, quantity_ordered: Number(e.target.value) } : x))} />
+                      <Input className="col-span-2 text-end" type="number" min={0} step="0.01" value={l.unit_cost} onChange={(e) => setLines((arr) => arr.map((x, idx) => idx === i ? { ...x, unit_cost: Number(e.target.value) } : x))} />
+                      <div className="col-span-1 text-end text-sm font-medium tabular-nums">{formatMoney((l.quantity_ordered || 0) * (l.unit_cost || 0), lang)}</div>
+                      <div className="col-span-1 text-end"><Button variant="ghost" size="icon" onClick={() => setLines((arr) => arr.filter((_, idx) => idx !== i))}><Trash2 className="size-4" /></Button></div>
                     </div>
-                    <Input className="col-span-2 text-end" type="number" min={0} step="0.001" value={l.quantity_ordered} onChange={(e) => setLines((arr) => arr.map((x, idx) => idx === i ? { ...x, quantity_ordered: Number(e.target.value) } : x))} />
-                    <Input className="col-span-2 text-end" type="number" min={0} step="0.01" value={l.unit_cost} onChange={(e) => setLines((arr) => arr.map((x, idx) => idx === i ? { ...x, unit_cost: Number(e.target.value) } : x))} />
-                    <div className="col-span-1 text-end text-sm font-medium tabular-nums">{formatMoney((l.quantity_ordered || 0) * (l.unit_cost || 0), lang)}</div>
-                    <div className="col-span-1 text-end"><Button variant="ghost" size="icon" onClick={() => setLines((arr) => arr.filter((_, idx) => idx !== i))}><Trash2 className="size-4" /></Button></div>
-                  </div>
-                ))}
-                <div className="px-3 py-2 border-t border-border">
-                  <Button variant="outline" size="sm" onClick={() => setLines((a) => [...a, { product_id: "", quantity_ordered: 1, unit_cost: 0 }])}><Plus className="me-2 size-4" />{t("addItem")}</Button>
-                </div>
-              </div>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-2"><Label>{t("notes")}</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={1000} rows={3} /></div>
-                <div className="space-y-2 text-sm bg-muted/30 border border-border/60 rounded-lg p-3">
-                  <div className="flex items-center justify-between"><span className="text-muted-foreground">{t("subtotal")}</span><span className="font-medium tabular-nums">{formatMoney(subtotal, lang)}</span></div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-muted-foreground">{t("tax")} %</span>
-                    <Input className="w-24 text-end h-8" type="number" min={0} max={100} step="0.1" value={taxPct} onChange={(e) => setTaxPct(Number(e.target.value))} />
-                    <span className="font-medium tabular-nums w-28 text-end">+ {formatMoney(tax, lang)}</span>
-                  </div>
-                  <div className="flex items-center justify-between bg-primary/5 border border-primary/20 rounded-md px-3 py-2 mt-2 text-lg font-extrabold">
-                    <span>{t("total")}</span>
-                    <span className="tabular-nums text-primary">{formatMoney(total, lang)}</span>
+                  ))}
+                  <div className="px-3 py-2 border-t border-border">
+                    <Button variant="outline" size="sm" onClick={() => setLines((a) => [...a, { product_id: "", quantity_ordered: 1, unit_cost: 0 }])}><Plus className="me-2 size-4" />{t("addItem")}</Button>
                   </div>
                 </div>
-              </div>
-              <DialogFooter>
-                <Button variant="ghost" onClick={() => setOpen(false)} disabled={saving}>{t("cancel")}</Button>
-                <Button variant="outline" onClick={() => save("draft")} disabled={saving}>{t("saveDraft")}</Button>
-                <Button className="gradient-primary text-primary-foreground" onClick={() => save("pending")} disabled={saving}>{t("submitOrder")}</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-2"><Label>{t("notes")}</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={1000} rows={3} /></div>
+                  <div className="space-y-2 text-sm bg-muted/30 border border-border/60 rounded-lg p-3">
+                    <div className="flex items-center justify-between"><span className="text-muted-foreground">{t("subtotal")}</span><span className="font-medium tabular-nums">{formatMoney(subtotal, lang)}</span></div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-muted-foreground">{t("tax")} %</span>
+                      <Input className="w-24 text-end h-8" type="number" min={0} max={100} step="0.1" value={taxPct} onChange={(e) => setTaxPct(Number(e.target.value))} />
+                      <span className="font-medium tabular-nums w-28 text-end">+ {formatMoney(tax, lang)}</span>
+                    </div>
+                    <div className="flex items-center justify-between bg-primary/5 border border-primary/20 rounded-md px-3 py-2 mt-2 text-lg font-extrabold">
+                      <span>{t("total")}</span>
+                      <span className="tabular-nums text-primary">{formatMoney(total, lang)}</span>
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="ghost" onClick={() => setOpen(false)} disabled={saving}>{t("cancel")}</Button>
+                  <Button variant="outline" onClick={() => save("draft")} disabled={saving}>{t("saveDraft")}</Button>
+                  <Button className="gradient-primary text-primary-foreground" onClick={() => save("pending")} disabled={saving}>{t("submitOrder")}</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </Can>
         </div>
       </div>
 
@@ -236,11 +239,13 @@ export default function PurchaseOrders() {
                   <Badge variant="outline" className={statusClass[po.status]}>{statusLabel}</Badge>
                   <div className="text-end font-semibold tabular-nums">{formatMoney(po.total, lang)}</div>
                   </Link>
-                  <RowActions
-                    onEdit={() => navigate(`/inventory/purchase-orders/${po.id}`)}
-                    onDelete={() => softDelete(po)}
-                    canDelete={canOverride || po.status === "draft"}
-                  />
+                  <Can permission="inventory.delete">
+                    <RowActions
+                      onEdit={() => navigate(`/inventory/purchase-orders/${po.id}`)}
+                      onDelete={() => softDelete(po)}
+                      canDelete={canOverride || po.status === "draft"}
+                    />
+                  </Can>
                 </div>
               );
             })}

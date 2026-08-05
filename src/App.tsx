@@ -147,7 +147,7 @@ function AppContent() {
                 </ProtectedRoute>
               }
             >
-              <Route path="/" element={<PermissionRoute adminOnly><Dashboard /></PermissionRoute>} />
+              <Route path="/" element={<PermissionRoute><Dashboard /></PermissionRoute>} />
               <Route path="/patients" element={<PermissionRoute><PatientsPage /></PermissionRoute>} />
               <Route path="/patients/:id" element={<PermissionRoute><PatientProfile /></PermissionRoute>} />
               <Route path="/calendar" element={<PermissionRoute><CalendarPage /></PermissionRoute>} />

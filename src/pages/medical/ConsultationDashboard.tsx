@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft, Pill, FlaskConical, Stethoscope, Plus, Trash2, FileText, Printer,
@@ -19,6 +19,7 @@ import { formatDate, formatMoney } from "@/lib/format";
 import {
   RX_FREQ_PRESETS, RX_INSTR_PRESETS, RX_DOSAGE_PRESETS, calcQuantity,
 } from "@/lib/rxPresets";
+import { logPhiAccess } from "@/lib/observability/phiAudit";
 
 function calcAge(dob?: string | null) {
   if (!dob) return null;
@@ -49,6 +50,8 @@ export default function ConsultationDashboard() {
   const [procOpen, setProcOpen] = useState(false);
   const [labOpen, setLabOpen] = useState(false);
   const [startingProc, setStartingProc] = useState(false);
+
+  const phiLogged = useRef(false);
 
   const load = useCallback(async () => {
     if (!recordId) return;
@@ -86,6 +89,11 @@ export default function ConsultationDashboard() {
     setThisRx(rx ?? []);
     setThisDocs(dc ?? []);
     setDraftInvoice(inv ?? null);
+
+    if (!phiLogged.current) {
+      phiLogged.current = true;
+      logPhiAccess("medical_record", r.id, { patientId: r.patient_id });
+    }
 
     // Active diagnoses across recent visits (last 5)
     const { data: histDx } = await supabase

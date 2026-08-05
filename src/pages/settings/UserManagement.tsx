@@ -31,7 +31,7 @@ import { ListSkeleton } from "@/components/ListSkeleton";
 import { TablePager } from "@/components/TablePager";
 import { toast } from "sonner";
 
-const ROLES = ["system_owner", "admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr"] as const;
+const ROLES = ["system_owner", "admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr", "staff"] as const;
 type Role = typeof ROLES[number];
 
 type StaffLink = { branch_id: string | null; employee_id: string | null };
@@ -62,7 +62,7 @@ function suggestRoleFromPosition(titleEn: string | null | undefined, groupKey: s
   if (/(account|محاسب)/i.test(s)) return "accountant";
   if (/(hr|human|موارد)/i.test(s)) return "hr";
   if (/(manager|مدير)/i.test(s)) return "manager";
-  return "doctor";
+  return "receptionist";
 }
 
 export default function UserManagement() {
@@ -77,7 +77,7 @@ export default function UserManagement() {
   const [open, setOpen] = useState(false);
   const [invEmail, setInvEmail] = useState("");
   const [invName, setInvName] = useState("");
-  const [invRole, setInvRole] = useState<Role>("doctor");
+  const [invRole, setInvRole] = useState<Role>("receptionist");
   const [invBranch, setInvBranch] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
@@ -85,7 +85,7 @@ export default function UserManagement() {
   const [createOpen, setCreateOpen] = useState(false);
   const [cEmail, setCEmail] = useState("");
   const [cName, setCName] = useState("");
-  const [cRole, setCRole] = useState<Role>("doctor");
+  const [cRole, setCRole] = useState<Role>("receptionist");
   const [cPassword, setCPassword] = useState("");
   const [cBranch, setCBranch] = useState<string>("");
   const [creating, setCreating] = useState(false);
@@ -103,7 +103,7 @@ export default function UserManagement() {
   const [resetInfo, setResetInfo] = useState<{ email: string; password: string } | null>(null);
   // Edit-user dialog state
   const [editTarget, setEditTarget] = useState<any | null>(null);
-  const [eRole, setERole] = useState<Role>("doctor");
+  const [eRole, setERole] = useState<Role>("receptionist");
   const [eBranch, setEBranch] = useState<string>("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [unlinkTarget, setUnlinkTarget] = useState<any | null>(null);
@@ -114,7 +114,7 @@ export default function UserManagement() {
   const [linkMode, setLinkMode] = useState<"link" | "replace">("link");
   const [pickerStaff, setPickerStaff] = useState<any[]>([]);
   const [pickedStaffId, setPickedStaffId] = useState<string>("");
-  const [pickedRole, setPickedRole] = useState<Role>("doctor");
+  const [pickedRole, setPickedRole] = useState<Role>("receptionist");
   const [linking, setLinking] = useState(false);
 
   // UI-only local state for the enterprise table view.
@@ -128,7 +128,7 @@ export default function UserManagement() {
     setLinkTarget(u);
     setLinkMode(mode);
     setPickedStaffId("");
-    setPickedRole(((roles[u.id] ?? [])[0] as Role) ?? "doctor");
+    setPickedRole(((roles[u.id] ?? [])[0] as Role) ?? "receptionist");
     if (!currentBranchId) { setPickerStaff([]); return; }
     const { data: sps } = await (supabase as any)
       .from("staff_profiles")
@@ -193,7 +193,7 @@ export default function UserManagement() {
 
   const openEdit = (u: any) => {
     const current = (roles[u.id] ?? [])[0] as Role | undefined;
-    setERole((current as Role) ?? "doctor");
+    setERole((current as Role) ?? "receptionist");
     setEBranch(staffLinks[u.id]?.branch_id ?? "");
     setEditTarget(u);
   };
@@ -327,7 +327,7 @@ export default function UserManagement() {
         ? "تمت الدعوة. اطلب من المستخدم التسجيل بهذا البريد."
         : "Invited. Ask the user to sign up with this email."
     );
-    setInvEmail(""); setInvName(""); setInvRole("doctor"); setInvBranch(""); setOpen(false);
+    setInvEmail(""); setInvName(""); setInvRole("receptionist"); setInvBranch(""); setOpen(false);
     load();
   };
 
@@ -350,7 +350,7 @@ export default function UserManagement() {
       if (r.error) { setCreating(false); toast.error(r.error.message); return; }
       setCreating(false);
       toast.success(lang === "ar" ? "تم ربط المستخدم بالموظف" : "User linked to employee");
-      setCEmail(""); setCName(""); setCRole("doctor"); setCPassword(""); setCBranch(""); setCLinkedStaffId("");
+      setCEmail(""); setCName(""); setCRole("receptionist"); setCPassword(""); setCBranch(""); setCLinkedStaffId("");
       setCreateOpen(false);
       load();
       return;
@@ -399,7 +399,7 @@ export default function UserManagement() {
       return;
     }
     setCreatedInfo({ email: info.email, password: info.password });
-    setCEmail(""); setCName(""); setCRole("doctor"); setCPassword(""); setCBranch(""); setCLinkedStaffId("");
+    setCEmail(""); setCName(""); setCRole("receptionist"); setCPassword(""); setCBranch(""); setCLinkedStaffId("");
     setCreateOpen(false);
     load();
   };

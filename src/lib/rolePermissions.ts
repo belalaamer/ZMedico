@@ -117,7 +117,7 @@ export function defaultActionsFor(role: string, module: string): string[] {
 
 // Map route path prefixes to permission modules. Used by PermissionRoute.
 export function moduleForPath(path: string): string | null {
-  if (path === "/") return "reports";
+  // "/" is deliberately absent: the dashboard route is not permission-gated.
   if (path.startsWith("/calendar") || path.startsWith("/reminders")) return "appointments";
   if (path.startsWith("/queue")) return "appointments";
   if (path.startsWith("/appointments")) return "appointments";

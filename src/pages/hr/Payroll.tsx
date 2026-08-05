@@ -202,7 +202,8 @@ export default function Payroll() {
   const addAdjustment = async () => {
     if (!openAdj || !adj.amount) return;
     const amount = Number(adj.amount);
-    await supabase.from("salary_adjustments").insert({ payroll_id: openAdj, type: adj.type as any, amount, reason_en: adj.reason_en || null, created_by: user?.id });
+    const { error: adjErr } = await supabase.from("salary_adjustments").insert({ payroll_id: openAdj, type: adj.type as any, amount, reason_en: adj.reason_en || null, created_by: user?.id });
+    if (adjErr) { toast.error(adjErr.message); return; }
     const p = items.find((i) => i.id === openAdj);
     if (p) {
       const patch: any = {};

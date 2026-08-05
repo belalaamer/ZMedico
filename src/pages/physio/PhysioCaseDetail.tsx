@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Plus, TrendingUp, TrendingDown, Minus, Trash2, AlertCircle, Calendar, BellRing, CheckCircle2, Clock, CalendarCheck, Activity, ClipboardList, FileText, Stethoscope } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -19,6 +19,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate } from "@/lib/format";
 import { toast } from "sonner";
+import { logPhiAccess } from "@/lib/observability/phiAudit";
 
 export default function PhysioCaseDetail() {
   const { id } = useParams();
@@ -35,6 +36,7 @@ export default function PhysioCaseDetail() {
   const [appointmentMap, setAppointmentMap] = useState<Record<string, any>>({});
   const [sessOpen, setSessOpen] = useState(false);
   const [reOpen, setReOpen] = useState(false);
+  const phiLogged = useRef(false);
 
   const loadAll = async () => {
     if (!id) return;
@@ -51,6 +53,12 @@ export default function PhysioCaseDetail() {
     setSessions((sessRes.data as any) ?? []);
     setReassessments((rasRes.data as any) ?? []);
     setStatus("loaded");
+    // Task B: log PHI access once after data arrives, guarded against re-fires.
+    const caseData = caseRes.data as any;
+    if (!phiLogged.current) {
+      phiLogged.current = true;
+      logPhiAccess("physio_case", caseData.id, { patientId: caseData.patient_id });
+    }
     const branchId = (caseRes.data as any).branch_id;
     const patientId = (caseRes.data as any).patient_id;
     // Load patient's appointments at this branch for linking + display.

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Printer, Save } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -11,6 +11,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { Can } from "@/components/Can";
+import { logPhiAccess } from "@/lib/observability/phiAudit";
 
 const STATUS = [
   "healthy", "caries", "filled", "crown", "implant", "extracted", "root_canal", "bridge",
@@ -47,6 +49,7 @@ export default function PatientDental() {
   const [chart, setChart] = useState<Record<string, any>>({});
   const [selected, setSelected] = useState<string | null>(null);
   const [procs, setProcs] = useState<any[]>([]);
+  const phiLogged = useRef(false);
 
   const load = async () => {
     if (!id) return;
@@ -60,6 +63,13 @@ export default function PatientDental() {
     (ch ?? []).forEach((row: any) => { map[row.tooth_number] = row; });
     setChart(map);
     setProcs(rp ?? []);
+    // Task B: log PHI access once after data arrives, guarded against re-fires.
+    if (p?.id) {
+      if (!phiLogged.current) {
+        phiLogged.current = true;
+        logPhiAccess("dental_chart", p.id, { patientId: p.id });
+      }
+    }
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
 
@@ -179,7 +189,11 @@ function ToothEditor({ tooth, row, procs, onSave }: any) {
         </div>
         <div className="space-y-1.5"><Label>{t("notes")}</Label><Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500}/></div>
       </div>
-      <div className="flex justify-end"><Button onClick={() => onSave({ status, notes: notes || null })} className="gradient-primary text-primary-foreground"><Save className="me-2 size-4"/>{t("saveChart")}</Button></div>
+      <div className="flex justify-end">
+        <Can permission="medical_records.edit">
+          <Button onClick={() => onSave({ status, notes: notes || null })} className="gradient-primary text-primary-foreground"><Save className="me-2 size-4"/>{t("saveChart")}</Button>
+        </Can>
+      </div>
 
       {procs.length > 0 && (
         <div className="pt-3 border-t border-border">

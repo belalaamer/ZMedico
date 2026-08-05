@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, FileText, CreditCard, Phone, Mail, MapPin, Calendar, Stethoscope, Trash2, Shield, Pencil, Activity } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -24,6 +24,7 @@ import PatientDocumentsTab from "./PatientDocumentsTab";
 import { RecordPaymentDialog } from "../payments/RecordPaymentDialog";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import PatientOverviewSnapshot from "./PatientOverviewSnapshot";
+import { logPhiAccess } from "@/lib/observability/phiAudit";
 
 const statusClass: Record<string, string> = {
   draft: "status-cancelled", pending: "status-review", paid: "status-completed", partial: "status-progress", cancelled: "status-departed",
@@ -52,6 +53,7 @@ export default function PatientProfile() {
   const [physioCases, setPhysioCases] = useState<any[]>([]);
   const [physioStats, setPhysioStats] = useState<{ active: number; lastSession: string | null; lastReassessment: string | null; nextFollowup: string | null; overdueFollowup: string | null } | null>(null);
   const [activePhysioCaseId, setActivePhysioCaseId] = useState<string | null>(null);
+  const phiLogged = useRef(false);
 
   useEffect(() => {
     if (!id) return;
@@ -122,6 +124,13 @@ export default function PatientProfile() {
       const { data: prof } = await supabase.from("profiles").select("full_name").eq("id", p.assigned_doctor_id).maybeSingle();
       setAssignedDoctorName(prof?.full_name ?? "");
     } else { setAssignedDoctorName(""); }
+    // Task B: log PHI access once after data arrives, guarded against re-fires.
+    if (p?.id) {
+      if (!phiLogged.current) {
+        phiLogged.current = true;
+        logPhiAccess("patient", p.id, { patientId: p.id });
+      }
+    }
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
 
@@ -154,32 +163,36 @@ export default function PatientProfile() {
               <Pencil className="me-2 size-4" />{t("edit")}
             </Button>
           </Can>
-          <Button className="gradient-primary text-primary-foreground" onClick={() => setCreateOpen(true)}>
-            <FileText className="me-2 size-4" />{t("createInvoice")}
-          </Button>
-          <AlertDialog open={delOpen} onOpenChange={setDelOpen}>
-            <AlertDialogTrigger asChild>
-              <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive">
-                <Trash2 className="me-2 size-4" />{lang === "ar" ? "حذف" : "Delete"}
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>{lang === "ar" ? "حذف المريض" : "Delete patient"}</AlertDialogTitle>
-                <AlertDialogDescription>
-                  {lang === "ar"
-                    ? "هل أنت متأكد من حذف هذا المريض؟ لا يمكن التراجع عن هذا الإجراء."
-                    : "Are you sure you want to delete this patient? This action cannot be undone."}
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                  {lang === "ar" ? "حذف" : "Delete"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <Can permission="invoices.create">
+            <Button className="gradient-primary text-primary-foreground" onClick={() => setCreateOpen(true)}>
+              <FileText className="me-2 size-4" />{t("createInvoice")}
+            </Button>
+          </Can>
+          <Can permission="patients.delete">
+            <AlertDialog open={delOpen} onOpenChange={setDelOpen}>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive">
+                  <Trash2 className="me-2 size-4" />{lang === "ar" ? "حذف" : "Delete"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{lang === "ar" ? "حذف المريض" : "Delete patient"}</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {lang === "ar"
+                      ? "هل أنت متأكد من حذف هذا المريض؟ لا يمكن التراجع عن هذا الإجراء."
+                      : "Are you sure you want to delete this patient? This action cannot be undone."}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    {lang === "ar" ? "حذف" : "Delete"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </Can>
         </div>
       </div>
 

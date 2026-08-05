@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Printer, Copy, Check, MessageCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { formatDate } from "@/lib/format";
 import { generatePrescriptionPdf } from "@/lib/prescriptionPdf";
 import { openWhatsApp, prescriptionWhatsAppMessage } from "@/lib/whatsapp";
+import { logPhiAccess } from "@/lib/observability/phiAudit";
 
 export default function PrescriptionDetail() {
   const { id } = useParams();
@@ -19,6 +20,7 @@ export default function PrescriptionDetail() {
   const [rx, setRx] = useState<any>(null);
   const [items, setItems] = useState<any[]>([]);
   const [patient, setPatient] = useState<any>(null);
+  const phiLogged = useRef(false);
 
   const load = async () => {
     if (!id) return;
@@ -30,6 +32,11 @@ export default function PrescriptionDetail() {
       supabase.from("patients").select("*").eq("id", r.patient_id).maybeSingle(),
     ]);
     setItems(it ?? []); setPatient(p);
+    // Task B: log PHI access once after data arrives, guarded against re-fires.
+    if (!phiLogged.current) {
+      phiLogged.current = true;
+      logPhiAccess("prescription", r.id, { patientId: r.patient_id });
+    }
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
 

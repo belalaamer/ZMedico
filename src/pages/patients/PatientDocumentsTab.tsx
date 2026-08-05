@@ -10,6 +10,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/format";
 import { useDataSync } from "@/lib/dataSync";
+import { Can } from "@/components/Can";
+import { logPhiAccess } from "@/lib/observability/phiAudit";
 
 type Props = { patientId: string; autoOpenUpload?: boolean };
 
@@ -20,6 +22,7 @@ export default function PatientDocumentsTab({ patientId, autoOpenUpload }: Props
   const [uploadType, setUploadType] = useState<string>("other");
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const phiLogged = useRef(false);
 
   const load = async () => {
     const { data } = await supabase
@@ -29,6 +32,13 @@ export default function PatientDocumentsTab({ patientId, autoOpenUpload }: Props
       .order("created_at", { ascending: false })
       .limit(200);
     setDocs(data ?? []);
+    // Task B: log PHI access once after data arrives, guarded against re-fires.
+    if (data !== null) {
+      if (!phiLogged.current) {
+        phiLogged.current = true;
+        logPhiAccess("document", patientId, { patientId });
+      }
+    }
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [patientId]);
   useDataSync(["patient_documents"], () => load());
@@ -77,35 +87,37 @@ export default function PatientDocumentsTab({ patientId, autoOpenUpload }: Props
 
   return (
     <div className="space-y-4">
-      <Card className="p-4 shadow-card">
-        <div className="grid sm:grid-cols-[1fr_auto] gap-3 items-end">
-          <div className="space-y-1.5">
-            <Label>{t("documentType")}</Label>
-            <Select value={uploadType} onValueChange={setUploadType}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="lab_result">{t("docLabResult")}</SelectItem>
-                <SelectItem value="xray">{t("docXray")}</SelectItem>
-                <SelectItem value="mri">{t("docMri")}</SelectItem>
-                <SelectItem value="ct_scan">{t("docCt")}</SelectItem>
-                <SelectItem value="report">{t("docReport")}</SelectItem>
-                <SelectItem value="other">{t("docOther")}</SelectItem>
-              </SelectContent>
-            </Select>
+      <Can permission="medical_records.create">
+        <Card className="p-4 shadow-card">
+          <div className="grid sm:grid-cols-[1fr_auto] gap-3 items-end">
+            <div className="space-y-1.5">
+              <Label>{t("documentType")}</Label>
+              <Select value={uploadType} onValueChange={setUploadType}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="lab_result">{t("docLabResult")}</SelectItem>
+                  <SelectItem value="xray">{t("docXray")}</SelectItem>
+                  <SelectItem value="mri">{t("docMri")}</SelectItem>
+                  <SelectItem value="ct_scan">{t("docCt")}</SelectItem>
+                  <SelectItem value="report">{t("docReport")}</SelectItem>
+                  <SelectItem value="other">{t("docOther")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <label className="cursor-pointer flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-dashed border-border hover:bg-muted/40 text-sm">
+              <Upload className="size-4" />{uploading ? t("uploading") : t("uploadFile")}
+              <input
+                ref={inputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(e) => upload(e.target.files)}
+                disabled={uploading}
+              />
+            </label>
           </div>
-          <label className="cursor-pointer flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-dashed border-border hover:bg-muted/40 text-sm">
-            <Upload className="size-4" />{uploading ? t("uploading") : t("uploadFile")}
-            <input
-              ref={inputRef}
-              type="file"
-              multiple
-              className="hidden"
-              onChange={(e) => upload(e.target.files)}
-              disabled={uploading}
-            />
-          </label>
-        </div>
-      </Card>
+        </Card>
+      </Can>
 
       {docs.length === 0 ? (
         <div className="p-10 text-center text-muted-foreground">{t("noDocuments")}</div>
@@ -124,9 +136,11 @@ export default function PatientDocumentsTab({ patientId, autoOpenUpload }: Props
                   {d.document_type} · {formatDate(d.created_at, lang)}
                 </div>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => remove(d)}>
-                <Trash2 className="size-4 text-destructive" />
-              </Button>
+              <Can permission="medical_records.delete">
+                <Button variant="ghost" size="icon" onClick={() => remove(d)}>
+                  <Trash2 className="size-4 text-destructive" />
+                </Button>
+              </Can>
             </Card>
           ))}
         </div>

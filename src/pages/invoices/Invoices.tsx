@@ -208,7 +208,7 @@ export default function Invoices() {
                     canEdit={authz.can("invoices.edit")}
                     canDelete={authz.can("invoices.delete") && (canOverride || i.status === "draft")}
                     extraItems={
-                      i.status !== "paid" && i.status !== "cancelled" && authz.can("payments.create")
+                      i.status !== "paid" && i.status !== "cancelled" && authz.can("invoices.create")
                         ? [{
                             label: t("recordPayment"),
                             icon: <CreditCard className="size-4" />,

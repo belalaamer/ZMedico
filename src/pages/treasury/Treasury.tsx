@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { formatMoney, formatDateTime } from "@/lib/format";
 import { TransferDialog } from "./TransferDialog";
 import { RowActions } from "@/components/RowActions";
+import { Can } from "@/components/Can";
 
 export default function Treasury() {
   const { t, lang } = useI18n();
@@ -119,60 +120,64 @@ export default function Treasury() {
               <Lock className="me-2 size-4" />{lang === "ar" ? "الإقفال اليومي" : "Daily close"}
             </Link>
           </Button>
-          <Button variant="outline" onClick={() => setTransferOpen(true)} disabled={treasuries.length < 2}>
-            <ArrowLeftRight className="me-2 size-4" />{t("transferFunds")}
-          </Button>
-          <Dialog open={adj.open} onOpenChange={(v) => setAdj({ ...adj, open: v })}>
-          <DialogTrigger asChild>
-            <Button className="gradient-primary text-primary-foreground">{t("adjust")}</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>{t("adjust")}</DialogTitle></DialogHeader>
-            <div className="space-y-3">
-              <div className="space-y-2">
-                <Label>{t("treasury")}</Label>
-                <Select value={adj.treasury_id} onValueChange={(v) => setAdj({ ...adj, treasury_id: v })}>
-                  <SelectTrigger><SelectValue placeholder={t("selectTreasury")} /></SelectTrigger>
-                  <SelectContent>{treasuries.map((tr) => <SelectItem key={tr.id} value={tr.id}>{lang === "ar" ? tr.name_ar : tr.name_en}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
+          <Can permission="treasury.tx.write">
+            <Button variant="outline" onClick={() => setTransferOpen(true)} disabled={treasuries.length < 2}>
+              <ArrowLeftRight className="me-2 size-4" />{t("transferFunds")}
+            </Button>
+          </Can>
+          <Can permission="treasury.tx.write">
+            <Dialog open={adj.open} onOpenChange={(v) => setAdj({ ...adj, open: v })}>
+            <DialogTrigger asChild>
+              <Button className="gradient-primary text-primary-foreground">{t("adjust")}</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>{t("adjust")}</DialogTitle></DialogHeader>
+              <div className="space-y-3">
                 <div className="space-y-2">
-                  <Label>{t("transactionType")}</Label>
-                  <Select value={adj.type} onValueChange={(v) => setAdj({ ...adj, type: v })}>
+                  <Label>{t("treasury")}</Label>
+                  <Select value={adj.treasury_id} onValueChange={(v) => setAdj({ ...adj, treasury_id: v })}>
+                    <SelectTrigger><SelectValue placeholder={t("selectTreasury")} /></SelectTrigger>
+                    <SelectContent>{treasuries.map((tr) => <SelectItem key={tr.id} value={tr.id}>{lang === "ar" ? tr.name_ar : tr.name_en}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>{t("transactionType")}</Label>
+                    <Select value={adj.type} onValueChange={(v) => setAdj({ ...adj, type: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="income">{t("income")}</SelectItem>
+                        <SelectItem value="expense">{t("expense")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{t("amount")}</Label>
+                    <Input type="number" min={0.01} step="0.01" value={adj.amount} onChange={(e) => setAdj({ ...adj, amount: Number(e.target.value) })} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("cashOrNonCash")}</Label>
+                  <Select value={adjIsCash} onValueChange={(v) => setAdjIsCash(v as "cash" | "non_cash")}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="income">{t("income")}</SelectItem>
-                      <SelectItem value="expense">{t("expense")}</SelectItem>
+                      <SelectItem value="cash">{t("cash")}</SelectItem>
+                      <SelectItem value="non_cash">{t("nonCash")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>{t("amount")}</Label>
-                  <Input type="number" min={0.01} step="0.01" value={adj.amount} onChange={(e) => setAdj({ ...adj, amount: Number(e.target.value) })} />
+                  <Label>{t("description")}</Label>
+                  <Input value={adj.desc_en} onChange={(e) => setAdj({ ...adj, desc_en: e.target.value, desc_ar: e.target.value })} maxLength={200} />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label>{t("cashOrNonCash")}</Label>
-                <Select value={adjIsCash} onValueChange={(v) => setAdjIsCash(v as "cash" | "non_cash")}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">{t("cash")}</SelectItem>
-                    <SelectItem value="non_cash">{t("nonCash")}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>{t("description")}</Label>
-                <Input value={adj.desc_en} onChange={(e) => setAdj({ ...adj, desc_en: e.target.value, desc_ar: e.target.value })} maxLength={200} />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="ghost" onClick={() => setAdj({ ...adj, open: false })}>{t("cancel")}</Button>
-              <Button className="gradient-primary text-primary-foreground" onClick={submitAdj}>{t("save")}</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setAdj({ ...adj, open: false })}>{t("cancel")}</Button>
+                <Button className="gradient-primary text-primary-foreground" onClick={submitAdj}>{t("save")}</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          </Can>
         </div>
       </div>
 
@@ -204,7 +209,9 @@ export default function Treasury() {
             <div key={tr.id} className="border border-border rounded-lg p-3">
               <div className="flex items-center justify-between">
                 <div className="font-medium">{lang === "ar" ? tr.name_ar : tr.name_en}</div>
-                <RowActions canEdit={false} onDelete={() => softDeleteTreasury(tr)} />
+                <Can permission="treasury.delete">
+                  <RowActions canEdit={false} onDelete={() => softDeleteTreasury(tr)} />
+                </Can>
               </div>
               <div className="mt-1 text-2xl font-bold tabular-nums text-primary">{formatMoney(Number(tr.current_balance) + Number(tr.non_cash_balance ?? 0), lang, tr.currency)}</div>
               <div className="text-[10px] text-muted-foreground">{t("totalBalance")}</div>

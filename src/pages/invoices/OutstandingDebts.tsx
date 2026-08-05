@@ -139,7 +139,7 @@ export default function OutstandingDebts() {
                     </div>
                   </Link>
                   <div className="flex items-center gap-2">
-                    <Can module="payments" action="create">
+                    <Can permission="invoices.create">
                       <Button size="sm" variant="outline" onClick={() => navigate(`/payments?invoice=${r.id}&patient=${r.patient_id}&amount=${outstanding.toFixed(2)}`)}>
                         <CreditCard className="me-1 size-4" />
                         {t("recordPayment")}

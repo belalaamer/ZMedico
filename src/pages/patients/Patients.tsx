@@ -335,9 +335,11 @@ export default function PatientsPage() {
                             <DropdownMenuItem onClick={() => navigate(`/calendar?patient_id=${p.id}`)}>
                               <CalendarIcon className="size-4 me-2" /> {lang === "ar" ? "حجز موعد" : "Book Appointment"}
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setInvoiceForPatient(p.id)}>
-                              <FileText className="size-4 me-2" /> {lang === "ar" ? "إنشاء فاتورة" : "Create Invoice"}
-                            </DropdownMenuItem>
+                            {authz.can("invoices.create") && (
+                              <DropdownMenuItem onClick={() => setInvoiceForPatient(p.id)}>
+                                <FileText className="size-4 me-2" /> {lang === "ar" ? "إنشاء فاتورة" : "Create Invoice"}
+                              </DropdownMenuItem>
+                            )}
                             {authz.can("patients.delete") && (
                               <>
                                 <DropdownMenuSeparator />

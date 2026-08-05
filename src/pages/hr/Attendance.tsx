@@ -100,9 +100,11 @@ export default function Attendance() {
   const setStatus = async (sid: string, status: any) => {
     const existing = recOf(sid);
     if (existing) {
-      await supabase.from("attendance").update({ status }).eq("id", existing.id);
+      const { error } = await supabase.from("attendance").update({ status }).eq("id", existing.id);
+      if (error) { toast.error(error.message); return; }
     } else {
-      await supabase.from("attendance").insert({ staff_id: sid, branch_id: currentBranchId, date, status, created_by: user?.id } as any);
+      const { error } = await supabase.from("attendance").insert({ staff_id: sid, branch_id: currentBranchId, date, status, created_by: user?.id } as any);
+      if (error) { toast.error(error.message); return; }
     }
     load();
   };

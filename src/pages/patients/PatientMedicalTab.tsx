@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/format";
+import { Can } from "@/components/Can";
 
 export default function PatientMedicalTab({ patientId }: { patientId: string }) {
   const { t, lang } = useI18n();
@@ -43,7 +44,9 @@ export default function PatientMedicalTab({ patientId }: { patientId: string }) 
       <Card className="p-5 shadow-card">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold flex items-center gap-2"><AlertTriangle className="size-4"/>{t("medicalHistory")}</h3>
-          <Button size="sm" variant="outline" onClick={() => setEditing(true)}><Edit3 className="me-2 size-3.5"/>{t("edit")}</Button>
+          <Can permission="medical_records.edit">
+            <Button size="sm" variant="outline" onClick={() => setEditing(true)}><Edit3 className="me-2 size-3.5"/>{t("edit")}</Button>
+          </Can>
         </div>
         {!history ? <div className="text-sm text-muted-foreground">{t("noHistory")}</div> : (
           <div className="space-y-2 text-sm">
@@ -104,7 +107,9 @@ export default function PatientMedicalTab({ patientId }: { patientId: string }) 
       <Card className="p-5 shadow-card">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold">{t("visitsTimeline")}</h3>
-          <Button asChild size="sm"><Link to="/medical/quick-consult"><Plus className="me-2 size-3.5"/>{t("addRecord")}</Link></Button>
+          <Can permission="medical_records.create">
+            <Button asChild size="sm"><Link to="/medical/quick-consult"><Plus className="me-2 size-3.5"/>{t("addRecord")}</Link></Button>
+          </Can>
         </div>
         {records.length === 0 ? <div className="text-sm text-muted-foreground">{t("noVisits")}</div> : (
           <div className="space-y-2">

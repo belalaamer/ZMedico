@@ -13,6 +13,7 @@ import { formatMoney, formatDateTime } from "@/lib/format";
 import { RecordPaymentDialog } from "./RecordPaymentDialog";
 import { RowActions } from "@/components/RowActions";
 import { TablePager } from "@/components/TablePager";
+import { Can } from "@/components/Can";
 
 const PAGE_SIZE = 50;
 
@@ -88,9 +89,11 @@ export default function Payments() {
           <span className="font-medium text-foreground">{t("payments")}</span>
           <span className="text-xs">· {total}</span>
         </div>
-        <Button className="gradient-primary text-primary-foreground shadow-md hover:shadow-lg transition-shadow" onClick={() => setOpen(true)}>
-          <Plus className="me-2 size-4" />{t("recordPayment")}
-        </Button>
+        <Can permission="invoices.create">
+          <Button className="gradient-primary text-primary-foreground shadow-md hover:shadow-lg transition-shadow" onClick={() => setOpen(true)}>
+            <Plus className="me-2 size-4" />{t("recordPayment")}
+          </Button>
+        </Can>
       </div>
 
       <Card className="shadow-card overflow-hidden">
@@ -127,7 +130,9 @@ export default function Payments() {
                     <div className="text-lg font-bold tabular-nums text-success">{formatMoney(p.amount, lang)}</div>
                     {p.reference_number && <Badge variant="outline" className="text-[10px] mt-1">{p.reference_number}</Badge>}
                   </div>
-                  <RowActions canEdit={false} onDelete={() => softDelete(p)} />
+                  <Can permission="treasury.delete">
+                    <RowActions canEdit={false} onDelete={() => softDelete(p)} />
+                  </Can>
                 </div>
               );
             })}

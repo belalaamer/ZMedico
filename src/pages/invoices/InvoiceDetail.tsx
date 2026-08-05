@@ -164,9 +164,11 @@ export default function InvoiceDetail() {
         <Button asChild variant="ghost" size="sm"><Link to="/invoices"><ArrowLeft className="me-2 size-4" />{t("invoices")}</Link></Button>
         <div className="flex gap-2">
           {inv.status !== "cancelled" && remaining > 0 && (
-            <Button size="lg" className="gradient-primary text-primary-foreground shadow-md hover:shadow-lg transition-shadow font-semibold" onClick={() => setPayOpen(true)}>
-              <CreditCard className="me-2 size-4" />{t("recordPayment")}
-            </Button>
+            <Can permission="invoices.create">
+              <Button size="lg" className="gradient-primary text-primary-foreground shadow-md hover:shadow-lg transition-shadow font-semibold" onClick={() => setPayOpen(true)}>
+                <CreditCard className="me-2 size-4" />{t("recordPayment")}
+              </Button>
+            </Can>
           )}
           <Button variant="outline" onClick={printInvoice}><Printer className="me-2 size-4" />{t("print")}</Button>
           <Button variant="outline" onClick={downloadPdf}><Download className="me-2 size-4" />{t("downloadPdf")}</Button>
@@ -285,17 +287,19 @@ export default function InvoiceDetail() {
           <div className="grid sm:grid-cols-2 gap-4 text-sm">
             <div>
               <div className="text-xs text-muted-foreground mb-1">{lang === "ar" ? "حالة المطالبة" : "Claim status"}</div>
-              <Select value={inv.claim_status ?? "none"} onValueChange={updateClaimStatus}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">{lang === "ar" ? "لا يوجد" : "None"}</SelectItem>
-                  <SelectItem value="pending">{lang === "ar" ? "قيد التحضير" : "Pending"}</SelectItem>
-                  <SelectItem value="submitted">{lang === "ar" ? "مُقدَّمة" : "Submitted"}</SelectItem>
-                  <SelectItem value="approved">{lang === "ar" ? "موافَق عليها" : "Approved"}</SelectItem>
-                  <SelectItem value="rejected">{lang === "ar" ? "مرفوضة" : "Rejected"}</SelectItem>
-                  <SelectItem value="paid">{lang === "ar" ? "مدفوعة" : "Paid"}</SelectItem>
-                </SelectContent>
-              </Select>
+              <Can permission="invoices.edit">
+                <Select value={inv.claim_status ?? "none"} onValueChange={updateClaimStatus}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">{lang === "ar" ? "لا يوجد" : "None"}</SelectItem>
+                    <SelectItem value="pending">{lang === "ar" ? "قيد التحضير" : "Pending"}</SelectItem>
+                    <SelectItem value="submitted">{lang === "ar" ? "مُقدَّمة" : "Submitted"}</SelectItem>
+                    <SelectItem value="approved">{lang === "ar" ? "موافَق عليها" : "Approved"}</SelectItem>
+                    <SelectItem value="rejected">{lang === "ar" ? "مرفوضة" : "Rejected"}</SelectItem>
+                    <SelectItem value="paid">{lang === "ar" ? "مدفوعة" : "Paid"}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Can>
             </div>
             <div className="space-y-1">
               {inv.claim_number && <div className="flex justify-between"><span className="text-muted-foreground">{lang === "ar" ? "رقم المطالبة" : "Claim #"}</span><span className="font-medium">{inv.claim_number}</span></div>}

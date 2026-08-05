@@ -17,6 +17,7 @@ import {
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Can } from "@/components/Can";
 
 type Supplier = any;
 
@@ -102,27 +103,29 @@ export default function Suppliers() {
               <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("search")} className="ps-9 border-0 shadow-none focus-visible:ring-1" />
             </div>
           </div>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button className="gradient-primary text-primary-foreground" onClick={openNew}><Plus className="me-2 size-4" />{t("addSupplier")}</Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader><DialogTitle>{edit ? t("supplier") : t("newSupplier")}</DialogTitle></DialogHeader>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-2 sm:col-span-2"><Label>{t("name")} / الاسم</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={120} /></div>
-                <div className="space-y-2"><Label>{t("contactPerson")}</Label><Input value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} maxLength={120} /></div>
-                <div className="space-y-2"><Label>{t("phone")}</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} maxLength={40} placeholder="+20..." /></div>
-                <div className="space-y-2"><Label>{t("email")}</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} maxLength={255} /></div>
-                <div className="space-y-2"><Label>{t("taxNumber")}</Label><Input value={form.tax_number} onChange={(e) => setForm({ ...form, tax_number: e.target.value })} maxLength={60} /></div>
-                <div className="space-y-2 sm:col-span-2"><Label>{t("address")}</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} maxLength={300} /></div>
-                <div className="space-y-2 sm:col-span-2"><Label>{t("notes")}</Label><Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} maxLength={1000} rows={3} /></div>
-              </div>
-              <DialogFooter>
-                <Button variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button>
-                <Button className="gradient-primary text-primary-foreground" onClick={save}>{t("save")}</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <Can permission="inventory.create">
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button className="gradient-primary text-primary-foreground" onClick={openNew}><Plus className="me-2 size-4" />{t("addSupplier")}</Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader><DialogTitle>{edit ? t("supplier") : t("newSupplier")}</DialogTitle></DialogHeader>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-2 sm:col-span-2"><Label>{t("name")} / الاسم</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={120} /></div>
+                  <div className="space-y-2"><Label>{t("contactPerson")}</Label><Input value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} maxLength={120} /></div>
+                  <div className="space-y-2"><Label>{t("phone")}</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} maxLength={40} placeholder="+20..." /></div>
+                  <div className="space-y-2"><Label>{t("email")}</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} maxLength={255} /></div>
+                  <div className="space-y-2"><Label>{t("taxNumber")}</Label><Input value={form.tax_number} onChange={(e) => setForm({ ...form, tax_number: e.target.value })} maxLength={60} /></div>
+                  <div className="space-y-2 sm:col-span-2"><Label>{t("address")}</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} maxLength={300} /></div>
+                  <div className="space-y-2 sm:col-span-2"><Label>{t("notes")}</Label><Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} maxLength={1000} rows={3} /></div>
+                </div>
+                <DialogFooter>
+                  <Button variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button>
+                  <Button className="gradient-primary text-primary-foreground" onClick={save}>{t("save")}</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </Can>
         </div>
       </div>
 
@@ -163,19 +166,23 @@ export default function Suppliers() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => openEdit(s)}>
-                      <Edit3 className="me-2 size-4" />{t("edit")}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => toggleActive(s)}>
-                      <Power className="me-2 size-4" />{s.is_active ? t("inactive") : t("active")}
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="text-destructive focus:text-destructive"
-                      onClick={() => setDeleteTarget(s)}
-                    >
-                      <Trash2 className="me-2 size-4" />{t("delete")}
-                    </DropdownMenuItem>
+                    <Can permission="inventory.edit">
+                      <DropdownMenuItem onClick={() => openEdit(s)}>
+                        <Edit3 className="me-2 size-4" />{t("edit")}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => toggleActive(s)}>
+                        <Power className="me-2 size-4" />{s.is_active ? t("inactive") : t("active")}
+                      </DropdownMenuItem>
+                    </Can>
+                    <Can permission="inventory.delete">
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => setDeleteTarget(s)}
+                      >
+                        <Trash2 className="me-2 size-4" />{t("delete")}
+                      </DropdownMenuItem>
+                    </Can>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>

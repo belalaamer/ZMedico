@@ -16,6 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney, formatDate } from "@/lib/format";
+import { Can } from "@/components/Can";
 
 const statusClass: Record<string, string> = {
   draft: "status-cancelled", pending: "status-review", partial: "status-progress", received: "status-completed", cancelled: "status-departed",
@@ -82,18 +83,22 @@ export default function PurchaseOrderDetail() {
         <Button asChild variant="ghost" size="sm"><Link to="/inventory/purchase-orders"><ArrowLeft className="me-2 size-4" />{t("purchaseOrders")}</Link></Button>
         <div className="flex gap-2">
           {po.status !== "cancelled" && po.status !== "received" && (
-            <Button className="gradient-primary text-primary-foreground" onClick={openReceive}>
-              <PackageCheck className="me-2 size-4" />{t("receiveItems")}
-            </Button>
+            <Can permission="purchase_orders.receive">
+              <Button className="gradient-primary text-primary-foreground" onClick={openReceive}>
+                <PackageCheck className="me-2 size-4" />{t("receiveItems")}
+              </Button>
+            </Can>
           )}
           {po.status !== "cancelled" && po.status !== "received" && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild><Button variant="outline"><X className="me-2 size-4" />{t("cancel")}</Button></AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader><AlertDialogTitle>{t("cancel")}</AlertDialogTitle><AlertDialogDescription>{t("confirmCancelInvoice")}</AlertDialogDescription></AlertDialogHeader>
-                <AlertDialogFooter><AlertDialogCancel>{t("cancel")}</AlertDialogCancel><AlertDialogAction onClick={cancelPo}>{t("confirm")}</AlertDialogAction></AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <Can permission="inventory.edit">
+              <AlertDialog>
+                <AlertDialogTrigger asChild><Button variant="outline"><X className="me-2 size-4" />{t("cancel")}</Button></AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader><AlertDialogTitle>{t("cancel")}</AlertDialogTitle><AlertDialogDescription>{t("confirmCancelInvoice")}</AlertDialogDescription></AlertDialogHeader>
+                  <AlertDialogFooter><AlertDialogCancel>{t("cancel")}</AlertDialogCancel><AlertDialogAction onClick={cancelPo}>{t("confirm")}</AlertDialogAction></AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </Can>
           )}
         </div>
       </div>

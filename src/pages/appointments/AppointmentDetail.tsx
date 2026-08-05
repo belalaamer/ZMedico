@@ -136,39 +136,41 @@ export default function AppointmentDetailPage() {
             </Button>
           )}
           {appt.status === "completed" && !record && (
-            <Button
-              size="sm"
-              className="h-9 gradient-primary text-primary-foreground"
-              disabled={starting}
-              onClick={async () => {
-                setStarting(true);
-                try {
-                  const { data, error } = await supabase
-                    .from("medical_records")
-                    .insert({
-                      patient_id: appt.patient_id,
-                      appointment_id: appt.id,
-                      branch_id: appt.branch_id,
-                      doctor_id: appt.doctor_id ?? user?.id ?? null,
-                      visit_date: new Date().toISOString().slice(0, 10),
-                      visit_type: "consultation",
-                      status: "draft",
-                      created_by: user?.id ?? null,
-                    } as any)
-                    .select("id")
-                    .single();
-                  if (error) throw error;
-                  nav(`/medical/records/${data.id}`);
-                } catch (e: any) {
-                  toast.error(e?.message ?? (lang === "ar" ? "تعذر بدء الاستشارة" : "Could not start consultation"));
-                } finally {
-                  setStarting(false);
-                }
-              }}
-            >
-              <Stethoscope className="size-4 me-1" />
-              {lang === "ar" ? "بدء الاستشارة" : "Start Consultation"}
-            </Button>
+            <Can permission="medical_records.create">
+              <Button
+                size="sm"
+                className="h-9 gradient-primary text-primary-foreground"
+                disabled={starting}
+                onClick={async () => {
+                  setStarting(true);
+                  try {
+                    const { data, error } = await supabase
+                      .from("medical_records")
+                      .insert({
+                        patient_id: appt.patient_id,
+                        appointment_id: appt.id,
+                        branch_id: appt.branch_id,
+                        doctor_id: appt.doctor_id ?? user?.id ?? null,
+                        visit_date: new Date().toISOString().slice(0, 10),
+                        visit_type: "consultation",
+                        status: "draft",
+                        created_by: user?.id ?? null,
+                      } as any)
+                      .select("id")
+                      .single();
+                    if (error) throw error;
+                    nav(`/medical/records/${data.id}`);
+                  } catch (e: any) {
+                    toast.error(e?.message ?? (lang === "ar" ? "تعذر بدء الاستشارة" : "Could not start consultation"));
+                  } finally {
+                    setStarting(false);
+                  }
+                }}
+              >
+                <Stethoscope className="size-4 me-1" />
+                {lang === "ar" ? "بدء الاستشارة" : "Start Consultation"}
+              </Button>
+            </Can>
           )}
           {appt.status === "completed" && (
             <Can permission="medical_records.create">
@@ -186,15 +188,17 @@ export default function AppointmentDetailPage() {
             </Can>
           )}
           {appt.status === "completed" && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-9 border-primary/30 text-primary hover:bg-primary/10"
-              onClick={() => setInvoiceOpen(true)}
-            >
-              <Receipt className="size-4 me-1" />
-              {lang === "ar" ? "إنشاء فاتورة" : "Generate Invoice"}
-            </Button>
+            <Can permission="invoices.create">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-9 border-primary/30 text-primary hover:bg-primary/10"
+                onClick={() => setInvoiceOpen(true)}
+              >
+                <Receipt className="size-4 me-1" />
+                {lang === "ar" ? "إنشاء فاتورة" : "Generate Invoice"}
+              </Button>
+            </Can>
           )}
         </div>
       </header>

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useI18n } from "@/contexts/I18nContext";
@@ -18,6 +19,7 @@ import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
 import { useNavigate } from "react-router-dom";
 import JobRoleSelect from "@/components/JobRoleSelect";
+import { Can } from "@/components/Can";
 
 // Operational roles only. Administrative roles (`admin`, `system_owner`) are
 // intentionally excluded — they must be granted exclusively via the User
@@ -46,6 +48,7 @@ export default function Staff() {
   const [newUser, setNewUser] = useState({ email: "", full_name: "", role: "staff" as string, password: "" });
   const [creatingUser, setCreatingUser] = useState(false);
   const [createdInfo, setCreatedInfo] = useState<{ email: string; password: string } | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<any>(null);
   const [form, setForm] = useState<any>({
     profile_id: "", position_id: "", department_id: "", branch_id: "",
     hire_date: new Date().toISOString().slice(0, 10), contract_type: "full_time",
@@ -192,127 +195,129 @@ export default function Staff() {
           <p className="text-sm text-muted-foreground mt-1">{filtered.length}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
-          <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setEditingId(null); }}>
-            <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground w-full md:w-auto"><Plus className="me-2 size-4" />{t("addStaff")}</Button></DialogTrigger>
-            <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-              <DialogHeader><DialogTitle>{editingId ? t("edit") : t("newStaff")}</DialogTitle></DialogHeader>
-              <Tabs defaultValue="identity" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 bg-muted/50 p-1 rounded-xl">
-                  <TabsTrigger value="identity">Identity & Access</TabsTrigger>
-                  <TabsTrigger value="employment">Employment</TabsTrigger>
-                  <TabsTrigger value="payroll">Payroll & Leaves</TabsTrigger>
-                  <TabsTrigger value="personal">Emergency</TabsTrigger>
-                </TabsList>
+          <Can permission="hr.create">
+            <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setEditingId(null); }}>
+              <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground w-full md:w-auto"><Plus className="me-2 size-4" />{t("addStaff")}</Button></DialogTrigger>
+              <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+                <DialogHeader><DialogTitle>{editingId ? t("edit") : t("newStaff")}</DialogTitle></DialogHeader>
+                <Tabs defaultValue="identity" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 bg-muted/50 p-1 rounded-xl">
+                    <TabsTrigger value="identity">Identity & Access</TabsTrigger>
+                    <TabsTrigger value="employment">Employment</TabsTrigger>
+                    <TabsTrigger value="payroll">Payroll & Leaves</TabsTrigger>
+                    <TabsTrigger value="personal">Emergency</TabsTrigger>
+                  </TabsList>
 
-                <TabsContent value="identity" className="mt-4 space-y-3">
-                  {!editingId && <div className="flex gap-2">
-                    <Button type="button" size="sm" variant={mode === "new" ? "default" : "outline"} onClick={() => setMode("new")}>+ New user</Button>
-                    <Button type="button" size="sm" variant={mode === "existing" ? "default" : "outline"} onClick={() => setMode("existing")}>Existing user</Button>
-                  </div>}
-                  {createdInfo && (
-                    <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 p-4 rounded-lg flex flex-col gap-2 shadow-[0_0_20px_-5px_hsl(var(--success)/0.4)]">
-                      <div className="font-semibold flex items-center gap-2">✓ User created successfully</div>
-                      <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-                        <span className="text-emerald-700/70 dark:text-emerald-400/70">Email</span>
-                        <span className="font-mono truncate">{createdInfo.email}</span>
-                        <span className="text-emerald-700/70 dark:text-emerald-400/70">Password</span>
-                        <span className="flex items-center gap-2">
-                          <span className="font-mono text-base font-bold px-2 py-0.5 rounded bg-emerald-500/15">{createdInfo.password}</span>
-                          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => { navigator.clipboard.writeText(createdInfo.password); toast.success("Copied"); }}><Copy className="size-3.5" /></Button>
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {editingId ? null : mode === "existing" ? (
-                      <div className="space-y-2 sm:col-span-2"><Label>{t("fullName")}</Label>
-                        <Select value={form.profile_id} onValueChange={(v) => setForm({ ...form, profile_id: v })}>
-                          <SelectTrigger><SelectValue placeholder={t("selectStaff")} /></SelectTrigger>
-                          <SelectContent>{availableProfiles.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name ?? p.email}</SelectItem>)}</SelectContent>
-                        </Select>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="space-y-2"><Label>{t("fullName")}</Label>
-                          <Input value={newUser.full_name} onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })} placeholder="Ahmed Ali" />
+                  <TabsContent value="identity" className="mt-4 space-y-3">
+                    {!editingId && <div className="flex gap-2">
+                      <Button type="button" size="sm" variant={mode === "new" ? "default" : "outline"} onClick={() => setMode("new")}>+ New user</Button>
+                      <Button type="button" size="sm" variant={mode === "existing" ? "default" : "outline"} onClick={() => setMode("existing")}>Existing user</Button>
+                    </div>}
+                    {createdInfo && (
+                      <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 p-4 rounded-lg flex flex-col gap-2 shadow-[0_0_20px_-5px_hsl(var(--success)/0.4)]">
+                        <div className="font-semibold flex items-center gap-2">✓ User created successfully</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+                          <span className="text-emerald-700/70 dark:text-emerald-400/70">Email</span>
+                          <span className="font-mono truncate">{createdInfo.email}</span>
+                          <span className="text-emerald-700/70 dark:text-emerald-400/70">Password</span>
+                          <span className="flex items-center gap-2">
+                            <span className="font-mono text-base font-bold px-2 py-0.5 rounded bg-emerald-500/15">{createdInfo.password}</span>
+                            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => { navigator.clipboard.writeText(createdInfo.password); toast.success("Copied"); }}><Copy className="size-3.5" /></Button>
+                          </span>
                         </div>
-                        <div className="space-y-2"><Label>Email</Label>
-                          <Input type="email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} placeholder="user@example.com" />
-                        </div>
-                        <div className="space-y-2"><Label>Role</Label>
-                          <Select value={newUser.role} onValueChange={(v) => setNewUser({ ...newUser, role: v })}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>)}</SelectContent>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {editingId ? null : mode === "existing" ? (
+                        <div className="space-y-2 sm:col-span-2"><Label>{t("fullName")}</Label>
+                          <Select value={form.profile_id} onValueChange={(v) => setForm({ ...form, profile_id: v })}>
+                            <SelectTrigger><SelectValue placeholder={t("selectStaff")} /></SelectTrigger>
+                            <SelectContent>{availableProfiles.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name ?? p.email}</SelectItem>)}</SelectContent>
                           </Select>
                         </div>
-                        <div className="space-y-2"><Label>Password (optional)</Label>
-                          <Input value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} placeholder="Auto-generated if empty" />
-                        </div>
-                      </>
-                    )}
-                    <div className="space-y-2 sm:col-span-2"><Label>{t("branch")}</Label>
-                      <Select value={form.branch_id || "none"} onValueChange={(v) => setForm({ ...form, branch_id: v === "none" ? "" : v })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent><SelectItem value="none">— {t("none")} —</SelectItem>{branches.map((b) => <SelectItem key={b.id} value={b.id}>{lang === "ar" ? b.name_ar : b.name_en}</SelectItem>)}</SelectContent>
-                      </Select>
+                      ) : (
+                        <>
+                          <div className="space-y-2"><Label>{t("fullName")}</Label>
+                            <Input value={newUser.full_name} onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })} placeholder="Ahmed Ali" />
+                          </div>
+                          <div className="space-y-2"><Label>Email</Label>
+                            <Input type="email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} placeholder="user@example.com" />
+                          </div>
+                          <div className="space-y-2"><Label>Role</Label>
+                            <Select value={newUser.role} onValueChange={(v) => setNewUser({ ...newUser, role: v })}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>)}</SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2"><Label>Password (optional)</Label>
+                            <Input value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} placeholder="Auto-generated if empty" />
+                          </div>
+                        </>
+                      )}
+                      <div className="space-y-2 sm:col-span-2"><Label>{t("branch")}</Label>
+                        <Select value={form.branch_id || "none"} onValueChange={(v) => setForm({ ...form, branch_id: v === "none" ? "" : v })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent><SelectItem value="none">— {t("none")} —</SelectItem>{branches.map((b) => <SelectItem key={b.id} value={b.id}>{lang === "ar" ? b.name_ar : b.name_en}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                  </div>
-                </TabsContent>
+                  </TabsContent>
 
-                <TabsContent value="employment" className="mt-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-2"><Label>{t("position")}</Label>
-                      <JobRoleSelect value={form.position_id} onChange={(v) => setForm({ ...form, position_id: v ?? "" })} />
+                  <TabsContent value="employment" className="mt-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-2"><Label>{t("position")}</Label>
+                        <JobRoleSelect value={form.position_id} onChange={(v) => setForm({ ...form, position_id: v ?? "" })} />
+                      </div>
+                      <div className="space-y-2"><Label>{t("department")}</Label>
+                        <Select value={form.department_id || "none"} onValueChange={(v) => setForm({ ...form, department_id: v === "none" ? "" : v })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent><SelectItem value="none">— {t("none")} —</SelectItem>{depts.map((d) => <SelectItem key={d.id} value={d.id}>{lang === "ar" ? d.name_ar : d.name_en}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2"><Label>{t("hireDate")}</Label><Input type="date" value={form.hire_date} onChange={(e) => setForm({ ...form, hire_date: e.target.value })} /></div>
+                      <div className="space-y-2"><Label>{t("contractType")}</Label>
+                        <Select value={form.contract_type} onValueChange={(v) => setForm({ ...form, contract_type: v })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="full_time">{t("fullTime")}</SelectItem>
+                            <SelectItem value="part_time">{t("partTime")}</SelectItem>
+                            <SelectItem value="contract">{t("contract")}</SelectItem>
+                            <SelectItem value="freelance">{t("freelance")}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2"><Label>{t("weeklyHours")}</Label><Input type="number" value={form.working_hours_per_week} onChange={(e) => setForm({ ...form, working_hours_per_week: e.target.value })} /></div>
+                      <div className="space-y-2"><Label>{t("nationalId")}</Label><Input value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} /></div>
                     </div>
-                    <div className="space-y-2"><Label>{t("department")}</Label>
-                      <Select value={form.department_id || "none"} onValueChange={(v) => setForm({ ...form, department_id: v === "none" ? "" : v })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent><SelectItem value="none">— {t("none")} —</SelectItem>{depts.map((d) => <SelectItem key={d.id} value={d.id}>{lang === "ar" ? d.name_ar : d.name_en}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2"><Label>{t("hireDate")}</Label><Input type="date" value={form.hire_date} onChange={(e) => setForm({ ...form, hire_date: e.target.value })} /></div>
-                    <div className="space-y-2"><Label>{t("contractType")}</Label>
-                      <Select value={form.contract_type} onValueChange={(v) => setForm({ ...form, contract_type: v })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="full_time">{t("fullTime")}</SelectItem>
-                          <SelectItem value="part_time">{t("partTime")}</SelectItem>
-                          <SelectItem value="contract">{t("contract")}</SelectItem>
-                          <SelectItem value="freelance">{t("freelance")}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2"><Label>{t("weeklyHours")}</Label><Input type="number" value={form.working_hours_per_week} onChange={(e) => setForm({ ...form, working_hours_per_week: e.target.value })} /></div>
-                    <div className="space-y-2"><Label>{t("nationalId")}</Label><Input value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} /></div>
-                  </div>
-                </TabsContent>
+                  </TabsContent>
 
-                <TabsContent value="payroll" className="mt-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-2"><Label>{t("salary")}</Label><Input type="number" value={form.salary} onChange={(e) => setForm({ ...form, salary: e.target.value })} /></div>
-                    <div className="space-y-2"><Label>{t("commissionPercent")}</Label><Input type="number" step="0.01" min="0" max="100" value={form.commission_percent} onChange={(e) => setForm({ ...form, commission_percent: e.target.value })} /></div>
-                    <div className="space-y-2"><Label>{t("bankName")}</Label><Input value={form.bank_name} onChange={(e) => setForm({ ...form, bank_name: e.target.value })} /></div>
-                    <div className="space-y-2"><Label>{t("bankAccount")}</Label><Input value={form.bank_account} onChange={(e) => setForm({ ...form, bank_account: e.target.value })} /></div>
-                    <div className="space-y-2"><Label>Annual Leave</Label><Input type="number" value={form.annual_leave_balance} onChange={(e) => setForm({ ...form, annual_leave_balance: e.target.value })} /></div>
-                    <div className="space-y-2"><Label>Sick Leave</Label><Input type="number" value={form.sick_leave_balance} onChange={(e) => setForm({ ...form, sick_leave_balance: e.target.value })} /></div>
-                  </div>
-                </TabsContent>
+                  <TabsContent value="payroll" className="mt-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-2"><Label>{t("salary")}</Label><Input type="number" value={form.salary} onChange={(e) => setForm({ ...form, salary: e.target.value })} /></div>
+                      <div className="space-y-2"><Label>{t("commissionPercent")}</Label><Input type="number" step="0.01" min="0" max="100" value={form.commission_percent} onChange={(e) => setForm({ ...form, commission_percent: e.target.value })} /></div>
+                      <div className="space-y-2"><Label>{t("bankName")}</Label><Input value={form.bank_name} onChange={(e) => setForm({ ...form, bank_name: e.target.value })} /></div>
+                      <div className="space-y-2"><Label>{t("bankAccount")}</Label><Input value={form.bank_account} onChange={(e) => setForm({ ...form, bank_account: e.target.value })} /></div>
+                      <div className="space-y-2"><Label>Annual Leave</Label><Input type="number" value={form.annual_leave_balance} onChange={(e) => setForm({ ...form, annual_leave_balance: e.target.value })} /></div>
+                      <div className="space-y-2"><Label>Sick Leave</Label><Input type="number" value={form.sick_leave_balance} onChange={(e) => setForm({ ...form, sick_leave_balance: e.target.value })} /></div>
+                    </div>
+                  </TabsContent>
 
-                <TabsContent value="personal" className="mt-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-2"><Label>{t("dob")}</Label><Input type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} /></div>
-                    <div className="space-y-2 sm:col-span-2"><Label>{t("address")}</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
-                    <div className="space-y-2"><Label>{t("emergencyContact")}</Label><Input value={form.emergency_contact_name} onChange={(e) => setForm({ ...form, emergency_contact_name: e.target.value })} /></div>
-                    <div className="space-y-2"><Label>{t("emergencyPhone")}</Label><Input value={form.emergency_contact_phone} onChange={(e) => setForm({ ...form, emergency_contact_phone: e.target.value })} /></div>
-                  </div>
-                </TabsContent>
-              </Tabs>
-              <DialogFooter>
-                <Button variant="ghost" onClick={() => { setOpen(false); setCreatedInfo(null); }}>{t("cancel")}</Button>
-                <Button className="gradient-primary text-primary-foreground" onClick={save} disabled={creatingUser}>{creatingUser ? "..." : t("save")}</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                  <TabsContent value="personal" className="mt-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-2"><Label>{t("dob")}</Label><Input type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} /></div>
+                      <div className="space-y-2 sm:col-span-2"><Label>{t("address")}</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
+                      <div className="space-y-2"><Label>{t("emergencyContact")}</Label><Input value={form.emergency_contact_name} onChange={(e) => setForm({ ...form, emergency_contact_name: e.target.value })} /></div>
+                      <div className="space-y-2"><Label>{t("emergencyPhone")}</Label><Input value={form.emergency_contact_phone} onChange={(e) => setForm({ ...form, emergency_contact_phone: e.target.value })} /></div>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+                <DialogFooter>
+                  <Button variant="ghost" onClick={() => { setOpen(false); setCreatedInfo(null); }}>{t("cancel")}</Button>
+                  <Button className="gradient-primary text-primary-foreground" onClick={save} disabled={creatingUser}>{creatingUser ? "..." : t("save")}</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </Can>
         </div>
       </div>
       <div className="bg-card border shadow-sm rounded-lg p-2 flex flex-wrap gap-2 items-center">
@@ -352,13 +357,17 @@ export default function Staff() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => openEdit(s)}>
-                    <Edit3 className="size-4 me-2" /> {t("edit")}
-                  </DropdownMenuItem>
+                  <Can permission="hr.edit">
+                    <DropdownMenuItem onClick={() => openEdit(s)}>
+                      <Edit3 className="size-4 me-2" /> {t("edit")}
+                    </DropdownMenuItem>
+                  </Can>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => softDelete(s)} className="text-destructive focus:text-destructive">
-                    <Trash2 className="size-4 me-2" /> {t("delete")}
-                  </DropdownMenuItem>
+                  <Can permission="hr.delete">
+                    <DropdownMenuItem onClick={() => setPendingDelete(s)} className="text-destructive focus:text-destructive">
+                      <Trash2 className="size-4 me-2" /> {t("delete")}
+                    </DropdownMenuItem>
+                  </Can>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -387,6 +396,28 @@ export default function Staff() {
         ))}
         {filtered.length === 0 && <Card className="p-10 col-span-full text-center text-muted-foreground">No staff members found.</Card>}
       </div>
+
+      <AlertDialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{lang === "ar" ? "حذف الموظف" : "Delete staff member"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {lang === "ar"
+                ? "هل أنت متأكد من حذف هذا الموظف؟ لا يمكن التراجع عن هذا الإجراء."
+                : "Are you sure you want to delete this staff member? This action cannot be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { if (pendingDelete) { softDelete(pendingDelete); setPendingDelete(null); } }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {t("delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

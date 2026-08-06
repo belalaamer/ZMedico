@@ -1,1 +1,148 @@
-ZXhwb3J0IGNvbnN0IFJPTEVTID0gWyJzeXN0ZW1fb3duZXIiLCAiYWRtaW4iLCAibWFuYWdlciIsICJkb2N0b3IiLCAibnVyc2UiLCAicmVjZXB0aW9uaXN0IiwgImFjY291bnRhbnQiLCAiaHIiXSBhcyBjb25zdDsKZXhwb3J0IGNvbnN0IE1PRFVMRVMgPSBbCiAgInBhdGllbnRzIiwKICAiYXBwb2ludG1lbnRzIiwKICAibWVkaWNhbF9yZWNvcmRzIiwKICAidml0YWxzIiwKICAidHJlYXRtZW50X3BsYW5zIiwKICAiaW52b2ljZXMiLAogICJ0cmVhc3VyeSIsCiAgImludmVudG9yeSIsCiAgInJlcG9ydHMiLAogICJyZXBvcnRzX2ZpbmFuY2UiLAogICJyZXBvcnRzX21lZGljYWwiLAogICJyZXBvcnRzX29wZXJhdGlvbmFsIiwKICAicmVwb3J0c19ociIsCiAgInJlcG9ydHNfaW52ZW50b3J5IiwKICAiaHIiLAogICJzZXR0aW5ncyIsCiAgImNvdXBvbnMiLApdIGFzIGNvbnN0OwpleHBvcnQgY29uc3QgQUNUSU9OUyA9IFsidmlldyIsICJjcmVhdGUiLCAiZWRpdCIsICJkZWxldGUiLCAiZXhwb3J0Il0gYXMgY29uc3Q7CgpleHBvcnQgdHlwZSBSb2xlTmFtZSA9IHR5cGVvZiBST0xFU1tudW1iZXJdIHwgc3RyaW5nOwpleHBvcnQgdHlwZSBNb2R1bGVOYW1lID0gdHlwZW9mIE1PRFVMRVNbbnVtYmVyXSB8IHN0cmluZzsKCmNvbnN0IEFMTCA9IFsuLi5BQ1RJT05TXSBhcyBzdHJpbmdbXTsKCi8vIFNUUklDVCBSQkFDIC0gRGVsZXRlIGlzIEFkbWluLW9ubHkgYWNyb3NzIGV2ZXJ5IG1vZHVsZS4gRXZlcnkgbm9uLWFkbWluCi8vIGFjdGlvbiBtaXJyb3JzIHdoYXQgUkxTICsgYHJvbGVfcGVybWlzc2lvbnNgIGFsbG93IGluIHRoZSBkYXRhYmFzZS4KLy8gU2VlIGRvY3MvUkJBQ19NQVRSSVgubWQgZm9yIHRoZSBhdXRob3JpdGF0aXZlIG1hdHJpeC4KZXhwb3J0IGNvbnN0IERFRkFVTFRfUEVSTUlTU0lPTlM6IFJlY29yZDxzdHJpbmcsIFJlY29yZDxzdHJpbmcsIHN0cmluZ1tdPj4gPSB7CiAgYWRtaW46IE9iamVjdC5mcm9tRW50cmllcyhNT0RVTEVTLm1hcChtID0+IFttLCBbLi4uQUxMXV0pKSwKICAvLyBNYW5hZ2VyOiBicmFuY2ggb3BlcmF0aW9ucyBvdmVyc2lnaHQuIE5vIGRlbGV0ZSwgbm8gY2xpbmljYWwgd3JpdGVzLAogIC8vIG5vIGZpbmFuY2lhbCB3cml0ZXMuCiAgLy8gQ2xpbmljYWwgZGF0YSAobWVkaWNhbF9yZWNvcmRzLCB2aXRhbHMsIHRyZWF0bWVudF9wbGFucywgcmVwb3J0c19tZWRpY2FsKQogIC8vIHJlbW92ZWQgdW5kZXIgdGhlIG1pbmltdW0tbmVjZXNzYXJ5IHByaW5jaXBsZTsgdGhlIGRhdGFiYXNlIGVuZm9yY2VzIHRoZSBzYW1lLgogIG1hbmFnZXI6IHsKICAgIHBhdGllbnRzOiBbInZpZXciLCJjcmVhdGUiLCJlZGl0IiwiZXhwb3J0Il0sCiAgICBhcHBvaW50bWVudHM6IFsidmlldyIsImNyZWF0ZSIsImVkaXQiLCJleHBvcnQiXSwKICAgIG1lZGljYWxfcmVjb3JkczogW10sCiAgICB2aXRhbHM6IFtdLAogICAgdHJlYXRtZW50X3BsYW5zOiBbXSwKICAgIGludm9pY2VzOiBbInZpZXciLCJleHBvcnQiXSwKICAgIHRyZWFzdXJ5OiBbInZpZXciLCJleHBvcnQiXSwKICAgIGludmVudG9yeTogWyJ2aWV3IiwiY3JlYXRlIiwiZWRpdCIsImV4cG9ydCJdLAogICAgcmVwb3J0czogWyJ2aWV3IiwiZXhwb3J0Il0sCiAgICByZXBvcnRzX2ZpbmFuY2U6IFsidmlldyIsImV4cG9ydCJdLAogICAgcmVwb3J0c19tZWRpY2FsOiBbXSwKICAgIHJlcG9ydHNfb3BlcmF0aW9uYWw6IFsidmlldyIsImV4cG9ydCJdLAogICAgcmVwb3J0c19ocjogW10sCiAgICByZXBvcnRzX2ludmVudG9yeTogWyJ2aWV3IiwiZXhwb3J0Il0sCiAgICBocjogWyJ2aWV3Il0sCiAgICBzZXR0aW5nczogWyJ2aWV3Il0sCiAgICBjb3Vwb25zOiBbInZpZXciLCJleHBvcnQiXSwKICB9LAogIC8vIERvY3RvcjogY2xpbmljYWwgb25seS4gRGVtb2dyYXBoaWNzIG93bmVkIGJ5IGZyb250IGRlc2suIE5vIGludm9pY2UgYWNjZXNzLgogIGRvY3RvcjogewogICAgcGF0aWVudHM6IFsidmlldyJdLAogICAgYXBwb2ludG1lbnRzOiBbInZpZXciLCJjcmVhdGUiLCJlZGl0Il0sCiAgICBtZWRpY2FsX3JlY29yZHM6IFsidmlldyIsImNyZWF0ZSIsImVkaXQiXSwKICAgIHZpdGFsczogWyJ2aWV3IiwiY3JlYXRlIiwiZWRpdCJdLAogICAgdHJlYXRtZW50X3BsYW5zOiBbInZpZXciLCJjcmVhdGUiLCJlZGl0Il0sCiAgICByZXBvcnRzOiBbInZpZXciXSwKICAgIHJlcG9ydHNfbWVkaWNhbDogWyJ2aWV3Il0sCiAgICByZXBvcnRzX29wZXJhdGlvbmFsOiBbInZpZXciXSwKICAgIHJlcG9ydHNfZmluYW5jZTogW10sCiAgICByZXBvcnRzX2hyOiBbXSwKICAgIHJlcG9ydHNfaW52ZW50b3J5OiBbXSwKICB9LAogIC8vIE51cnNlOiBhc3Npc3RhbnQuIFZpdGFscyB3cml0ZSwgZXZlcnl0aGluZyBlbHNlIHZpZXcuCiAgbnVyc2U6IHsKICAgIHBhdGllbnRzOiBbInZpZXciXSwKICAgIGFwcG9pbnRtZW50czogWyJ2aWV3IiwiY3JlYXRlIiwiZWRpdCJdLAogICAgbWVkaWNhbF9yZWNvcmRzOiBbInZpZXciXSwKICAgIHZpdGFsczogWyJ2aWV3IiwiY3JlYXRlIiwiZWRpdCJdLAogICAgdHJlYXRtZW50X3BsYW5zOiBbInZpZXciXSwKICAgIGludmVudG9yeTogWyJ2aWV3Il0sCiAgfSwKICAvLyBSZWNlcHRpb25pc3Q6IGZyb250IGRlc2suIENhbmNlbHMgYXBwb2ludG1lbnRzIHZpYSBzdGF0dXMgdXBkYXRlCiAgLy8gKG5vIGRlbGV0ZSkuIE5vIGludm9pY2UgZWRpdHMgLSBhY2NvdW50YW50IG93bnMgaW52b2ljZSBlZGl0cy4KICAvLyBDbGluaWNhbCBkYXRhICh0cmVhdG1lbnRfcGxhbnMpIHJlbW92ZWQgdW5kZXIgdGhlIG1pbmltdW0tbmVjZXNzYXJ5CiAgLy8gcHJpbmNpcGxlOyB0aGUgZGF0YWJhc2UgZW5mb3JjZXMgdGhlIHNhbWUuCiAgcmVjZXB0aW9uaXN0OiB7CiAgICBwYXRpZW50czogWyJ2aWV3IiwiY3JlYXRlIiwiZWRpdCJdLAogICAgYXBwb2ludG1lbnRzOiBbInZpZXciLCJjcmVhdGUiLCJlZGl0Il0sCiAgICB0cmVhdG1lbnRfcGxhbnM6IFtdLAogICAgaW52b2ljZXM6IFsidmlldyIsImNyZWF0ZSJdLAogICAgY291cG9uczogWyJ2aWV3Il0sCiAgfSwKICAvLyBBY2NvdW50YW50OiBmaW5hbmNlLiBObyBjbGluaWNhbCBhY2Nlc3MuCiAgLy8gQ2xpbmljYWwgZGF0YSAodHJlYXRtZW50X3BsYW5zKSBhbmQgYXBwb2ludG1lbnRzIHJlbW92ZWQgdW5kZXIgdGhlCiAgLy8gbWluaW11bS1uZWNlc3NhcnkgcHJpbmNpcGxlOyB0aGUgZGF0YWJhc2UgZW5mb3JjZXMgdGhlIHNhbWUuCiAgYWNjb3VudGFudDogewogICAgcGF0aWVudHM6IFsidmlldyJdLAogICAgYXBwb2ludG1lbnRzOiBbXSwKICAgIHRyZWF0bWVudF9wbGFuczogW10sCiAgICBpbnZvaWNlczogWyJ2aWV3IiwiY3JlYXRlIiwiZWRpdCIsImV4cG9ydCJdLAogICAgdHJlYXN1cnk6IFsidmlldyIsImNyZWF0ZSIsImVkaXQiLCJleHBvcnQiXSwKICAgIGludmVudG9yeTogWyJ2aWV3Il0sCiAgICByZXBvcnRzOiBbInZpZXciLCJleHBvcnQiXSwKICAgIHJlcG9ydHNfZmluYW5jZTogWyJ2aWV3IiwiZXhwb3J0Il0sCiAgICByZXBvcnRzX2ludmVudG9yeTogWyJ2aWV3IiwiZXhwb3J0Il0sCiAgICByZXBvcnRzX29wZXJhdGlvbmFsOiBbInZpZXciLCJleHBvcnQiXSwKICAgIHJlcG9ydHNfbWVkaWNhbDogW10sCiAgICByZXBvcnRzX2hyOiBbXSwKICAgIGNvdXBvbnM6IFsidmlldyIsImNyZWF0ZSIsImVkaXQiLCJleHBvcnQiXSwKICAgIC8vIENvYXJzZS1ncmFpbmVkIHByZXJlcXVpc2l0ZSBzbyBQZXJtaXNzaW9uUm91dGUgYWRtaXRzIGFjY291bnRhbnQKICAgIC8vIGludG8gL3NldHRpbmdzLyogdG8gcmVhY2ggc2V0dGluZ3MucHJpY2luZy51cGRhdGUuIE1hdGNoZXMgdGhlCiAgICAvLyBjYW5vbmljYWwgYnVuZGxlLnJvbGUuYWNjb3VudGFudCBncmFudCBvZiBzZXR0aW5ncy52aWV3LgogICAgc2V0dGluZ3M6IFsidmlldyJdLAogIH0sCiAgLy8gSFI6IHBlb3BsZSBvbmx5LgogIGhyOiB7CiAgICByZXBvcnRzOiBbInZpZXciXSwKICAgIHJlcG9ydHNfaHI6IFsidmlldyIsImV4cG9ydCJdLAogICAgaHI6IFsidmlldyIsImNyZWF0ZSIsImVkaXQiLCJleHBvcnQiXSwKICB9LAp9OwoKZXhwb3J0IGZ1bmN0aW9uIGRlZmF1bHRBY3Rpb25zRm9yKHJvbGU6IHN0cmluZywgbW9kdWxlOiBzdHJpbmcpOiBzdHJpbmdbXSB7CiAgcmV0dXJuIERFRkFVTFRfUEVSTUlTU0lPTlNbcm9sZV0/Llttb2R1bGVdID8/IFtdOwp9CgovLyBNYXAgcm91dGUgcGF0aCBwcmVmaXhlcyB0byBwZXJtaXNzaW9uIG1vZHVsZXMuIFVzZWQgYnkgUGVybWlzc2lvblJvdXRlLgpleHBvcnQgZnVuY3Rpb24gbW9kdWxlRm9yUGF0aChwYXRoOiBzdHJpbmcpOiBzdHJpbmcgfCBudWxsIHsKICAvLyAiLyIgaXMgZGVsaWJlcmF0ZWx5IGFic2VudDogdGhlIGRhc2hib2FyZCByb3V0ZSBpcyBub3QgcGVybWlzc2lvbi1nYXRlZC4KICBpZiAocGF0aC5zdGFydHNXaXRoKCIvY2FsZW5kYXIiKSB8fCBwYXRoLnN0YXJ0c1dpdGgoIi9yZW1pbmRlcnMiKSkgcmV0dXJuICJhcHBvaW50bWVudHMiOwogIGlmIChwYXRoLnN0YXJ0c1dpdGgoIi9xdWV1ZSIpKSByZXR1cm4gImFwcG9pbnRtZW50cyI7CiAgaWYgKHBhdGguc3RhcnRzV2l0aCgiL2FwcG9pbnRtZW50cyIpKSByZXR1cm4gImFwcG9pbnRtZW50cyI7CiAgaWYgKHBhdGguc3RhcnRzV2l0aCgiL3BoeXNpbyIpKSByZXR1cm4gIm1lZGljYWxfcmVjb3JkcyI7CiAgaWYgKHBhdGguc3RhcnRzV2l0aCgiL3BhdGllbnRzIikpIHJldHVybiAicGF0aWVudHMiOwogIGlmIChwYXRoLnN0YXJ0c1dpdGgoIi9pbnZvaWNlcyIpIHx8IHBhdGguc3RhcnRzV2l0aCgiL3BheW1lbnRzIikpIHJldHVybiAiaW52b2ljZXMiOwogIGlmIChwYXRoLnN0YXJ0c1dpdGgoIi90cmVhc3VyeSIpIHx8IHBhdGguc3RhcnRzV2l0aCgiL2V4cGVuc2VzIikpIHJldHVybiAidHJlYXN1cnkiOwogIGlmIChwYXRoLnN0YXJ0c1dpdGgoIi9jb3Vwb25zIikpIHJldHVybiAiY291cG9ucyI7CiAgaWYgKHBhdGguc3RhcnRzV2l0aCgiL2ludmVudG9yeSIpKSByZXR1cm4gImludmVudG9yeSI7CiAgaWYgKHBhdGguc3RhcnRzV2l0aCgiL21lZGljYWwiKSkgcmV0dXJuICJtZWRpY2FsX3JlY29yZHMiOwogIGlmIChwYXRoLnN0YXJ0c1dpdGgoIi9ociIpKSByZXR1cm4gImhyIjsKICBpZiAocGF0aC5zdGFydHNXaXRoKCIvcmVwb3J0cy9maW5hbmNpYWwiKSkgcmV0dXJuICJyZXBvcnRzX2ZpbmFuY2UiOwogIGlmIChwYXRoLnN0YXJ0c1dpdGgoIi9yZXBvcnRzL21lZGljYWwiKSkgcmV0dXJuICJyZXBvcnRzX21lZGljYWwiOwogIGlmIChwYXRoLnN0YXJ0c1dpdGgoIi9yZXBvcnRzL29wZXJhdGlvbmFsIikpIHJldHVybiAicmVwb3J0c19vcGVyYXRpb25hbCI7CiAgaWYgKHBhdGguc3RhcnRzV2l0aCgiL3JlcG9ydHMvaHIiKSkgcmV0dXJuICJyZXBvcnRzX2hyIjsKICBpZiAocGF0aC5zdGFydHNXaXRoKCIvcmVwb3J0cy9pbnZlbnRvcnkiKSkgcmV0dXJuICJyZXBvcnRzX2ludmVudG9yeSI7CiAgaWYgKHBhdGguc3RhcnRzV2l0aCgiL3JlcG9ydHMvY29tbWlzc2lvbnMiKSB8fCBwYXRoLnN0YXJ0c1dpdGgoIi9yZXBvcnRzL2RvY3Rvci1wZXJmb3JtYW5jZSIpKSByZXR1cm4gInJlcG9ydHNfbWVkaWNhbCI7CiAgaWYgKHBhdGguc3RhcnRzV2l0aCgiL3JlcG9ydHMiKSkgcmV0dXJuICJyZXBvcnRzIjsKICBpZiAocGF0aC5zdGFydHNXaXRoKCIvc2V0dGluZ3MiKSB8fCBwYXRoLnN0YXJ0c1dpdGgoIi9icmFuY2hlcyIpKSByZXR1cm4gInNldHRpbmdzIjsKICBpZiAocGF0aC5zdGFydHNXaXRoKCIvcHJpY2luZyIpKSByZXR1cm4gInNldHRpbmdzIjsKICByZXR1cm4gbnVsbDsKfQo=
+export const ROLES = ["system_owner", "admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr"] as const;
+export const MODULES = [
+  "patients",
+  "appointments",
+  "medical_records",
+  "vitals",
+  "treatment_plans",
+  "invoices",
+  "treasury",
+  "inventory",
+  "reports",
+  "reports_finance",
+  "reports_medical",
+  "reports_operational",
+  "reports_hr",
+  "reports_inventory",
+  "hr",
+  "settings",
+  "coupons",
+] as const;
+export const ACTIONS = ["view", "create", "edit", "delete", "export"] as const;
+
+export type RoleName = typeof ROLES[number] | string;
+export type ModuleName = typeof MODULES[number] | string;
+
+const ALL = [...ACTIONS] as string[];
+
+// STRICT RBAC - Delete is Admin-only across every module. Every non-admin
+// action mirrors what RLS + `role_permissions` allow in the database.
+// See docs/RBAC_MATRIX.md for the authoritative matrix.
+export const DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
+  admin: Object.fromEntries(MODULES.map(m => [m, [...ALL]])),
+  // Manager: branch operations oversight. No delete, no clinical writes,
+  // no financial writes.
+  // Clinical data (medical_records, vitals, treatment_plans, reports_medical)
+  // removed under the minimum-necessary principle; the database enforces the same.
+  manager: {
+    patients: ["view","create","edit","export"],
+    appointments: ["view","create","edit","export"],
+    medical_records: [],
+    vitals: [],
+    treatment_plans: [],
+    invoices: ["view","export"],
+    treasury: ["view","export"],
+    inventory: ["view","create","edit","export"],
+    reports: ["view","export"],
+    reports_finance: ["view","export"],
+    reports_medical: [],
+    reports_operational: ["view","export"],
+    reports_hr: [],
+    reports_inventory: ["view","export"],
+    hr: ["view"],
+    settings: ["view"],
+    coupons: ["view","export"],
+  },
+  // Doctor: clinical only. Demographics owned by front desk. No invoice access.
+  doctor: {
+    patients: ["view"],
+    appointments: ["view","create","edit"],
+    medical_records: ["view","create","edit"],
+    vitals: ["view","create","edit"],
+    treatment_plans: ["view","create","edit"],
+    reports: ["view"],
+    reports_medical: ["view"],
+    reports_operational: ["view"],
+    reports_finance: [],
+    reports_hr: [],
+    reports_inventory: [],
+  },
+  // Nurse: assistant. Vitals write, everything else view.
+  nurse: {
+    patients: ["view"],
+    appointments: ["view","create","edit"],
+    medical_records: ["view"],
+    vitals: ["view","create","edit"],
+    treatment_plans: ["view"],
+    inventory: ["view"],
+  },
+  // Receptionist: front desk. Cancels appointments via status update
+  // (no delete). No invoice edits - accountant owns invoice edits.
+  // Clinical data (treatment_plans) removed under the minimum-necessary
+  // principle; the database enforces the same.
+  receptionist: {
+    patients: ["view","create","edit"],
+    appointments: ["view","create","edit"],
+    treatment_plans: [],
+    invoices: ["view","create"],
+    coupons: ["view"],
+  },
+  // Accountant: finance. No clinical access.
+  // Clinical data (treatment_plans) and appointments removed under the
+  // minimum-necessary principle; the database enforces the same.
+  accountant: {
+    patients: ["view"],
+    appointments: [],
+    treatment_plans: [],
+    invoices: ["view","create","edit","export"],
+    treasury: ["view","create","edit","export"],
+    inventory: ["view"],
+    reports: ["view","export"],
+    reports_finance: ["view","export"],
+    reports_inventory: ["view","export"],
+    reports_operational: ["view","export"],
+    reports_medical: [],
+    reports_hr: [],
+    coupons: ["view","create","edit","export"],
+    // Coarse-grained prerequisite so PermissionRoute admits accountant
+    // into /settings/* to reach settings.pricing.update. Matches the
+    // canonical bundle.role.accountant grant of settings.view.
+    settings: ["view"],
+  },
+  // HR: people only.
+  hr: {
+    reports: ["view"],
+    reports_hr: ["view","export"],
+    hr: ["view","create","edit","export"],
+  },
+};
+
+export function defaultActionsFor(role: string, module: string): string[] {
+  return DEFAULT_PERMISSIONS[role]?.[module] ?? [];
+}
+
+// Map route path prefixes to permission modules. Used by PermissionRoute.
+export function moduleForPath(path: string): string | null {
+  // "/" is deliberately absent: the dashboard route is not permission-gated.
+  if (path.startsWith("/calendar") || path.startsWith("/reminders")) return "appointments";
+  if (path.startsWith("/queue")) return "appointments";
+  if (path.startsWith("/appointments")) return "appointments";
+  if (path.startsWith("/physio")) return "medical_records";
+  if (path.startsWith("/patients")) return "patients";
+  if (path.startsWith("/invoices") || path.startsWith("/payments")) return "invoices";
+  if (path.startsWith("/treasury") || path.startsWith("/expenses")) return "treasury";
+  if (path.startsWith("/coupons")) return "coupons";
+  if (path.startsWith("/inventory")) return "inventory";
+  if (path.startsWith("/medical")) return "medical_records";
+  if (path.startsWith("/hr")) return "hr";
+  if (path.startsWith("/reports/financial")) return "reports_finance";
+  if (path.startsWith("/reports/medical")) return "reports_medical";
+  if (path.startsWith("/reports/operational")) return "reports_operational";
+  if (path.startsWith("/reports/hr")) return "reports_hr";
+  if (path.startsWith("/reports/inventory")) return "reports_inventory";
+  if (path.startsWith("/reports/commissions") || path.startsWith("/reports/doctor-performance")) return "reports_medical";
+  if (path.startsWith("/reports")) return "reports";
+  if (path.startsWith("/settings") || path.startsWith("/branches")) return "settings";
+  if (path.startsWith("/pricing")) return "settings";
+  return null;
+}

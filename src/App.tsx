@@ -1,1 +1,274 @@
-aW1wb3J0IHsgU3VzcGVuc2UsIGxhenksIHVzZUVmZmVjdCB9IGZyb20gInJlYWN0IjsKaW1wb3J0IHsgUXVlcnlDbGllbnQsIFF1ZXJ5Q2xpZW50UHJvdmlkZXIgfSBmcm9tICJAdGFuc3RhY2svcmVhY3QtcXVlcnkiOwppbXBvcnQgeyBCcm93c2VyUm91dGVyLCBOYXZpZ2F0ZSwgUm91dGUsIFJvdXRlcyB9IGZyb20gInJlYWN0LXJvdXRlci1kb20iOwppbXBvcnQgeyBUb2FzdGVyIGFzIFNvbm5lciB9IGZyb20gIkAvY29tcG9uZW50cy91aS9zb25uZXIiOwppbXBvcnQgeyBUb2FzdGVyIH0gZnJvbSAiQC9jb21wb25lbnRzL3VpL3RvYXN0ZXIiOwppbXBvcnQgeyBUb29sdGlwUHJvdmlkZXIgfSBmcm9tICJAL2NvbXBvbmVudHMvdWkvdG9vbHRpcCI7CmltcG9ydCB7IEkxOG5Qcm92aWRlciB9IGZyb20gIkAvY29udGV4dHMvSTE4bkNvbnRleHQiOwppbXBvcnQgeyBBdXRoUHJvdmlkZXIgfSBmcm9tICJAL2NvbnRleHRzL0F1dGhDb250ZXh0IjsKaW1wb3J0IHsgQnJhbmNoUHJvdmlkZXIgfSBmcm9tICJAL2NvbnRleHRzL0JyYW5jaENvbnRleHQiOwppbXBvcnQgUHJvdGVjdGVkUm91dGUgZnJvbSAiQC9jb21wb25lbnRzL1Byb3RlY3RlZFJvdXRlIjsKaW1wb3J0IHsgUGVybWlzc2lvblJvdXRlIH0gZnJvbSAiQC9jb21wb25lbnRzL1Blcm1pc3Npb25Sb3V0ZSI7CmltcG9ydCB7IGF0dGFjaEdsb2JhbFJlZnJlc2hMaXN0ZW5lcnMgfSBmcm9tICJAL2xpYi9kYXRhU3luYyI7CmltcG9ydCB7IEVycm9yQm91bmRhcnkgfSBmcm9tICJAL2NvbXBvbmVudHMvRXJyb3JCb3VuZGFyeSI7Cgpjb25zdCBOb3RGb3VuZCA9IGxhenkoKCkgPT4gaW1wb3J0KCIuL3BhZ2VzL05vdEZvdW5kLnRzeCIpKTsKY29uc3QgQXBwU2hlbGwgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9jb21wb25lbnRzL2xheW91dC9BcHBTaGVsbCIpKTsKY29uc3QgQXV0aFBhZ2UgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9hdXRoL0F1dGgiKSk7CmNvbnN0IEF1dGhDYWxsYmFjayA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL2F1dGgvQXV0aENhbGxiYWNrIikpOwpjb25zdCBSZXNldFBhc3N3b3JkID0gbGF6eSgoKSA9PiBpbXBvcnQoIkAvcGFnZXMvYXV0aC9SZXNldFBhc3N3b3JkIikpOwpjb25zdCBQcmljaW5nID0gbGF6eSgoKSA9PiBpbXBvcnQoIkAvcGFnZXMvcHJpY2luZy9QcmljaW5nIikpOwpjb25zdCBUcnVzdCA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL1RydXN0IikpOwpjb25zdCBEYXNoYm9hcmQgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9kYXNoYm9hcmQvRGFzaGJvYXJkIikpOwpjb25zdCBQYXRpZW50c1BhZ2UgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9wYXRpZW50cy9QYXRpZW50cyIpKTsKY29uc3QgUGF0aWVudFByb2ZpbGUgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9wYXRpZW50cy9QYXRpZW50UHJvZmlsZSIpKTsKY29uc3QgQ2FsZW5kYXJQYWdlID0gbGF6eSgoKSA9PiBpbXBvcnQoIkAvcGFnZXMvY2FsZW5kYXIvQ2FsZW5kYXJQYWdlIikpOwpjb25zdCBRdWV1ZVBhZ2UgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9xdWV1ZS9RdWV1ZSIpKTsKY29uc3QgUXVldWVBdWRpdFBhZ2UgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9xdWV1ZS9RdWV1ZUF1ZGl0IikpOwpjb25zdCBRdWV1ZVNlbGZBdWRpdFBhZ2UgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9xdWV1ZS9RdWV1ZVNlbGZBdWRpdCIpKTsKY29uc3QgQXBwb2ludG1lbnREZXRhaWxQYWdlID0gbGF6eSgoKSA9PiBpbXBvcnQoIkAvcGFnZXMvYXBwb2ludG1lbnRzL0FwcG9pbnRtZW50RGV0YWlsIikpOwpjb25zdCBJbnZvaWNlcyA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL2ludm9pY2VzL0ludm9pY2VzIikpOwpjb25zdCBJbnZvaWNlRGV0YWlsID0gbGF6eSgoKSA9PiBpbXBvcnQoIkAvcGFnZXMvaW52b2ljZXMvSW52b2ljZURldGFpbCIpKTsKY29uc3QgT3V0c3RhbmRpbmdEZWJ0cyA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL2ludm9pY2VzL091dHN0YW5kaW5nRGVidHMiKSk7CmNvbnN0IFBheW1lbnRzID0gbGF6eSgoKSA9PiBpbXBvcnQoIkAvcGFnZXMvcGF5bWVudHMvUGF5bWVudHMiKSk7CmNvbnN0IFRyZWFzdXJ5ID0gbGF6eSgoKSA9PiBpbXBvcnQoIkAvcGFnZXMvdHJlYXN1cnkvVHJlYXN1cnkiKSk7CmNvbnN0IFRyZWFzdXJ5RGFpbHlDbG9zZSA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL3RyZWFzdXJ5L0RhaWx5Q2xvc2UiKSk7CmNvbnN0IEV4cGVuc2VzID0gbGF6eSgoKSA9PiBpbXBvcnQoIkAvcGFnZXMvZXhwZW5zZXMvRXhwZW5zZXMiKSk7CmNvbnN0IEV4cGVuc2VTZWxmQXVkaXQgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9leHBlbnNlcy9FeHBlbnNlU2VsZkF1ZGl0IikpOwpjb25zdCBQaHlzaW9DYXNlcyA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL3BoeXNpby9QaHlzaW9DYXNlcyIpKTsKY29uc3QgUGh5c2lvQ2FzZURldGFpbCA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL3BoeXNpby9QaHlzaW9DYXNlRGV0YWlsIikpOwpjb25zdCBQaHlzaW9EYXNoYm9hcmQgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9waHlzaW8vUGh5c2lvRGFzaGJvYXJkIikpOwpjb25zdCBQaHlzaW9SZXBvcnRzID0gbGF6eSgoKSA9PiBpbXBvcnQoIkAvcGFnZXMvcGh5c2lvL1BoeXNpb1JlcG9ydHMiKSk7CmNvbnN0IFBoeXNpb0ZvbGxvd3VwcyA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL3BoeXNpby9QaHlzaW9Gb2xsb3d1cHMiKSk7CmNvbnN0IFByb2R1Y3RzID0gbGF6eSgoKSA9PiBpbXBvcnQoIkAvcGFnZXMvaW52ZW50b3J5L1Byb2R1Y3RzIikpOwpjb25zdCBQcm9kdWN0RGV0YWlsID0gbGF6eSgoKSA9PiBpbXBvcnQoIkAvcGFnZXMvaW52ZW50b3J5L1Byb2R1Y3REZXRhaWwiKSk7CmNvbnN0IENhdGVnb3JpZXMgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9pbnZlbnRvcnkvQ2F0ZWdvcmllcyIpKTsKY29uc3QgU3VwcGxpZXJzID0gbGF6eSgoKSA9PiBpbXBvcnQoIkAvcGFnZXMvaW52ZW50b3J5L1N1cHBsaWVycyIpKTsKY29uc3QgU3RvY2tPdmVydmlldyA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL2ludmVudG9yeS9TdG9ja092ZXJ2aWV3IikpOwpjb25zdCBQdXJjaGFzZU9yZGVycyA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL2ludmVudG9yeS9QdXJjaGFzZU9yZGVycyIpKTsKY29uc3QgUHVyY2hhc2VPcmRlckRldGFpbCA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL2ludmVudG9yeS9QdXJjaGFzZU9yZGVyRGV0YWlsIikpOwpjb25zdCBBbGVydHMgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9pbnZlbnRvcnkvQWxlcnRzIikpOwpjb25zdCBTcGVjaWFsdGllcyA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL21lZGljYWwvU3BlY2lhbHRpZXMiKSk7CmNvbnN0IERpYWdub3NlcyA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL21lZGljYWwvRGlhZ25vc2VzIikpOwpjb25zdCBNZWRpY2F0aW9ucyA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL21lZGljYWwvTWVkaWNhdGlvbnMiKSk7CmNvbnN0IFByb2NlZHVyZXNQYWdlID0gbGF6eSgoKSA9PiBpbXBvcnQoIkAvcGFnZXMvbWVkaWNhbC9Qcm9jZWR1cmVzIikpOwpjb25zdCBNZWRpY2FsUmVjb3JkcyA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL21lZGljYWwvTWVkaWNhbFJlY29yZHMiKSk7CmNvbnN0IFF1aWNrQ29uc3VsdCA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL21lZGljYWwvUXVpY2tDb25zdWx0IikpOwpjb25zdCBNZWRpY2FsUmVjb3JkRWRpdG9yID0gbGF6eSgoKSA9PiBpbXBvcnQoIkAvcGFnZXMvbWVkaWNhbC9NZWRpY2FsUmVjb3JkRWRpdG9yIikpOwpjb25zdCBDb25zdWx0YXRpb25EYXNoYm9hcmQgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9tZWRpY2FsL0NvbnN1bHRhdGlvbkRhc2hib2FyZCIpKTsKY29uc3QgUHJlc2NyaXB0aW9ucyA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL21lZGljYWwvUHJlc2NyaXB0aW9ucyIpKTsKY29uc3QgUHJlc2NyaXB0aW9uRGV0YWlsID0gbGF6eSgoKSA9PiBpbXBvcnQoIkAvcGFnZXMvbWVkaWNhbC9QcmVzY3JpcHRpb25EZXRhaWwiKSk7CmNvbnN0IERvY3VtZW50c0NlbnRlciA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL21lZGljYWwvRG9jdW1lbnRzQ2VudGVyIikpOwpjb25zdCBQYXRpZW50RGVudGFsID0gbGF6eSgoKSA9PiBpbXBvcnQoIkAvcGFnZXMvcGF0aWVudHMvUGF0aWVudERlbnRhbCIpKTsKY29uc3QgRGVwYXJ0bWVudHMgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9oci9EZXBhcnRtZW50cyIpKTsKY29uc3QgUG9zaXRpb25zID0gbGF6eSgoKSA9PiBpbXBvcnQoIkAvcGFnZXMvaHIvUG9zaXRpb25zIikpOwpjb25zdCBTdGFmZiA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL2hyL1N0YWZmIikpOwpjb25zdCBTdGFmZkRldGFpbCA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL2hyL1N0YWZmRGV0YWlsIikpOwpjb25zdCBTY2hlZHVsZXMgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9oci9TY2hlZHVsZXMiKSk7CmNvbnN0IEF0dGVuZGFuY2UgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9oci9BdHRlbmRhbmNlIikpOwpjb25zdCBMZWF2ZXMgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9oci9MZWF2ZXMiKSk7CmNvbnN0IFBheXJvbGwgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9oci9QYXlyb2xsIikpOwpjb25zdCBQZW5kaW5nQ29tbWlzc2lvbnMgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9oci9QZW5kaW5nQ29tbWlzc2lvbnMiKSk7CmNvbnN0IFBlcmZvcm1hbmNlID0gbGF6eSgoKSA9PiBpbXBvcnQoIkAvcGFnZXMvaHIvUGVyZm9ybWFuY2UiKSk7CmNvbnN0IFRhcmdldEJvbnVzZXMgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9oci9UYXJnZXRCb251c2VzIikpOwpjb25zdCBDb3Vwb25zID0gbGF6eSgoKSA9PiBpbXBvcnQoIkAvcGFnZXMvY291cG9ucy9Db3Vwb25zIikpOwpjb25zdCBSZXBvcnRzRGFzaGJvYXJkID0gbGF6eSgoKSA9PiBpbXBvcnQoIkAvcGFnZXMvcmVwb3J0cy9SZXBvcnRzRGFzaGJvYXJkIikpOwpjb25zdCBGaW5hbmNpYWxSZXBvcnRzID0gbGF6eSgoKSA9PiBpbXBvcnQoIkAvcGFnZXMvcmVwb3J0cy9GaW5hbmNpYWxSZXBvcnRzIikpOwpjb25zdCBPcGVyYXRpb25hbFJlcG9ydHMgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9yZXBvcnRzL09wZXJhdGlvbmFsUmVwb3J0cyIpKTsKY29uc3QgTWVkaWNhbFJlcG9ydHMgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9yZXBvcnRzL01lZGljYWxSZXBvcnRzIikpOwpjb25zdCBIUlJlcG9ydHMgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9yZXBvcnRzL0hSUmVwb3J0cyIpKTsKY29uc3QgSW52ZW50b3J5UmVwb3J0cyA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL3JlcG9ydHMvSW52ZW50b3J5UmVwb3J0cyIpKTsKY29uc3QgU2NoZWR1bGVkUmVwb3J0cyA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL3JlcG9ydHMvU2NoZWR1bGVkUmVwb3J0cyIpKTsKY29uc3QgRG9jdG9yQ29tbWlzc2lvbnMgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9yZXBvcnRzL0RvY3RvckNvbW1pc3Npb25zIikpOwpjb25zdCBEb2N0b3JQZXJmb3JtYW5jZSA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL3JlcG9ydHMvRG9jdG9yUGVyZm9ybWFuY2UiKSk7CmNvbnN0IEdlbmVyYWxTZXR0aW5ncyA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL3NldHRpbmdzL0dlbmVyYWxTZXR0aW5ncyIpKTsKY29uc3QgQXBwb2ludG1lbnRTZXR0aW5ncyA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL3NldHRpbmdzL0FwcG9pbnRtZW50U2V0dGluZ3MiKSk7CmNvbnN0IEludm9pY2VTZXR0aW5ncyA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL3NldHRpbmdzL0ludm9pY2VTZXR0aW5ncyIpKTsKY29uc3QgUGF5bWVudE1ldGhvZHNQYWdlID0gbGF6eSgoKSA9PiBpbXBvcnQoIkAvcGFnZXMvc2V0dGluZ3MvUGF5bWVudE1ldGhvZHMiKSk7CmNvbnN0IFNlcnZpY2VzUGFnZSA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL3NldHRpbmdzL1NlcnZpY2VzIikpOwpjb25zdCBJbnN1cmFuY2VDb21wYW5pZXMgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9zZXR0aW5ncy9JbnN1cmFuY2VDb21wYW5pZXMiKSk7CmNvbnN0IEluc3VyYW5jZUNvbnRyYWN0cyA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL3NldHRpbmdzL0luc3VyYW5jZUNvbnRyYWN0cyIpKTsKY29uc3QgTm90aWZpY2F0aW9uU2V0dGluZ3MgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9zZXR0aW5ncy9Ob3RpZmljYXRpb25TZXR0aW5ncyIpKTsKY29uc3QgUmVtaW5kZXJzU2V0dGluZ3MgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9zZXR0aW5ncy9SZW1pbmRlcnNTZXR0aW5ncyIpKTsKY29uc3QgQXV0b21hdGVkQ29tbXVuaWNhdGlvbiA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL3NldHRpbmdzL0F1dG9tYXRlZENvbW11bmljYXRpb24iKSk7CmNvbnN0IFRlbXBsYXRlcyA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL3NldHRpbmdzL1RlbXBsYXRlcyIpKTsKY29uc3QgQ29tbXVuaWNhdGlvbiA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL3NldHRpbmdzL0NvbW11bmljYXRpb24iKSk7CmNvbnN0IExhbmd1YWdlc1BhZ2UgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9zZXR0aW5ncy9MYW5ndWFnZXMiKSk7CmNvbnN0IFJvbGVQZXJtaXNzaW9ucyA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL3NldHRpbmdzL1JvbGVQZXJtaXNzaW9ucyIpKTsKY29uc3QgVXNlck1hbmFnZW1lbnQgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9zZXR0aW5ncy9Vc2VyTWFuYWdlbWVudCIpKTsKY29uc3QgQmFja3VwRXhwb3J0ID0gbGF6eSgoKSA9PiBpbXBvcnQoIkAvcGFnZXMvc2V0dGluZ3MvQmFja3VwRXhwb3J0IikpOwpjb25zdCBBdWRpdExvZ3MgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9zZXR0aW5ncy9BdWRpdExvZ3MiKSk7CmNvbnN0IFN5c3RlbUluZm8gPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9zZXR0aW5ncy9TeXN0ZW1JbmZvIikpOwpjb25zdCBRQUlkZW50aXRpZXMgPSBsYXp5KCgpID0+IGltcG9ydCgiQC9wYWdlcy9zZXR0aW5ncy9RQUlkZW50aXRpZXMiKSk7CmNvbnN0IFN5c3RlbVNlbGZBdWRpdCA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL3N5c3RlbS9TeXN0ZW1TZWxmQXVkaXQiKSk7CmNvbnN0IEJyYW5jaGVzID0gbGF6eSgoKSA9PiBpbXBvcnQoIkAvcGFnZXMvYnJhbmNoZXMvQnJhbmNoZXMiKSk7CmNvbnN0IEJyYW5jaERhc2hib2FyZCA9IGxhenkoKCkgPT4gaW1wb3J0KCJAL3BhZ2VzL2JyYW5jaGVzL0JyYW5jaERhc2hib2FyZCIpKTsKY29uc3QgUmVtaW5kZXJzID0gbGF6eSgoKSA9PiBpbXBvcnQoIkAvcGFnZXMvcmVtaW5kZXJzL1JlbWluZGVycyIpKTsKY29uc3QgU2NoZWR1bGVkUmVtaW5kZXJzID0gbGF6eSgoKSA9PiBpbXBvcnQoIkAvcGFnZXMvcmVtaW5kZXJzL1NjaGVkdWxlZFJlbWluZGVycyIpKTsKCmNvbnN0IHF1ZXJ5Q2xpZW50ID0gbmV3IFF1ZXJ5Q2xpZW50KHsKICBkZWZhdWx0T3B0aW9uczogewogICAgcXVlcmllczogewogICAgICBzdGFsZVRpbWU6IDYwXzAwMCwKICAgICAgZ2NUaW1lOiA1ICogNjBfMDAwLAogICAgICByZWZldGNoT25XaW5kb3dGb2N1czogZmFsc2UsCiAgICAgIHJldHJ5OiAxLAogICAgfSwKICB9LAp9KTsKCmZ1bmN0aW9uIFJvdXRlTG9hZGVyKCkgewogIHJldHVybiAoCiAgICA8ZGl2IGNsYXNzTmFtZT0ibWluLWgtc2NyZWVuIGZsZXggaXRlbXMtY2VudGVyIGp1c3RpZnktY2VudGVyIGJnLWJhY2tncm91bmQiPgogICAgICA8ZGl2IGNsYXNzTmFtZT0ic2l6ZS0xMCByb3VuZGVkLWZ1bGwgYm9yZGVyLTQgYm9yZGVyLXByaW1hcnkvMjAgYm9yZGVyLXQtcHJpbWFyeSBhbmltYXRlLXNwaW4iIC8+CiAgICA8L2Rpdj4KICApOwp9CgpmdW5jdGlvbiBBcHBDb250ZW50KCkgewogIHVzZUVmZmVjdCgoKSA9PiBhdHRhY2hHbG9iYWxSZWZyZXNoTGlzdGVuZXJzKCksIFtdKTsKCiAgcmV0dXJuICgKICAgIDxUb29sdGlwUHJvdmlkZXI+CiAgICAgIDxUb2FzdGVyIC8+CiAgICAgIDxTb25uZXIgLz4KICAgICAgPEJyb3dzZXJSb3V0ZXI+CiAgICAgICAgPFN1c3BlbnNlIGZhbGxiYWNrPXs8Um91dGVMb2FkZXIgLz59PgogICAgICAgICAgPFJvdXRlcz4KICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9hdXRoIiBlbGVtZW50PXs8QXV0aFBhZ2UgLz59IC8+CiAgICAgICAgICAgIDxSb3V0ZSBwYXRoPSIvYXV0aC9jYWxsYmFjayIgZWxlbWVudD17PEF1dGhDYWxsYmFjayAvPn0gLz4KICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9yZXNldC1wYXNzd29yZCIgZWxlbWVudD17PFJlc2V0UGFzc3dvcmQgLz59IC8+CiAgICAgICAgICAgIDxSb3V0ZSBwYXRoPSIvcHJpY2luZyIgZWxlbWVudD17PFByaWNpbmcgLz59IC8+CiAgICAgICAgICAgIDxSb3V0ZSBwYXRoPSIvdHJ1c3QiIGVsZW1lbnQ9ezxUcnVzdCAvPn0gLz4KICAgICAgICAgICAgPFJvdXRlCiAgICAgICAgICAgICAgZWxlbWVudD17CiAgICAgICAgICAgICAgICA8UHJvdGVjdGVkUm91dGU+CiAgICAgICAgICAgICAgICAgIDxBcHBTaGVsbCAvPgogICAgICAgICAgICAgICAgPC9Qcm90ZWN0ZWRSb3V0ZT4KICAgICAgICAgICAgICB9CiAgICAgICAgICAgID4KICAgICAgICAgICAgICB7LyogVGhlIGxhbmRpbmcgcGFnZSBpcyByZWFjaGFibGUgYnkgZXZlcnkgYXV0aGVudGljYXRlZCB1c2VyLiBObyBzaW5nbGUKICAgICAgICAgICAgICAgICAgcGVybWlzc2lvbiBpcyBoZWxkIGJ5IGFsbCByb2xlcywgYW5kIHJvdy1sZXZlbCBzZWN1cml0eSBhbHJlYWR5IGxpbWl0cwogICAgICAgICAgICAgICAgICB3aGF0IGVhY2ggb25lIHNlZXMgaW5zaWRlIGl0LiAqL30KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iLyIgZWxlbWVudD17PERhc2hib2FyZCAvPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL3BhdGllbnRzIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlPjxQYXRpZW50c1BhZ2UgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9wYXRpZW50cy86aWQiIGVsZW1lbnQ9ezxQZXJtaXNzaW9uUm91dGU+PFBhdGllbnRQcm9maWxlIC8+PC9QZXJtaXNzaW9uUm91dGU+fSAvPgogICAgICAgICAgICAgIDxSb3V0ZSBwYXRoPSIvY2FsZW5kYXIiIGVsZW1lbnQ9ezxQZXJtaXNzaW9uUm91dGU+PENhbGVuZGFyUGFnZSAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL3F1ZXVlIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlPjxRdWV1ZVBhZ2UgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9xdWV1ZS9hdWRpdCIgZWxlbWVudD17PFBlcm1pc3Npb25Sb3V0ZT48UXVldWVBdWRpdFBhZ2UgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9xdWV1ZS9zZWxmLWF1ZGl0IiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlIGFkbWluT25seT48UXVldWVTZWxmQXVkaXRQYWdlIC8+PC9QZXJtaXNzaW9uUm91dGU+fSAvPgogICAgICAgICAgICAgIDxSb3V0ZSBwYXRoPSIvYXBwb2ludG1lbnRzLzphcHBvaW50bWVudElkIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlPjxBcHBvaW50bWVudERldGFpbFBhZ2UgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9pbnZvaWNlcyIgZWxlbWVudD17PFBlcm1pc3Npb25Sb3V0ZT48SW52b2ljZXMgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9pbnZvaWNlcy9vdXRzdGFuZGluZyIgZWxlbWVudD17PFBlcm1pc3Npb25Sb3V0ZT48T3V0c3RhbmRpbmdEZWJ0cyAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL2ludm9pY2VzLzppZCIgZWxlbWVudD17PFBlcm1pc3Npb25Sb3V0ZT48SW52b2ljZURldGFpbCAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL3BheW1lbnRzIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlPjxQYXltZW50cyAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL3RyZWFzdXJ5IiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlPjxUcmVhc3VyeSAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL3RyZWFzdXJ5L2RhaWx5LWNsb3NlIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlPjxUcmVhc3VyeURhaWx5Q2xvc2UgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9leHBlbnNlcyIgZWxlbWVudD17PFBlcm1pc3Npb25Sb3V0ZT48RXhwZW5zZXMgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9leHBlbnNlcy9zZWxmLWF1ZGl0IiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlIGFkbWluT25seT48RXhwZW5zZVNlbGZBdWRpdCAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL3BoeXNpbyIgZWxlbWVudD17PFBlcm1pc3Npb25Sb3V0ZT48UGh5c2lvQ2FzZXMgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9waHlzaW8vZGFzaGJvYXJkIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlPjxQaHlzaW9EYXNoYm9hcmQgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9waHlzaW8vcmVwb3J0cyIgZWxlbWVudD17PFBlcm1pc3Npb25Sb3V0ZT48UGh5c2lvUmVwb3J0cyAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL3BoeXNpby9mb2xsb3d1cHMiIGVsZW1lbnQ9ezxQZXJtaXNzaW9uUm91dGU+PFBoeXNpb0ZvbGxvd3VwcyAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL3BoeXNpby86aWQiIGVsZW1lbnQ9ezxQZXJtaXNzaW9uUm91dGU+PFBoeXNpb0Nhc2VEZXRhaWwgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9jb3Vwb25zIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlPjxDb3Vwb25zIC8+PC9QZXJtaXNzaW9uUm91dGU+fSAvPgogICAgICAgICAgICAgIDxSb3V0ZSBwYXRoPSIvcmVtaW5kZXJzIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlPjxSZW1pbmRlcnMgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9yZW1pbmRlcnMvc2NoZWR1bGVkIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlPjxSZW1pbmRlcnMgLz48L1Blcm1pc3Npb25Sb3V0ZT59PgogICAgICAgICAgICAgICAgPFJvdXRlIGluZGV4IGVsZW1lbnQ9ezxTY2hlZHVsZWRSZW1pbmRlcnMgLz59IC8+CiAgICAgICAgICAgICAgPC9Sb3V0ZT4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL2ludmVudG9yeSIgZWxlbWVudD17PFBlcm1pc3Npb25Sb3V0ZT48U3RvY2tPdmVydmlldyAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL2ludmVudG9yeS9zdG9jayIgZWxlbWVudD17PFBlcm1pc3Npb25Sb3V0ZT48U3RvY2tPdmVydmlldyAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL2ludmVudG9yeS9wcm9kdWN0cyIgZWxlbWVudD17PFBlcm1pc3Npb25Sb3V0ZT48UHJvZHVjdHMgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9pbnZlbnRvcnkvcHJvZHVjdHMvOmlkIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlPjxQcm9kdWN0RGV0YWlsIC8+PC9QZXJtaXNzaW9uUm91dGU+fSAvPgogICAgICAgICAgICAgIDxSb3V0ZSBwYXRoPSIvaW52ZW50b3J5L2NhdGVnb3JpZXMiIGVsZW1lbnQ9ezxQZXJtaXNzaW9uUm91dGU+PENhdGVnb3JpZXMgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9pbnZlbnRvcnkvc3VwcGxpZXJzIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlPjxTdXBwbGllcnMgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9pbnZlbnRvcnkvcHVyY2hhc2Utb3JkZXJzIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlPjxQdXJjaGFzZU9yZGVycyAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL2ludmVudG9yeS9wdXJjaGFzZS1vcmRlcnMvOmlkIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlPjxQdXJjaGFzZU9yZGVyRGV0YWlsIC8+PC9QZXJtaXNzaW9uUm91dGU+fSAvPgogICAgICAgICAgICAgIDxSb3V0ZSBwYXRoPSIvaW52ZW50b3J5L2FsZXJ0cyIgZWxlbWVudD17PFBlcm1pc3Npb25Sb3V0ZT48QWxlcnRzIC8+PC9QZXJtaXNzaW9uUm91dGU+fSAvPgogICAgICAgICAgICAgIDxSb3V0ZSBwYXRoPSIvbWVkaWNhbC9yZWNvcmRzIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlPjxNZWRpY2FsUmVjb3JkcyAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL21lZGljYWwvcmVjb3Jkcy86aWQiIGVsZW1lbnQ9ezxQZXJtaXNzaW9uUm91dGU+PE1lZGljYWxSZWNvcmRFZGl0b3IgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9tZWRpY2FsL2NvbnN1bHRhdGlvbi86cmVjb3JkSWQiIGVsZW1lbnQ9ezxQZXJtaXNzaW9uUm91dGU+PENvbnN1bHRhdGlvbkRhc2hib2FyZCAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL21lZGljYWwvcXVpY2stY29uc3VsdCIgZWxlbWVudD17PFBlcm1pc3Npb25Sb3V0ZT48UXVpY2tDb25zdWx0IC8+PC9QZXJtaXNzaW9uUm91dGU+fSAvPgogICAgICAgICAgICAgIDxSb3V0ZSBwYXRoPSIvbWVkaWNhbC9wcmVzY3JpcHRpb25zIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlPjxQcmVzY3JpcHRpb25zIC8+PC9QZXJtaXNzaW9uUm91dGU+fSAvPgogICAgICAgICAgICAgIDxSb3V0ZSBwYXRoPSIvbWVkaWNhbC9wcmVzY3JpcHRpb25zLzppZCIgZWxlbWVudD17PFBlcm1pc3Npb25Sb3V0ZT48UHJlc2NyaXB0aW9uRGV0YWlsIC8+PC9QZXJtaXNzaW9uUm91dGU+fSAvPgogICAgICAgICAgICAgIDxSb3V0ZSBwYXRoPSIvbWVkaWNhbC9kb2N1bWVudHMiIGVsZW1lbnQ9ezxQZXJtaXNzaW9uUm91dGU+PERvY3VtZW50c0NlbnRlciAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL3BhdGllbnRzLzppZC9kZW50YWwiIGVsZW1lbnQ9ezxQZXJtaXNzaW9uUm91dGU+PFBhdGllbnREZW50YWwgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9tZWRpY2FsL3NwZWNpYWx0aWVzIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlPjxTcGVjaWFsdGllcyAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL21lZGljYWwvZGlhZ25vc2VzIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlPjxEaWFnbm9zZXMgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9tZWRpY2FsL21lZGljYXRpb25zIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlPjxNZWRpY2F0aW9ucyAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL21lZGljYWwvcHJvY2VkdXJlcyIgZWxlbWVudD17PFBlcm1pc3Npb25Sb3V0ZT48UHJvY2VkdXJlc1BhZ2UgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9oci9kZXBhcnRtZW50cyIgZWxlbWVudD17PFBlcm1pc3Npb25Sb3V0ZT48RGVwYXJ0bWVudHMgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9oci9wb3NpdGlvbnMiIGVsZW1lbnQ9ezxQZXJtaXNzaW9uUm91dGU+PFBvc2l0aW9ucyAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL2hyL3N0YWZmIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlPjxTdGFmZiAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL2hyL3N0YWZmLzppZCIgZWxlbWVudD17PFBlcm1pc3Npb25Sb3V0ZT48U3RhZmZEZXRhaWwgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9oci9zY2hlZHVsZXMiIGVsZW1lbnQ9ezxQZXJtaXNzaW9uUm91dGU+PFNjaGVkdWxlcyAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL2hyL2F0dGVuZGFuY2UiIGVsZW1lbnQ9ezxQZXJtaXNzaW9uUm91dGU+PEF0dGVuZGFuY2UgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9oci9sZWF2ZXMiIGVsZW1lbnQ9ezxQZXJtaXNzaW9uUm91dGU+PExlYXZlcyAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL2hyL3BheXJvbGwiIGVsZW1lbnQ9ezxQZXJtaXNzaW9uUm91dGU+PFBheXJvbGwgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9oci9wZW5kaW5nLWNvbW1pc3Npb25zIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlPjxQZW5kaW5nQ29tbWlzc2lvbnMgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9oci9wZXJmb3JtYW5jZSIgZWxlbWVudD17PFBlcm1pc3Npb25Sb3V0ZT48UGVyZm9ybWFuY2UgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9oci90YXJnZXQtYm9udXNlcyIgZWxlbWVudD17PFBlcm1pc3Npb25Sb3V0ZT48VGFyZ2V0Qm9udXNlcyAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL3JlcG9ydHMiIGVsZW1lbnQ9ezxQZXJtaXNzaW9uUm91dGU+PFJlcG9ydHNEYXNoYm9hcmQgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9yZXBvcnRzL2ZpbmFuY2lhbCIgZWxlbWVudD17PFBlcm1pc3Npb25Sb3V0ZT48RmluYW5jaWFsUmVwb3J0cyAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL3JlcG9ydHMvb3BlcmF0aW9uYWwiIGVsZW1lbnQ9ezxQZXJtaXNzaW9uUm91dGU+PE9wZXJhdGlvbmFsUmVwb3J0cyAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL3JlcG9ydHMvbWVkaWNhbCIgZWxlbWVudD17PFBlcm1pc3Npb25Sb3V0ZT48TWVkaWNhbFJlcG9ydHMgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9yZXBvcnRzL2hyIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlPjxIUlJlcG9ydHMgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9yZXBvcnRzL2ludmVudG9yeSIgZWxlbWVudD17PFBlcm1pc3Npb25Sb3V0ZT48SW52ZW50b3J5UmVwb3J0cyAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL3JlcG9ydHMvc2NoZWR1bGVkIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlPjxTY2hlZHVsZWRSZXBvcnRzIC8+PC9QZXJtaXNzaW9uUm91dGU+fSAvPgogICAgICAgICAgICAgIDxSb3V0ZSBwYXRoPSIvcmVwb3J0cy9jb21taXNzaW9ucyIgZWxlbWVudD17PFBlcm1pc3Npb25Sb3V0ZT48RG9jdG9yQ29tbWlzc2lvbnMgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9yZXBvcnRzL2RvY3Rvci1wZXJmb3JtYW5jZSIgZWxlbWVudD17PFBlcm1pc3Npb25Sb3V0ZT48RG9jdG9yUGVyZm9ybWFuY2UgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9icmFuY2hlcyIgZWxlbWVudD17PFBlcm1pc3Npb25Sb3V0ZSBhZG1pbk9ubHk+PEJyYW5jaGVzIC8+PC9QZXJtaXNzaW9uUm91dGU+fSAvPgogICAgICAgICAgICAgIDxSb3V0ZSBwYXRoPSIvYnJhbmNoZXMvZGFzaGJvYXJkIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlIGFkbWluT25seT48QnJhbmNoRGFzaGJvYXJkIC8+PC9QZXJtaXNzaW9uUm91dGU+fSAvPgogICAgICAgICAgICAgIDxSb3V0ZSBwYXRoPSIvc2V0dGluZ3MvYnJhbmNoZXMiIGVsZW1lbnQ9ezxQZXJtaXNzaW9uUm91dGU+PEJyYW5jaGVzIC8+PC9QZXJtaXNzaW9uUm91dGU+fSAvPgogICAgICAgICAgICAgIDxSb3V0ZSBwYXRoPSIvc2V0dGluZ3MiIGVsZW1lbnQ9ezxQZXJtaXNzaW9uUm91dGUgYWRtaW5Pbmx5PjxHZW5lcmFsU2V0dGluZ3MgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9zZXR0aW5ncy9nZW5lcmFsIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlIGFkbWluT25seT48R2VuZXJhbFNldHRpbmdzIC8+PC9QZXJtaXNzaW9uUm91dGU+fSAvPgogICAgICAgICAgICAgIDxSb3V0ZSBwYXRoPSIvc2V0dGluZ3MvYXBwb2ludG1lbnRzIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlIGFkbWluT25seT48QXBwb2ludG1lbnRTZXR0aW5ncyAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL3NldHRpbmdzL2ludm9pY2VzIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlIGFkbWluT25seT48SW52b2ljZVNldHRpbmdzIC8+PC9QZXJtaXNzaW9uUm91dGU+fSAvPgogICAgICAgICAgICAgIDxSb3V0ZSBwYXRoPSIvc2V0dGluZ3MvcGF5bWVudHMiIGVsZW1lbnQ9ezxQZXJtaXNzaW9uUm91dGUgYWRtaW5Pbmx5PjxQYXltZW50TWV0aG9kc1BhZ2UgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9zZXR0aW5ncy9zZXJ2aWNlcyIgZWxlbWVudD17PFBlcm1pc3Npb25Sb3V0ZSBhZG1pbk9ubHk+PFNlcnZpY2VzUGFnZSAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL3NldHRpbmdzL2luc3VyYW5jZSIgZWxlbWVudD17PFBlcm1pc3Npb25Sb3V0ZSBhZG1pbk9ubHk+PEluc3VyYW5jZUNvbXBhbmllcyAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL3NldHRpbmdzL2luc3VyYW5jZS1jb250cmFjdHMiIGVsZW1lbnQ9ezxQZXJtaXNzaW9uUm91dGUgYWRtaW5Pbmx5PjxJbnN1cmFuY2VDb250cmFjdHMgLz48L1Blcm1pc3Npb25Sb3V0ZT59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9zZXR0aW5ncy9jb21tdW5pY2F0aW9uIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlIGFkbWluT25seT48Q29tbXVuaWNhdGlvbiAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICB7LyogQmFja3dhcmQtY29tcGF0aWJsZSByZWRpcmVjdHMgZnJvbSB0aGUgbGVnYWN5IDYgcm91dGVzICovfQogICAgICAgICAgICAgIDxSb3V0ZSBwYXRoPSIvc2V0dGluZ3Mvbm90aWZpY2F0aW9ucyIgZWxlbWVudD17PE5hdmlnYXRlIHRvPSIvc2V0dGluZ3MvY29tbXVuaWNhdGlvbj90YWI9bm90aWZpY2F0aW9ucyIgcmVwbGFjZSAvPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL3NldHRpbmdzL3JlbWluZGVycyIgZWxlbWVudD17PE5hdmlnYXRlIHRvPSIvc2V0dGluZ3MvY29tbXVuaWNhdGlvbj90YWI9cmVtaW5kZXJzIiByZXBsYWNlIC8+fSAvPgogICAgICAgICAgICAgIDxSb3V0ZSBwYXRoPSIvc2V0dGluZ3MvYXV0b21hdGVkLWNvbW0iIGVsZW1lbnQ9ezxOYXZpZ2F0ZSB0bz0iL3NldHRpbmdzL2NvbW11bmljYXRpb24/dGFiPWF1dG9tYXRlZCIgcmVwbGFjZSAvPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL3NldHRpbmdzL3RlbXBsYXRlcy9lbWFpbCIgZWxlbWVudD17PE5hdmlnYXRlIHRvPSIvc2V0dGluZ3MvY29tbXVuaWNhdGlvbj90YWI9ZW1haWwiIHJlcGxhY2UgLz59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9zZXR0aW5ncy90ZW1wbGF0ZXMvc21zIiBlbGVtZW50PXs8TmF2aWdhdGUgdG89Ii9zZXR0aW5ncy9jb21tdW5pY2F0aW9uP3RhYj1zbXMiIHJlcGxhY2UgLz59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9zZXR0aW5ncy90ZW1wbGF0ZXMvd2hhdHNhcHAiIGVsZW1lbnQ9ezxOYXZpZ2F0ZSB0bz0iL3NldHRpbmdzL2NvbW11bmljYXRpb24/dGFiPXdoYXRzYXBwIiByZXBsYWNlIC8+fSAvPgogICAgICAgICAgICAgIDxSb3V0ZSBwYXRoPSIvc2V0dGluZ3MvbGFuZ3VhZ2VzIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlIGFkbWluT25seT48TGFuZ3VhZ2VzUGFnZSAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL3NldHRpbmdzL3JvbGVzIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlIGFkbWluT25seT48Um9sZVBlcm1pc3Npb25zIC8+PC9QZXJtaXNzaW9uUm91dGU+fSAvPgogICAgICAgICAgICAgIDxSb3V0ZSBwYXRoPSIvc2V0dGluZ3MvdXNlcnMiIGVsZW1lbnQ9ezxQZXJtaXNzaW9uUm91dGUgYWRtaW5Pbmx5PjxVc2VyTWFuYWdlbWVudCAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL3NldHRpbmdzL2JhY2t1cCIgZWxlbWVudD17PFBlcm1pc3Npb25Sb3V0ZSBhZG1pbk9ubHk+PEJhY2t1cEV4cG9ydCAvPjwvUGVybWlzc2lvblJvdXRlPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL3NldHRpbmdzL2F1ZGl0IiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlIGFkbWluT25seT48QXVkaXRMb2dzIC8+PC9QZXJtaXNzaW9uUm91dGU+fSAvPgogICAgICAgICAgICAgIDxSb3V0ZSBwYXRoPSIvc2V0dGluZ3MvYXVkaXQtbG9ncyIgZWxlbWVudD17PE5hdmlnYXRlIHRvPSIvc2V0dGluZ3MvYXVkaXQiIHJlcGxhY2UgLz59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9zZXR0aW5ncy9zeXN0ZW0iIGVsZW1lbnQ9ezxQZXJtaXNzaW9uUm91dGUgYWRtaW5Pbmx5PjxTeXN0ZW1JbmZvIC8+PC9QZXJtaXNzaW9uUm91dGU+fSAvPgogICAgICAgICAgICAgIDxSb3V0ZSBwYXRoPSIvc2V0dGluZ3Mvc3lzdGVtLWluZm8iIGVsZW1lbnQ9ezxOYXZpZ2F0ZSB0bz0iL3NldHRpbmdzL3N5c3RlbSIgcmVwbGFjZSAvPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL3NldHRpbmdzL3FhIiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlIGFkbWluT25seT48UUFJZGVudGl0aWVzIC8+PC9QZXJtaXNzaW9uUm91dGU+fSAvPgogICAgICAgICAgICAgIDxSb3V0ZSBwYXRoPSIvY29tbWlzc2lvbnMiIGVsZW1lbnQ9ezxOYXZpZ2F0ZSB0bz0iL3JlcG9ydHMvY29tbWlzc2lvbnMiIHJlcGxhY2UgLz59IC8+CiAgICAgICAgICAgICAgPFJvdXRlIHBhdGg9Ii9tZWRpY2FsLXJlY29yZHMiIGVsZW1lbnQ9ezxOYXZpZ2F0ZSB0bz0iL21lZGljYWwvcmVjb3JkcyIgcmVwbGFjZSAvPn0gLz4KICAgICAgICAgICAgICA8Um91dGUgcGF0aD0iL3N5c3RlbS9zZWxmLWF1ZGl0IiBlbGVtZW50PXs8UGVybWlzc2lvblJvdXRlIGFkbWluT25seT48U3lzdGVtU2VsZkF1ZGl0IC8+PC9QZXJtaXNzaW9uUm91dGU+fSAvPgogICAgICAgICAgICA8L1JvdXRlPgogICAgICAgICAgICA8Um91dGUgcGF0aD0iKiIgZWxlbWVudD17PE5vdEZvdW5kIC8+fSAvPgogICAgICAgICAgPC9Sb3V0ZXM+CiAgICAgICAgPC9TdXNwZW5zZT4KICAgICAgPC9Ccm93c2VyUm91dGVyPgogICAgPC9Ub29sdGlwUHJvdmlkZXI+CiAgKTsKfQoKY29uc3QgQXBwID0gKCkgPT4gKAogIDxFcnJvckJvdW5kYXJ5PgogICAgPFF1ZXJ5Q2xpZW50UHJvdmlkZXIgY2xpZW50PXtxdWVyeUNsaWVudH0+CiAgICAgIDxJMThuUHJvdmlkZXI+CiAgICAgICAgPEF1dGhQcm92aWRlcj4KICAgICAgICAgIDxCcmFuY2hQcm92aWRlcj4KICAgICAgICAgICAgPEFwcENvbnRlbnQgLz4KICAgICAgICAgIDwvQnJhbmNoUHJvdmlkZXI+CiAgICAgICAgPC9BdXRoUHJvdmlkZXI+CiAgICAgIDwvSTE4blByb3ZpZGVyPgogICAgPC9RdWVyeUNsaWVudFByb3ZpZGVyPgogIDwvRXJyb3JCb3VuZGFyeT4KKTsKCmV4cG9ydCBkZWZhdWx0IEFwcDsK
+import { Suspense, lazy, useEffect } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { I18nProvider } from "@/contexts/I18nContext";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { BranchProvider } from "@/contexts/BranchContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
+import { PermissionRoute } from "@/components/PermissionRoute";
+import { attachGlobalRefreshListeners } from "@/lib/dataSync";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+
+const NotFound = lazy(() => import("./pages/NotFound.tsx"));
+const AppShell = lazy(() => import("@/components/layout/AppShell"));
+const AuthPage = lazy(() => import("@/pages/auth/Auth"));
+const AuthCallback = lazy(() => import("@/pages/auth/AuthCallback"));
+const ResetPassword = lazy(() => import("@/pages/auth/ResetPassword"));
+const Pricing = lazy(() => import("@/pages/pricing/Pricing"));
+const Trust = lazy(() => import("@/pages/Trust"));
+const Dashboard = lazy(() => import("@/pages/dashboard/Dashboard"));
+const PatientsPage = lazy(() => import("@/pages/patients/Patients"));
+const PatientProfile = lazy(() => import("@/pages/patients/PatientProfile"));
+const CalendarPage = lazy(() => import("@/pages/calendar/CalendarPage"));
+const QueuePage = lazy(() => import("@/pages/queue/Queue"));
+const QueueAuditPage = lazy(() => import("@/pages/queue/QueueAudit"));
+const QueueSelfAuditPage = lazy(() => import("@/pages/queue/QueueSelfAudit"));
+const AppointmentDetailPage = lazy(() => import("@/pages/appointments/AppointmentDetail"));
+const Invoices = lazy(() => import("@/pages/invoices/Invoices"));
+const InvoiceDetail = lazy(() => import("@/pages/invoices/InvoiceDetail"));
+const OutstandingDebts = lazy(() => import("@/pages/invoices/OutstandingDebts"));
+const Payments = lazy(() => import("@/pages/payments/Payments"));
+const Treasury = lazy(() => import("@/pages/treasury/Treasury"));
+const TreasuryDailyClose = lazy(() => import("@/pages/treasury/DailyClose"));
+const Expenses = lazy(() => import("@/pages/expenses/Expenses"));
+const ExpenseSelfAudit = lazy(() => import("@/pages/expenses/ExpenseSelfAudit"));
+const PhysioCases = lazy(() => import("@/pages/physio/PhysioCases"));
+const PhysioCaseDetail = lazy(() => import("@/pages/physio/PhysioCaseDetail"));
+const PhysioDashboard = lazy(() => import("@/pages/physio/PhysioDashboard"));
+const PhysioReports = lazy(() => import("@/pages/physio/PhysioReports"));
+const PhysioFollowups = lazy(() => import("@/pages/physio/PhysioFollowups"));
+const Products = lazy(() => import("@/pages/inventory/Products"));
+const ProductDetail = lazy(() => import("@/pages/inventory/ProductDetail"));
+const Categories = lazy(() => import("@/pages/inventory/Categories"));
+const Suppliers = lazy(() => import("@/pages/inventory/Suppliers"));
+const StockOverview = lazy(() => import("@/pages/inventory/StockOverview"));
+const PurchaseOrders = lazy(() => import("@/pages/inventory/PurchaseOrders"));
+const PurchaseOrderDetail = lazy(() => import("@/pages/inventory/PurchaseOrderDetail"));
+const Alerts = lazy(() => import("@/pages/inventory/Alerts"));
+const Specialties = lazy(() => import("@/pages/medical/Specialties"));
+const Diagnoses = lazy(() => import("@/pages/medical/Diagnoses"));
+const Medications = lazy(() => import("@/pages/medical/Medications"));
+const ProceduresPage = lazy(() => import("@/pages/medical/Procedures"));
+const MedicalRecords = lazy(() => import("@/pages/medical/MedicalRecords"));
+const QuickConsult = lazy(() => import("@/pages/medical/QuickConsult"));
+const MedicalRecordEditor = lazy(() => import("@/pages/medical/MedicalRecordEditor"));
+const ConsultationDashboard = lazy(() => import("@/pages/medical/ConsultationDashboard"));
+const Prescriptions = lazy(() => import("@/pages/medical/Prescriptions"));
+const PrescriptionDetail = lazy(() => import("@/pages/medical/PrescriptionDetail"));
+const DocumentsCenter = lazy(() => import("@/pages/medical/DocumentsCenter"));
+const PatientDental = lazy(() => import("@/pages/patients/PatientDental"));
+const Departments = lazy(() => import("@/pages/hr/Departments"));
+const Positions = lazy(() => import("@/pages/hr/Positions"));
+const Staff = lazy(() => import("@/pages/hr/Staff"));
+const StaffDetail = lazy(() => import("@/pages/hr/StaffDetail"));
+const Schedules = lazy(() => import("@/pages/hr/Schedules"));
+const Attendance = lazy(() => import("@/pages/hr/Attendance"));
+const Leaves = lazy(() => import("@/pages/hr/Leaves"));
+const Payroll = lazy(() => import("@/pages/hr/Payroll"));
+const PendingCommissions = lazy(() => import("@/pages/hr/PendingCommissions"));
+const Performance = lazy(() => import("@/pages/hr/Performance"));
+const TargetBonuses = lazy(() => import("@/pages/hr/TargetBonuses"));
+const Coupons = lazy(() => import("@/pages/coupons/Coupons"));
+const ReportsDashboard = lazy(() => import("@/pages/reports/ReportsDashboard"));
+const FinancialReports = lazy(() => import("@/pages/reports/FinancialReports"));
+const OperationalReports = lazy(() => import("@/pages/reports/OperationalReports"));
+const MedicalReports = lazy(() => import("@/pages/reports/MedicalReports"));
+const HRReports = lazy(() => import("@/pages/reports/HRReports"));
+const InventoryReports = lazy(() => import("@/pages/reports/InventoryReports"));
+const ScheduledReports = lazy(() => import("@/pages/reports/ScheduledReports"));
+const DoctorCommissions = lazy(() => import("@/pages/reports/DoctorCommissions"));
+const DoctorPerformance = lazy(() => import("@/pages/reports/DoctorPerformance"));
+const GeneralSettings = lazy(() => import("@/pages/settings/GeneralSettings"));
+const AppointmentSettings = lazy(() => import("@/pages/settings/AppointmentSettings"));
+const InvoiceSettings = lazy(() => import("@/pages/settings/InvoiceSettings"));
+const PaymentMethodsPage = lazy(() => import("@/pages/settings/PaymentMethods"));
+const ServicesPage = lazy(() => import("@/pages/settings/Services"));
+const InsuranceCompanies = lazy(() => import("@/pages/settings/InsuranceCompanies"));
+const InsuranceContracts = lazy(() => import("@/pages/settings/InsuranceContracts"));
+const NotificationSettings = lazy(() => import("@/pages/settings/NotificationSettings"));
+const RemindersSettings = lazy(() => import("@/pages/settings/RemindersSettings"));
+const AutomatedCommunication = lazy(() => import("@/pages/settings/AutomatedCommunication"));
+const Templates = lazy(() => import("@/pages/settings/Templates"));
+const Communication = lazy(() => import("@/pages/settings/Communication"));
+const LanguagesPage = lazy(() => import("@/pages/settings/Languages"));
+const RolePermissions = lazy(() => import("@/pages/settings/RolePermissions"));
+const UserManagement = lazy(() => import("@/pages/settings/UserManagement"));
+const BackupExport = lazy(() => import("@/pages/settings/BackupExport"));
+const AuditLogs = lazy(() => import("@/pages/settings/AuditLogs"));
+const SystemInfo = lazy(() => import("@/pages/settings/SystemInfo"));
+const QAIdentities = lazy(() => import("@/pages/settings/QAIdentities"));
+const SystemSelfAudit = lazy(() => import("@/pages/system/SystemSelfAudit"));
+const Branches = lazy(() => import("@/pages/branches/Branches"));
+const BranchDashboard = lazy(() => import("@/pages/branches/BranchDashboard"));
+const Reminders = lazy(() => import("@/pages/reminders/Reminders"));
+const ScheduledReminders = lazy(() => import("@/pages/reminders/ScheduledReminders"));
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,
+      gcTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
+
+function RouteLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="size-10 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+    </div>
+  );
+}
+
+function AppContent() {
+  useEffect(() => attachGlobalRefreshListeners(), []);
+
+  return (
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <Suspense fallback={<RouteLoader />}>
+          <Routes>
+            <Route path="/auth" element={<AuthPage />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/trust" element={<Trust />} />
+            <Route
+              element={
+                <ProtectedRoute>
+                  <AppShell />
+                </ProtectedRoute>
+              }
+            >
+              {/* The landing page is reachable by every authenticated user. No single
+                  permission is held by all roles, and row-level security already limits
+                  what each one sees inside it. */}
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/patients" element={<PermissionRoute><PatientsPage /></PermissionRoute>} />
+              <Route path="/patients/:id" element={<PermissionRoute><PatientProfile /></PermissionRoute>} />
+              <Route path="/calendar" element={<PermissionRoute><CalendarPage /></PermissionRoute>} />
+              <Route path="/queue" element={<PermissionRoute><QueuePage /></PermissionRoute>} />
+              <Route path="/queue/audit" element={<PermissionRoute><QueueAuditPage /></PermissionRoute>} />
+              <Route path="/queue/self-audit" element={<PermissionRoute adminOnly><QueueSelfAuditPage /></PermissionRoute>} />
+              <Route path="/appointments/:appointmentId" element={<PermissionRoute><AppointmentDetailPage /></PermissionRoute>} />
+              <Route path="/invoices" element={<PermissionRoute><Invoices /></PermissionRoute>} />
+              <Route path="/invoices/outstanding" element={<PermissionRoute><OutstandingDebts /></PermissionRoute>} />
+              <Route path="/invoices/:id" element={<PermissionRoute><InvoiceDetail /></PermissionRoute>} />
+              <Route path="/payments" element={<PermissionRoute><Payments /></PermissionRoute>} />
+              <Route path="/treasury" element={<PermissionRoute><Treasury /></PermissionRoute>} />
+              <Route path="/treasury/daily-close" element={<PermissionRoute><TreasuryDailyClose /></PermissionRoute>} />
+              <Route path="/expenses" element={<PermissionRoute><Expenses /></PermissionRoute>} />
+              <Route path="/expenses/self-audit" element={<PermissionRoute adminOnly><ExpenseSelfAudit /></PermissionRoute>} />
+              <Route path="/physio" element={<PermissionRoute><PhysioCases /></PermissionRoute>} />
+              <Route path="/physio/dashboard" element={<PermissionRoute><PhysioDashboard /></PermissionRoute>} />
+              <Route path="/physio/reports" element={<PermissionRoute><PhysioReports /></PermissionRoute>} />
+              <Route path="/physio/followups" element={<PermissionRoute><PhysioFollowups /></PermissionRoute>} />
+              <Route path="/physio/:id" element={<PermissionRoute><PhysioCaseDetail /></PermissionRoute>} />
+              <Route path="/coupons" element={<PermissionRoute><Coupons /></PermissionRoute>} />
+              <Route path="/reminders" element={<PermissionRoute><Reminders /></PermissionRoute>} />
+              <Route path="/reminders/scheduled" element={<PermissionRoute><Reminders /></PermissionRoute>}>
+                <Route index element={<ScheduledReminders />} />
+              </Route>
+              <Route path="/inventory" element={<PermissionRoute><StockOverview /></PermissionRoute>} />
+              <Route path="/inventory/stock" element={<PermissionRoute><StockOverview /></PermissionRoute>} />
+              <Route path="/inventory/products" element={<PermissionRoute><Products /></PermissionRoute>} />
+              <Route path="/inventory/products/:id" element={<PermissionRoute><ProductDetail /></PermissionRoute>} />
+              <Route path="/inventory/categories" element={<PermissionRoute><Categories /></PermissionRoute>} />
+              <Route path="/inventory/suppliers" element={<PermissionRoute><Suppliers /></PermissionRoute>} />
+              <Route path="/inventory/purchase-orders" element={<PermissionRoute><PurchaseOrders /></PermissionRoute>} />
+              <Route path="/inventory/purchase-orders/:id" element={<PermissionRoute><PurchaseOrderDetail /></PermissionRoute>} />
+              <Route path="/inventory/alerts" element={<PermissionRoute><Alerts /></PermissionRoute>} />
+              <Route path="/medical/records" element={<PermissionRoute><MedicalRecords /></PermissionRoute>} />
+              <Route path="/medical/records/:id" element={<PermissionRoute><MedicalRecordEditor /></PermissionRoute>} />
+              <Route path="/medical/consultation/:recordId" element={<PermissionRoute><ConsultationDashboard /></PermissionRoute>} />
+              <Route path="/medical/quick-consult" element={<PermissionRoute><QuickConsult /></PermissionRoute>} />
+              <Route path="/medical/prescriptions" element={<PermissionRoute><Prescriptions /></PermissionRoute>} />
+              <Route path="/medical/prescriptions/:id" element={<PermissionRoute><PrescriptionDetail /></PermissionRoute>} />
+              <Route path="/medical/documents" element={<PermissionRoute><DocumentsCenter /></PermissionRoute>} />
+              <Route path="/patients/:id/dental" element={<PermissionRoute><PatientDental /></PermissionRoute>} />
+              <Route path="/medical/specialties" element={<PermissionRoute><Specialties /></PermissionRoute>} />
+              <Route path="/medical/diagnoses" element={<PermissionRoute><Diagnoses /></PermissionRoute>} />
+              <Route path="/medical/medications" element={<PermissionRoute><Medications /></PermissionRoute>} />
+              <Route path="/medical/procedures" element={<PermissionRoute><ProceduresPage /></PermissionRoute>} />
+              <Route path="/hr/departments" element={<PermissionRoute><Departments /></PermissionRoute>} />
+              <Route path="/hr/positions" element={<PermissionRoute><Positions /></PermissionRoute>} />
+              <Route path="/hr/staff" element={<PermissionRoute><Staff /></PermissionRoute>} />
+              <Route path="/hr/staff/:id" element={<PermissionRoute><StaffDetail /></PermissionRoute>} />
+              <Route path="/hr/schedules" element={<PermissionRoute><Schedules /></PermissionRoute>} />
+              <Route path="/hr/attendance" element={<PermissionRoute><Attendance /></PermissionRoute>} />
+              <Route path="/hr/leaves" element={<PermissionRoute><Leaves /></PermissionRoute>} />
+              <Route path="/hr/payroll" element={<PermissionRoute><Payroll /></PermissionRoute>} />
+              <Route path="/hr/pending-commissions" element={<PermissionRoute><PendingCommissions /></PermissionRoute>} />
+              <Route path="/hr/performance" element={<PermissionRoute><Performance /></PermissionRoute>} />
+              <Route path="/hr/target-bonuses" element={<PermissionRoute><TargetBonuses /></PermissionRoute>} />
+              <Route path="/reports" element={<PermissionRoute><ReportsDashboard /></PermissionRoute>} />
+              <Route path="/reports/financial" element={<PermissionRoute><FinancialReports /></PermissionRoute>} />
+              <Route path="/reports/operational" element={<PermissionRoute><OperationalReports /></PermissionRoute>} />
+              <Route path="/reports/medical" element={<PermissionRoute><MedicalReports /></PermissionRoute>} />
+              <Route path="/reports/hr" element={<PermissionRoute><HRReports /></PermissionRoute>} />
+              <Route path="/reports/inventory" element={<PermissionRoute><InventoryReports /></PermissionRoute>} />
+              <Route path="/reports/scheduled" element={<PermissionRoute><ScheduledReports /></PermissionRoute>} />
+              <Route path="/reports/commissions" element={<PermissionRoute><DoctorCommissions /></PermissionRoute>} />
+              <Route path="/reports/doctor-performance" element={<PermissionRoute><DoctorPerformance /></PermissionRoute>} />
+              <Route path="/branches" element={<PermissionRoute adminOnly><Branches /></PermissionRoute>} />
+              <Route path="/branches/dashboard" element={<PermissionRoute adminOnly><BranchDashboard /></PermissionRoute>} />
+              <Route path="/settings/branches" element={<PermissionRoute><Branches /></PermissionRoute>} />
+              <Route path="/settings" element={<PermissionRoute adminOnly><GeneralSettings /></PermissionRoute>} />
+              <Route path="/settings/general" element={<PermissionRoute adminOnly><GeneralSettings /></PermissionRoute>} />
+              <Route path="/settings/appointments" element={<PermissionRoute adminOnly><AppointmentSettings /></PermissionRoute>} />
+              <Route path="/settings/invoices" element={<PermissionRoute adminOnly><InvoiceSettings /></PermissionRoute>} />
+              <Route path="/settings/payments" element={<PermissionRoute adminOnly><PaymentMethodsPage /></PermissionRoute>} />
+              <Route path="/settings/services" element={<PermissionRoute adminOnly><ServicesPage /></PermissionRoute>} />
+              <Route path="/settings/insurance" element={<PermissionRoute adminOnly><InsuranceCompanies /></PermissionRoute>} />
+              <Route path="/settings/insurance-contracts" element={<PermissionRoute adminOnly><InsuranceContracts /></PermissionRoute>} />
+              <Route path="/settings/communication" element={<PermissionRoute adminOnly><Communication /></PermissionRoute>} />
+              {/* Backward-compatible redirects from the legacy 6 routes */}
+              <Route path="/settings/notifications" element={<Navigate to="/settings/communication?tab=notifications" replace />} />
+              <Route path="/settings/reminders" element={<Navigate to="/settings/communication?tab=reminders" replace />} />
+              <Route path="/settings/automated-comm" element={<Navigate to="/settings/communication?tab=automated" replace />} />
+              <Route path="/settings/templates/email" element={<Navigate to="/settings/communication?tab=email" replace />} />
+              <Route path="/settings/templates/sms" element={<Navigate to="/settings/communication?tab=sms" replace />} />
+              <Route path="/settings/templates/whatsapp" element={<Navigate to="/settings/communication?tab=whatsapp" replace />} />
+              <Route path="/settings/languages" element={<PermissionRoute adminOnly><LanguagesPage /></PermissionRoute>} />
+              <Route path="/settings/roles" element={<PermissionRoute adminOnly><RolePermissions /></PermissionRoute>} />
+              <Route path="/settings/users" element={<PermissionRoute adminOnly><UserManagement /></PermissionRoute>} />
+              <Route path="/settings/backup" element={<PermissionRoute adminOnly><BackupExport /></PermissionRoute>} />
+              <Route path="/settings/audit" element={<PermissionRoute adminOnly><AuditLogs /></PermissionRoute>} />
+              <Route path="/settings/audit-logs" element={<Navigate to="/settings/audit" replace />} />
+              <Route path="/settings/system" element={<PermissionRoute adminOnly><SystemInfo /></PermissionRoute>} />
+              <Route path="/settings/system-info" element={<Navigate to="/settings/system" replace />} />
+              <Route path="/settings/qa" element={<PermissionRoute adminOnly><QAIdentities /></PermissionRoute>} />
+              <Route path="/commissions" element={<Navigate to="/reports/commissions" replace />} />
+              <Route path="/medical-records" element={<Navigate to="/medical/records" replace />} />
+              <Route path="/system/self-audit" element={<PermissionRoute adminOnly><SystemSelfAudit /></PermissionRoute>} />
+            </Route>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
+      </BrowserRouter>
+    </TooltipProvider>
+  );
+}
+
+const App = () => (
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <I18nProvider>
+        <AuthProvider>
+          <BranchProvider>
+            <AppContent />
+          </BranchProvider>
+        </AuthProvider>
+      </I18nProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
+);
+
+export default App;

@@ -66,7 +66,7 @@ function wrapText(value: any, opts?: { rtl?: boolean; arabic?: boolean }) {
 
 function transliterateInvoiceAddress(value: any) {
   const input = String(value ?? "").trim();
-  if (!input || !/[؀-ۿ]/.test(input)) return input;
+  if (!input || !/[\u0600-\u06FF]/.test(input)) return input;
 
   const phraseMap: Array<[RegExp, string]> = [
     [/التجمع الخامس/g, "Fifth Settlement"],

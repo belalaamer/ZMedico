@@ -79,8 +79,16 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       items: [
         authz.can("invoices.view") && { to: "/invoices", icon: FileText, label: t("invoices") },
         authz.can("invoices.view") && { to: "/payments", icon: CreditCard, label: t("payments") },
+        authz.can("coupons.view") && { to: "/coupons", icon: Ticket, label: lang === "ar" ? "الكوبونات" : "Coupons" },
         authz.can("treasury.view") && { to: "/treasury", icon: Banknote, label: t("treasury") },
         authz.can("treasury.view") && { to: "/expenses", icon: Receipt, label: t("expenses") },
+      ].filter(Boolean) as NavItem[],
+    },
+    {
+      key: "reports",
+      label: lang === "ar" ? "التقارير" : "Reports",
+      icon: BarChart3,
+      items: [
         authz.can("reports.view") && { to: "/reports", icon: PieChart, label: t("reports") },
       ].filter(Boolean) as NavItem[],
     },
@@ -122,10 +130,9 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
         authz.can("medical_records.view") && { to: "/medical/specialties", icon: Stethoscope, label: t("specialties") },
         authz.can("medical_records.view") && { to: "/medical/diagnoses", icon: HeartPulse, label: t("diagnoses") },
         authz.can("medical_records.view") && { to: "/medical/medications", icon: Pill, label: t("medications") },
-        authz.can("medical_records.view") && authz.isSuperAdmin() && { to: "/medical/procedures", icon: Activity, label: t("proceduresCatalog") },
-        authz.can("coupons.view") && { to: "/coupons", icon: Ticket, label: lang === "ar" ? "الكوبونات" : "Coupons" },
+        authz.can("medical_records.view") && { to: "/medical/procedures", icon: Activity, label: t("proceduresCatalog") },
         authz.isSuperAdmin() && { to: "/branches", icon: Building2, label: t("branches") },
-        authz.can("settings.view") && { to: "/settings", icon: Settings, label: t("settings") },
+        authz.isSuperAdmin() && { to: "/settings", icon: Settings, label: t("settings") },
       ].filter(Boolean) as NavItem[],
     },
   ].filter(g => g.items.length > 0), [t, lang, authz, alertCount]);
@@ -164,7 +171,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
             cn(
               "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
               isActive
-                ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold border-l-2 border-sidebar-primary rounded-l-none"
+                ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold border-s-2 border-sidebar-primary rounded-s-none"
                 : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground font-medium"
             )
           }
@@ -215,7 +222,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
                         className={({ isActive }) => cn(
                           "flex items-center gap-2.5 px-3 py-2 rounded-md text-[13px] transition-colors duration-150",
                           isActive
-                            ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold border-l-2 border-sidebar-primary rounded-l-none"
+                            ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold border-s-2 border-sidebar-primary rounded-s-none"
                             : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground font-medium"
                         )}>
                         <it.icon className="size-4 shrink-0" />

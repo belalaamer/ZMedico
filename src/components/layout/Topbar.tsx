@@ -162,7 +162,7 @@ export function Topbar() {
               : `${lang === "ar" ? "translate-x-full" : "-translate-x-full"} pointer-events-none`
           }`}
         >
-          <div className="flex h-16 items-center justify-end border-b border-sidebar-border px-3 py-2">
+          <div className="flex h-16 items-center justify-start border-b border-sidebar-border px-3 py-2">
             <Button
               variant="ghost"
               size="icon"

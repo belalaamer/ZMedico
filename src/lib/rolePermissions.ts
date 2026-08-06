@@ -32,18 +32,20 @@ export const DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
   admin: Object.fromEntries(MODULES.map(m => [m, [...ALL]])),
   // Manager: branch operations oversight. No delete, no clinical writes,
   // no financial writes.
+  // Clinical data (medical_records, vitals, treatment_plans, reports_medical)
+  // removed under the minimum-necessary principle; the database enforces the same.
   manager: {
     patients: ["view","create","edit","export"],
     appointments: ["view","create","edit","export"],
-    medical_records: ["view"],
-    vitals: ["view"],
-    treatment_plans: ["view"],
+    medical_records: [],
+    vitals: [],
+    treatment_plans: [],
     invoices: ["view","export"],
     treasury: ["view","export"],
     inventory: ["view","create","edit","export"],
     reports: ["view","export"],
     reports_finance: ["view","export"],
-    reports_medical: ["view","export"],
+    reports_medical: [],
     reports_operational: ["view","export"],
     reports_hr: [],
     reports_inventory: ["view","export"],
@@ -76,18 +78,22 @@ export const DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
   },
   // Receptionist: front desk. Cancels appointments via status update
   // (no delete). No invoice edits - accountant owns invoice edits.
+  // Clinical data (treatment_plans) removed under the minimum-necessary
+  // principle; the database enforces the same.
   receptionist: {
     patients: ["view","create","edit"],
     appointments: ["view","create","edit"],
-    treatment_plans: ["view"],
+    treatment_plans: [],
     invoices: ["view","create"],
     coupons: ["view"],
   },
   // Accountant: finance. No clinical access.
+  // Clinical data (treatment_plans) and appointments removed under the
+  // minimum-necessary principle; the database enforces the same.
   accountant: {
     patients: ["view"],
-    appointments: ["view"],
-    treatment_plans: ["view"],
+    appointments: [],
+    treatment_plans: [],
     invoices: ["view","create","edit","export"],
     treasury: ["view","create","edit","export"],
     inventory: ["view"],

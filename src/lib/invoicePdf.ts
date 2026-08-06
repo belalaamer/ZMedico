@@ -299,8 +299,12 @@ export async function generateInvoicePdf(opts: {
 
   const node = container.firstElementChild as HTMLElement;
   try {
+    const targetPixels = 4_000_000;                 // ~4 MP is ample for A4 at print quality
+    const estimated = node.scrollWidth * node.scrollHeight;
+    const scale = Math.max(1, Math.min(2, Math.sqrt(targetPixels / Math.max(estimated, 1))));
+
     const canvas = await html2canvas(node, {
-      scale: 2,
+      scale,
       useCORS: true,
       backgroundColor: "#ffffff",
       letterRendering: true,
@@ -317,16 +321,27 @@ export async function generateInvoicePdf(opts: {
     if (imgHeight <= pageHeight) {
       doc.addImage(imgData, "JPEG", 0, 0, imgWidth, imgHeight);
     } else {
-      // Multi-page: slice the canvas
-      let position = 0;
-      let heightLeft = imgHeight;
-      doc.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        doc.addPage();
-        doc.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+      // Multi-page: slice the source canvas into page-sized bands so each page
+      // only embeds the pixels it needs, avoiding both memory blow-up and the
+      // stack overflow that comes from re-encoding the full image per page.
+      const pageHeightPx = Math.floor((pageHeight / imgHeight) * canvas.height);
+      const totalPages = Math.ceil(canvas.height / pageHeightPx);
+
+      for (let pageIndex = 0; pageIndex < totalPages; pageIndex++) {
+        if (pageIndex > 0) doc.addPage();
+
+        const srcY = pageIndex * pageHeightPx;
+        const srcH = Math.min(pageHeightPx, canvas.height - srcY);
+
+        const pageCanvas = document.createElement("canvas");
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = srcH;
+        const ctx = pageCanvas.getContext("2d")!;
+        ctx.drawImage(canvas, 0, srcY, canvas.width, srcH, 0, 0, canvas.width, srcH);
+
+        const pageImgData = pageCanvas.toDataURL("image/jpeg", 0.95);
+        const pageImgHeight = (srcH * imgWidth) / canvas.width;
+        doc.addImage(pageImgData, "JPEG", 0, 0, imgWidth, pageImgHeight);
       }
     }
 

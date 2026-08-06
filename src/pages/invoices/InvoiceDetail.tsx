@@ -19,6 +19,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { reportClientError } from "@/lib/observability/reportError";
 
 type Inv = any;
 
@@ -51,6 +52,7 @@ export default function InvoiceDetail() {
   const [pays, setPays] = useState<any[]>([]);
   const [payOpen, setPayOpen] = useState(false);
   const [coupon, setCoupon] = useState<{ code: string; amount: number } | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const load = async () => {
     if (!id) return;
@@ -114,13 +116,31 @@ export default function InvoiceDetail() {
   };
 
   const downloadPdf = async () => {
-    let branch = null;
-    if (inv.branch_id) {
-      const { data } = await supabase.from("branches").select("name_en,name_ar,address,phone").eq("id", inv.branch_id).maybeSingle();
-      branch = data;
+    setPdfLoading(true);
+    try {
+      let branch = null;
+      if (inv.branch_id) {
+        const { data } = await supabase.from("branches").select("name_en,name_ar,address,phone").eq("id", inv.branch_id).maybeSingle();
+        branch = data;
+      }
+      const logoUrl = await loadClinicLogo();
+      try {
+        await generateInvoicePdf({ invoice: inv, items, payments: pays, patient: inv.patients, branch, logoUrl, lang, t: t as any });
+      } catch (e: any) {
+        toast.error(
+          lang === "ar"
+            ? "تعذر إنشاء ملف الفاتورة. حاول مرة أخرى أو استخدم الطباعة."
+            : "Could not generate the invoice file. Try again, or use Print."
+        );
+        reportClientError({
+          kind: "error",
+          message: `invoice pdf failed: ${String(e?.message ?? e)}`,
+          component: "InvoiceDetail.pdf",
+        });
+      }
+    } finally {
+      setPdfLoading(false);
     }
-    const logoUrl = await loadClinicLogo();
-    generateInvoicePdf({ invoice: inv, items, payments: pays, patient: inv.patients, branch, logoUrl, lang, t: t as any });
   };
 
   const sendWhatsApp = () => {
@@ -149,13 +169,31 @@ export default function InvoiceDetail() {
   };
 
   const printInvoice = async () => {
-    let branch = null;
-    if (inv.branch_id) {
-      const { data } = await supabase.from("branches").select("name_en,name_ar,address,phone").eq("id", inv.branch_id).maybeSingle();
-      branch = data;
+    setPdfLoading(true);
+    try {
+      let branch = null;
+      if (inv.branch_id) {
+        const { data } = await supabase.from("branches").select("name_en,name_ar,address,phone").eq("id", inv.branch_id).maybeSingle();
+        branch = data;
+      }
+      const logoUrl = await loadClinicLogo();
+      try {
+        await generateInvoicePdf({ invoice: inv, items, payments: pays, patient: inv.patients, branch, logoUrl, lang, mode: "print", t: t as any });
+      } catch (e: any) {
+        toast.error(
+          lang === "ar"
+            ? "تعذر إنشاء ملف الفاتورة. حاول مرة أخرى أو استخدم الطباعة."
+            : "Could not generate the invoice file. Try again, or use Print."
+        );
+        reportClientError({
+          kind: "error",
+          message: `invoice pdf failed: ${String(e?.message ?? e)}`,
+          component: "InvoiceDetail.pdf",
+        });
+      }
+    } finally {
+      setPdfLoading(false);
     }
-    const logoUrl = await loadClinicLogo();
-    generateInvoicePdf({ invoice: inv, items, payments: pays, patient: inv.patients, branch, logoUrl, lang, mode: "print", t: t as any });
   };
 
   return (
@@ -170,8 +208,8 @@ export default function InvoiceDetail() {
               </Button>
             </Can>
           )}
-          <Button variant="outline" onClick={printInvoice}><Printer className="me-2 size-4" />{t("print")}</Button>
-          <Button variant="outline" onClick={downloadPdf}><Download className="me-2 size-4" />{t("downloadPdf")}</Button>
+          <Button variant="outline" onClick={printInvoice} disabled={pdfLoading}><Printer className="me-2 size-4" />{t("print")}</Button>
+          <Button variant="outline" onClick={downloadPdf} disabled={pdfLoading}><Download className="me-2 size-4" />{t("downloadPdf")}</Button>
           <Button variant="outline" onClick={sendWhatsApp} className="bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#128C7E] border-[#25D366]/30 dark:text-[#25D366] dark:border-[#25D366]/40">
             <MessageCircle className="me-2 size-4"/>WhatsApp
           </Button>

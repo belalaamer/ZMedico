@@ -25,6 +25,20 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
     referred_by_patient_id: null as string | null,
   });
 
+  // The single name box is backed by its own draft string holding EXACTLY what the
+  // user typed.
+  //
+  // It used to be a controlled round-trip: the value was rebuilt every render as
+  // `${first} ${last}`.trim() while onChange split the text on whitespace. Typing a
+  // space after the first name produced "Ahmed " -> split -> first="Ahmed", last=""
+  // -> rebuilt as "Ahmed " -> .trim() -> "Ahmed". The space was erased on the same
+  // keystroke that created it, so the second name could never be started. Reception
+  // hit this on every patient with more than one name, which is all of them.
+  //
+  // Keeping the raw draft separate means the box shows what was typed; first and
+  // last are still derived from it for storage.
+  const [nameDraft, setNameDraft] = useState("");
+
   useEffect(() => {
     (async () => {
       // Fetch via SECURITY DEFINER RPC so front-desk/nurse roles (no SELECT on user_roles) can load doctors.
@@ -58,15 +72,31 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
       assigned_doctor_id: (patient as any).assigned_doctor_id ?? "",
       referred_by_patient_id: (patient as any).referred_by_patient_id ?? null,
     });
+    setNameDraft(
+      lang === "ar"
+        ? `${patient.first_name_ar ?? ""} ${patient.last_name_ar ?? ""}`.trim()
+        : `${patient.first_name_en ?? ""} ${patient.last_name_en ?? ""}`.trim()
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patient, open]);
 
-  // Single name field bound to active-language fields; preserves the other side if already set.
-  const nameValue = lang === "ar"
-    ? `${form.first_name_ar} ${form.last_name_ar}`.trim()
-    : `${form.first_name_en} ${form.last_name_en}`.trim();
+  // Switching language mid-edit re-seeds the box from the values entered so far,
+  // rather than from the saved patient, so work in progress is not lost.
+  useEffect(() => {
+    setNameDraft(
+      lang === "ar"
+        ? `${form.first_name_ar} ${form.last_name_ar}`.trim()
+        : `${form.first_name_en} ${form.last_name_en}`.trim()
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang]);
 
   const setName = (v: string) => {
-    const parts = v.trim().split(/\s+/);
+    // Show the typed text verbatim, spaces included.
+    setNameDraft(v);
+    // Derive first / last for storage. Trimming here is correct: it only affects
+    // what is saved, never what the box displays.
+    const parts = v.trim().split(/\s+/).filter(Boolean);
     const first = parts.shift() ?? "";
     const last = parts.join(" ");
     if (lang === "ar") {
@@ -117,7 +147,7 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
         <form onSubmit={save} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2 sm:col-span-2">
             <Label>{t("fullName")} *</Label>
-            <Input dir="auto" value={nameValue} onChange={(e) => setName(e.target.value)} required maxLength={160} />
+            <Input dir="auto" value={nameDraft} onChange={(e) => setName(e.target.value)} required maxLength={160} />
           </div>
           <div className="space-y-2">
             <Label>{t("phone")} *</Label>

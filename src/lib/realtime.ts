@@ -9,6 +9,34 @@
 //  - cleanup that prevents further reconnect attempts after teardown
 //
 // The polling fallbacks in callers (30–60s ticks) remain as a safety net.
+//
+// ---------------------------------------------------------------------------
+// REENTRANCY, and why the two small details below matter
+//
+// This helper crashed the app in production: 21 "Maximum call stack size
+// exceeded" rejections on the landing page in 24 hours, recorded in
+// client_errors with this stack:
+//
+//     at TR.makeRef  at xl.startTimeout  at xl.send
+//     at xR.leave    at OR.unsubscribe   at HR.removeChannel
+//
+// The cause was that cleanupCurrent() called supabase.removeChannel() from
+// INSIDE the channel's own subscribe status callback. Removing a channel makes
+// it leave, which can emit another CLOSED status synchronously, which re-enters
+// this same callback, which removes again — recursion until the stack is gone.
+//
+// The guard `if (current === ch)` did not stop it, because `current` was only
+// cleared AFTER removeChannel returned. During the synchronous recursion the
+// guard was still true every time. A reentrancy guard has to be closed before
+// the dangerous call, not after it.
+//
+// Two changes fix it and both are needed:
+//   1. `current` is cleared BEFORE the removal, so any re-entry is a no-op.
+//   2. The removal is deferred out of the callback with setTimeout(0), so it
+//      never runs on the callback's own stack in the first place.
+// The promise from removeChannel is also swallowed explicitly — an unhandled
+// rejection here is what surfaced the crash to the global handler.
+// ---------------------------------------------------------------------------
 
 import { supabase } from "@/integrations/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -26,6 +54,19 @@ export interface SubscribeResilientOptions {
   maxBackoffMs?: number;
 }
 
+/** Remove a channel off the current call stack, never throwing or rejecting. */
+function removeChannelSafely(ch: RealtimeChannel) {
+  setTimeout(() => {
+    try {
+      Promise.resolve(supabase.removeChannel(ch)).catch(() => {
+        /* teardown failures are not actionable */
+      });
+    } catch {
+      /* ignore */
+    }
+  }, 0);
+}
+
 export function subscribeResilient(opts: SubscribeResilientOptions): () => void {
   const maxBackoff = opts.maxBackoffMs ?? 30_000;
   let stopped = false;
@@ -35,10 +76,11 @@ export function subscribeResilient(opts: SubscribeResilientOptions): () => void 
   let everSubscribed = false;
 
   const cleanupCurrent = () => {
-    if (current) {
-      try { supabase.removeChannel(current); } catch { /* ignore */ }
-      current = null;
-    }
+    const ch = current;
+    // Clear the reference FIRST. If removing the channel re-enters this
+    // callback synchronously, `current` is already null and nothing recurses.
+    current = null;
+    if (ch) removeChannelSafely(ch);
   };
 
   const connect = () => {
@@ -60,7 +102,10 @@ export function subscribeResilient(opts: SubscribeResilientOptions): () => void 
         status === "TIMED_OUT" ||
         status === "CHANNEL_ERROR"
       ) {
-        if (current === ch) cleanupCurrent();
+        // Only the channel that is still current may trigger a reconnect. A
+        // late status from a channel we already replaced is ignored.
+        if (current !== ch) return;
+        cleanupCurrent();
         const delay = Math.min(maxBackoff, 1000 * Math.pow(2, retry));
         retry += 1;
         if (timer) clearTimeout(timer);

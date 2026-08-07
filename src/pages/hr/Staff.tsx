@@ -172,11 +172,36 @@ export default function Staff() {
   };
 
   const softDelete = async (s: any): Promise<void> => {
-    const { error } = await supabase.from("staff_profiles").update({ deleted_at: new Date().toISOString() } as any).eq("id", s.id);
-    if (error) { toast.error(error.message); return; }
-    const { error: delErr } = await supabase.functions.invoke("admin-delete-user", { body: { user_id: s.id } });
-    if (delErr) { toast.error(delErr.message); return; }
-    toast.success(t("delete")); load();
+    // Remove the login account FIRST. admin-delete-user deletes the staff profile,
+    // the role grants and the profile row itself as part of its cascade, so on
+    // success there is nothing left to do here but refresh.
+    //
+    // The old order soft-deleted the row before calling the function, and did not
+    // roll back when the call failed. That left the person hidden from this screen
+    // while their account and roles stayed live — a deleted employee who could
+    // still sign in. Doing the irreversible part first means a failure leaves the
+    // record exactly as it was.
+    const { error: delErr } = await supabase.functions.invoke("admin-delete-user", {
+      body: { user_id: s.id, branch_id: s.branch_id ?? null },
+    });
+    if (delErr) {
+      // functions.invoke reports every non-2xx as the same generic sentence and
+      // hides the response body, which is where the actual reason is. Read it.
+      let detail = "";
+      try {
+        const ctx: any = (delErr as any).context;
+        if (ctx && typeof ctx.json === "function") {
+          const parsed = await ctx.json();
+          if (parsed?.error) detail = String(parsed.error);
+        }
+      } catch {
+        /* keep the generic message */
+      }
+      toast.error(detail || delErr.message);
+      return;
+    }
+    toast.success(t("delete"));
+    load();
   };
 
   const filtered = items.filter((s) => {

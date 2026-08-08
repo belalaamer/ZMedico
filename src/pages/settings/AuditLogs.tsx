@@ -18,6 +18,8 @@ import { Info, AlertTriangle } from "lucide-react";
 
 const PAGE_SIZE = 10;
 
+type Actor = { full_name: string | null; email: string | null } | null;
+
 type AuditRow = {
   id: string;
   action: string | null;
@@ -25,7 +27,9 @@ type AuditRow = {
   entity_id: string | null;
   created_at: string;
   user_id: string | null;
-  profiles?: { full_name: string | null; email: string | null } | null;
+  /** Resolved separately — see the note on load(). Absent when the actor's
+   *  account has since been deleted. */
+  actor?: Actor;
 };
 
 function actionTone(action: string | null) {
@@ -69,36 +73,95 @@ export default function AuditLogs() {
 
   useEffect(() => {
     let active = true;
-    setIsLoading(true);
-    setLoadError(null);
 
-    (supabase as any).from("audit_logs")
-      .select("id,action,entity_type,entity_id,created_at,user_id, profiles(full_name, email)")
-      .order("created_at", { ascending: false }).limit(100)
-      .then(({ data, error }: any) => {
-        if (!active) return;
-        // Previously the `error` field was ignored entirely. A permission
-        // denial (RLS or a missing GRANT) then rendered as an empty table,
-        // which is exactly how the July 2026 outage stayed invisible.
-        if (error) {
-          setLoadError(error.message ?? "Unknown error");
-          setItems([]);
-        } else {
-          setItems((data ?? []) as AuditRow[]);
-        }
-        setIsLoading(false);
-      })
-      // Previously there was no .catch(), so a rejected promise left the
-      // spinner running forever with no explanation.
-      .catch((err: any) => {
-        if (!active) return;
-        setLoadError(err?.message ?? "Request failed");
+    // The actor is resolved with a SECOND query rather than a PostgREST embed.
+    //
+    // This screen used to ask for `profiles(full_name, email)` inline, which
+    // worked because audit_logs.user_id was a foreign key to profiles. That key
+    // was deliberately removed: it carried ON DELETE SET NULL, so deleting an
+    // employee tried to blank the actor on their own audit history, the
+    // append-only guard refused, and the delete failed. An audit trail that
+    // forgets who acted is not an audit trail, so the column is now a plain
+    // historical uuid.
+    //
+    // Without the key PostgREST has no relationship to follow and answered
+    // "Could not find a relationship between 'audit_logs' and 'profiles'".
+    //
+    // Looking the names up separately is also the more truthful shape: the id
+    // is now allowed to point at someone who no longer exists, and that case
+    // gets its own label below instead of silently rendering as blank.
+    const load = async () => {
+      setIsLoading(true);
+      setLoadError(null);
+
+      const { data, error } = await (supabase as any)
+        .from("audit_logs")
+        .select("id,action,entity_type,entity_id,created_at,user_id")
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      if (!active) return;
+
+      // The `error` field was ignored here once. A permission denial then
+      // rendered as an empty table, which is exactly how the July 2026 outage
+      // stayed invisible. It is checked on both queries now.
+      if (error) {
+        setLoadError(error.message ?? "Unknown error");
         setItems([]);
         setIsLoading(false);
-      });
+        return;
+      }
+
+      const rows = (data ?? []) as AuditRow[];
+      const ids = Array.from(
+        new Set(rows.map(r => r.user_id).filter((v): v is string => !!v)),
+      );
+
+      let actors = new Map<string, Actor>();
+      if (ids.length > 0) {
+        const { data: profs, error: profErr } = await (supabase as any)
+          .from("profiles")
+          .select("id,full_name,email")
+          .in("id", ids);
+
+        if (!active) return;
+
+        // A failure here costs the names, not the log. The entries are the
+        // record; showing them with ids beats showing nothing, so this is
+        // surfaced as a warning and the table still renders.
+        if (profErr) {
+          setLoadError(
+            (lang === "ar"
+              ? "تعذّر تحميل أسماء المستخدمين؛ السجل معروض بالمعرّفات. "
+              : "Could not load user names; the log is shown with ids. ") +
+            (profErr.message ?? ""),
+          );
+        } else {
+          actors = new Map(
+            ((profs ?? []) as any[]).map(p => [
+              p.id as string,
+              { full_name: p.full_name ?? null, email: p.email ?? null } as Actor,
+            ]),
+          );
+        }
+      }
+
+      setItems(rows.map(r => ({
+        ...r,
+        actor: r.user_id ? actors.get(r.user_id) ?? null : null,
+      })));
+      setIsLoading(false);
+    };
+
+    load().catch((err: any) => {
+      if (!active) return;
+      setLoadError(err?.message ?? "Request failed");
+      setItems([]);
+      setIsLoading(false);
+    });
 
     return () => { active = false; };
-  }, []);
+  }, [lang]);
 
   const entityTypes = useMemo(() => {
     const s = new Set<string>();
@@ -113,7 +176,7 @@ export default function AuditLogs() {
       const needle = q.toLowerCase();
       const hay = [
         i.entity_type, i.action, i.entity_id, i.user_id,
-        i.profiles?.full_name, i.profiles?.email,
+        i.actor?.full_name, i.actor?.email,
       ].filter(Boolean).join(" ").toLowerCase();
       if (!hay.includes(needle)) return false;
     }
@@ -200,10 +263,19 @@ export default function AuditLogs() {
                   <TableBody>
                     {pageRows.map(i => {
                       const { date, time } = formatDateCell(i.created_at, lang);
-                      const displayName = i.profiles?.full_name
-                        || i.profiles?.email
-                        || (i.user_id ? `${i.user_id.slice(0, 8)}…` : (lang === "ar" ? "النظام" : "System"));
-                      const subLabel = i.profiles?.full_name ? i.profiles?.email : (i.profiles?.email ? null : i.user_id);
+                      // Three distinct cases, and they mean different things:
+                      //   - a known person
+                      //   - an id with no profile: the account was deleted, and
+                      //     keeping the id is the whole reason the key was dropped
+                      //   - no id at all: the system acted, not a person
+                      const deletedActor = lang === "ar" ? "حساب محذوف" : "Deleted account";
+                      const systemActor = lang === "ar" ? "النظام" : "System";
+                      const displayName = i.actor?.full_name
+                        || i.actor?.email
+                        || (i.user_id ? deletedActor : systemActor);
+                      const subLabel = i.actor?.full_name
+                        ? i.actor?.email
+                        : (i.actor?.email ? null : i.user_id);
                       return (
                         <TableRow key={i.id}>
                           <TableCell className="align-top">
@@ -214,13 +286,15 @@ export default function AuditLogs() {
                             <div className="flex items-center gap-2 min-w-0">
                               <Avatar className="size-7 shrink-0">
                                 <AvatarFallback className="text-[10px]">
-                                  {initials(i.profiles?.full_name, i.profiles?.email ?? i.user_id)}
+                                  {initials(i.actor?.full_name, i.actor?.email ?? i.user_id)}
                                 </AvatarFallback>
                               </Avatar>
                               <div className="min-w-0">
-                                <div className="text-sm font-medium truncate">{displayName}</div>
+                                <div className={`text-sm font-medium truncate ${!i.actor && i.user_id ? "text-muted-foreground italic" : ""}`}>
+                                  {displayName}
+                                </div>
                                 {subLabel && (
-                                  <div className="text-xs text-muted-foreground truncate">{subLabel}</div>
+                                  <div className="text-xs text-muted-foreground truncate font-mono">{subLabel}</div>
                                 )}
                               </div>
                             </div>

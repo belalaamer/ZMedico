@@ -15,6 +15,7 @@ import { ListSkeleton } from "@/components/ListSkeleton";
 import { TablePager } from "@/components/TablePager";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
+import { formatMoney } from "@/lib/format";
 import { Info, AlertTriangle, ExternalLink } from "lucide-react";
 
 const PAGE_SIZE = 10;
@@ -28,10 +29,17 @@ type AuditRow = {
   entity_id: string | null;
   created_at: string;
   user_id: string | null;
+  old_values: Record<string, any> | null;
+  new_values: Record<string, any> | null;
   /** Resolved separately — see the note on load(). Absent when the actor's
    *  account has since been deleted. */
   actor?: Actor;
 };
+
+/** A batch-resolved person: same shape as `Actor`, looked up by any id
+ *  (an actor's user_id, a staff_profiles.id, or a user_role's target
+ *  user_id) against the single shared `profiles` map built in load(). */
+type PersonMap = Map<string, Actor>;
 
 // --- Entity display & navigation -------------------------------------------
 // audit_logs.entity_type is written by many different call sites across the
@@ -60,7 +68,7 @@ const ENTITY_LABELS: Record<string, { ar: string; en: string }> = {
   auth_user: { ar: "حساب مستخدم", en: "User account" },
   bulk_export: { ar: "تصدير مجمّع", en: "Bulk export" },
   staff_profile_sensitive: { ar: "بيانات موظف حساسة", en: "Staff sensitive data" },
-  staff_profiles: { ar: "ملف موظف", en: "Staff profile" },
+  staff_profiles: { ar: "موظف", en: "Staff" },
   medical_record: { ar: "سجل طبي", en: "Medical record" },
   medical_records: { ar: "سجل طبي", en: "Medical record" },
   products: { ar: "منتج", en: "Product" },
@@ -99,6 +107,136 @@ function entityRoute(entityType: string | null, entityId: string | null) {
   return build ? build(entityId) : null;
 }
 
+// A field is read from new_values first, then old_values. This covers every
+// action shape written by the triggers: create/update rows carry the current
+// value in new_values; delete/revoke rows (e.g. role_revoked, soft_delete)
+// often only carry it in old_values.
+function auditField(row: AuditRow, field: string): any {
+  return row.new_values?.[field] ?? row.old_values?.[field] ?? null;
+}
+
+function personDisplayName(person: Actor, hadId: boolean, lang: "ar" | "en" | string) {
+  if (person?.full_name) return person.full_name;
+  if (person?.email) return person.email;
+  return hadId ? (lang === "ar" ? "مستخدم محذوف" : "Deleted user") : null;
+}
+
+function patientDisplayName(
+  p: { first_name_en?: string | null; last_name_en?: string | null; first_name_ar?: string | null; last_name_ar?: string | null },
+  lang: "ar" | "en" | string,
+) {
+  return lang === "ar"
+    ? `${p.first_name_ar ?? p.first_name_en ?? ""} ${p.last_name_ar ?? p.last_name_en ?? ""}`.trim()
+    : `${p.first_name_en ?? ""} ${p.last_name_en ?? ""}`.trim();
+}
+
+/** Batch-resolved lookup tables, one per entity kind we know how to name. */
+type RecordMaps = {
+  profiles: PersonMap;
+  invoices: Map<string, { invoiceNumber: string | null }>;
+  patients: Map<string, { name: string; code: number | string | null }>;
+  medicalRecordPatients: Map<string, { name: string; code: number | string | null } | null>;
+  products: Map<string, { name: string }>;
+  staff: Map<string, { employeeId: string | null }>;
+};
+
+const EMPTY_MAPS: RecordMaps = {
+  profiles: new Map(),
+  invoices: new Map(),
+  patients: new Map(),
+  medicalRecordPatients: new Map(),
+  products: new Map(),
+  staff: new Map(),
+};
+
+/**
+ * Turns an audit row into a human-readable "what/whom" label, or null when
+ * there isn't a safe, proven way to name the record. Callers fall back to
+ * plain entity_type + id when this returns null — never a guess.
+ */
+function resolveRecordLabel(row: AuditRow, lang: "ar" | "en" | string, maps: RecordMaps): string | null {
+  const type = row.entity_type;
+  const id = row.entity_id;
+  if (!type) return null;
+  const label = entityLabel(type, lang);
+
+  switch (type) {
+    case "invoice":
+    case "invoices": {
+      const inv = id ? maps.invoices.get(id) : undefined;
+      if (!inv?.invoiceNumber) return null;
+      return `${label} — ${inv.invoiceNumber}`;
+    }
+    case "patient":
+    case "patients": {
+      const p = id ? maps.patients.get(id) : undefined;
+      if (!p?.name) return null;
+      return `${label} — ${p.name}${p.code != null ? ` — #${p.code}` : ""}`;
+    }
+    case "medical_record":
+    case "medical_records": {
+      const p = id ? maps.medicalRecordPatients.get(id) : undefined;
+      if (!p?.name) return null;
+      return `${label} — ${p.name}`;
+    }
+    case "products": {
+      const prod = id ? maps.products.get(id) : undefined;
+      if (!prod?.name) return null;
+      return `${label} — ${prod.name}`;
+    }
+    case "staff_profiles":
+    case "staff_profile_sensitive": {
+      // StaffDetail.tsx resolves the header name via profiles.id === staff_profiles.id
+      // (a real FK: staff_profiles_id_fkey -> profiles), so that is used first;
+      // employee_id (always present) is the safe fallback.
+      const person = id ? maps.profiles.get(id) : undefined;
+      const staff = id ? maps.staff.get(id) : undefined;
+      const who = person?.full_name || staff?.employeeId;
+      if (!who) return null;
+      return `${label} — ${who}`;
+    }
+    case "user_role":
+    case "user_roles":
+    case "user_role_assignment": {
+      const role = auditField(row, "role");
+      const targetId = auditField(row, "user_id");
+      if (!role) return null;
+      const who = personDisplayName(targetId ? maps.profiles.get(targetId) ?? null : null, !!targetId, lang);
+      return [label, role, who].filter(Boolean).join(" — ");
+    }
+    case "role_permission": {
+      const role = auditField(row, "role");
+      const module = auditField(row, "module");
+      if (!role && !module) return null;
+      return [label, role, module].filter(Boolean).join(" — ");
+    }
+    case "treasury_transaction": {
+      const txType = auditField(row, "transaction_type");
+      const amount = auditField(row, "amount");
+      if (amount == null && !txType) return null;
+      const amountLabel = amount != null ? formatMoney(amount, lang === "ar" ? "ar" : "en") : null;
+      return [label, txType, amountLabel].filter(Boolean).join(" — ");
+    }
+    case "payment":
+    case "payments": {
+      const method = auditField(row, "payment_method");
+      const amount = auditField(row, "amount");
+      if (amount == null && !method) return null;
+      const amountLabel = amount != null ? formatMoney(amount, lang === "ar" ? "ar" : "en") : null;
+      return [label, method, amountLabel].filter(Boolean).join(" — ");
+    }
+    case "auth_user":
+      // These rows are always admin_delete_user: the account is gone by
+      // definition, so there is no reliable name left to show.
+      return lang === "ar" ? "مستخدم محذوف" : "Deleted User";
+    default:
+      // bulk_export, user_employee_link, and anything not yet seen: no safe
+      // identity to show. Entity type + action are already visible in their
+      // own columns; the id stays as plain text (handled by the caller).
+      return null;
+  }
+}
+
 function actionTone(action: string | null) {
   const a = (action ?? "").toLowerCase();
   if (a === "create" || a === "insert") {
@@ -131,6 +269,7 @@ function formatDateCell(iso: string, lang: "ar" | "en" | string) {
 export default function AuditLogs() {
   const { t, lang } = useI18n();
   const [items, setItems] = useState<AuditRow[]>([]);
+  const [maps, setMaps] = useState<RecordMaps>(EMPTY_MAPS);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [q, setQ] = useState("");
@@ -157,13 +296,22 @@ export default function AuditLogs() {
     // Looking the names up separately is also the more truthful shape: the id
     // is now allowed to point at someone who no longer exists, and that case
     // gets its own label below instead of silently rendering as blank.
+    //
+    // --- Record identity (this block) -----------------------------------
+    // Same idea, extended: instead of one query per row (N+1), every id we
+    // might need to name is collected first, grouped by what kind of lookup
+    // it needs, and each group is fetched in a single batched `.in(...)`
+    // query. Worst case for a 100-row page is the existing profiles query
+    // (now also carrying staff ids and user_role targets) plus up to five
+    // more — one per entity kind actually present on the page. Entity kinds
+    // not present on the page never fire a query at all.
     const load = async () => {
       setIsLoading(true);
       setLoadError(null);
 
       const { data, error } = await (supabase as any)
         .from("audit_logs")
-        .select("id,action,entity_type,entity_id,created_at,user_id")
+        .select("id,action,entity_type,entity_id,created_at,user_id,old_values,new_values")
         .order("created_at", { ascending: false })
         .limit(100);
 
@@ -180,42 +328,114 @@ export default function AuditLogs() {
       }
 
       const rows = (data ?? []) as AuditRow[];
-      const ids = Array.from(
-        new Set(rows.map(r => r.user_id).filter((v): v is string => !!v)),
-      );
 
-      let actors = new Map<string, Actor>();
-      if (ids.length > 0) {
-        const { data: profs, error: profErr } = await (supabase as any)
-          .from("profiles")
-          .select("id,full_name,email")
-          .in("id", ids);
+      // Actors (existing) + staff ids (staff_profiles.id === profiles.id via
+      // a real FK) + user_role targets (embedded in the JSON diff) all share
+      // one table, so they share one query.
+      const profileIds = new Set<string>();
+      rows.forEach(r => { if (r.user_id) profileIds.add(r.user_id); });
 
-        if (!active) return;
+      const invoiceIds = new Set<string>();
+      const patientIds = new Set<string>();
+      const medicalRecordIds = new Set<string>();
+      const productIds = new Set<string>();
+      const staffIds = new Set<string>();
 
-        // A failure here costs the names, not the log. The entries are the
-        // record; showing them with ids beats showing nothing, so this is
-        // surfaced as a warning and the table still renders.
-        if (profErr) {
-          setLoadError(
-            (lang === "ar"
-              ? "تعذّر تحميل أسماء المستخدمين؛ السجل معروض بالمعرّفات. "
-              : "Could not load user names; the log is shown with ids. ") +
-            (profErr.message ?? ""),
-          );
-        } else {
-          actors = new Map(
-            ((profs ?? []) as any[]).map(p => [
-              p.id as string,
-              { full_name: p.full_name ?? null, email: p.email ?? null } as Actor,
-            ]),
-          );
+      rows.forEach(r => {
+        const type = r.entity_type;
+        const id = r.entity_id;
+        if (!type || !id) return;
+        if (type === "invoice" || type === "invoices") invoiceIds.add(id);
+        else if (type === "patient" || type === "patients") patientIds.add(id);
+        else if (type === "medical_record" || type === "medical_records") medicalRecordIds.add(id);
+        else if (type === "products") productIds.add(id);
+        else if (type === "staff_profiles" || type === "staff_profile_sensitive") {
+          staffIds.add(id);
+          profileIds.add(id);
+        } else if (type === "user_role" || type === "user_roles" || type === "user_role_assignment") {
+          const targetId = auditField(r, "user_id");
+          if (targetId) profileIds.add(targetId);
         }
+      });
+
+      const noRows = { data: [] as any[], error: null as any };
+      const [profilesRes, invoicesRes, patientsRes, medicalRecordsRes, productsRes, staffRes] = await Promise.all([
+        profileIds.size
+          ? (supabase as any).from("profiles").select("id,full_name,email").in("id", Array.from(profileIds))
+          : Promise.resolve(noRows),
+        invoiceIds.size
+          ? supabase.from("invoices").select("id,invoice_number").in("id", Array.from(invoiceIds))
+          : Promise.resolve(noRows),
+        patientIds.size
+          ? supabase.from("patients").select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code").in("id", Array.from(patientIds))
+          : Promise.resolve(noRows),
+        medicalRecordIds.size
+          ? (supabase as any).from("medical_records")
+              .select("id,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)")
+              .in("id", Array.from(medicalRecordIds))
+          : Promise.resolve(noRows),
+        productIds.size
+          ? supabase.from("products").select("id,name_en,name_ar").in("id", Array.from(productIds))
+          : Promise.resolve(noRows),
+        staffIds.size
+          ? (supabase as any).from("staff_profiles").select("id,employee_id").in("id", Array.from(staffIds))
+          : Promise.resolve(noRows),
+      ]);
+
+      if (!active) return;
+
+      // A failure here costs the names, not the log. The entries are the
+      // record; showing them with ids beats showing nothing, so this is
+      // surfaced as a warning and the table still renders.
+      if (profilesRes.error) {
+        setLoadError(
+          (lang === "ar"
+            ? "تعذّر تحميل أسماء المستخدمين؛ السجل معروض بالمعرّفات. "
+            : "Could not load user names; the log is shown with ids. ") +
+          (profilesRes.error.message ?? ""),
+        );
       }
 
+      const profiles: PersonMap = new Map(
+        ((profilesRes.data ?? []) as any[]).map(p => [
+          p.id as string,
+          { full_name: p.full_name ?? null, email: p.email ?? null } as Actor,
+        ]),
+      );
+
+      // Secondary lookups (invoice/patient/medical record/product/staff)
+      // degrade silently on failure: the row simply falls back to its plain
+      // entity type + id, which is exactly the pre-existing behavior and
+      // never misleading.
+      const invoices = new Map(
+        ((invoicesRes.data ?? []) as any[]).map(i => [i.id as string, { invoiceNumber: i.invoice_number ?? null }]),
+      );
+      const patients = new Map(
+        ((patientsRes.data ?? []) as any[]).map(p => [
+          p.id as string,
+          { name: patientDisplayName(p, lang), code: p.patient_code ?? null },
+        ]),
+      );
+      const medicalRecordPatients = new Map(
+        ((medicalRecordsRes.data ?? []) as any[]).map(r => [
+          r.id as string,
+          r.patients ? { name: patientDisplayName(r.patients, lang), code: r.patients.patient_code ?? null } : null,
+        ]),
+      );
+      const products = new Map(
+        ((productsRes.data ?? []) as any[]).map(p => [
+          p.id as string,
+          { name: (lang === "ar" ? p.name_ar : p.name_en) || p.name_en || p.name_ar || "" },
+        ]),
+      );
+      const staff = new Map(
+        ((staffRes.data ?? []) as any[]).map(s => [s.id as string, { employeeId: s.employee_id ?? null }]),
+      );
+
+      setMaps({ profiles, invoices, patients, medicalRecordPatients, products, staff });
       setItems(rows.map(r => ({
         ...r,
-        actor: r.user_id ? actors.get(r.user_id) ?? null : null,
+        actor: r.user_id ? profiles.get(r.user_id) ?? null : null,
       })));
       setIsLoading(false);
     };
@@ -344,6 +564,7 @@ export default function AuditLogs() {
                         ? i.actor?.email
                         : (i.actor?.email ? null : i.user_id);
                       const recordHref = entityRoute(i.entity_type, i.entity_id);
+                      const recordLabel = resolveRecordLabel(i, lang, maps);
                       return (
                         <TableRow key={i.id}>
                           <TableCell className="align-top">
@@ -378,15 +599,38 @@ export default function AuditLogs() {
                             </Badge>
                           </TableCell>
                           <TableCell className="align-top">
-                            {recordHref ? (
-                              <Link
-                                to={recordHref}
-                                className="inline-flex items-center gap-1 text-xs font-mono text-primary hover:underline max-w-[240px]"
-                                title={i.entity_id ?? undefined}
-                              >
-                                <ExternalLink className="size-3.5 shrink-0" />
-                                <span className="truncate">{i.entity_id}</span>
-                              </Link>
+                            {recordLabel ? (
+                              recordHref ? (
+                                <Link
+                                  to={recordHref}
+                                  className="flex flex-col gap-0.5 max-w-[220px] sm:max-w-[280px] text-primary hover:underline"
+                                >
+                                  <span className="inline-flex items-center gap-1 text-sm font-medium capitalize">
+                                    <ExternalLink className="size-3.5 shrink-0" />
+                                    <span className="truncate">{recordLabel}</span>
+                                  </span>
+                                  {i.entity_id && (
+                                    <span
+                                      className="text-[11px] text-muted-foreground font-mono truncate"
+                                      title={i.entity_id}
+                                    >
+                                      {i.entity_id}
+                                    </span>
+                                  )}
+                                </Link>
+                              ) : (
+                                <div className="flex flex-col gap-0.5 max-w-[220px] sm:max-w-[280px]">
+                                  <span className="text-sm font-medium capitalize truncate">{recordLabel}</span>
+                                  {i.entity_id && (
+                                    <span
+                                      className="text-[11px] text-muted-foreground font-mono truncate"
+                                      title={i.entity_id}
+                                    >
+                                      {i.entity_id}
+                                    </span>
+                                  )}
+                                </div>
+                              )
                             ) : (
                               <div
                                 className="text-xs text-muted-foreground font-mono truncate max-w-[240px]"

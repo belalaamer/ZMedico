@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap, FolderOpen, Briefcase, UserCog, Clock, CalendarDays, DollarSign, Star, PieChart, Target, Ticket, ListChecks, ChevronDown, Wallet } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap, FolderOpen, Briefcase, UserCog, Clock, CalendarDays, DollarSign, Star, PieChart, Target, Ticket, ListChecks, ChevronDown, Wallet, ScrollText, Percent } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { subscribeResilient } from "@/lib/realtime";
@@ -46,6 +46,10 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       items: [
         authz.can("appointments.view") && { to: "/calendar", icon: Calendar, label: t("calendar") },
         authz.can("appointments.view") && { to: "/queue", icon: ListChecks, label: t("queue") },
+        // Same permission as /queue (appointments.view) -- this was previously
+        // reachable only incidentally via the admin-only Branches quick-link,
+        // which left the queue/front-desk audience with no way to open it.
+        authz.can("appointments.view") && { to: "/queue/audit", icon: ScrollText, label: lang === "ar" ? "تدقيق الطابور" : "Queue Audit" },
         authz.can("patients.view") && { to: "/patients", icon: Users, label: t("patients") },
         authz.can("appointments.view") && { to: "/reminders", icon: Bell, label: t("notifications") },
       ].filter(Boolean) as NavItem[],
@@ -89,6 +93,11 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       label: lang === "ar" ? "التقارير" : "Reports",
       icon: BarChart3,
       items: [
+        // Only the hub is linked here on purpose: ReportsDashboard.tsx already
+        // links every /reports/* sub-page (financial, operational, medical, hr,
+        // inventory, scheduled, commissions, doctor-performance) as cards for
+        // the same reports.view/reports_*.view audience. Adding them again here
+        // would duplicate navigation that already exists one click away.
         authz.can("reports.view") && { to: "/reports", icon: PieChart, label: t("reports") },
       ].filter(Boolean) as NavItem[],
     },
@@ -118,6 +127,9 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
         { to: "/hr/attendance", icon: Clock, label: t("attendance") },
         { to: "/hr/leaves", icon: FileText, label: t("leaves") },
         { to: "/hr/payroll", icon: DollarSign, label: t("payroll") },
+        // Same "hr" module permission as the rest of this group. Was not
+        // reachable from anywhere in the UI before.
+        { to: "/hr/pending-commissions", icon: Percent, label: lang === "ar" ? "العمولات المستحقة" : "Pending Commissions" },
         { to: "/hr/performance", icon: Star, label: t("performance") },
         { to: "/hr/target-bonuses", icon: Target, label: lang === "ar" ? "أهداف ومكافآت" : "Target Bonuses" },
       ],
@@ -132,6 +144,10 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
         authz.can("medical_records.view") && { to: "/medical/medications", icon: Pill, label: t("medications") },
         authz.can("medical_records.view") && { to: "/medical/procedures", icon: Activity, label: t("proceduresCatalog") },
         authz.isSuperAdmin() && { to: "/branches", icon: Building2, label: t("branches") },
+        // Same adminOnly gate as /branches (and the same audience the existing
+        // "Branch dashboard" quick-link inside Branches.tsx already targets),
+        // surfaced directly instead of one extra click deep.
+        authz.isSuperAdmin() && { to: "/branches/dashboard", icon: LayoutDashboard, label: lang === "ar" ? "لوحة الفرع" : "Branch Dashboard" },
         authz.isSuperAdmin() && { to: "/settings", icon: Settings, label: t("settings") },
       ].filter(Boolean) as NavItem[],
     },

@@ -64,6 +64,11 @@ const ENTITY_LABELS: Record<string, { ar: string; en: string }> = {
   medical_record: { ar: "سجل طبي", en: "Medical record" },
   medical_records: { ar: "سجل طبي", en: "Medical record" },
   products: { ar: "منتج", en: "Product" },
+  // Written by StaffDetail.tsx when a staff record is linked/unlinked from a
+  // login account. entity_id there is not consistently one table's primary
+  // key (it is the linked user's id on link/unlink, or the staff id as a
+  // fallback), so this only gets a label, never a route.
+  user_employee_link: { ar: "ربط موظف بمستخدم", en: "Staff-user link" },
 };
 
 const ENTITY_ROUTES: Record<string, (id: string) => string> = {
@@ -368,7 +373,7 @@ export default function AuditLogs() {
                             </Badge>
                           </TableCell>
                           <TableCell className="align-top">
-                            <Badge variant="outline" title={i.entity_type ?? undefined}>
+                            <Badge variant="outline" className="capitalize" title={i.entity_type ?? undefined}>
                               {entityLabel(i.entity_type, lang)}
                             </Badge>
                           </TableCell>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import SettingsLayout from "./SettingsLayout";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +15,7 @@ import { ListSkeleton } from "@/components/ListSkeleton";
 import { TablePager } from "@/components/TablePager";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Info, AlertTriangle } from "lucide-react";
+import { Info, AlertTriangle, ExternalLink } from "lucide-react";
 
 const PAGE_SIZE = 10;
 
@@ -31,6 +32,72 @@ type AuditRow = {
    *  account has since been deleted. */
   actor?: Actor;
 };
+
+// --- Entity display & navigation -------------------------------------------
+// audit_logs.entity_type is written by many different call sites across the
+// app (some historical, some current), so the same kind of record shows up
+// under more than one spelling (e.g. "invoice" and "invoices"). This map
+// normalizes those spellings to one bilingual label so the column reads the
+// same regardless of which code path wrote the row.
+//
+// ENTITY_ROUTES only lists entity types that (a) have a real, existing
+// detail route in src/App.tsx and (b) are known to store that route's :id
+// param as entity_id. Anything not listed here still shows its id — it is
+// just not turned into a link, because a link to a route that does not
+// exist (or to the wrong id) would be worse than no link at all.
+const ENTITY_LABELS: Record<string, { ar: string; en: string }> = {
+  invoice: { ar: "فاتورة", en: "Invoice" },
+  invoices: { ar: "فاتورة", en: "Invoice" },
+  payment: { ar: "دفعة", en: "Payment" },
+  payments: { ar: "دفعة", en: "Payment" },
+  patient: { ar: "مريض", en: "Patient" },
+  patients: { ar: "مريض", en: "Patient" },
+  treasury_transaction: { ar: "حركة خزينة", en: "Treasury transaction" },
+  user_role: { ar: "دور مستخدم", en: "User role" },
+  user_roles: { ar: "دور مستخدم", en: "User role" },
+  user_role_assignment: { ar: "تعيين دور", en: "Role assignment" },
+  role_permission: { ar: "صلاحية دور", en: "Role permission" },
+  auth_user: { ar: "حساب مستخدم", en: "User account" },
+  bulk_export: { ar: "تصدير مجمّع", en: "Bulk export" },
+  staff_profile_sensitive: { ar: "بيانات موظف حساسة", en: "Staff sensitive data" },
+  staff_profiles: { ar: "ملف موظف", en: "Staff profile" },
+  medical_record: { ar: "سجل طبي", en: "Medical record" },
+  medical_records: { ar: "سجل طبي", en: "Medical record" },
+  products: { ar: "منتج", en: "Product" },
+  // Written by StaffDetail.tsx when a staff record is linked/unlinked from a
+  // login account. entity_id there is not consistently one table's primary
+  // key (it is the linked user's id on link/unlink, or the staff id as a
+  // fallback), so this only gets a label, never a route.
+  user_employee_link: { ar: "ربط موظف بمستخدم", en: "Staff-user link" },
+};
+
+const ENTITY_ROUTES: Record<string, (id: string) => string> = {
+  invoice: (id) => `/invoices/${id}`,
+  invoices: (id) => `/invoices/${id}`,
+  patient: (id) => `/patients/${id}`,
+  patients: (id) => `/patients/${id}`,
+  medical_record: (id) => `/medical/records/${id}`,
+  medical_records: (id) => `/medical/records/${id}`,
+  products: (id) => `/inventory/products/${id}`,
+  staff_profiles: (id) => `/hr/staff/${id}`,
+  staff_profile_sensitive: (id) => `/hr/staff/${id}`,
+};
+
+function entityLabel(entityType: string | null, lang: "ar" | "en" | string) {
+  if (!entityType) return "—";
+  const known = ENTITY_LABELS[entityType];
+  if (known) return lang === "ar" ? known.ar : known.en;
+  // Unknown/unmapped entity_type: fall back to the raw value, prettified,
+  // rather than hiding it — an unfamiliar label is still more honest than
+  // guessing at a translation we are not sure of.
+  return entityType.replace(/_/g, " ");
+}
+
+function entityRoute(entityType: string | null, entityId: string | null) {
+  if (!entityType || !entityId) return null;
+  const build = ENTITY_ROUTES[entityType];
+  return build ? build(entityId) : null;
+}
 
 function actionTone(action: string | null) {
   const a = (action ?? "").toLowerCase();
@@ -238,7 +305,7 @@ export default function AuditLogs() {
             <SelectContent>
               <SelectItem value="all">{lang === "ar" ? "كل الكيانات" : "All entities"}</SelectItem>
               {entityTypes.map(e => (
-                <SelectItem key={e} value={e} className="capitalize">{e.replace(/_/g, " ")}</SelectItem>
+                <SelectItem key={e} value={e}>{entityLabel(e, lang)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -257,7 +324,7 @@ export default function AuditLogs() {
                       <TableHead>{lang === "ar" ? "المستخدم" : "User"}</TableHead>
                       <TableHead className="w-[120px]">{lang === "ar" ? "الإجراء" : "Action"}</TableHead>
                       <TableHead className="w-[160px]">{lang === "ar" ? "نوع الكيان" : "Entity type"}</TableHead>
-                      <TableHead>{lang === "ar" ? "معرّف الكيان" : "Entity ID"}</TableHead>
+                      <TableHead>{lang === "ar" ? "السجل" : "Record"}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -276,6 +343,7 @@ export default function AuditLogs() {
                       const subLabel = i.actor?.full_name
                         ? i.actor?.email
                         : (i.actor?.email ? null : i.user_id);
+                      const recordHref = entityRoute(i.entity_type, i.entity_id);
                       return (
                         <TableRow key={i.id}>
                           <TableCell className="align-top">
@@ -305,14 +373,28 @@ export default function AuditLogs() {
                             </Badge>
                           </TableCell>
                           <TableCell className="align-top">
-                            <Badge variant="outline" className="capitalize">
-                              {i.entity_type ? i.entity_type.replace(/_/g, " ") : "—"}
+                            <Badge variant="outline" className="capitalize" title={i.entity_type ?? undefined}>
+                              {entityLabel(i.entity_type, lang)}
                             </Badge>
                           </TableCell>
                           <TableCell className="align-top">
-                            <div className="text-xs text-muted-foreground font-mono truncate max-w-[240px]">
-                              {i.entity_id ?? "—"}
-                            </div>
+                            {recordHref ? (
+                              <Link
+                                to={recordHref}
+                                className="inline-flex items-center gap-1 text-xs font-mono text-primary hover:underline max-w-[240px]"
+                                title={i.entity_id ?? undefined}
+                              >
+                                <ExternalLink className="size-3.5 shrink-0" />
+                                <span className="truncate">{i.entity_id}</span>
+                              </Link>
+                            ) : (
+                              <div
+                                className="text-xs text-muted-foreground font-mono truncate max-w-[240px]"
+                                title={i.entity_id ?? undefined}
+                              >
+                                {i.entity_id ?? "—"}
+                              </div>
+                            )}
                           </TableCell>
                         </TableRow>
                       );

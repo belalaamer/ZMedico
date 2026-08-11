@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Plus, Activity, AlertCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ type Therapist = {
 export default function PhysioCases() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
+  const navigate = useNavigate();
   // R2: canonical authorization entry point.
   const { authz } = useAuthorization("PhysioCases");
   const [searchParams, setSearchParams] = useSearchParams();
@@ -122,9 +123,21 @@ export default function PhysioCases() {
       expected_sessions: Number(form.expected_sessions) || 0,
       created_by: u.user?.id ?? null,
     };
-    const { error } = await supabase.from("physio_cases" as any).insert(payload);
+    // .select("id") so we can navigate straight to the record we just
+    // created -- never by re-querying/sorting for "the latest one".
+    const { data: inserted, error } = await supabase
+      .from("physio_cases" as any)
+      .insert(payload)
+      .select("id")
+      .single();
     if (error) { toast.error(error.message); return; }
-    toast.success(t("saved") ?? "Saved");
+    const newCaseId = (inserted as any)?.id as string | undefined;
+    toast.success(t("saved") ?? "Saved", newCaseId ? {
+      action: {
+        label: lang === "ar" ? "عرض السجل" : "View Record",
+        onClick: () => navigate(`/physio/${newCaseId}`),
+      },
+    } : undefined);
     setOpen(false);
     setForm({ ...form, patient_id: "", appointment_id: null, diagnosis: "", treatment_goal: "", treatment_plan: "", notes: "" });
     load();

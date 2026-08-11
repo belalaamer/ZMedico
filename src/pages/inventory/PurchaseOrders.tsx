@@ -104,7 +104,15 @@ export default function PurchaseOrders() {
     const { error: e2 } = await supabase.from("purchase_order_items").insert(rows as any);
     setSaving(false);
     if (e2) { toast.error(e2.message); return; }
-    toast.success(po.po_number);
+    // po.id here is the exact row the insert above returned -- never a
+    // "latest purchase order" lookup -- so the action always opens the
+    // record that was actually just created.
+    toast.success(po.po_number, {
+      action: {
+        label: lang === "ar" ? "عرض السجل" : "View Record",
+        onClick: () => navigate(`/inventory/purchase-orders/${po.id}`),
+      },
+    });
     reset(); setOpen(false); load();
   };
 

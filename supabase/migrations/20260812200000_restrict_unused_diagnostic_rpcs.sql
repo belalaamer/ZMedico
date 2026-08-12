@@ -1,0 +1,57 @@
+-- Security remediation: J-08, J-09, J-13 (RBAC audit, Phase K.4)
+--
+-- Three internal/diagnostic RPCs were reachable via PostgREST by any
+-- authenticated user, with zero legitimate application, Edge Function, or
+-- workflow caller (verified by full-repository search across src/,
+-- supabase/functions/, .github/workflows/, and by searching every other
+-- function body and trigger definition in the live database):
+--
+--   * public.renumber_active_invoices()
+--     Renumbers EVERY active invoice across EVERY branch in a single call.
+--     A dormant trigger FUNCTION (tg_invoice_renumber_after_change, owned
+--     by postgres, SECURITY DEFINER) already calls it, but that trigger
+--     function is NOT currently attached to any table (confirmed via
+--     pg_trigger -- zero live triggers reference it). Even if it were
+--     reattached in the future, it would execute in the trigger function's
+--     own SECURITY DEFINER context (postgres), which is unaffected by
+--     revoking EXECUTE from `authenticated`/`anon`/PUBLIC. This migration
+--     does not touch tg_invoice_renumber_after_change() or any trigger.
+--
+--   * public.run_financial_regression_tests()
+--     A manual diagnostic/regression tool that writes real rows into
+--     production tables (patients, invoices, payments, ...) and relies on
+--     transaction rollback for cleanup, while internally impersonating an
+--     admin JWT claim. No CI workflow, Edge Function, or application code
+--     calls it.
+--
+--   * public.prune_client_errors(integer)
+--     Temporarily disables the append-only trigger on client_errors and
+--     deletes rows older than the given number of days. Not currently
+--     scheduled anywhere (absent from cron.job) and not called by any
+--     application/Edge Function/workflow code.
+--
+-- Pre-flight note: prune_client_errors(integer) was found to already have
+-- no `authenticated` EXECUTE grant at the time this migration was written
+-- (re-verified live immediately before applying), contradicting an earlier
+-- assumption made from a bulk grants dump rather than a targeted check.
+-- The REVOKE statement below is kept anyway -- it is a safe no-op for that
+-- function and keeps the intended end state explicit and idempotent.
+--
+-- This migration ONLY changes function-level GRANT/REVOKE for these three
+-- functions. It does not alter function bodies, SECURITY DEFINER status,
+-- ownership, triggers, RLS, cron jobs, Edge Function source, or GitHub
+-- Actions workflows. It is fully independent of the J-06/J-07/J-12
+-- migration (20260812180000_revoke_authenticated_execute_cron_secret_rpcs.sql).
+
+revoke execute on function public.renumber_active_invoices() from public, anon, authenticated;
+revoke execute on function public.run_financial_regression_tests() from public, anon, authenticated;
+revoke execute on function public.prune_client_errors(integer) from public, anon, authenticated;
+
+-- Intended end state for all three functions:
+--   anon           -> no EXECUTE
+--   authenticated  -> no EXECUTE (renumber_active_invoices and
+--                     run_financial_regression_tests previously granted it;
+--                     removed by this migration)
+--   PUBLIC         -> no EXECUTE
+--   postgres       -> EXECUTE preserved (function owner)
+--   service_role   -> EXECUTE preserved (untouched by this migration)

@@ -1,0 +1,38 @@
+-- Security remediation: J-15 (RBAC audit, Phase K.8)
+--
+-- public.fn_resolve_coverage(uuid, invoice_item_type, uuid, numeric) was
+-- callable via PostgREST by any authenticated user, despite having no
+-- legitimate caller anywhere.
+--
+-- Phase K.7 established this through four independent search layers:
+--   1. Full-repository code search (src/, supabase/functions/,
+--      supabase/migrations/, .github/workflows/) for "fn_resolve_coverage",
+--      "resolve_coverage", and related terms: zero matches.
+--   2. Direct read of src/pages/settings/InsuranceContracts.tsx (the only
+--      page that manages insurance_contracts / insurance_contract_rules):
+--      it performs plain CRUD on those two tables and never calls this RPC
+--      -- it only lets admins *define* coverage rules, it does not *apply*
+--      them to anything.
+--   3. A search of every other function body (pg_proc.prosrc) in the live
+--      database: zero callers.
+--   4. A search of every trigger definition (pg_trigger) and view
+--      definition (pg_views): zero references.
+--
+-- insurance_contracts has no branch_id column (verified against the live
+-- schema), so there is no branch-isolation gap to close here either --
+-- the function reads a branch-less, company-level contract/rule pair and
+-- returns a computed coverage amount; it performs no writes and is STABLE.
+--
+-- This migration changes EXECUTE privileges only, for this one function.
+-- It does not touch the eight user_has_branch_access_via_* functions
+-- (J-14 -- confirmed NOT SAFE TO RESTRICT, left untouched), RLS policies,
+-- triggers, other functions, Edge Functions, workflows, cron, or Vault.
+
+revoke execute on function public.fn_resolve_coverage(uuid, invoice_item_type, uuid, numeric) from public, anon, authenticated;
+
+-- Intended end state:
+--   anon           -> no EXECUTE (was already the case)
+--   authenticated  -> no EXECUTE (previously granted; removed by this migration)
+--   PUBLIC         -> no EXECUTE (was already the case)
+--   postgres       -> EXECUTE preserved (function owner)
+--   service_role   -> EXECUTE preserved (untouched by this migration)

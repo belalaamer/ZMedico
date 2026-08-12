@@ -1,0 +1,67 @@
+-- Security remediation: J-06, J-07, J-12 (RBAC audit, Phase K.2)
+--
+-- Problem: three internal/system RPCs were reachable via PostgREST by any
+-- authenticated user because EXECUTE was granted to the `authenticated`
+-- role (a default Supabase behavior for newly created functions). None of
+-- them have any legitimate application, Edge Function, or workflow caller
+-- (verified by full-repository code search in Phase J-Final / K.1 -- zero
+-- matches in src/, supabase/functions/, and .github/workflows/).
+--
+--   * public._get_cron_secret()              -- reads the shared pg_cron ->
+--     Edge Function bearer secret straight out of Vault. Any authenticated
+--     user could call it and obtain the secret.
+--   * public._set_cron_secret(text)           -- overwrites that same secret
+--     with an arbitrary value supplied by the caller. Any authenticated user
+--     could hijack or break the reminder pipeline's trust anchor.
+--   * public.invoke_reminder_function(text,jsonb) -- reads the secret
+--     internally and performs an authenticated net.http_post to
+--     `.../functions/v1/<_fn>` with an arbitrary caller-supplied function
+--     name and body. Strictly more dangerous than the two above combined:
+--     it does not just leak the secret, it lets the caller *use* it against
+--     any Edge Function immediately.
+--
+-- Legitimate execution path (confirmed live in pg_cron and left untouched):
+--   pg_cron (runs as `postgres`)
+--     -> invoke_reminder_function('send-reminder', ...)   [*/15 * * * *]
+--     -> invoke_reminder_function('enqueue-winback', ...) [0 2 * * *]
+--       -> _get_cron_secret() (internal SQL call, not via PostgREST)
+--       -> net.http_post(..., Authorization: Bearer <secret>)
+--       -> send-reminder / enqueue-winback Edge Functions
+--
+-- pg_cron executes scheduled commands as the role that owns the cron job
+-- (`postgres` here), which is entirely separate from PostgREST's `anon` /
+-- `authenticated` roles. Revoking EXECUTE from `anon` and `authenticated`
+-- does not affect `postgres`, `service_role`, or pg_cron in any way.
+--
+-- A second, independent reminder-dispatch path exists via GitHub Actions
+-- (.github/workflows/reminders.yml), which calls the same Edge Functions
+-- directly over HTTPS using a GitHub Actions secret. That path never calls
+-- any of these three RPCs and is completely unaffected by this migration.
+--
+-- This migration ONLY changes function-level GRANT/REVOKE. It does not
+-- alter function bodies, SECURITY DEFINER status, ownership, Vault access,
+-- pg_cron jobs, Edge Function source, or GitHub Actions workflows.
+--
+-- Verified live before applying (Phase K.2):
+--   owner = postgres, SECURITY DEFINER = true for all three functions.
+--   Before: anon=false, authenticated=true, PUBLIC=false, postgres=true,
+--           service_role=true (via information_schema.role_routine_grants).
+--   After (this migration): anon=false, authenticated=false, PUBLIC=false,
+--           postgres=true, service_role=true.
+--   Negative-access runtime test: SET LOCAL ROLE authenticated; SELECT
+--   public._get_cron_secret(); -> ERROR 42501 permission denied. SET LOCAL
+--   ROLE anon; SELECT public.invoke_reminder_function(...); -> ERROR 42501
+--   permission denied. Both rolled back (no side effects).
+--   Positive test: has_function_privilege('postgres', ...) = true for both
+--   functions, confirming pg_cron's execution path is unaffected.
+
+revoke execute on function public._get_cron_secret() from public, anon, authenticated;
+revoke execute on function public._set_cron_secret(text) from public, anon, authenticated;
+revoke execute on function public.invoke_reminder_function(text, jsonb) from public, anon, authenticated;
+
+-- Intended end state:
+--   anon           -> no EXECUTE (was already the case)
+--   authenticated  -> no EXECUTE (previously granted; removed by this migration)
+--   PUBLIC         -> no EXECUTE (was already the case)
+--   postgres       -> EXECUTE preserved (function owner)
+--   service_role   -> EXECUTE preserved (untouched by this migration)

@@ -219,7 +219,7 @@ function AppContent() {
               <Route path="/reports/doctor-performance" element={<PermissionRoute><DoctorPerformance /></PermissionRoute>} />
               <Route path="/branches" element={<PermissionRoute adminOnly><Branches /></PermissionRoute>} />
               <Route path="/branches/dashboard" element={<PermissionRoute adminOnly><BranchDashboard /></PermissionRoute>} />
-              <Route path="/settings/branches" element={<PermissionRoute><Branches /></PermissionRoute>} />
+              <Route path="/settings/branches" element={<PermissionRoute adminOnly><Branches /></PermissionRoute>} />
               <Route path="/settings" element={<PermissionRoute adminOnly><GeneralSettings /></PermissionRoute>} />
               <Route path="/settings/general" element={<PermissionRoute adminOnly><GeneralSettings /></PermissionRoute>} />
               <Route path="/settings/appointments" element={<PermissionRoute adminOnly><AppointmentSettings /></PermissionRoute>} />

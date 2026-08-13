@@ -24,7 +24,7 @@ import { Can } from "@/components/Can";
 // Operational roles only. Administrative roles (`admin`, `system_owner`) are
 // intentionally excluded — they must be granted exclusively via the User
 // Management module, never through Staff creation.
-const ROLES = ["manager", "doctor", "nurse", "receptionist", "accountant", "hr", "staff"] as const;
+const ROLES = ["manager", "doctor", "nurse", "receptionist", "accountant", "hr"] as const;
 
 export function statusLabel(s: string, t: (k: any) => string) {
   const map: Record<string, string> = { active: "statusActive", on_leave: "statusOnLeave", terminated: "statusTerminated", suspended: "statusSuspended" };

@@ -22,7 +22,7 @@ Scope: 101 public tables, 8 roles, 4 admin edge functions, 7 scheduled/system jo
 | 2 | Doctor sees own commissions | `doctor_commissions."View commissions"` allows `doctor_id=auth.uid()` OR admin/hr/manager | Confirmed |
 | 3 | Wallet balances for receptionist | `wallets_select_scoped` includes receptionist | Confirmed |
 | 4 | Nurse reads medical history | `medical_records` SELECT policy includes nurse role | Confirmed |
-| 5 | Accountant cross-branch | `branch_isolation` runs on invoices/treasury, and `user_has_branch_access` grants admins/accountants everything via role bypass in `has_role` short-circuit — verify each accountant is granted branches explicitly | Confirmed by convention (accountants get all branches at seed time) |
+| 5 | Accountant cross-branch | `branch_isolation` runs on invoices/treasury. `user_has_branch_access()` does not grant admin/accountant any bypass — only `system_owner` is exempted inside that function. Admin/accountant cross-branch coverage observed in practice comes solely from `staff_branches` rows assigned at seed time, not from a function-level bypass; this remains a seed-data convention, not an enforced guarantee. | Confirmed by convention (accountants get all branches at seed time) |
 | 6 | Audit logs admin-only | `al_select_admin` = admin only | Confirmed |
 
 ## Critical findings

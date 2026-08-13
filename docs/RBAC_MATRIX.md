@@ -11,7 +11,14 @@ Authoritative matrix. Enforced in three layers that MUST agree:
   Void / Soft-archive are exposed via UI where appropriate.
 - **Segregation of Duties (strict).** Each role sees only what it needs.
 - **Branch isolation.** All branch-scoped tables enforce
-  `user_has_branch_access(branch_id)`; admins bypass via `has_role`.
+  `user_has_branch_access(branch_id)`. Only `system_owner` receives an
+  unconditional bypass from this function; `admin` does not — where a
+  policy AND-combines an admin role check with `user_has_branch_access(branch_id)`
+  (e.g. `payroll.pay_admin`), an admin still needs a matching `staff_branches`
+  row for that branch. Some policies separately grant admin an unconditional
+  allow via an explicit `has_role(admin)` OR-branch in the policy expression
+  itself, independent of `user_has_branch_access()` — check the specific
+  policy, not this function, to know which applies.
 
 ## Modules x Actions
 

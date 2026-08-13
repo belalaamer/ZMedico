@@ -45,7 +45,7 @@ export default function Staff() {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"existing" | "new">("new");
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [newUser, setNewUser] = useState({ email: "", full_name: "", role: "staff" as string, password: "" });
+  const [newUser, setNewUser] = useState({ email: "", full_name: "", role: "" as string, password: "" });
   const [creatingUser, setCreatingUser] = useState(false);
   const [createdInfo, setCreatedInfo] = useState<{ email: string; password: string } | null>(null);
   const [pendingDelete, setPendingDelete] = useState<any>(null);
@@ -83,7 +83,7 @@ export default function Staff() {
     }
 
     if (mode === "new" && !editingId) {
-      if (!newUser.email || !newUser.full_name) { toast.error(t("fullName") + " / Email"); return; }
+      if (!newUser.email || !newUser.full_name || !newUser.role) { toast.error(t("fullName") + " / Email / Role"); return; }
       setCreatingUser(true);
       const { data, error } = await supabase.functions.invoke("admin-create-user", {
         body: {

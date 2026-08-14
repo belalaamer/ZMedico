@@ -32,6 +32,10 @@ export default function Prescriptions() {
     toast.success(t("delete")); load();
   };
 
+  // NOTE: patient_code is still included in the search filter below (so
+  // searching by clinic number keeps working) even though it's no longer
+  // shown as a visible badge in the row -- per the UX fix, the number should
+  // only be *displayed* on the main Patients list, not here.
   const filtered = items.filter((r) => {
     if (!search) return true;
     const s = search.toLowerCase();
@@ -57,7 +61,7 @@ export default function Prescriptions() {
                   <Link to={`/medical/prescriptions/${rx.id}`} className="flex items-center gap-3 flex-1 min-w-0">
                   <Pill className="size-5 text-primary"/>
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium">{name} <span className="text-xs text-muted-foreground">#{p?.patient_code}</span></div>
+                    <div className="font-medium">{name}</div>
                     <div className="text-xs text-muted-foreground">{formatDate(rx.prescription_date, lang)}</div>
                   </div>
                   <Badge variant="outline" className={rx.status === "active" ? "status-progress" : rx.status === "completed" ? "status-completed" : "status-cancelled"}>{rx.status === "active" ? t("activeRx") : rx.status === "completed" ? t("completed") : t("discontinued")}</Badge>

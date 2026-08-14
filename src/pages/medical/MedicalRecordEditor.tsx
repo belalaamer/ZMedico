@@ -150,7 +150,6 @@ export default function MedicalRecordEditor() {
           <div className="flex-1 min-w-0">
             <Link to={`/patients/${patient.id}`} className="font-bold text-lg hover:underline">{patientName}</Link>
             <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-1 mt-1">
-              <span>#{patient.patient_code}</span>
               {age != null && <span>{age} {t("yearsOld")}</span>}
               {patient.gender && <span>{t(patient.gender as any)}</span>}
               {patient.phone && <span>{patient.phone}</span>}

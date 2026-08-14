@@ -36,7 +36,7 @@ export function ReferrerPicker({
         .map((p: any) => {
           const name = `${p.first_name_en ?? p.first_name_ar ?? ""} ${p.last_name_en ?? p.last_name_ar ?? ""}`.trim();
           const phone = p.phone ? ` · ${p.phone}` : "";
-          return { value: p.id, label: `#${p.patient_code} · ${name}${phone}` };
+          return { value: p.id, label: `${name}${phone}` };
         });
       // Keep current value selectable even if it's outside the page window.
       if (value && !rows.find((r) => r.value === value)) {
@@ -48,7 +48,7 @@ export function ReferrerPicker({
         if (cur) {
           rows.unshift({
             value: cur.id,
-            label: `#${cur.patient_code} · ${cur.first_name_en ?? cur.last_name_ar ?? ""}${cur.phone ? " · " + cur.phone : ""}`,
+            label: `${cur.first_name_en ?? cur.last_name_ar ?? ""}${cur.phone ? " · " + cur.phone : ""}`,
           });
         }
       }

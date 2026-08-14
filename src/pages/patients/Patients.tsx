@@ -88,9 +88,18 @@ export default function PatientsPage() {
     setLoading(true);
     const from = page * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
+    // RBAC-11 / UX fix: sort by patient_code (a guaranteed strictly-
+    // increasing, never-reused sequence assigned by tg_patient_assign_code)
+    // instead of created_at. Previously the list was ordered by created_at,
+    // which does not always correspond to the visible "#N" numbering shown
+    // per row (e.g. batches of older records inserted later than newer-
+    // numbered ones) -- so a user scanning the numbered list saw the
+    // numbers jump around non-sequentially. patient_code descending gives
+    // the same "most recently registered first" ordering intent while
+    // guaranteeing the visible numbers are always in consistent order.
     let query = supabase.from("patients")
       .select("id,patient_code,first_name_en,last_name_en,first_name_ar,last_name_ar,phone,phone2,email,gender,city,address,dob,blood_type,notes,branch_id,created_at", { count: "exact" })
-      .is("deleted_at", null).order("created_at", { ascending: false }).range(from, to);
+      .is("deleted_at", null).order("patient_code", { ascending: false }).range(from, to);
     if (currentBranchId) query = query.eq("branch_id", currentBranchId);
     const { data, error, count } = await query;
     setLoading(false);

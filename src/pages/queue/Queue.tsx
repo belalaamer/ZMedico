@@ -786,9 +786,6 @@ export default function QueuePage() {
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-2">
                           <Link to={`/patients/${r.patient_id}`} className="font-medium hover:underline">{patientName(r)}</Link>
-                          {r.patients?.patient_code != null && (
-                            <span className="text-[11px] text-muted-foreground">#{r.patients.patient_code}</span>
-                          )}
                           {(r.priority ?? 0) > 0 && (
                             <Badge variant="destructive" className="text-[10px] h-5">{t("urgent")}</Badge>
                           )}
@@ -894,7 +891,10 @@ export default function QueuePage() {
               <Combobox
                 options={patientOptions.map((p) => ({
                   value: p.id,
-                  label: `${patientDisplay(p)} · #${p.patient_code}`,
+                  // UX fix: only show the patient's name here; the "#N" clinic
+                  // number stays exclusive to the main Patients list. It's kept
+                  // in `keywords` below so searching by number still works.
+                  label: `${patientDisplay(p)}`,
                   keywords: `${p.first_name_en} ${p.last_name_en ?? ""} ${p.first_name_ar ?? ""} ${p.last_name_ar ?? ""} ${p.phone ?? ""} ${p.patient_code}`,
                 }))}
                 value={walkInPatient}

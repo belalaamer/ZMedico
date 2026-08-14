@@ -151,7 +151,9 @@ export default function QuickConsult() {
               onChange={(v) => setForm({ ...form, patient_id: v })}
               options={patients.map((p) => ({
                 value: p.id,
-                label: `#${p.patient_code} · ${p.first_name_en} ${p.last_name_en ?? ""}`.trim(),
+                // UX fix: only show the patient's name here -- the "#N" clinic
+                // number stays exclusive to the main Patients list.
+                label: `${p.first_name_en} ${p.last_name_en ?? ""}`.trim(),
               }))}
               placeholder={t("selectPatient")}
               searchPlaceholder={lang === "ar" ? "ابحث عن مريض..." : "Search patient..."}

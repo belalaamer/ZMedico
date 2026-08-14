@@ -116,7 +116,6 @@ export default function OutstandingDebts() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <div className="font-semibold tabular-nums">{r.invoice_number}</div>
-                        <Badge variant="outline" className="text-[10px]">#{p.patient_code}</Badge>
                         <Badge variant="outline" className={r.status === "partial" ? "status-progress" : "status-review"}>
                           {r.status === "partial" ? t("statusPartial") : t("statusPending")}
                         </Badge>

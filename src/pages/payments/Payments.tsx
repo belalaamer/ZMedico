@@ -115,7 +115,7 @@ export default function Payments() {
                     <MIcon className="size-5" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">{name} <span className="text-xs text-muted-foreground">#{pt?.patient_code}</span></div>
+                    <div className="font-medium truncate">{name}</div>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
                       <span className="text-xs text-muted-foreground">{formatDateTime(p.created_at, lang)}</span>
                       <Badge variant="outline" className={`text-[10px] font-medium ${ms.badge}`}>{methodLabel}</Badge>

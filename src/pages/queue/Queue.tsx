@@ -94,9 +94,21 @@ export default function QueuePage() {
   const navigate = useNavigate();
   // R2: canonical authorization entry point.
   const { authz } = useAuthorization("Queue");
-  // Queue mutations are gated behind appointments:update. Users without it
-  // see read-only rows; route-level guard handles view permission.
-  const canMutate = authz.can("appointments.update") || authz.can("appointments.manage");
+  // Queue mutations are gated behind appointments.edit — the real permission
+  // key (RBAC-04 fix). The matrix's canonical action vocabulary is strictly
+  // view/create/edit/delete/export (src/lib/rolePermissions.ts ACTIONS); the
+  // previous check here — "appointments.update" / "appointments.manage" —
+  // referenced two actions that do not exist anywhere in that vocabulary, so
+  // `authz.can(...)` always resolved false for every non-admin role. Since
+  // doctor, nurse, receptionist, and manager all legitimately hold
+  // appointments.edit (confirmed against the live role_permissions table and
+  // the appointments RLS policies, which already allow their UPDATEs), this
+  // silently blocked check-in/status-change/cancel for all of them in the
+  // Queue UI alone — a front-end-only regression, not a security boundary
+  // (the DB never depended on this check). Only `isAdmin` bypassed it via
+  // AuthorizationService's own short-circuit, which is why the bug went
+  // unnoticed for admin testing.
+  const canMutate = authz.can("appointments.edit");
   const [rows, setRows] = useState<QueueRow[]>([]);
   const [doctors, setDoctors] = useState<{ id: string; full_name: string }[]>([]);
   const [loading, setLoading] = useState(true);

@@ -22,14 +22,31 @@ export function usePermissions() {
 
   // Access gate: a user must be linked to an active staff_profile to have
   // module access. Admins bypass to prevent bootstrap lockout.
+  //
+  // RBAC-06 fix: this used to query the base `staff_profiles` table
+  // directly (`.from("staff_profiles").select("id")...`). That table's
+  // only SELECT policies are `staff_admin` (settings.edit, i.e. admin) and
+  // `hr_staff_select` (hr role) as of the H1-01-S security remediation
+  // (PR #66), which intentionally dropped the old `staff_select_self`
+  // policy to close a full-row self-access exposure (salary,
+  // national_id, bank_account, etc.). That migration's consumer sweep
+  // did not catch this call site, so since that merge this query has
+  // returned zero rows for every non-admin, non-hr user -- meaning
+  // `linked` resolved to `false` and `can()` denied every permission for
+  // every doctor/nurse/receptionist/accountant/manager account in
+  // production. Fix: read from `staff_profiles_self` instead -- the
+  // column-restricted, security-invoker=false view created by that same
+  // H1-01-S migration specifically so a caller can read their own
+  // non-sensitive staff fields (including `status`) without needing the
+  // dropped policy. This restores the original linkage semantics (must
+  // have a staff record, must not be terminated) without reopening the
+  // sensitive-column exposure the H1-01-S fix closed.
   useEffect(() => {
     let active = true;
     if (!user) { setLinked(null); return; }
     (supabase as any)
-      .from("staff_profiles")
-      .select("id")
-      .eq("linked_user_id", user.id)
-      .is("deleted_at", null)
+      .from("staff_profiles_self")
+      .select("status")
       .neq("status", "terminated")
       .limit(1)
       .maybeSingle()

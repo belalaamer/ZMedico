@@ -771,7 +771,16 @@ export default function QueuePage() {
               {loading ? (
                 <tr><td colSpan={8} className="p-0"><ListSkeleton rows={6} /></td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={8} className="text-center text-muted-foreground py-10">{t("noPatientsInQueue")}</td></tr>
+                <tr>
+                  <td colSpan={8} className="text-center py-10">
+                    <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                      <span>{t("noPatientsInQueue")}</span>
+                      <Button type="button" onClick={() => setWalkInOpen(true)} size="sm" variant="outline">
+                        <Plus className="size-4 me-1" /> {t("addWalkIn")}
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
               ) : (
                 filtered.map((r) => {
                   const waitMs = rowWaitingMs(r);
@@ -828,7 +837,12 @@ export default function QueuePage() {
         {loading ? (
           <Card className="p-0 overflow-hidden"><ListSkeleton rows={5} /></Card>
         ) : filtered.length === 0 ? (
-          <Card className="py-10 text-center text-muted-foreground">{t("noPatientsInQueue")}</Card>
+          <Card className="py-10 flex flex-col items-center gap-3 text-center text-muted-foreground">
+            <span>{t("noPatientsInQueue")}</span>
+            <Button type="button" onClick={() => setWalkInOpen(true)} size="sm" variant="outline">
+              <Plus className="size-4 me-1" /> {t("addWalkIn")}
+            </Button>
+          </Card>
         ) : (
           filtered.map((r) => {
             const waitMs = rowWaitingMs(r);

@@ -17,6 +17,8 @@ import {
 } from "recharts";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { supabase } from "@/integrations/supabase/client";
 import { formatMoney, formatDate, formatDateTime } from "@/lib/format";
 
@@ -56,9 +58,28 @@ function localToday(): string {
 export default function Dashboard() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
+  const { user } = useAuth();
+  // Role-aware composition (FINAL-03 UX audit): the Dashboard is reachable by
+  // every authenticated role (see App.tsx route comment — no single
+  // permission is held by all roles), so widget VISIBILITY here is gated on
+  // the same authz.can(...) permission keys already used for navigation and
+  // routing, not on a hardcoded role list. This keeps one Dashboard
+  // implementation while each role only sees the sections relevant to their
+  // actual responsibilities. This is presentation-only: every query below
+  // already ran unconditionally for every role prior to this change, and
+  // still does — Postgres RLS remains the sole data-authorization boundary.
+  // Hiding a card here never substitutes for, or weakens, that boundary.
+  const { authz } = useAuthorization("Dashboard");
+  const canFinance = authz.can("invoices.view") || authz.can("treasury.view");
+  const canTreasury = authz.can("treasury.view");
+  const canFrontDeskIntake = authz.can("patients.create") || authz.can("appointments.create");
+  const canClinical = authz.can("medical_records.view");
+  const canOpsReports = authz.can("reports_operational.view");
+  const canHR = authz.can("hr.view");
 
   const [loading, setLoading] = useState(true);
   const [todayAppts, setTodayAppts] = useState(0);
+  const [myApptsToday, setMyApptsToday] = useState(0);
   const [apptStatusToday, setApptStatusToday] = useState<Record<string, number>>({});
   const [newPatientsToday, setNewPatientsToday] = useState(0);
   const [todayRevenue, setTodayRevenue] = useState(0);
@@ -66,6 +87,7 @@ export default function Dashboard() {
   const [pendingInvoicesAmount, setPendingInvoicesAmount] = useState(0);
   const [todayConsults, setTodayConsults] = useState(0);
   const [draftRecords, setDraftRecords] = useState(0);
+  const [pendingLeaveRequests, setPendingLeaveRequests] = useState(0);
 
   // Treasury at-a-glance (today + last close)
   const [lastClose, setLastClose] = useState<{ business_date: string; counted_cash: number; variance: number } | null>(null);
@@ -129,8 +151,9 @@ export default function Dashboard() {
         recentPayRes,
         doctorApptRes,
         topItemsRes,
+        pendingLeaveRes,
       ] = await Promise.all([
-        branchEq(supabase.from("appointments").select("status")
+        branchEq(supabase.from("appointments").select("status,doctor_id")
           .is("deleted_at", null)
           .gte("scheduled_at", start.toISOString()).lte("scheduled_at", end.toISOString())),
         branchEq(supabase.from("patients").select("id", { count: "exact", head: true })
@@ -160,6 +183,7 @@ export default function Dashboard() {
         supabase.from("invoice_items").select("description_en,description_ar,quantity,total,invoice:invoices!inner(branch_id,invoice_date,deleted_at)")
           .is("invoice.deleted_at", null)
           .gte("invoice.invoice_date", rangeStart).lte("invoice.invoice_date", rangeEnd),
+        supabase.from("leave_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
       ]);
 
       // Treasury (mirrors Treasury page: filter by treasury_id for this branch,
@@ -200,8 +224,9 @@ export default function Dashboard() {
       setTodayTreasuryIn(tIn);
       setTodayTreasuryOut(tOut);
 
-      const apptRows = (apptsTodayRes.data ?? []) as { status: string }[];
+      const apptRows = (apptsTodayRes.data ?? []) as { status: string; doctor_id: string | null }[];
       setTodayAppts(apptRows.length);
+      setMyApptsToday(user?.id ? apptRows.filter((r) => r.doctor_id === user.id).length : 0);
       const sb: Record<string, number> = {};
       for (const r of apptRows) sb[r.status] = (sb[r.status] ?? 0) + 1;
       setApptStatusToday(sb);
@@ -216,6 +241,7 @@ export default function Dashboard() {
 
       setTodayConsults(consultsRes.count ?? 0);
       setDraftRecords(draftsRes.count ?? 0);
+      setPendingLeaveRequests(pendingLeaveRes.count ?? 0);
 
       // Revenue over selected range
       const buckets = new Map<string, number>();
@@ -314,7 +340,7 @@ export default function Dashboard() {
         .sort((a, b) => b.count - a.count).slice(0, 8));
 
       setLoading(false);
-  }, [currentBranchId, rangeStart, rangeEnd, lang]);
+  }, [currentBranchId, rangeStart, rangeEnd, lang, user?.id]);
 
   // Initial load + refetch on branch change
   useEffect(() => { run(); }, [run]);
@@ -384,9 +410,9 @@ export default function Dashboard() {
           <p className="text-sm text-muted-foreground mt-1">{t("tagline")}</p>
         </div>
         <div className="hidden md:flex gap-2 flex-wrap">
-          <Button asChild><Link to="/patients">{t("addPatient")}</Link></Button>
+          {canFrontDeskIntake && <Button asChild><Link to="/patients">{t("addPatient")}</Link></Button>}
           <Button asChild variant="outline"><Link to="/calendar">{t("newAppointment")}</Link></Button>
-          <Button asChild variant="outline"><Link to="/invoices">{t("createInvoice")}</Link></Button>
+          {canFinance && <Button asChild variant="outline"><Link to="/invoices">{t("createInvoice")}</Link></Button>}
           <Button asChild variant="outline"><Link to="/reports">{t("viewAllReports")}</Link></Button>
         </div>
       </div>
@@ -394,15 +420,19 @@ export default function Dashboard() {
       {/* Mobile quick actions — scrollable pill row */}
       <div className="md:hidden -mx-4 px-4 overflow-x-auto">
         <div className="flex gap-2 w-max pb-1">
-          <Button asChild size="sm" className="rounded-full whitespace-nowrap">
-            <Link to="/patients"><UserPlus className="size-4 me-1" />{t("addPatient")}</Link>
-          </Button>
+          {canFrontDeskIntake && (
+            <Button asChild size="sm" className="rounded-full whitespace-nowrap">
+              <Link to="/patients"><UserPlus className="size-4 me-1" />{t("addPatient")}</Link>
+            </Button>
+          )}
           <Button asChild size="sm" variant="outline" className="rounded-full whitespace-nowrap">
             <Link to="/calendar"><CalendarCheck className="size-4 me-1" />{t("newAppointment")}</Link>
           </Button>
-          <Button asChild size="sm" variant="outline" className="rounded-full whitespace-nowrap">
-            <Link to="/invoices"><Receipt className="size-4 me-1" />{t("createInvoice")}</Link>
-          </Button>
+          {canFinance && (
+            <Button asChild size="sm" variant="outline" className="rounded-full whitespace-nowrap">
+              <Link to="/invoices"><Receipt className="size-4 me-1" />{t("createInvoice")}</Link>
+            </Button>
+          )}
           <Button asChild size="sm" variant="outline" className="rounded-full whitespace-nowrap">
             <Link to="/reports"><FileText className="size-4 me-1" />{t("viewAllReports")}</Link>
           </Button>
@@ -443,44 +473,67 @@ export default function Dashboard() {
           <h2 className="mt-4 text-xl font-semibold">{t("noDataYet")}</h2>
           <p className="mt-1 text-sm text-muted-foreground">{t("noDataYetDesc")}</p>
           <div className="mt-5 flex justify-center gap-2 flex-wrap">
-            <Button asChild><Link to="/patients">{t("addPatient")}</Link></Button>
+            {canFrontDeskIntake && <Button asChild><Link to="/patients">{t("addPatient")}</Link></Button>}
             <Button asChild variant="outline"><Link to="/calendar">{t("newAppointment")}</Link></Button>
-            <Button asChild variant="outline"><Link to="/invoices">{t("createInvoice")}</Link></Button>
+            {canFinance && <Button asChild variant="outline"><Link to="/invoices">{t("createInvoice")}</Link></Button>}
           </div>
         </Card>
       ) : (
         <>
           <section className="space-y-3">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{lang === "ar" ? "الماليات والخزينة — اليوم" : "Financials & Treasury — Today"}</h2>
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{lang === "ar" ? "اليوم" : "Today"}</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
             <StatCard
               label={t("todayAppointments")} value={todayAppts}
               sub={`${apptStatusToday.completed ?? 0} ${t("statusCompleted")} · ${apptStatusToday.scheduled ?? 0} ${t("statusScheduled")}`}
               icon={CalendarCheck} tone="from-primary to-primary-glow" to={`/calendar?date=${localToday()}`}
             />
-            <StatCard
-              label={t("newPatientsToday")} value={newPatientsToday}
-              icon={UserPlus} tone="from-info to-info" to="/patients"
-            />
-            <StatCard
-              label={t("todayRevenue")} value={formatMoney(todayRevenue, lang)}
-              icon={Wallet} tone="from-success to-success" to="/payments"
-            />
-            <StatCard
-              label={t("pendingInvoices")} value={pendingInvoicesCount}
-              subValue={`${t("pendingAmount")}: ${formatMoney(pendingInvoicesAmount, lang)}`}
-              icon={Receipt} tone="from-warning to-warning" to="/invoices"
-            />
-            <StatCard
-              label={t("todaysConsultations")} value={todayConsults}
-              icon={Stethoscope} tone="from-primary-glow to-primary" to={`/calendar?date=${localToday()}`}
-            />
-            <StatCard
-              label={t("pendingRecords")} value={draftRecords}
-              icon={FileText} tone="from-warning to-warning" to="/medical/records"
-            />
+            {canClinical && (
+              <StatCard
+                label={lang === "ar" ? "مواعيدي اليوم" : "My appointments today"} value={myApptsToday}
+                icon={Stethoscope} tone="from-primary-glow to-primary" to={`/calendar?date=${localToday()}`}
+              />
+            )}
+            {canFrontDeskIntake && (
+              <StatCard
+                label={t("newPatientsToday")} value={newPatientsToday}
+                icon={UserPlus} tone="from-info to-info" to="/patients"
+              />
+            )}
+            {canFinance && (
+              <StatCard
+                label={t("todayRevenue")} value={formatMoney(todayRevenue, lang)}
+                icon={Wallet} tone="from-success to-success" to="/payments"
+              />
+            )}
+            {canFinance && (
+              <StatCard
+                label={t("pendingInvoices")} value={pendingInvoicesCount}
+                subValue={`${t("pendingAmount")}: ${formatMoney(pendingInvoicesAmount, lang)}`}
+                icon={Receipt} tone="from-warning to-warning" to="/invoices"
+              />
+            )}
+            {canClinical && (
+              <StatCard
+                label={t("todaysConsultations")} value={todayConsults}
+                icon={Stethoscope} tone="from-primary-glow to-primary" to={`/calendar?date=${localToday()}`}
+              />
+            )}
+            {canClinical && (
+              <StatCard
+                label={t("pendingRecords")} value={draftRecords}
+                icon={FileText} tone="from-warning to-warning" to="/medical/records"
+              />
+            )}
+            {canHR && (
+              <StatCard
+                label={lang === "ar" ? "طلبات إجازة معلقة" : "Pending leave requests"} value={pendingLeaveRequests}
+                icon={Clock} tone="from-warning to-warning" to="/hr/leaves"
+              />
+            )}
           </div>
           {/* Treasury at-a-glance */}
+          {canTreasury && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mt-3">
             <StatCard
               label={lang === "ar" ? "آخر إقفال يومي" : "Last daily close"}
@@ -499,8 +552,10 @@ export default function Dashboard() {
               icon={ArrowDownUp} tone="from-info to-info" to="/treasury"
             />
           </div>
+          )}
           </section>
 
+          {canFinance && (
           <section className="space-y-3 pt-2 border-t border-border/40">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{lang === "ar" ? "الاتجاهات — هذا الأسبوع" : "Trends — This week"}</h2>
           <div className="grid lg:grid-cols-3 gap-4">
@@ -543,6 +598,7 @@ export default function Dashboard() {
             </Card>
           </div>
           </section>
+          )}
 
           <section className="space-y-3 pt-2 border-t border-border/40">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{lang === "ar" ? "الاتجاهات — هذا الشهر / النطاق" : "Trends — This month / range"}</h2>
@@ -584,7 +640,9 @@ export default function Dashboard() {
             </Card>
           </div>
 
+          {(canOpsReports || canFinance) && (
           <div className="grid lg:grid-cols-2 gap-4">
+            {canOpsReports && (
             <Card className="p-5 shadow-card border-border/60">
               <div className="text-sm font-medium mb-3 flex items-center gap-2">
                 <Stethoscope className="size-4" /> {t("doctorPerformance")}
@@ -605,7 +663,9 @@ export default function Dashboard() {
                 </div>
               )}
             </Card>
+            )}
 
+            {canFinance && (
             <Card className="p-5 shadow-card border-border/60">
               <div className="flex items-center justify-between mb-3">
                 <div className="text-sm font-medium flex items-center gap-2">
@@ -631,7 +691,9 @@ export default function Dashboard() {
                 )
               }
             </Card>
+            )}
           </div>
+          )}
 
           </section>
 
@@ -683,6 +745,7 @@ export default function Dashboard() {
               }
             </Card>
 
+            {canFinance && (
             <Card className="p-5 shadow-card border-border/60">
               <div className="flex items-center justify-between mb-3">
                 <div className="text-sm font-medium flex items-center gap-2"><Wallet className="size-4" /> {t("recentPayments")}</div>
@@ -703,6 +766,7 @@ export default function Dashboard() {
                 </ul>
               }
             </Card>
+            )}
           </div>
           </section>
         </>

@@ -18,6 +18,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatMoney, formatDate } from "@/lib/format";
 import { toast } from "sonner";
@@ -122,6 +123,7 @@ function parseHour(s: string | null | undefined, mode: "floor" | "ceil"): number
 export default function CalendarPage() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
+  const { user } = useAuth();
   const isMobile = useIsMobile();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -134,6 +136,13 @@ export default function CalendarPage() {
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [doctors, setDoctors] = useState<{ id: string; full_name: string }[]>([]);
   const [doctorFilter, setDoctorFilter] = useState<string>("all");
+  // Doctor-centric default (FINAL-03 UX audit): mirrors the existing,
+  // already-shipped Queue.tsx pattern (see doctorDefaultApplied there) so a
+  // logged-in doctor lands on their own schedule instead of the branch-wide
+  // list. Applied once per mount; the doctor can freely switch back to "All
+  // doctors" afterwards and we do not re-apply. Presentation-only default —
+  // does not change the underlying query, filters, or any authorization.
+  const [doctorDefaultApplied, setDoctorDefaultApplied] = useState(false);
   const [roomFilter, setRoomFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [monthDots, setMonthDots] = useState<Record<string, number>>({});
@@ -284,6 +293,20 @@ export default function CalendarPage() {
       setDoctors(list);
     })();
   }, []);
+
+  // If the signed-in user IS one of the doctors, default the calendar to
+  // "My schedule" on first load — mirrors the equivalent, already-approved
+  // Queue.tsx behavior. The doctor can switch to "All doctors" freely
+  // afterwards; we never re-apply once the default has run.
+  useEffect(() => {
+    if (doctorDefaultApplied || !user?.id || doctors.length === 0) return;
+    if (doctors.some((d) => d.id === user.id)) {
+      setDoctorFilter(user.id);
+    }
+    setDoctorDefaultApplied(true);
+  }, [user?.id, doctors, doctorDefaultApplied]);
+
+  const isDoctorUser = !!user?.id && doctors.some((d) => d.id === user.id);
 
   // Read ?date=YYYY-MM-DD and ?appt=<id> from URL
   useEffect(() => {
@@ -962,6 +985,9 @@ export default function CalendarPage() {
           <SelectTrigger className="h-10 md:h-9 w-auto min-w-[140px] text-sm md:text-xs shrink-0"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{lang === "ar" ? "كل الأطباء" : "All doctors"}</SelectItem>
+            {isDoctorUser && user?.id && (
+              <SelectItem value={user.id}>{lang === "ar" ? "جدولي" : "My schedule"}</SelectItem>
+            )}
             <SelectItem value="__none__">{lang === "ar" ? "بدون طبيب" : "Unassigned"}</SelectItem>
             {doctors.map((d) => <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>)}
           </SelectContent>

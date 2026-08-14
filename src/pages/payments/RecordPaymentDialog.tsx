@@ -23,7 +23,11 @@ export function RecordPaymentDialog({
   open: boolean; onOpenChange: (v: boolean) => void; onSaved: () => void;
   invoiceId?: string | null; patientId?: string; defaultAmount?: number;
 }) {
-  const { t } = useI18n();
+  // UX fix: `lang` is now destructured alongside `t` so the "Amount
+  // required" / fallback "Error" messages below can be localized -- this
+  // file previously only pulled `t`, so those two messages were stuck in
+  // English regardless of the active language.
+  const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
   const { user } = useAuth();
 
@@ -118,9 +122,14 @@ export function RecordPaymentDialog({
       .limit(500)
       .then(({ data }) => {
         const rows = (data ?? []).filter((p: any) => p.deleted_at == null);
+        // UX fix: this combobox is used to pick who the payment is for --
+        // not to look them up by clinic number -- so show just the name,
+        // matching the fix already applied to the other patient pickers
+        // across the app (invoice/appointment/prescription/etc). The "#N"
+        // numbering stays exclusive to the main Patients list.
         setPatients(rows.map((p: any) => ({
           id: p.id,
-          label: `#${p.patient_code} · ${p.first_name_en} ${p.last_name_en ?? ""}`.trim(),
+          label: `${p.first_name_en} ${p.last_name_en ?? ""}`.trim(),
         })));
       });
   };
@@ -131,7 +140,7 @@ export function RecordPaymentDialog({
     if (submittingRef.current) return;
     submittingRef.current = true;
     if (!pid) { toast.error(t("selectPatient")); submittingRef.current = false; return; }
-    if (!amount || amount <= 0) { toast.error("Amount required"); submittingRef.current = false; return; }
+    if (!amount || amount <= 0) { toast.error(lang === "ar" ? "المبلغ مطلوب" : "Amount required"); submittingRef.current = false; return; }
     if (isTopup) {
       if (method === "wallet" || (split && method2 === "wallet")) {
         toast.error(t("walletTopupCannotUseWallet")); submittingRef.current = false; return;
@@ -183,7 +192,7 @@ export function RecordPaymentDialog({
           raw.includes("insufficient") ||
           (raw.includes("balance") && (raw.includes("check") || raw.includes("negative") || raw.includes(">= 0") || raw.includes(">=0")))
         );
-      toast.error(isInsufficient ? t("walletInsufficient") : (error.message ?? "Error"));
+      toast.error(isInsufficient ? t("walletInsufficient") : (error.message ?? (lang === "ar" ? "خطأ" : "Error")));
       return;
     }
     toast.success(t("paid"));

@@ -63,6 +63,16 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
         authz.can("medical_records.view") && { to: "/medical/quick-consult", icon: Zap, label: t("quickConsult") },
         authz.can("medical_records.view") && { to: "/medical/prescriptions", icon: Pill, label: t("prescriptions") },
         authz.can("medical_records.view") && { to: "/medical/documents", icon: FolderOpen, label: t("documentsCenter") },
+        // Moved here from "Setup & Admin" (FINAL-02.1, organizational only) --
+        // these are clinical reference catalogs gated on the same
+        // medical_records.view permission as the rest of this group; they
+        // were previously listed under an admin-labeled section even though
+        // doctors/nurses (not admins) are their actual audience. Permission
+        // gate, route, and authorization are all unchanged.
+        authz.can("medical_records.view") && { to: "/medical/specialties", icon: Stethoscope, label: t("specialties") },
+        authz.can("medical_records.view") && { to: "/medical/diagnoses", icon: HeartPulse, label: t("diagnoses") },
+        authz.can("medical_records.view") && { to: "/medical/medications", icon: Pill, label: t("medications") },
+        authz.can("medical_records.view") && { to: "/medical/procedures", icon: Activity, label: t("proceduresCatalog") },
       ].filter(Boolean) as NavItem[],
     },
     {
@@ -139,10 +149,6 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       label: lang === "ar" ? "الإعداد والإدارة" : "Setup & Admin",
       icon: Settings,
       items: [
-        authz.can("medical_records.view") && { to: "/medical/specialties", icon: Stethoscope, label: t("specialties") },
-        authz.can("medical_records.view") && { to: "/medical/diagnoses", icon: HeartPulse, label: t("diagnoses") },
-        authz.can("medical_records.view") && { to: "/medical/medications", icon: Pill, label: t("medications") },
-        authz.can("medical_records.view") && { to: "/medical/procedures", icon: Activity, label: t("proceduresCatalog") },
         authz.isSuperAdmin() && { to: "/branches", icon: Building2, label: t("branches") },
         // Same adminOnly gate as /branches (and the same audience the existing
         // "Branch dashboard" quick-link inside Branches.tsx already targets),

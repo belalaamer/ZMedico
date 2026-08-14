@@ -94,7 +94,14 @@ export default function StockOverview() {
   const totalValue = rows.reduce((s, r) => s + r.quantity * Number(r.product.cost_price), 0);
 
   const submitAdj = async () => {
-    if (!adj.product_id || !adj.branch_id || !adj.qty) { toast.error(t("selectProduct")); return; }
+    // Bug fix: this previously always showed t("selectProduct") regardless
+    // of which field was actually missing -- a copy-paste mismatch that told
+    // the user to pick a product even when they'd already picked one and
+    // just forgot the branch (or left qty at 0). Now checks and reports each
+    // field independently.
+    if (!adj.product_id) { toast.error(t("selectProduct")); return; }
+    if (!adj.branch_id) { toast.error(t("selectBranch")); return; }
+    if (!adj.qty) { toast.error(t("amount")); return; }
     let signed = 0;
     if (adj.type === "add") signed = adj.qty;
     else if (adj.type === "remove") signed = -adj.qty;
@@ -103,7 +110,7 @@ export default function StockOverview() {
       const cur = inv.find((x) => x.product_id === adj.product_id && x.branch_id === adj.branch_id);
       signed = adj.qty - Number(cur?.quantity ?? 0);
     }
-    if (signed === 0) { toast.error("No change"); return; }
+    if (signed === 0) { toast.error(lang === "ar" ? "لا يوجد تغيير" : "No change"); return; }
     const reasonLabel = t(("reason" + adj.reason.charAt(0).toUpperCase() + adj.reason.slice(1)) as any);
     const { error } = await supabase.rpc("apply_inventory_tx", {
       _product_id: adj.product_id, _branch_id: adj.branch_id,
@@ -121,7 +128,11 @@ export default function StockOverview() {
   };
 
   const submitTransfer = async () => {
-    if (!tr.product_id || !tr.from_branch || !tr.to_branch) { toast.error(t("selectProduct")); return; }
+    // Bug fix: same copy-paste mismatch as submitAdj above -- always said
+    // "select product" no matter which of the three required fields was
+    // actually missing.
+    if (!tr.product_id) { toast.error(t("selectProduct")); return; }
+    if (!tr.from_branch || !tr.to_branch) { toast.error(t("selectBranch")); return; }
     if (tr.from_branch === tr.to_branch) { toast.error(t("transferSameBranchError")); return; }
     if (!tr.qty || tr.qty <= 0) { toast.error(t("amount")); return; }
     const refId = crypto.randomUUID();
@@ -233,7 +244,13 @@ export default function StockOverview() {
                   </div>
                   <div className="col-span-2 truncate">{branchName(r.branch_id)}</div>
                   <div className="col-span-1 text-end tabular-nums">{r.quantity}</div>
-                  <div className="col-span-1 text-end tabular-nums">{r.quantity - r.reserved}</div>
+                  {/* Bug fix: r.reserved is read straight from the DB
+                      (reserved_quantity); if it ever exceeds quantity
+                      (race condition, manual edit, reservation bug), this
+                      rendered a negative "available" count directly to
+                      users with no clamping. Never show a negative available
+                      quantity. */}
+                  <div className="col-span-1 text-end tabular-nums">{Math.max(0, r.quantity - r.reserved)}</div>
                   <div className="col-span-1 text-end tabular-nums text-muted-foreground">{r.product.min_stock_level}</div>
                   <div className="col-span-1 text-center"><Badge variant="outline" className={`${status.c} text-[10px]`}>{status.l}</Badge></div>
                   <div className="col-span-2 text-end tabular-nums">{formatMoney(r.quantity * Number(r.product.cost_price), lang)}</div>

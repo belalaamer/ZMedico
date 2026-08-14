@@ -46,7 +46,13 @@ export default function Leaves() {
   const totalDays = useMemo(() => form.start_date && form.end_date ? diffDays(form.start_date, form.end_date) : 0, [form.start_date, form.end_date]);
 
   const submit = async () => {
-    if (!form.staff_id || !form.leave_type_id || !form.start_date || !form.end_date) { toast.error("Fill all fields"); return; }
+    // UX fix: this validation message was hardcoded English regardless of
+    // `lang` (every other message in this file goes through t(...)), and it
+    // was a single generic message no matter which field was missing.
+    if (!form.staff_id || !form.leave_type_id || !form.start_date || !form.end_date) {
+      toast.error(lang === "ar" ? "من فضلك أكمل جميع الحقول" : "Fill all fields");
+      return;
+    }
     const { error } = await supabase.from("leave_requests").insert({ staff_id: form.staff_id, leave_type_id: form.leave_type_id, start_date: form.start_date, end_date: form.end_date, total_days: totalDays, reason_en: form.reason_en || null });
     if (error) return toast.error(error.message);
     toast.success(t("save")); setOpen(false); setForm({ staff_id: "", leave_type_id: "", start_date: "", end_date: "", reason_en: "" }); load();
@@ -93,8 +99,12 @@ export default function Leaves() {
                   </Select>
                 </div>
                 <div className="space-y-2"><Label>{t("leaveType")}</Label>
+                  {/* UX fix: this SelectValue had no placeholder, so the
+                      trigger rendered visually blank on first open with no
+                      indication the field is required -- unlike every other
+                      Select in this dialog, which does have a placeholder. */}
                   <Select value={form.leave_type_id} onValueChange={(v) => setForm({ ...form, leave_type_id: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={lang === "ar" ? "اختر نوع الإجازة" : "Select leave type"} /></SelectTrigger>
                     <SelectContent>{types.map((lt) => <SelectItem key={lt.id} value={lt.id}>{lang === "ar" ? lt.name_ar : lt.name_en}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>

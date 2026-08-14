@@ -47,6 +47,12 @@ export default function Payroll() {
   const [commAttached, setCommAttached] = useState<Record<string, boolean>>({});
   const [confirmDelete, setConfirmDelete] = useState<any | null>(null);
 
+  // UX fix: this string was hardcoded English in a file where every other
+  // user-facing message goes through t(...) or a lang === "ar" ternary --
+  // Arabic-mode users would see "Not permitted" in English. Centralized here
+  // so all 4 call sites below stay consistent.
+  const notPermittedMsg = lang === "ar" ? "غير مسموح" : "Not permitted";
+
   const load = async () => {
     let q = supabase.from("payroll").select("*").eq("period_year", year).eq("period_month", month);
     if (currentBranchId) q = q.eq("branch_id", currentBranchId);
@@ -86,13 +92,13 @@ export default function Payroll() {
   const profName = (sid: string) => profiles.find((p) => p.id === sid)?.full_name ?? sid;
 
   const generate = async () => {
-    if (!canEdit) { toast.error("Not permitted"); return; }
+    if (!canEdit) { toast.error(notPermittedMsg); return; }
     if (!currentBranchId) { toast.error(t("errSelectBranchFirst")); return; }
     const existing = new Set(items.map((i) => i.staff_id));
     const candidates = staff.filter((s) => !existing.has(s.id));
     const missing = candidates.filter((s) => !s.branch_id && !currentBranchId);
     if (missing.length) { toast.error(t("errStaffNoBranch")); return; }
-    if (candidates.length === 0) { toast.info("All staff already in payroll"); return; }
+    if (candidates.length === 0) { toast.info(lang === "ar" ? "جميع الموظفين مضافون بالفعل في كشف الرواتب" : "All staff already in payroll"); return; }
 
     // Pull attendance for the target period to compute real absences per staff.
     const startDate = new Date(year, month - 1, 1);
@@ -158,7 +164,7 @@ export default function Payroll() {
   };
 
   const setStatus = async (id: string, status: "draft" | "approved" | "paid") => {
-    if (!canEdit) { toast.error("Not permitted"); return; }
+    if (!canEdit) { toast.error(notPermittedMsg); return; }
     const patch: any = { status };
     if (status === "paid") { patch.paid_at = new Date().toISOString(); patch.paid_by = user?.id; }
     const { error } = await supabase.from("payroll").update(patch).eq("id", id);
@@ -167,7 +173,7 @@ export default function Payroll() {
   };
 
   const remove = async (p: any) => {
-    if (!canDelete) { toast.error("Not permitted"); return; }
+    if (!canDelete) { toast.error(notPermittedMsg); return; }
     await supabase.from("salary_adjustments").delete().eq("payroll_id", p.id);
     const { error } = await supabase.from("payroll").delete().eq("id", p.id);
     if (error) { toast.error(error.message); return; }
@@ -244,7 +250,7 @@ export default function Payroll() {
             className="gradient-primary text-primary-foreground"
             onClick={generate}
             disabled={!canEdit}
-            title={!canEdit ? ("Not permitted") : undefined}
+            title={!canEdit ? notPermittedMsg : undefined}
           >
             <Plus className="me-2 size-4" />{t("generatePayroll")}
           </Button>
@@ -392,7 +398,12 @@ export default function Payroll() {
         <DialogContent>
           <DialogHeader><DialogTitle>{t("addAdjustment")}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div className="space-y-2"><Label>{t("status")}</Label>
+            {/* Bug fix: this label previously reused t("status") (which
+                renders "Status" elsewhere in this same file for the payroll
+                row's own status badge), even though this field is actually
+                the adjustment TYPE (bonus/allowance/deduction/penalty) --
+                a copy-paste mismatch between label and field. */}
+            <div className="space-y-2"><Label>{lang === "ar" ? "النوع" : "Type"}</Label>
               <Select value={adj.type} onValueChange={(v) => setAdj({ ...adj, type: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>

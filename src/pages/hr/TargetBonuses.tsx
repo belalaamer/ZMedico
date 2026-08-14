@@ -103,8 +103,14 @@ export default function TargetBonusesPage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.staff_id || !form.target_value || !form.period_start || !form.period_end) {
-      toast.error(lang === "ar" ? "أكمل الحقول المطلوبة" : "Please fill required fields"); return;
+    // Bug fix: previously only checked `!form.target_value`, which lets a
+    // literal "0" through (Number("0") is falsy-safe here since the check is
+    // on the raw string, but "0" is truthy as a non-empty string -- so a
+    // target of exactly zero was accepted). A zero target divides by zero
+    // in the progress-percentage calculation below (`actual / target_value`),
+    // producing NaN and breaking the progress bar. Reject it explicitly.
+    if (!form.staff_id || !form.target_value || Number(form.target_value) <= 0 || !form.period_start || !form.period_end) {
+      toast.error(lang === "ar" ? "أكمل الحقول المطلوبة (يجب أن تكون قيمة الهدف أكبر من صفر)" : "Please fill required fields (target value must be greater than zero)"); return;
     }
     const payload = {
       staff_id: form.staff_id,
@@ -185,7 +191,7 @@ export default function TargetBonusesPage() {
               </div>
               <div className="space-y-2">
                 <Label>{lang === "ar" ? "قيمة الهدف" : "Target value"} *</Label>
-                <Input type="number" min="0" step="0.01" value={form.target_value} onChange={(e) => setForm({ ...form, target_value: e.target.value })} required />
+                <Input type="number" min="0.01" step="0.01" value={form.target_value} onChange={(e) => setForm({ ...form, target_value: e.target.value })} required />
               </div>
               <div className="space-y-2">
                 <Label>{lang === "ar" ? "نوع المكافأة" : "Bonus type"}</Label>
@@ -233,7 +239,14 @@ export default function TargetBonusesPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {items.map((t) => {
             const actual = actuals[t.id] ?? 0;
-            const pct = Math.min(100, Math.round((actual / Number(t.target_value)) * 100));
+            // Bug fix: `target_value` could be 0 for rows created before the
+            // handleCreate zero-guard above existed (or edited directly in
+            // the DB), which made `actual / target_value` divide by zero,
+            // producing NaN -> Math.min(100, NaN) -> NaN -> a broken/blank
+            // <Progress value={NaN}> bar. Guard the whole calculation.
+            const pct = Number(t.target_value) > 0
+              ? Math.min(100, Math.round((actual / Number(t.target_value)) * 100))
+              : 0;
             const achieved = actual >= Number(t.target_value);
             const bonus = computeBonus(t, actual);
             const money = isMoney(t.metric_type);

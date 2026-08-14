@@ -34,6 +34,17 @@ import { toast } from "sonner";
 const ROLES = ["system_owner", "admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr"] as const;
 type Role = typeof ROLES[number];
 
+// RBAC-05 fix: the admin-create-user edge function requires branch_id for
+// manager, doctor, nurse, receptionist, and accountant (its own
+// rolesRequiringBranch list also includes the retired "staff" role, which is
+// omitted here since it can never be selected from this UI's ROLES list).
+// This form previously only collected/validated branch for "manager",
+// so creating a doctor/nurse/receptionist/accountant account here always
+// failed server-side with "Branch is required for role: <role>" -- a
+// confirmed, reproducible bug that silently blocked onboarding any new
+// non-manager, non-admin, non-hr staff member through this dialog.
+const ROLES_REQUIRING_BRANCH: readonly Role[] = ["manager", "doctor", "nurse", "receptionist", "accountant"];
+
 type StaffLink = { branch_id: string | null; employee_id: string | null };
 
 // M2 Settings cutover: identity/role writes go through the
@@ -361,9 +372,9 @@ export default function UserManagement() {
       return;
     }
     setCreating(true);
-    if (cRole === "manager" && !cBranch) {
+    if (ROLES_REQUIRING_BRANCH.includes(cRole) && !cBranch) {
       setCreating(false);
-      toast.error(lang === "ar" ? "يجب اختيار فرع لدور المدير" : "Branch is required for the manager role");
+      toast.error(lang === "ar" ? "يجب اختيار فرع لهذا الدور" : "Branch is required for this role");
       return;
     }
     const { data, error } = await supabase.functions.invoke("admin-create-user", {
@@ -851,10 +862,10 @@ export default function UserManagement() {
                   </SelectContent>
                 </Select>
               </div>
-              {cRole === "manager" && (
+              {ROLES_REQUIRING_BRANCH.includes(cRole) && (
                 <div className="space-y-2">
                   <Label>
-                    {lang === "ar" ? "الفرع (مطلوب للمدير)" : "Branch (required for manager)"}
+                    {lang === "ar" ? "الفرع (مطلوب لهذا الدور)" : "Branch (required for this role)"}
                   </Label>
                   <Select value={cBranch} onValueChange={setCBranch}>
                     <SelectTrigger><SelectValue placeholder={lang === "ar" ? "اختر فرعاً" : "Select a branch"} /></SelectTrigger>

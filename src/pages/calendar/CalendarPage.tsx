@@ -395,7 +395,21 @@ export default function CalendarPage() {
 
   const openNew = () => {
     setEditId(null);
-    setForm({ patient_id: "", doctor_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "", status: "scheduled" });
+    // UX fix: this entry point (the toolbar "New Appointment" button and the
+    // mobile FAB) previously left scheduled_at completely empty -- unlike
+    // openNewAt() below (triggered by clicking a grid slot), which always
+    // prefills it. An empty required datetime-local field gives no visual
+    // cue that anything is wrong until the user tries to save, so default
+    // it to the next half-hour slot on the day currently being viewed --
+    // easy to adjust, never blank.
+    const now = new Date();
+    const base = sameDay(date, now) ? new Date(now) : (() => { const d = new Date(date); d.setHours(9, 0, 0, 0); return d; })();
+    // Round up to the next 30-minute mark (e.g. 10:07 -> 10:30, 10:35 -> 11:00).
+    const remainder = base.getMinutes() % 30;
+    if (remainder !== 0 || base.getSeconds() > 0) base.setMinutes(base.getMinutes() + (30 - remainder), 0, 0);
+    const tz = base.getTimezoneOffset();
+    const local = new Date(base.getTime() - tz * 60000).toISOString().slice(0, 16);
+    setForm({ patient_id: "", doctor_id: "", scheduled_at: local, duration_minutes: 30, procedure: "", room: "", notes: "", status: "scheduled" });
     setOpen(true);
   };
   const openNewAt = (slot: Date) => {
@@ -501,7 +515,20 @@ export default function CalendarPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.patient_id || !form.scheduled_at) { toast.error("Pick a patient and time"); return; }
+    // UX fix: this validation message was hardcoded in English regardless of
+    // the active language, and was a single generic message even when only
+    // one of the two required fields was missing. Localized, and now names
+    // the specific missing field(s) so the user knows exactly what to fix
+    // instead of guessing.
+    if (!form.patient_id || !form.scheduled_at) {
+      const missing = !form.patient_id && !form.scheduled_at
+        ? (lang === "ar" ? "المريض والتاريخ/الوقت" : "a patient and a date/time")
+        : !form.patient_id
+          ? (lang === "ar" ? "المريض" : "a patient")
+          : (lang === "ar" ? "التاريخ والوقت" : "a date/time");
+      toast.error(lang === "ar" ? `من فضلك اختر ${missing}` : `Please select ${missing}`);
+      return;
+    }
     const payload: any = {
       patient_id: form.patient_id,
       doctor_id: form.doctor_id || null,
@@ -554,23 +581,48 @@ export default function CalendarPage() {
     return s;
   }, [filteredItems]);
 
-  // Block position for time grid
+  // Block position for time grid.
+  //
+  // Bug fix: an appointment scheduled outside the branch's configured
+  // working-hours window (dayStartHour..dayEndHour) previously produced a
+  // `top` value outside the day column's own bounds -- e.g. a 10:00 AM
+  // appointment when the visible grid only covers 3 PM-10 PM computed to
+  // `top: -300px`. Since the day column has no fixed/clipped height of its
+  // own (its height comes implicitly from the stacked hour rows) and no
+  // overflow clipping, that put the absolutely-positioned appointment card
+  // outside the grid's visible area entirely -- overlapping whatever UI sits
+  // above it (or scrolled out of reach with no way to scroll further up),
+  // making the appointment effectively invisible/misplaced even though the
+  // underlying scheduled_at was stored correctly. This is a real scenario:
+  // walk-ins, emergencies, or manually-created appointments can legitimately
+  // fall outside standard business hours.
+  //
+  // Fix: clamp `top` to the visible grid range [0, gridHeightPx - height],
+  // and flag clamped (out-of-hours) appointments with `isOutOfHours` so the
+  // caller can render a visual indicator -- the displayed time label itself
+  // (via timeStr) is untouched and always reflects the real scheduled_at.
   const blockStyle = (a: Appt, lane = 0, lanes = 1) => {
     const dt = new Date(a.scheduled_at);
     const minutesFromStart = (dt.getHours() - dayStartHour) * 60 + dt.getMinutes();
-    const top = (minutesFromStart / 60) * HOUR_HEIGHT;
+    const rawTop = (minutesFromStart / 60) * HOUR_HEIGHT;
     const height = Math.max(28, (a.duration_minutes / 60) * HOUR_HEIGHT - 2);
+    const gridHeightPx = Math.max(1, dayEndHour - dayStartHour) * HOUR_HEIGHT;
+    const top = Math.max(0, Math.min(rawTop, gridHeightPx - height));
+    const isOutOfHours = rawTop !== top;
     // Side-by-side lanes when appointments overlap. Small horizontal padding
     // is applied via inline left/right instead of the previous inset-x-1.
     const gap = 2; // px between lanes
     const widthPct = 100 / lanes;
     const leftPct = widthPct * lane;
     return {
-      top: `${top}px`,
-      height: `${height}px`,
-      left: `calc(${leftPct}% + ${lane === 0 ? 4 : gap}px)`,
-      width: `calc(${widthPct}% - ${lane === 0 || lane === lanes - 1 ? 6 : gap * 2}px)`,
-    } as React.CSSProperties;
+      style: {
+        top: `${top}px`,
+        height: `${height}px`,
+        left: `calc(${leftPct}% + ${lane === 0 ? 4 : gap}px)`,
+        width: `calc(${widthPct}% - ${lane === 0 || lane === lanes - 1 ? 6 : gap * 2}px)`,
+      } as React.CSSProperties,
+      isOutOfHours,
+    };
   };
 
   // Assign each appointment to a lane so overlapping events render side-by-side.
@@ -617,7 +669,9 @@ export default function CalendarPage() {
     ? `${p.first_name_ar ?? p.first_name_en} ${p.last_name_ar ?? p.last_name_en ?? ""}`.trim()
     : `${p.first_name_en} ${p.last_name_en ?? ""}`.trim();
 
-  const renderApptBlock = (a: Appt, lane = 0, lanes = 1) => (
+  const renderApptBlock = (a: Appt, lane = 0, lanes = 1) => {
+    const { style, isOutOfHours } = blockStyle(a, lane, lanes);
+    return (
     <button
       key={a.id}
       id={`appt-${a.id}`}
@@ -630,15 +684,21 @@ export default function CalendarPage() {
         statusAccent[a.status],
         highlightId === a.id && "ring-2 ring-primary shadow-lg z-20",
         lanes > 1 && "ring-1 ring-background/60",
+        // Pinned to the top/bottom edge of the visible grid because its real
+        // time falls outside the branch's configured working hours -- the
+        // dashed ring calls that out so the pinned position isn't mistaken
+        // for the actual appointment time (shown correctly below regardless).
+        isOutOfHours && "ring-2 ring-dashed ring-muted-foreground/50",
       )}
-      style={blockStyle(a, lane, lanes)}
-      title={`${fullName(a.patients!)} · ${timeStr(new Date(a.scheduled_at))}`}
+      style={style}
+      title={`${fullName(a.patients!)} · ${timeStr(new Date(a.scheduled_at))}${isOutOfHours ? ` (${lang === "ar" ? "خارج ساعات العمل" : "outside working hours"})` : ""}`}
     >
       <div className="text-xs font-bold leading-tight truncate">
         {fullName(a.patients!)}
       </div>
       <div className="text-[11px] leading-tight truncate text-muted-foreground">
         {timeStr(new Date(a.scheduled_at))}
+        {isOutOfHours && <span className="ms-1" aria-hidden>⚠</span>}
       </div>
       {(a.procedure || a.room) && (
         <div className="text-[10px] leading-tight truncate text-muted-foreground/90">
@@ -646,7 +706,8 @@ export default function CalendarPage() {
         </div>
       )}
     </button>
-  );
+    );
+  };
 
   // Month grid (sidebar mini calendar)
   const monthGrid = useMemo(() => {

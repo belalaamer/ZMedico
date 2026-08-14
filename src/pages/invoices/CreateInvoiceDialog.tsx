@@ -93,10 +93,14 @@ export function CreateInvoiceDialog({
     staleTime: 0,
   });
 
+  // UX fix: the patient picker here is used to identify who the invoice is
+  // for, not to look them up by their clinic number -- show just the name
+  // (matching the "referred by" and appointment-booking pickers), the
+  // "#N" numbering stays exclusively on the main Patients list.
   const patients = useMemo(
     () => patientRows.map((p: any) => ({
       id: p.id,
-      label: `#${p.patient_code} · ${p.first_name_en ?? ""} ${p.last_name_en ?? ""}`.trim(),
+      label: `${p.first_name_en ?? ""} ${p.last_name_en ?? ""}`.trim(),
     })),
     [patientRows],
   );

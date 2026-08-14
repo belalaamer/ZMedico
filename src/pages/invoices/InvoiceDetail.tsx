@@ -253,7 +253,7 @@ export default function InvoiceDetail() {
             <div className="text-xs text-muted-foreground">{t("invoiceDate")}</div>
             <div className="font-medium">{formatDate(inv.invoice_date, lang)}</div>
             <div className="text-xs text-muted-foreground mt-2">{t("patientName")}</div>
-            <div className="font-medium">{name} <span className="text-xs text-muted-foreground">#{p?.patient_code}</span></div>
+            <div className="font-medium">{name}</div>
           </div>
         </div>
 

@@ -185,7 +185,7 @@ export default function PhysioCases() {
                 <Select value={form.patient_id} onValueChange={(v) => setForm({ ...form, patient_id: v })}>
                   <SelectTrigger><SelectValue placeholder={lang === "ar" ? "اختر المريض" : "Select patient"} /></SelectTrigger>
                   <SelectContent>{patients.map(p => (
-                    <SelectItem key={p.id} value={p.id}>{patientName(p)} {p.patient_code ? `· #${p.patient_code}` : ""}</SelectItem>
+                    <SelectItem key={p.id} value={p.id}>{patientName(p)}</SelectItem>
                   ))}</SelectContent>
                 </Select>
               </div>
@@ -260,7 +260,7 @@ export default function PhysioCases() {
               <Link to={`/physio/${c.id}`} key={c.id} className="flex items-center gap-4 p-4 hover:bg-muted/40 transition-colors">
                 <Activity className="size-5 text-muted-foreground" />
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{patientName(c.patients)} {c.patients?.patient_code ? <span className="text-xs text-muted-foreground">#{c.patients.patient_code}</span> : null}</div>
+                  <div className="font-medium truncate">{patientName(c.patients)}</div>
                   <div className="text-xs text-muted-foreground truncate">{c.diagnosis || "—"} · {lang === "ar" ? "بدء" : "start"} {formatDate(c.start_date, lang)} · {c.expected_sessions} {lang === "ar" ? "جلسة" : "sessions"}</div>
                 </div>
                 <Badge variant="outline" className={statusVariant(c.status)}>{statusLabel(c.status)}</Badge>

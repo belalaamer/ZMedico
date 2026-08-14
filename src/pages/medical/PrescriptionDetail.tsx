@@ -105,7 +105,6 @@ export default function PrescriptionDetail() {
           <div>
             <div className="text-xs text-muted-foreground uppercase">{t("rxFor")}</div>
             <Link to={`/patients/${patient.id}`} className="font-bold text-lg hover:underline">{name}</Link>
-            <div className="text-xs text-muted-foreground">#{patient.patient_code}</div>
           </div>
           <div className="text-end">
             <div className="text-xs text-muted-foreground uppercase">{t("rxDate")}</div>

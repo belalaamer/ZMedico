@@ -186,7 +186,6 @@ export default function Invoices() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <div className="font-semibold tabular-nums">{i.invoice_number}</div>
-                      <Badge variant="outline" className="text-[10px]">#{p.patient_code}</Badge>
                     </div>
                     <div className="text-xs text-muted-foreground truncate">{name} · {formatDate(i.invoice_date, lang)}</div>
                   </div>

@@ -43,7 +43,21 @@ type Role = typeof ROLES[number];
 // failed server-side with "Branch is required for role: <role>" -- a
 // confirmed, reproducible bug that silently blocked onboarding any new
 // non-manager, non-admin, non-hr staff member through this dialog.
-const ROLES_REQUIRING_BRANCH: readonly Role[] = ["manager", "doctor", "nurse", "receptionist", "accountant"];
+// RBAC-08: "hr" added here too. Every HR-facing RLS policy
+// (hr_staff_select, hr_payroll_select, hr_attendance_select,
+// hr_leave_select) requires has_role(auth.uid(),'hr') AND (branch_id IS
+// NULL OR user_has_branch_access(branch_id)) against the row being read --
+// so an hr account with no branch_id of their own could only ever match
+// the "branch_id IS NULL" half against other branch-less rows, meaning
+// they could see themselves and effectively nobody else they're supposed
+// to manage. Confirmed live: a freshly created hr test account could read
+// exactly 1 staff_profiles row (their own) out of many branch-scoped
+// staff. This mirrors the identical, already-fixed gap for
+// manager/doctor/nurse/receptionist/accountant above. (Note: this UI-side
+// half of RBAC-08 was originally pushed to the already-merged PR #72
+// branch by mistake and never actually landed on main -- this commit is
+// the corrected, properly-merged version.)
+const ROLES_REQUIRING_BRANCH: readonly Role[] = ["manager", "doctor", "nurse", "receptionist", "accountant", "hr"];
 
 type StaffLink = { branch_id: string | null; employee_id: string | null };
 

@@ -182,7 +182,9 @@ export default function StaffDetail() {
       setLinkOpen(false);
       reload();
     } catch (e: any) {
-      toast.error(e?.message ?? "Failed");
+      // UX fix: hardcoded English fallback regardless of `lang`, in a file
+      // where every other message is bilingual.
+      toast.error(e?.message ?? (lang === "ar" ? "فشل" : "Failed"));
     } finally {
       setLinking(false);
     }

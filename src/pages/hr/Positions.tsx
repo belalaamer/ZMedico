@@ -39,7 +39,9 @@ export default function Positions() {
   const save = async () => {
     const title = form.title.trim();
     const desc = form.description.trim();
-    if (!title) { toast.error("Title required"); return; }
+    // UX fix: hardcoded English regardless of `lang`, in a file where every
+    // other message goes through t(...) or a lang === "ar" ternary.
+    if (!title) { toast.error(lang === "ar" ? "المسمى الوظيفي مطلوب" : "Title required"); return; }
     const payload: any = {
       title_en: title, title_ar: title,
       department_id: form.department_id || null,

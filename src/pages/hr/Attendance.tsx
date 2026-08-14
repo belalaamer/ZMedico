@@ -13,7 +13,12 @@ import { MapPin, CheckCircle2, AlertTriangle, UserCheck, UserX, Clock, CalendarR
 import GpsCheckDialog from "@/components/attendance/GpsCheckDialog";
 
 export default function Attendance() {
-  const { t } = useI18n();
+  // UX fix: `lang` is now pulled from useI18n() alongside `t` so the
+  // "Check in first" validation message below can be localized -- it
+  // previously couldn't reference `lang` at all since this file never
+  // destructured it, so the message was hardcoded English regardless of
+  // the active language.
+  const { t, lang } = useI18n();
   const { user } = useAuth();
   const { currentBranchId } = useBranch();
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
@@ -86,7 +91,10 @@ export default function Attendance() {
   const performCheckOut = async (sid: string, payload: { coords: { lat: number; lon: number; accuracy?: number }; within: boolean; reason?: string }) => {
     const time = new Date().toTimeString().slice(0, 8);
     const existing = recOf(sid);
-    if (!existing) { toast.error("Check in first"); return; }
+    // UX fix: hardcoded English regardless of `lang` -- localized to match
+    // every other toast in this file (t("outsideAllowedZone"), t("checkIn"),
+    // t("checkOut")).
+    if (!existing) { toast.error(lang === "ar" ? "يجب تسجيل الحضور أولاً" : "Check in first"); return; }
     const { error } = await supabase.from("attendance").update({
       check_out_time: time, check_out_method: "gps",
       check_out_latitude: payload.coords.lat,

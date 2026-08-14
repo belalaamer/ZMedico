@@ -83,7 +83,13 @@ export default function Staff() {
     }
 
     if (mode === "new" && !editingId) {
-      if (!newUser.email || !newUser.full_name || !newUser.role) { toast.error(t("fullName") + " / Email / Role"); return; }
+      // UX fix: this concatenated a translated t("fullName") with a
+      // hardcoded English suffix (" / Email / Role") -- a half-translated
+      // message an Arabic-mode user would find jarring. Fully localized now.
+      if (!newUser.email || !newUser.full_name || !newUser.role) {
+        toast.error(lang === "ar" ? "الاسم الكامل / البريد الإلكتروني / الدور مطلوبة" : "Full name / Email / Role are required");
+        return;
+      }
       setCreatingUser(true);
       const { data, error } = await supabase.functions.invoke("admin-create-user", {
         body: {
@@ -96,18 +102,20 @@ export default function Staff() {
       });
       setCreatingUser(false);
       if (error || (data as any)?.error) {
-        toast.error((data as any)?.error ?? error?.message ?? "Failed to create user");
+        toast.error((data as any)?.error ?? error?.message ?? (lang === "ar" ? "فشل إنشاء المستخدم" : "Failed to create user"));
         return;
       }
       profileId = (data as any).user_id;
       if (!(data as any).password) {
-        toast.error("User was created, but the server did not return a login password. Reset the password from User Management.");
+        toast.error(lang === "ar"
+          ? "تم إنشاء المستخدم، لكن الخادم لم يُرجع كلمة مرور الدخول. أعد تعيين كلمة المرور من إدارة المستخدمين."
+          : "User was created, but the server did not return a login password. Reset the password from User Management.");
         return;
       }
       setCreatedInfo({ email: (data as any).email, password: (data as any).password });
     }
 
-    if (!profileId) { toast.error("Profile required"); return; }
+    if (!profileId) { toast.error(lang === "ar" ? "الملف الشخصي مطلوب" : "Profile required"); return; }
 
     const payload: any = {
       id: profileId,
@@ -247,7 +255,7 @@ export default function Staff() {
                           <span className="text-emerald-700/70 dark:text-emerald-400/70">Password</span>
                           <span className="flex items-center gap-2">
                             <span className="font-mono text-base font-bold px-2 py-0.5 rounded bg-emerald-500/15">{createdInfo.password}</span>
-                            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => { navigator.clipboard.writeText(createdInfo.password); toast.success("Copied"); }}><Copy className="size-3.5" /></Button>
+                            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => { navigator.clipboard.writeText(createdInfo.password); toast.success(lang === "ar" ? "تم النسخ" : "Copied"); }}><Copy className="size-3.5" /></Button>
                           </span>
                         </div>
                       </div>

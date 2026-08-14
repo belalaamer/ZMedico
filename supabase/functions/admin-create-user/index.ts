@@ -69,7 +69,21 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Invalid role" }, 400);
     }
 
-    const rolesRequiringBranch = ["manager", "doctor", "nurse", "receptionist", "accountant", "staff"];
+    // RBAC-08 fix: "hr" was missing from this list even though every
+    // HR-facing RLS policy (hr_staff_select, hr_payroll_select,
+    // hr_attendance_select, hr_leave_select) requires
+    // "has_role(auth.uid(),'hr') AND (branch_id IS NULL OR
+    // user_has_branch_access(branch_id))" against the TARGET row's branch.
+    // Because a fresh hr account never received a branch_id, they only ever
+    // matched the "branch_id IS NULL" half of that check against their own
+    // (also branch-less) row -- meaning they could see themselves and
+    // nobody else. Confirmed live: a freshly created hr test account could
+    // read exactly 1 staff_profiles row (their own) out of many branch-
+    // scoped staff. Adding "hr" here (mirroring manager/doctor/nurse/
+    // receptionist/accountant, which already require it) closes this --
+    // admin remains the only role that is deliberately cross-branch "by
+    // design" per the comment below.
+    const rolesRequiringBranch = ["manager", "doctor", "nurse", "receptionist", "accountant", "hr", "staff"];
     // admin is a cross-branch identity and does not require a branch assignment.
     if (rolesRequiringBranch.includes(role) && !branch_id) {
       return jsonResponse({ error: `Branch is required for role: ${role}` }, 400);

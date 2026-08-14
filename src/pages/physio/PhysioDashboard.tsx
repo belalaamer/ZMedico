@@ -41,10 +41,18 @@ export default function PhysioDashboard() {
     setReassess((rs as any) ?? []);
     const therapistIds: string[] = Array.from(new Set(((cs as any) ?? []).map((c: any) => c.therapist_id).filter(Boolean) as string[]));
     if (therapistIds.length) {
+      // Bug fix: staff_profiles has no first_name_en/last_name_en columns at
+      // all -- this query was silently failing (PostgREST 400,
+      // "column staff_profiles.first_name_en does not exist"), so `tps` was
+      // always null/[] and every therapist in this dashboard showed as an
+      // 8-char UUID slice instead of their name. The staff member's display
+      // name lives on `profiles.full_name`, reached the same way
+      // PhysioCases.tsx already does it (the one place in this app that
+      // gets it right).
       const { data: tps } = await supabase.from("staff_profiles")
-        .select("id,first_name_en,last_name_en").in("id", therapistIds);
+        .select("id,profile:profiles!staff_profiles_id_fkey(full_name,email)").in("id", therapistIds);
       const map: Record<string, string> = {};
-      (tps ?? []).forEach((t: any) => { map[t.id] = `${t.first_name_en ?? ""} ${t.last_name_en ?? ""}`.trim() || t.id.slice(0, 8); });
+      (tps ?? []).forEach((t: any) => { map[t.id] = t.profile?.full_name || t.profile?.email || t.id.slice(0, 8); });
       setTherapistMap(map);
     }
     setLoading(false);

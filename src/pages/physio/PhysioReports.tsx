@@ -18,7 +18,7 @@ function downloadCsv(filename: string, rows: any[][]) {
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const csv = rows.map(r => r.map(esc).join(",")).join("\n");
-  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url; a.download = filename;
@@ -45,9 +45,17 @@ export default function PhysioReports() {
 
   useEffect(() => {
     if (!currentBranchId) return;
-    supabase.from("staff_profiles").select("id,first_name_en,last_name_en")
+    // Bug fix: staff_profiles has no first_name_en/last_name_en columns --
+    // this select errored (PostgREST 400: "column ... does not exist"), so
+    // `therapists` was always empty and the Therapist filter/CSV export
+    // never showed a real name, only the 8-char UUID fallback. The display
+    // name lives on profiles.full_name, joined the same way PhysioCases.tsx
+    // already does it correctly.
+    supabase.from("staff_profiles").select("id,profile:profiles!staff_profiles_id_fkey(full_name,email)")
       .eq("branch_id", currentBranchId).limit(500).then(({ data }) => setTherapists((data as any) ?? []));
   }, [currentBranchId]);
+
+  const therapistName = (t: any) => t?.profile?.full_name || t?.profile?.email || t?.id?.slice(0, 8) || "";
 
   const run = async () => {
     if (!currentBranchId) return;
@@ -90,10 +98,10 @@ export default function PhysioReports() {
     // Build case_id -> patient lookup so per-session/per-reassessment rows are human-readable.
     const caseLookup: Record<string, { patient: string; diagnosis: string }> = {};
     cases.forEach(c => { caseLookup[c.id] = { patient: pn(c.patients), diagnosis: c.diagnosis ?? "" }; });
-    const therapistName = therapistId === "_all"
+    const therapistFilterName = therapistId === "_all"
       ? "All"
       : (therapists.find((t: any) => t.id === therapistId)
-          ? `${therapists.find((t: any) => t.id === therapistId)!.first_name_en ?? ""} ${therapists.find((t: any) => t.id === therapistId)!.last_name_en ?? ""}`.trim() || therapistId
+          ? therapistName(therapists.find((t: any) => t.id === therapistId))
           : therapistId);
     downloadCsv(`physio_cases_${filterTag}.csv`, [
       ["case_id", "patient", "diagnosis", "status", "therapist_id", "start_date", "expected_sessions"],
@@ -110,7 +118,7 @@ export default function PhysioReports() {
     downloadCsv(`physio_summary_${filterTag}.csv`, [
       ["metric", "value"],
       ["from", from], ["to", to],
-      ["therapist_filter", therapistName], ["status_filter", status], ["attendance_filter", attendance],
+      ["therapist_filter", therapistFilterName], ["status_filter", status], ["attendance_filter", attendance],
       ["cases_total", cases.length],
       ["sessions_done", summary.done], ["sessions_missed", summary.missed],
       ["active_cases_now", activeNow], ["reassessments_total", summary.reassessTotal],
@@ -145,7 +153,7 @@ export default function PhysioReports() {
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="_all">{lang === "ar" ? "الكل" : "All"}</SelectItem>
-              {therapists.map((t: any) => <SelectItem key={t.id} value={t.id}>{`${t.first_name_en ?? ""} ${t.last_name_en ?? ""}`.trim() || t.id.slice(0, 8)}</SelectItem>)}
+              {therapists.map((t: any) => <SelectItem key={t.id} value={t.id}>{therapistName(t)}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -155,10 +163,14 @@ export default function PhysioReports() {
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="_all">{lang === "ar" ? "الكل" : "All"}</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="paused">Paused</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
+              {/* UX fix: these 8 status/attendance option labels were
+                  hardcoded English while every other label in this file
+                  uses a lang === "ar" ternary -- Arabic-mode users saw a
+                  mix of Arabic labels and English filter options. */}
+              <SelectItem value="active">{lang === "ar" ? "نشطة" : "Active"}</SelectItem>
+              <SelectItem value="paused">{lang === "ar" ? "متوقفة" : "Paused"}</SelectItem>
+              <SelectItem value="completed">{lang === "ar" ? "مكتملة" : "Completed"}</SelectItem>
+              <SelectItem value="cancelled">{lang === "ar" ? "ملغاة" : "Cancelled"}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -168,10 +180,10 @@ export default function PhysioReports() {
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="_all">{lang === "ar" ? "الكل" : "All"}</SelectItem>
-              <SelectItem value="scheduled">Scheduled</SelectItem>
-              <SelectItem value="done">Done</SelectItem>
-              <SelectItem value="missed">Missed</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
+              <SelectItem value="scheduled">{lang === "ar" ? "مجدولة" : "Scheduled"}</SelectItem>
+              <SelectItem value="done">{lang === "ar" ? "تمت" : "Done"}</SelectItem>
+              <SelectItem value="missed">{lang === "ar" ? "غياب" : "Missed"}</SelectItem>
+              <SelectItem value="cancelled">{lang === "ar" ? "ملغاة" : "Cancelled"}</SelectItem>
             </SelectContent>
           </Select>
         </div>

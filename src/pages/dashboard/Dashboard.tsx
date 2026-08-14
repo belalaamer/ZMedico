@@ -351,12 +351,25 @@ export default function Dashboard() {
     () => { run(); },
   );
 
+  // RBAC-07 fix: the empty-state check below predates the "Pending leave
+  // requests" card added for hr.view holders and never accounted for it.
+  // hr has no visibility into appointments/patients/invoices/payments (all
+  // legitimately zero for that role via RLS), so every other counter here
+  // was always zero for hr regardless of real HR activity -- meaning hr
+  // would see the generic "No data yet" empty state instead of their own
+  // dedicated card whenever there happened to be zero pending leave
+  // requests, and would only ever see their card on days there IS a
+  // pending request (an inconsistent, confusing experience). Adding the
+  // `(!canHR || pendingLeaveRequests === 0)` clause so hr's own signal is
+  // part of the emptiness decision, matching the treatment already given
+  // to every other role-specific counter here.
   const isEmpty = useMemo(() =>
     !loading && todayAppts === 0 && newPatientsToday === 0 && todayRevenue === 0 &&
     pendingInvoicesCount === 0 && todayConsults === 0 && draftRecords === 0 &&
     recentPatients.length === 0 && recentAppts.length === 0 && recentPayments.length === 0 &&
-    revenue7d.every((r) => r.revenue === 0) && apptStatusAll.length === 0,
-  [loading, todayAppts, newPatientsToday, todayRevenue, pendingInvoicesCount, todayConsults, draftRecords, recentPatients, recentAppts, recentPayments, revenue7d, apptStatusAll]);
+    revenue7d.every((r) => r.revenue === 0) && apptStatusAll.length === 0 &&
+    (!canHR || pendingLeaveRequests === 0),
+  [loading, todayAppts, newPatientsToday, todayRevenue, pendingInvoicesCount, todayConsults, draftRecords, recentPatients, recentAppts, recentPayments, revenue7d, apptStatusAll, canHR, pendingLeaveRequests]);
 
   const fullName = (r: any) => {
     if (!r) return "—";

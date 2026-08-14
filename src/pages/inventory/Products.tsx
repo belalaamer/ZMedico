@@ -56,7 +56,10 @@ export default function Products() {
 
   const handleImageUpload = async (file: File) => {
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { toast.error("Max 5MB"); return; }
+    // UX fix: these four validation messages were hardcoded English
+    // regardless of `lang`, in a file where every other user-facing string
+    // goes through t(...).
+    if (file.size > 5 * 1024 * 1024) { toast.error(lang === "ar" ? "الحد الأقصى 5 ميجابايت" : "Max 5MB"); return; }
     const ALLOWED_MIME: Record<string, string> = {
       "image/jpeg": "jpg",
       "image/png": "png",
@@ -64,14 +67,14 @@ export default function Products() {
       "image/gif": "gif",
     };
     if (!ALLOWED_MIME[file.type]) {
-      toast.error("Only JPEG, PNG, WebP, or GIF images are allowed");
+      toast.error(lang === "ar" ? "يُسمح فقط بصور JPEG أو PNG أو WebP أو GIF" : "Only JPEG, PNG, WebP, or GIF images are allowed");
       return;
     }
     const ext = ALLOWED_MIME[file.type];
     const declaredExt = (file.name.split(".").pop() || "").toLowerCase();
     const validExts = new Set(["jpg", "jpeg", "png", "webp", "gif"]);
     if (declaredExt && !validExts.has(declaredExt)) {
-      toast.error("File extension does not match an allowed image type");
+      toast.error(lang === "ar" ? "امتداد الملف لا يطابق نوع صورة مسموح به" : "File extension does not match an allowed image type");
       return;
     }
     setUploading(true);
@@ -137,7 +140,7 @@ export default function Products() {
   const save = async () => {
     const name = form.name.trim();
     const desc = form.description.trim();
-    if (!name) { toast.error("Name required"); return; }
+    if (!name) { toast.error(lang === "ar" ? "الاسم مطلوب" : "Name required"); return; }
     const payload: any = {
       barcode: form.barcode || null,
       name_en: name, name_ar: name,

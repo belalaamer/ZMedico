@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Trash2, Ticket, Search } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Fab } from "@/components/ui/fab";
@@ -27,6 +28,19 @@ type Coupon = {
 export default function CouponsPage() {
   const { lang } = useI18n();
   const { currentBranchId } = useBranch();
+  // RBAC-04 hardening: this page previously had zero permission gating on
+  // its create/edit(toggle)/delete controls — a receptionist (coupons: view
+  // only per the live role_permissions table) could see and click "New
+  // coupon", the active/inactive toggle, and the delete icon on every row.
+  // Live RLS (`coupons_manage_billing_admin`, admin/manager/accountant only)
+  // already rejected any such write for receptionist, so this was UI-only
+  // over-exposure, not an exploitable gap — but it produced a broken,
+  // confusing UX (a control that always fails) and is the exact
+  // "excess access" pattern this audit was asked to close.
+  const { authz } = useAuthorization("Coupons");
+  const canCreate = authz.can("coupons.create");
+  const canEdit = authz.can("coupons.edit");
+  const canDelete = authz.can("coupons.delete");
   const [items, setItems] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
@@ -55,6 +69,7 @@ export default function CouponsPage() {
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canCreate) { toast.error(lang === "ar" ? "غير مسموح" : "Not allowed"); return; }
     if (!form.code.trim() || !form.discount_value) {
       toast.error(lang === "ar" ? "أكمل الحقول المطلوبة" : "Fill required fields"); return;
     }
@@ -78,6 +93,7 @@ export default function CouponsPage() {
   };
 
   const remove = async (c: Coupon) => {
+    if (!canDelete) { toast.error(lang === "ar" ? "غير مسموح" : "Not allowed"); return; }
     const { error } = await supabase.from("coupons").delete().eq("id", c.id);
     if (error) { toast.error(error.message); return; }
     toast.success(lang === "ar" ? "تم الحذف" : "Deleted");
@@ -85,6 +101,7 @@ export default function CouponsPage() {
   };
 
   const toggle = async (c: Coupon) => {
+    if (!canEdit) { toast.error(lang === "ar" ? "غير مسموح" : "Not allowed"); return; }
     const { error } = await supabase.from("coupons").update({ is_active: !c.is_active }).eq("id", c.id);
     if (error) { toast.error(error.message); return; }
     load();
@@ -116,6 +133,7 @@ export default function CouponsPage() {
             <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={lang === "ar" ? "بحث" : "Search"} className="ps-9" />
           </div>
+          {canCreate && (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button className="gradient-primary text-primary-foreground hidden sm:inline-flex">
@@ -178,6 +196,7 @@ export default function CouponsPage() {
               </form>
             </DialogContent>
           </Dialog>
+          )}
         </div>
       </div>
 
@@ -207,10 +226,12 @@ export default function CouponsPage() {
                       {c.description && <span className="truncate">{c.description}</span>}
                     </div>
                   </div>
-                  <Switch checked={c.is_active} onCheckedChange={() => toggle(c)} />
-                  <Button variant="ghost" size="icon" className="text-destructive size-10" onClick={() => setDel(c)}>
-                    <Trash2 className="size-4" />
-                  </Button>
+                  <Switch checked={c.is_active} onCheckedChange={() => toggle(c)} disabled={!canEdit} />
+                  {canDelete && (
+                    <Button variant="ghost" size="icon" className="text-destructive size-10" onClick={() => setDel(c)}>
+                      <Trash2 className="size-4" />
+                    </Button>
+                  )}
                 </div>
               );
             })}
@@ -218,9 +239,11 @@ export default function CouponsPage() {
         )}
       </Card>
 
-      <Fab ariaLabel={lang === "ar" ? "كوبون جديد" : "New coupon"} onClick={() => setOpen(true)}>
-        <Plus className="size-6" />
-      </Fab>
+      {canCreate && (
+        <Fab ariaLabel={lang === "ar" ? "كوبون جديد" : "New coupon"} onClick={() => setOpen(true)}>
+          <Plus className="size-6" />
+        </Fab>
+      )}
 
       <AlertDialog open={!!del} onOpenChange={(o) => !o && setDel(null)}>
         <AlertDialogContent>

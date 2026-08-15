@@ -54,7 +54,9 @@ export default function Diagnoses() {
   const save = async () => {
     const name = form.name.trim();
     const desc = form.description.trim();
-    if (!form.code.trim() || !name) return toast.error("Code & name required");
+    // UX fix: hardcoded English regardless of `lang`, same pattern as the
+    // "Cannot delete" message above in this same file.
+    if (!form.code.trim() || !name) return toast.error(lang === "ar" ? "الرمز والاسم مطلوبان" : "Code & name required");
     const payload = {
       code: form.code.trim().toUpperCase(),
       name_en: name, name_ar: name,

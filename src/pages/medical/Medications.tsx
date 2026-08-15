@@ -61,7 +61,9 @@ export default function Medications() {
   const save = async () => {
     const name = form.name.trim();
     const ins = form.instructions.trim();
-    if (!name) return toast.error("Name required");
+    // UX fix: hardcoded English regardless of `lang`, same pattern as the
+    // "Cannot delete" message above in this same file.
+    if (!name) return toast.error(lang === "ar" ? "الاسم مطلوب" : "Name required");
     const payload = {
       name_en: name, name_ar: name,
       generic_name: form.generic_name || null,

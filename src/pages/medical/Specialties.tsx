@@ -32,7 +32,9 @@ export default function Specialties() {
 
   const save = async () => {
     const name = form.name.trim();
-    if (!name) { toast.error("Name required"); return; }
+    // UX fix: hardcoded English regardless of `lang`, in a file that
+    // otherwise fully supports both languages.
+    if (!name) { toast.error(lang === "ar" ? "الاسم مطلوب" : "Name required"); return; }
     const payload = {
       name_en: name, name_ar: name,
       description: form.description || null,

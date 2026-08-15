@@ -55,7 +55,9 @@ export default function Procedures() {
   const save = async () => {
     const name = form.name.trim();
     const desc = form.description.trim();
-    if (!name) return toast.error("Name required");
+    // UX fix: hardcoded English regardless of `lang`, in a file where every
+    // other message goes through t(...) or a lang === "ar" ternary.
+    if (!name) return toast.error(lang === "ar" ? "الاسم مطلوب" : "Name required");
     const payload = {
       specialty_id: form.specialty_id || null, code: form.code || null,
       name_en: name, name_ar: name,

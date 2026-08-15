@@ -35,9 +35,15 @@ export default function PhysioFollowups() {
       setCases(list);
       const ids = Array.from(new Set(list.map((c: any) => c.therapist_id).filter(Boolean))) as string[];
       if (ids.length) {
-        const { data: tps } = await supabase.from("staff_profiles").select("id,first_name_en,last_name_en").in("id", ids);
+        // Bug fix: staff_profiles has no first_name_en/last_name_en columns
+        // -- this query errored (PostgREST 400) so `tps` was always
+        // null/[], meaning every therapist here showed as an 8-char UUID
+        // slice. The display name lives on profiles.full_name, reached the
+        // same way PhysioCases.tsx already does it correctly.
+        const { data: tps } = await supabase.from("staff_profiles")
+          .select("id,profile:profiles!staff_profiles_id_fkey(full_name,email)").in("id", ids);
         const map: Record<string, string> = {};
-        (tps ?? []).forEach((t: any) => { map[t.id] = `${t.first_name_en ?? ""} ${t.last_name_en ?? ""}`.trim() || t.id.slice(0, 8); });
+        (tps ?? []).forEach((t: any) => { map[t.id] = t.profile?.full_name || t.profile?.email || t.id.slice(0, 8); });
         setTherapists(map);
       } else setTherapists({});
       setLoading(false);
@@ -119,7 +125,11 @@ function Section({ title, icon, items, empty, lang, therapists, patientName, acc
           {items.map((c: any) => (
             <Link key={c.id} to={`/physio/${c.id}`} className="flex items-center gap-3 p-3 hover:bg-muted/40">
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate">{patientName(c.patients)} {c.patients?.patient_code ? <span className="text-xs text-muted-foreground">#{c.patients.patient_code}</span> : null}</div>
+                {/* UX fix: this was the last file still showing the "#N"
+                    patient clinic-number badge on a card that just
+                    references a patient -- missed in the earlier sweep.
+                    Only the main Patients list should show it. */}
+                <div className="text-sm font-medium truncate">{patientName(c.patients)}</div>
                 <div className="text-xs text-muted-foreground truncate">{c.diagnosis || "—"} · {c.therapist_id ? (therapists[c.therapist_id] ?? "—") : (lang === "ar" ? "غير محدد" : "Unassigned")}</div>
               </div>
               <Badge variant="outline" className={accent === "destructive" ? "status-cancelled" : "status-pending"}>

@@ -9,30 +9,37 @@ import { Download, Database } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
+import { formatDateTime } from "@/lib/format";
 
 export default function BackupExport() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { user } = useAuth();
   // R2: admin gate routed through the canonical AuthorizationService.
   // Replaces a bespoke user_roles fetch that mirrored `isSuperAdmin()`.
   const { authz, loading: authzLoading } = useAuthorization("BackupExport");
   const canBackup = authz.isSuperAdmin();
   const [lastBackup, setLastBackup] = useState<{ created_at: string; rows_count: number | null; size_bytes: number | null } | null>(null);
+  const [backupLoading, setBackupLoading] = useState(true);
+  const [backupError, setBackupError] = useState(false);
 
-  const refreshLastBackup = () => {
-    (supabase as any)
+  const refreshLastBackup = async () => {
+    setBackupLoading(true);
+    setBackupError(false);
+    const { data, error } = await (supabase as any)
       .from("system_backups")
       .select("created_at,rows_count,size_bytes,status")
       .eq("status", "completed")
       .order("created_at", { ascending: false })
       .limit(1)
-      .maybeSingle()
-      .then(({ data }: any) => setLastBackup(data ?? null));
+      .maybeSingle();
+    setBackupLoading(false);
+    if (error) { setBackupError(true); return; }
+    setLastBackup(data ?? null);
   };
-  useEffect(() => { refreshLastBackup(); }, []);
+  useEffect(() => { void refreshLastBackup(); }, []);
 
   const guard = () => {
-    if (!canBackup) { toast.error("Admin access required"); return false; }
+    if (!canBackup) { toast.error(t("backupRestricted")); return false; }
     return true;
   };
 
@@ -81,27 +88,34 @@ export default function BackupExport() {
     <SettingsLayout>
       <div className="space-y-4">
         <h1 className="text-2xl font-bold">{t("backupExport")}</h1>
-        <div className="rounded-md border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-          {lastBackup
-            ? (<>Last backup: <span className="font-medium text-foreground">{new Date(lastBackup.created_at).toLocaleString()}</span>{lastBackup.rows_count != null ? <> · {lastBackup.rows_count.toLocaleString()} rows</> : null}{lastBackup.size_bytes != null ? <> · {(lastBackup.size_bytes/1024/1024).toFixed(2)} MB</> : null}</>)
-            : <>No backup recorded yet. Use <em>Backup now</em> to create one.</>}
+        <div className="rounded-md border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground" role={backupError ? "alert" : undefined}>
+          {backupLoading ? (
+            <span>{t("loading")}</span>
+          ) : backupError ? (
+            <span className="inline-flex items-center gap-2">{t("backupLoadFailed")} <Button variant="ghost" size="sm" onClick={() => void refreshLastBackup()}>{t("retry")}</Button></span>
+          ) : lastBackup ? (
+            <>{t("lastBackup")}: <span className="font-medium text-foreground">{formatDateTime(lastBackup.created_at, lang)}</span>{lastBackup.rows_count != null ? <> · {lastBackup.rows_count.toLocaleString(lang === "ar" ? "ar-EG" : "en-US")} {t("rows")}</> : null}{lastBackup.size_bytes != null ? <> · {(lastBackup.size_bytes/1024/1024).toFixed(2)} {t("megabytes")}</> : null}</>
+          ) : (
+            <>{t("noBackupRecorded")}</>
+          )}
         </div>
+        <div className="rounded-md border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">{t("snapshotNotice")}</div>
         {!authzLoading && !canBackup && (
           <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            Backup and export are restricted to administrators.
+            {t("backupRestricted")}
           </div>
         )}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Card className="p-5 space-y-3"><div className="flex items-center gap-2"><Database className="size-5 text-primary" /><h3 className="font-semibold">Backup</h3></div>
-            <p className="text-sm text-muted-foreground">Export full snapshot of core tables as JSON.</p>
+          <Card className="p-5 space-y-3"><div className="flex items-center gap-2"><Database className="size-5 text-primary" /><h3 className="font-semibold">{t("backupSection")}</h3></div>
+            <p className="text-sm text-muted-foreground">{t("backupDescription")}</p>
             <Button disabled={!canBackup} className="gradient-primary text-primary-foreground" onClick={exportAllJson}><Download className="me-2 size-4" />{t("backupNow")}</Button>
           </Card>
-          <Card className="p-5 space-y-3"><div className="flex items-center gap-2"><Download className="size-5 text-primary" /><h3 className="font-semibold">Export</h3></div>
+          <Card className="p-5 space-y-3"><div className="flex items-center gap-2"><Download className="size-5 text-primary" /><h3 className="font-semibold">{t("exportSection")}</h3></div>
             <div className="grid gap-2">
               <Button disabled={!canBackup} variant="outline" onClick={() => exportTable("patients", "patients.xlsx")}>{t("exportPatients")}</Button>
               <Button disabled={!canBackup} variant="outline" onClick={() => exportTable("invoices", "invoices.xlsx")}>{t("exportInvoices")}</Button>
-              <Button disabled={!canBackup} variant="outline" onClick={() => exportTable("appointments", "appointments.xlsx")}>Export appointments</Button>
-              <Button disabled={!canBackup} variant="outline" onClick={() => exportTable("products", "products.xlsx")}>Export products</Button>
+              <Button disabled={!canBackup} variant="outline" onClick={() => exportTable("appointments", "appointments.xlsx")}>{t("exportAppointments")}</Button>
+              <Button disabled={!canBackup} variant="outline" onClick={() => exportTable("products", "products.xlsx")}>{t("exportProducts")}</Button>
             </div>
           </Card>
         </div>

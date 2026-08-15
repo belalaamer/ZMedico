@@ -79,7 +79,7 @@ export default function Treasury() {
 
   const softDeleteTreasury = async (tr: any): Promise<void> => {
     const { count } = await supabase.from("treasury_transactions").select("id", { count: "exact", head: true }).eq("treasury_id", tr.id);
-    if ((count ?? 0) > 0) { toast.error(lang === "ar" ? "لا يمكن الحذف: توجد معاملات" : "Cannot delete: has transactions"); return; }
+    if ((count ?? 0) > 0) { toast.error(t("transactionsExist")); return; }
     const { error } = await supabase.from("treasury").update({ deleted_at: new Date().toISOString() } as any).eq("id", tr.id);
     if (error) { toast.error(error.message); return; }
     toast.success(t("delete")); load();
@@ -90,7 +90,7 @@ export default function Treasury() {
   const totalBalance = totalCashBalance + totalNonCashBalance;
 
   const submitAdj = async () => {
-    if (!adj.treasury_id || !adj.amount || !adj.desc_en) { toast.error("Fill all fields"); return; }
+    if (!adj.treasury_id || !adj.amount || !adj.desc_en) { toast.error(t("fillAllFields")); return; }
     const { error } = await supabase.rpc("add_treasury_tx", {
       _treasury_id: adj.treasury_id,
       _type: adj.type,
@@ -117,7 +117,7 @@ export default function Treasury() {
         <div className="flex gap-2">
           <Button variant="outline" asChild>
             <Link to="/treasury/daily-close">
-              <Lock className="me-2 size-4" />{lang === "ar" ? "الإقفال اليومي" : "Daily close"}
+              <Lock className="me-2 size-4" />{t("dailyClose")}
             </Link>
           </Button>
           <Can permission="treasury.tx.write">

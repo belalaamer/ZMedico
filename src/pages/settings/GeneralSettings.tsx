@@ -46,8 +46,8 @@ export default function GeneralSettings() {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    if (!file.type.startsWith("image/")) return toast.error("Please pick an image file");
-    if (file.size > 1024 * 1024) return toast.error("Max 1 MB");
+    if (!file.type.startsWith("image/")) return toast.error(t("invalidImageFile"));
+    if (file.size > 1024 * 1024) return toast.error(t("maxImageSize"));
     setUploading(true);
     try {
       const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -57,9 +57,9 @@ export default function GeneralSettings() {
         r.readAsDataURL(file);
       });
       setForm((f: any) => ({ ...f, logo_url: dataUrl }));
-      toast.success(lang === "ar" ? "تم رفع اللوجو، اضغط حفظ" : "Logo loaded — click Save");
+      toast.success(t("logoLoaded"));
     } catch (err: any) {
-      toast.error(err?.message || "Upload failed");
+      toast.error(err?.message || t("uploadFailed"));
     } finally {
       setUploading(false);
     }

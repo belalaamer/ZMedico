@@ -205,12 +205,12 @@ test.describe("hr", () => {
 
 // ---------- STAFF ----------
 test.describe("staff", () => {
-  test("only calendar (view) is reachable", async ({ page }) => {
+  test("only the dashboard is reachable after staff retirement", async ({ page }) => {
     await login(page, "staff");
-    await expectRouteOk(page, "/calendar");
+    await expectRouteOk(page, "/");
     for (const p of [
-      "/patients", "/invoices", "/treasury", "/medical/records",
-      "/inventory", "/reports", "/hr/staff", "/settings",
+      "/calendar", "/patients", "/invoices", "/payments", "/treasury",
+      "/medical/records", "/inventory", "/reports", "/hr/staff", "/settings",
     ]) await expectAccessDenied(page, p);
   });
 });

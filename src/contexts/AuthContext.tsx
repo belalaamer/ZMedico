@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { useI18n } from "@/contexts/I18nContext";
 import { withTimeout } from "@/lib/withTimeout";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -15,7 +16,7 @@ type Ctx = {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signOut: () => Promise<void>;
+  signOut: (notify?: boolean) => Promise<void>;
 };
 
 const AuthContext = createContext<Ctx | null>(null);
@@ -75,6 +76,7 @@ function notifySessionInvalid() {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
   const [session, setSession] = useState<Session | null>(() => readPersistedAuthSession());
   const [user, setUser] = useState<User | null>(() => readPersistedAuthSession()?.user ?? null);
   const [loading, setLoading] = useState(() => !readPersistedAuthSession());
@@ -190,7 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signOut = async () => {
+  const signOut = async (notify = true) => {
     try {
       await supabase.auth.signOut();
     } catch {
@@ -199,6 +201,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearLocalAppState();
     setSession(null);
     setUser(null);
+    if (notify) toast({ title: t("signedOut") });
   };
 
   // Idle auto-logout: signs the user out after IDLE_TIMEOUT_MS without activity.
@@ -207,7 +210,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let timer: ReturnType<typeof setTimeout>;
     const reset = () => {
       clearTimeout(timer);
-      timer = setTimeout(() => { void signOut(); }, IDLE_TIMEOUT_MS);
+      timer = setTimeout(() => { void signOut(false); }, IDLE_TIMEOUT_MS);
     };
     const events = ["mousemove", "mousedown", "keydown", "touchstart", "scroll", "visibilitychange"];
     events.forEach((e) => window.addEventListener(e, reset, { passive: true } as AddEventListenerOptions));

@@ -36,7 +36,7 @@ export default function Categories() {
 
   const save = async () => {
     const name = form.name.trim();
-    if (!name) { toast.error("Name required"); return; }
+    if (!name) { toast.error(t("nameRequired")); return; }
     const payload = {
       name_en: name,
       name_ar: name,
@@ -52,7 +52,7 @@ export default function Categories() {
   };
 
   const del = async (id: string) => {
-    if (counts[id]) { toast.error("Cannot delete: category has products"); return; }
+    if (counts[id]) { toast.error(t("categoryHasProducts")); return; }
     const { error } = await supabase.from("product_categories").delete().eq("id", id);
     if (error) { toast.error(error.message); return; }
     toast.success(t("delete")); load();

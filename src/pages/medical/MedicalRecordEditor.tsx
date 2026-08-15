@@ -24,7 +24,10 @@ function calcAge(dob?: string | null) {
   if (!dob) return null;
   const d = new Date(dob);
   const diff = Date.now() - d.getTime();
-  return Math.floor(diff / (365.25 * 24 * 3600 * 1000));
+  // Bug fix: a future dob (data-entry error, or a misdated newborn record)
+  // produced a negative diff and thus a negative age (e.g. "-1 years old")
+  // rendered straight to the patient header. Clamp at 0.
+  return Math.max(0, Math.floor(diff / (365.25 * 24 * 3600 * 1000)));
 }
 
 export default function MedicalRecordEditor() {
@@ -691,13 +694,16 @@ function DocumentsTab({ record, patient, docs, reload, userId }: any) {
     ]);
     const ALLOWED_EXT = /\.(jpe?g|png|webp|gif|pdf|dcm|dicom)$/i;
     const MAX_SIZE = 20 * 1024 * 1024; // 20 MB
+    // UX fix: these two messages were hardcoded English regardless of
+    // `lang`, in a component that otherwise fully supports both languages
+    // (t(...) and lang === "ar" ternaries throughout).
     if (file.size > MAX_SIZE) {
-      return toast.error(`${file.name}: file exceeds 20 MB limit`);
+      return toast.error(`${file.name}: ${lang === "ar" ? "الملف يتجاوز الحد الأقصى 20 ميغابايت" : "file exceeds 20 MB limit"}`);
     }
     const mimeOk = file.type && ALLOWED_MIME.has(file.type);
     const extOk = ALLOWED_EXT.test(file.name);
     if (!mimeOk && !extOk) {
-      return toast.error(`${file.name}: unsupported file type`);
+      return toast.error(`${file.name}: ${lang === "ar" ? "نوع ملف غير مدعوم" : "unsupported file type"}`);
     }
     const safeName = (file.name
       .replace(/[^a-zA-Z0-9._-]/g, "_")
@@ -808,7 +814,8 @@ function InvoicePreviewTab({ record, patient, procs, nav, userId }: any) {
       } as any, { defaultToNull: false })
       .select("id")
       .single();
-    if (error || !inv) return toast.error(error?.message ?? "error");
+    // UX fix: hardcoded English fallback regardless of `lang`.
+    if (error || !inv) return toast.error(error?.message ?? (lang === "ar" ? "خطأ" : "error"));
     const rows = items.map((rp: any) => ({
       invoice_id: inv.id, item_type: "procedure" as const,
       description_en: rp.procedures.name_en, description_ar: rp.procedures.name_ar,

@@ -42,7 +42,7 @@ export default function Departments() {
   const openEdit = (d: Dept) => { setE(d); setForm({ name: d.name_en || d.name_ar || "", description: d.description ?? "", branch_id: d.branch_id ?? "", manager_id: d.manager_id ?? "" }); setOpen(true); };
   const save = async () => {
     const name = form.name.trim();
-    if (!name) { toast.error("Name required"); return; }
+    if (!name) { toast.error(t("nameRequired")); return; }
     const effectiveBranchId = form.branch_id || currentBranchId;
     if (!effectiveBranchId) {
       toast.error(t("errSelectBranchFirst"));
@@ -58,7 +58,7 @@ export default function Departments() {
   const toggle = async (d: Dept) => { await supabase.from("departments").update({ is_active: !d.is_active }).eq("id", d.id); load(); };
 
   const softDelete = async (d: Dept) => {
-    if ((counts[d.id] ?? 0) > 0) { toast.error(lang === "ar" ? "لا يمكن الحذف: يوجد موظفين" : "Cannot delete: has staff"); return; }
+    if ((counts[d.id] ?? 0) > 0) { toast.error(t("departmentHasStaff")); return; }
     const { error } = await supabase.from("departments").update({ deleted_at: new Date().toISOString() } as any).eq("id", d.id);
     if (error) { toast.error(error.message); return; }
     toast.success(t("delete")); load();

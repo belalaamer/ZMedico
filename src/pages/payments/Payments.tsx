@@ -117,7 +117,7 @@ export default function Payments() {
                   <div className="flex-1 min-w-0">
                     <div className="font-medium truncate">{name}</div>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      <span className="text-xs text-muted-foreground">{formatDateTime(p.created_at, lang)}</span>
+                      <span className="text-xs text-muted-foreground">{t("paymentDate")}: {formatDateTime(p.created_at, lang)}</span>
                       <Badge variant="outline" className={`text-[10px] font-medium ${ms.badge}`}>{methodLabel}</Badge>
                       {p.invoices?.invoice_number && (
                         <Badge variant="outline" className="text-[10px] font-mono bg-primary/5 text-primary border-primary/20">

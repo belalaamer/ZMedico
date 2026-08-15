@@ -28,7 +28,7 @@ Delete column omitted — Admin-only everywhere.
 | Module / Role        | admin | manager | doctor | nurse | receptionist | accountant | hr    | staff |
 |----------------------|:-----:|:-------:|:------:|:-----:|:------------:|:----------:|:-----:|:-----:|
 | patients             | VCEX  | VCEX    | V      | V     | VCE          | V          | —     | —     |
-| appointments         | VCEX  | VCEX    | VCE    | VCE   | VCE*         | V          | —     | V     |
+| appointments         | VCEX  | VCEX    | VCE    | VCE   | VCE*         | V          | —     | —     |
 | medical_records      | VCEX  | V       | VCE    | V     | —            | —          | —     | —     |
 | vitals               | VCEX  | V       | VCE    | VCE   | —            | —          | —     | —     |
 | treatment_plans      | VCEX  | V       | VCE    | V     | V            | V          | —     | —     |
@@ -61,6 +61,7 @@ Delete column omitted — Admin-only everywhere.
 - Nurse lost medical_records/treatment_plans writes.
 - Accountant lost any medical_records access; gained treatment_plans view.
 - HR unchanged in scope, but confirmed strict isolation to HR modules.
+- Staff was retired from the operational permission matrix; existing QA staff identities remain for negative-access regression tests and receive Dashboard-only access.
 
 ## Per-role expectations
 
@@ -84,9 +85,9 @@ Assistant. Vitals VCE (nurses take vitals). Patients/Medical Records/
 Treatment Plans view-only. Appointments VCE. Inventory V. No reports.
 
 ### receptionist
-Front desk. Patients VCE, Appointments VCE (cancel via status update),
-Treatment Plans V, Invoices VC (create initial invoice, no edit),
-Coupons V (apply codes only). No expenses, no treasury, no reports.
+Front desk. Patients VCE, Appointments VCE (cancel via status update), Treatment
+Plans V, Invoices VC (create initial invoice, no edit), Coupons V (apply codes only). No expenses, no treasury, no reports. The `/payments` collection flow is intentionally available through the legacy `invoices.create` gate; the `20260804130000_reception_can_record_payments.sql` migration permits only ledger entries derived from an already-authorized payment and still blocks arbitrary treasury adjustments.
+
 
 ### accountant
 Finance only. Invoices VCEX (void, no hard-delete), Treasury VCEX,
@@ -97,7 +98,7 @@ reports VX. No clinical access, no HR, no settings.
 HR VCEX, HR Reports VX. Nothing else.
 
 ### staff
-Appointments V only.
+Retired/minimal QA role. Dashboard-only access is intentional after migration `20260805085000_retire_staff_and_scope_catalogs.sql`; all operational routes, including appointments, are denied.
 
 ## RLS policy alignment
 

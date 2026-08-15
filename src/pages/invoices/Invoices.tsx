@@ -187,7 +187,9 @@ export default function Invoices() {
                     <div className="flex items-center gap-2">
                       <div className="font-semibold tabular-nums">{i.invoice_number}</div>
                     </div>
-                    <div className="text-xs text-muted-foreground truncate">{name} · {formatDate(i.invoice_date, lang)}</div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {name} · {t("invoiceDate")}: {formatDate(i.invoice_date, lang)}
+                    </div>
                   </div>
                   <div className="text-end shrink-0">
                     <div className="text-lg font-bold tabular-nums leading-tight">{formatMoney(i.total, lang)}</div>

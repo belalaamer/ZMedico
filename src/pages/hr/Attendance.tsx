@@ -129,7 +129,7 @@ export default function Attendance() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("attendance")}</h1>
-          <p className="text-sm text-muted-foreground mt-1">Timesheet &amp; workforce presence overview</p>
+          <p className="text-sm text-muted-foreground mt-1">{t("timesheetWorkforceOverview")}</p>
         </div>
         <div className="bg-card border shadow-sm rounded-lg p-2 flex items-center gap-3">
           <Select value={zoneFilter} onValueChange={(v: any) => setZoneFilter(v)}>
@@ -154,12 +154,12 @@ export default function Attendance() {
 
       <Card className="shadow-card overflow-hidden">
         <div className="sticky top-0 bg-muted/80 backdrop-blur z-10 border-b px-4 py-2 text-xs font-medium uppercase text-muted-foreground grid grid-cols-12 gap-3">
-          <div className="col-span-3">Employee</div>
-          <div className="col-span-2">Location</div>
-          <div className="col-span-2">Time In → Out</div>
-          <div className="col-span-1">Hours</div>
-          <div className="col-span-2">Status</div>
-          <div className="col-span-2 text-right">Actions</div>
+          <div className="col-span-3">{t("employee")}</div>
+          <div className="col-span-2">{t("location")}</div>
+          <div className="col-span-2">{t("timeInOut")}</div>
+          <div className="col-span-1">{t("hours")}</div>
+          <div className="col-span-2">{t("status")}</div>
+          <div className="col-span-2 text-right">{t("actions")}</div>
         </div>
         <div className="divide-y divide-border">
           {visibleStaff.map((s) => {

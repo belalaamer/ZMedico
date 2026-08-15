@@ -54,9 +54,9 @@ export default function Expenses() {
   };
 
   const save = async () => {
-    if (!currentBranchId) { toast.error("Select a branch"); return; }
-    if (!form.amount || form.amount <= 0) { toast.error("Amount required"); return; }
-    if (!form.description_en) { toast.error("Description required"); return; }
+    if (!currentBranchId) { toast.error(t("selectBranch")); return; }
+    if (!form.amount || form.amount <= 0) { toast.error(t("amountRequired")); return; }
+    if (!form.description_en) { toast.error(t("descriptionRequired")); return; }
     const { error } = await supabase.from("expenses").insert({
       branch_id: currentBranchId,
       category_id: form.category_id || null,

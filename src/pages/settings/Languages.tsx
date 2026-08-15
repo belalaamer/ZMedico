@@ -22,7 +22,7 @@ export default function Languages() {
   useEffect(() => { load(); }, []);
 
   const save = async () => {
-    if (!f.code || !f.name_en || !f.name_ar) return toast.error("required");
+    if (!f.code || !f.name_en || !f.name_ar) return toast.error(t("requiredFields"));
     if (f.is_default) await supabase.from("system_languages").update({ is_default: false }).neq("id", "00000000-0000-0000-0000-000000000000");
     const { error } = await supabase.from("system_languages").insert(f);
     if (error) return toast.error(error.message);

@@ -39,7 +39,7 @@ export default function Services() {
 
   const saveCat = async () => {
     const name = (cf.name || "").trim();
-    if (!name) return toast.error("required");
+    if (!name) return toast.error(t("nameRequired"));
     const payload = { name_en: name, name_ar: name, icon: cf.icon || null, color: cf.color || null, display_order: cf.display_order, is_active: cf.is_active };
     const { error } = editC ? await supabase.from("service_categories").update(payload).eq("id", editC.id) : await supabase.from("service_categories").insert(payload);
     if (error) return toast.error(error.message);
@@ -47,7 +47,7 @@ export default function Services() {
   };
   const saveSv = async () => {
     const name = (sf.name || "").trim();
-    if (!name) return toast.error("required");
+    if (!name) return toast.error(t("nameRequired"));
     const { name: _ignored, ...rest } = sf;
     const payload = { ...rest, name_en: name, name_ar: name, category_id: sf.category_id || null, cost_price: sf.cost_price === "" ? null : sf.cost_price };
     const { error } = editS ? await supabase.from("services").update(payload).eq("id", editS.id) : await supabase.from("services").insert(payload);
@@ -58,7 +58,7 @@ export default function Services() {
   const toggleCat = async (c: any) => { await supabase.from("service_categories").update({ is_active: !c.is_active }).eq("id", c.id); load(); };
 
   const delCat = async (c: any): Promise<void> => {
-    if (services.some(s => s.category_id === c.id)) { toast.error(lang === "ar" ? "لا يمكن الحذف: تحتوي على خدمات" : "Cannot delete: has services"); return; }
+    if (services.some(s => s.category_id === c.id)) { toast.error(t("servicesHaveItems")); return; }
     const { error } = await supabase.from("service_categories").update({ deleted_at: new Date().toISOString() } as any).eq("id", c.id);
     if (error) { toast.error(error.message); return; }
     toast.success(t("delete")); load();
@@ -121,7 +121,7 @@ export default function Services() {
                       <TableHead className="w-20">{t("color")}</TableHead>
                       <TableHead>{t("name")}</TableHead>
                       <TableHead className="w-32">{t("servicesMgmt")}</TableHead>
-                      <TableHead className="w-28">{t("status") || "Status"}</TableHead>
+                      <TableHead className="w-28">{t("status")}</TableHead>
                       <TableHead className="w-16 text-end">—</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -168,12 +168,12 @@ export default function Services() {
               <div className="flex flex-1 gap-2 flex-wrap">
                 <div className="relative flex-1 min-w-[200px] max-w-md">
                   <Search className="absolute start-2 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                  <Input className="ps-8" placeholder={lang === "ar" ? "بحث بالاسم أو الكود" : "Search by name or code"} value={search} onChange={e => setSearch(e.target.value)} />
+                  <Input className="ps-8" placeholder={t("searchByNameOrCode")} value={search} onChange={e => setSearch(e.target.value)} />
                 </div>
                 <Select value={catFilter} onValueChange={setCatFilter}>
                   <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">{lang === "ar" ? "كل الفئات" : "All categories"}</SelectItem>
+                    <SelectItem value="all">{t("allCategories")}</SelectItem>
                     {cats.map(c => <SelectItem key={c.id} value={c.id}>{lang === "ar" ? c.name_ar : c.name_en}</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -212,7 +212,7 @@ export default function Services() {
                       <TableHead>{t("name")}</TableHead>
                       <TableHead>{t("category")}</TableHead>
                       <TableHead className="w-40">{t("durationMinutes")} · {t("defaultPrice")}</TableHead>
-                      <TableHead className="w-28">{t("status") || "Status"}</TableHead>
+                      <TableHead className="w-28">{t("status")}</TableHead>
                       <TableHead className="w-16 text-end">—</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -238,7 +238,7 @@ export default function Services() {
                             )}
                           </TableCell>
                           <TableCell className="whitespace-nowrap text-sm">
-                            <div>{s.default_duration_minutes} min</div>
+                            <div>{s.default_duration_minutes} {t("minutesShort")}</div>
                             <div className="text-xs text-muted-foreground">{s.default_price}</div>
                           </TableCell>
                           <TableCell>

@@ -13,7 +13,15 @@ import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-const TYPES = ["cash","card","bank_transfer","wallet","insurance","other"] as const;
+const TYPES = ["cash", "card", "bank_transfer", "wallet", "insurance", "other"] as const;
+const PAYMENT_TYPE_KEYS = {
+  cash: "paymentTypeCash",
+  card: "paymentTypeCard",
+  bank_transfer: "paymentTypeBankTransfer",
+  wallet: "paymentTypeWallet",
+  insurance: "paymentTypeInsurance",
+  other: "paymentTypeOther",
+} as const;
 
 export default function PaymentMethods() {
   const { t, lang } = useI18n();
@@ -32,7 +40,7 @@ export default function PaymentMethods() {
   const openEdit = (m: any) => { setE(m); setF({ ...m, name: m.name_en || m.name_ar || "" }); setOpen(true); };
   const save = async () => {
     const name = (f.name || "").trim();
-    if (!name || !f.code) return toast.error("required");
+    if (!name || !f.code) return toast.error(t("requiredFields"));
     const payload = { name_en: name, name_ar: name, code: f.code, type: f.type, requires_reference: f.requires_reference, processing_fee_percentage: f.processing_fee_percentage, processing_fee_fixed: f.processing_fee_fixed, display_order: f.display_order, is_active: f.is_active };
     const { error } = edit ? await supabase.from("payment_methods").update(payload).eq("id", edit.id) : await supabase.from("payment_methods").insert(payload);
     if (error) return toast.error(error.message);
@@ -55,7 +63,7 @@ export default function PaymentMethods() {
                 <div><Label>{t("methodType")}</Label>
                   <Select value={f.type} onValueChange={(v) => setF({ ...f, type: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{TYPES.map(x => <SelectItem key={x} value={x}>{x}</SelectItem>)}</SelectContent>
+                    <SelectContent>{TYPES.map(x => <SelectItem key={x} value={x}>{t(PAYMENT_TYPE_KEYS[x])}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div><Label>{t("processingFeePct")}</Label><Input type="number" step="0.01" value={f.processing_fee_percentage} onChange={e => setF({ ...f, processing_fee_percentage: +e.target.value })} /></div>
@@ -75,7 +83,7 @@ export default function PaymentMethods() {
                   <div className="flex items-center gap-2">
                     <div className="font-medium">{lang === "ar" ? m.name_ar : m.name_en}</div>
                     <Badge variant="outline">{m.code}</Badge>
-                    <Badge variant="outline">{m.type}</Badge>
+                    <Badge variant="outline">{t(PAYMENT_TYPE_KEYS[m.type as keyof typeof PAYMENT_TYPE_KEYS] ?? "paymentTypeOther")}</Badge>
                     <Badge variant="outline" className={m.is_active ? "status-completed" : "status-departed"}>{m.is_active ? t("active") : t("inactive")}</Badge>
                   </div>
                   <div className="text-xs text-muted-foreground">{t("processingFeePct")}: {m.processing_fee_percentage}% · {t("processingFeeFixed")}: {m.processing_fee_fixed}</div>

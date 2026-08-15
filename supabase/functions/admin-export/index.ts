@@ -38,11 +38,11 @@ Deno.serve(async (req) => {
       .from("user_roles")
       .select("role")
       .eq("user_id", userData.user.id)
-      .eq("role", "admin")
+      .in("role", ["admin", "system_owner"])
       .maybeSingle();
 
     if (roleErr || !roleRow) {
-      return json({ error: "Forbidden: admin access required" }, 403);
+      return json({ error: "Forbidden: administrator access required" }, 403);
     }
 
     const body = await req.json().catch(() => ({}));

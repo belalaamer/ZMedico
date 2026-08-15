@@ -37,13 +37,13 @@ export function GlobalSearch({ variant = "desktop", onClose }: Props) {
   // Build the list of groups the current user is allowed to see.
   const allowedGroups = useMemo<{ key: SearchGroupKey; module: string; label: string }[]>(() => {
     const labels: Record<SearchGroupKey, string> = {
-      patients:        lang === "ar" ? "المرضى" : "Patients",
-      invoices:        lang === "ar" ? "الفواتير" : "Invoices",
-      appointments:    lang === "ar" ? "المواعيد" : "Appointments",
-      payments:        lang === "ar" ? "المدفوعات" : "Payments",
-      medical_records: lang === "ar" ? "السجلات الطبية" : "Medical records",
-      prescriptions:   lang === "ar" ? "الوصفات" : "Prescriptions",
-      staff:           lang === "ar" ? "الموظفون" : "Staff",
+      patients: t("searchPatients"),
+      invoices: t("searchInvoices"),
+      appointments: t("searchAppointments"),
+      payments: t("searchPayments"),
+      medical_records: t("searchMedicalRecords"),
+      prescriptions: t("searchPrescriptions"),
+      staff: t("searchStaff"),
     };
     const defs: { key: SearchGroupKey; module: string }[] = [
       { key: "patients",        module: "patients" },
@@ -55,7 +55,7 @@ export function GlobalSearch({ variant = "desktop", onClose }: Props) {
       { key: "staff",           module: "hr" },
     ];
     return defs.filter((d) => authz.can(`${d.module}.view`)).map((d) => ({ ...d, label: labels[d.key] }));
-  }, [authz, lang, permLoading]);
+  }, [authz, lang, permLoading, t]);
 
   // Stable signature so the search effect doesn't re-fire on every render
   // (useAuthorization returns a fresh authz each render, which would otherwise
@@ -211,7 +211,7 @@ export function GlobalSearch({ variant = "desktop", onClose }: Props) {
       >
         {loading && totalHits === 0 ? (
           <div className="p-4 text-sm text-muted-foreground text-center">
-            {lang === "ar" ? "جارٍ البحث..." : "Searching..."}
+            {t("searching")}
           </div>
         ) : totalHits === 0 ? (
           <div className="p-4 text-sm text-muted-foreground text-center">{t("noResults")}</div>

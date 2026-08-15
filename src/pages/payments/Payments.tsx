@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useDataSync } from "@/lib/dataSync";
-import { Plus, CreditCard, Banknote, Wallet, Shield, Landmark, Smartphone } from "lucide-react";
+import { Plus, CreditCard, Banknote, Wallet, Shield, Landmark, Smartphone, AlertCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ import { formatMoney, formatDateTime } from "@/lib/format";
 import { RecordPaymentDialog } from "./RecordPaymentDialog";
 import { RowActions } from "@/components/RowActions";
 import { TablePager } from "@/components/TablePager";
+import { ListSkeleton } from "@/components/ListSkeleton";
 import { Can } from "@/components/Can";
 
 const PAGE_SIZE = 50;
@@ -31,6 +32,8 @@ export default function Payments() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
   const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
@@ -53,6 +56,8 @@ export default function Payments() {
   };
 
   const load = async () => {
+    setLoading(true);
+    setLoadError(false);
     const from = page * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
     let q = supabase.from("payments")
@@ -61,7 +66,8 @@ export default function Payments() {
       .order("created_at", { ascending: false }).range(from, to);
     if (currentBranchId) q = q.eq("branch_id", currentBranchId);
     const { data, error, count } = await q;
-    if (error) { toast.error(error.message); return; }
+    setLoading(false);
+    if (error) { setLoadError(true); toast.error(error.message); return; }
     setItems(data ?? []);
     setTotal(count ?? 0);
   };
@@ -97,7 +103,15 @@ export default function Payments() {
       </div>
 
       <Card className="shadow-card overflow-hidden">
-        {items.length === 0 ? (
+        {loading ? (
+          <ListSkeleton rows={8} />
+        ) : loadError ? (
+          <div className="p-10 text-center space-y-3" role="alert">
+            <AlertCircle className="mx-auto size-8 text-destructive" aria-hidden="true" />
+            <p className="text-sm text-muted-foreground">{t("loadFailed")}</p>
+            <Button variant="outline" onClick={load}>{t("retry")}</Button>
+          </div>
+        ) : items.length === 0 ? (
           <div className="p-10 text-center text-muted-foreground">{t("noPayments")}</div>
         ) : (
           <div className="divide-y divide-border">

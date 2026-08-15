@@ -54,6 +54,7 @@ export default function Invoices() {
   const canOverride = authz.isSuperAdmin();
   const [items, setItems] = useState<Inv[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [open, setOpen] = useState(false);
@@ -62,6 +63,7 @@ export default function Invoices() {
 
   const load = async () => {
     setLoading(true);
+    setLoadError(false);
     const from = page * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
     let query = supabase.from("invoices")
@@ -72,7 +74,7 @@ export default function Invoices() {
     if (statusFilter !== "all") query = query.eq("status", statusFilter as Inv["status"]);
     const { data, error, count } = await query;
     setLoading(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { setLoadError(true); toast.error(error.message); return; }
     setItems((data ?? []) as any);
     setTotal(count ?? 0);
   };
@@ -161,6 +163,12 @@ export default function Invoices() {
       <Card className="shadow-card overflow-hidden">
         {loading ? (
           <ListSkeleton rows={8} />
+        ) : loadError ? (
+          <div className="p-10 text-center space-y-3" role="alert">
+            <AlertCircle className="mx-auto size-8 text-destructive" aria-hidden="true" />
+            <p className="text-sm text-muted-foreground">{t("loadFailed")}</p>
+            <Button variant="outline" onClick={load}>{t("retry")}</Button>
+          </div>
         ) : filtered.length === 0 ? (
           <div className="p-10 text-center text-muted-foreground">{t("noInvoices")}</div>
         ) : (

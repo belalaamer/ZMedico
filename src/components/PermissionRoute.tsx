@@ -69,7 +69,7 @@ function InvoicesShadowProbeMount({ path }: { path: string }) {
 export function PermissionRoute({ children, module, adminOnly }: { children: ReactNode; module?: string; adminOnly?: boolean }) {
   const { pathname } = useLocation();
   const { authz, loading } = useAuthorization();
-  const { lang } = useI18n();
+  const { t } = useI18n();
   const mod = module ?? moduleForPath(pathname);
   // Shadow-probe telemetry for the Settings vertical slice. Mounted
   // regardless of the gate outcome so denied roles (e.g. staff) also
@@ -88,7 +88,7 @@ export function PermissionRoute({ children, module, adminOnly }: { children: Rea
       <div className="min-h-[40vh] flex items-center justify-center" role="status" aria-live="polite">
         <div className="flex flex-col items-center gap-3 text-muted-foreground">
           <div className="size-8 rounded-full border-4 border-primary/20 border-t-primary animate-spin" aria-hidden="true" />
-          <span className="text-sm">{lang === "ar" ? "جارٍ التحقق من الصلاحيات…" : "Checking permissions…"}</span>
+          <span className="text-sm">{t("loadingPermissions")}</span>
         </div>
       </div>
     );
@@ -144,12 +144,10 @@ export function PermissionRoute({ children, module, adminOnly }: { children: Rea
           <ShieldAlert className="size-7" />
         </div>
         <h2 className="text-xl font-bold">
-          {lang === "ar" ? "لا تملك صلاحية الوصول" : "Access denied"}
+          {t("accessDenied")}
         </h2>
         <p className="text-sm text-muted-foreground">
-          {lang === "ar"
-            ? "ليس لديك إذن لعرض هذه الصفحة. تواصل مع المسؤول إذا كنت تعتقد أن هذا خطأ."
-            : "You don't have permission to view this page. Contact your administrator if you think this is a mistake."}
+          {t("accessDeniedDescription")}
         </p>
       </div>
     </div>

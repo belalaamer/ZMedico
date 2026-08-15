@@ -85,8 +85,11 @@ export function PermissionRoute({ children, module, adminOnly }: { children: Rea
 
   if (loading) {
     return (
-      <div className="min-h-[40vh] flex items-center justify-center">
-        <div className="size-8 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+      <div className="min-h-[40vh] flex items-center justify-center" role="status" aria-live="polite">
+        <div className="flex flex-col items-center gap-3 text-muted-foreground">
+          <div className="size-8 rounded-full border-4 border-primary/20 border-t-primary animate-spin" aria-hidden="true" />
+          <span className="text-sm">{lang === "ar" ? "جارٍ التحقق من الصلاحيات…" : "Checking permissions…"}</span>
+        </div>
       </div>
     );
   }

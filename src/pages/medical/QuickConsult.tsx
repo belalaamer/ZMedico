@@ -158,6 +158,9 @@ export default function QuickConsult() {
               placeholder={t("selectPatient")}
               searchPlaceholder={lang === "ar" ? "ابحث عن مريض..." : "Search patient..."}
             />
+            {!form.patient_id && (
+              <p className="text-xs text-destructive" role="status">{t("selectPatient")}</p>
+            )}
           </div>
           <div className="space-y-2"><Label>{t("specialty")}</Label>
             <Select value={form.specialty_id || "none"} onValueChange={(v) => setForm({ ...form, specialty_id: v === "none" ? "" : v })}>
@@ -257,8 +260,8 @@ export default function QuickConsult() {
         </div>
 
         <div className="flex justify-end gap-2 pt-2 flex-wrap">
-          <Button variant="outline" onClick={saveAndStay} disabled={saving}>{t("saveQuickConsult")}</Button>
-          <Button className="gradient-primary text-primary-foreground" onClick={saveAndOpen} disabled={saving}>{t("openFullRecord")}</Button>
+          <Button variant="outline" onClick={saveAndStay} disabled={saving || !form.patient_id} aria-disabled={saving || !form.patient_id}>{t("saveQuickConsult")}</Button>
+          <Button className="gradient-primary text-primary-foreground" onClick={saveAndOpen} disabled={saving || !form.patient_id} aria-disabled={saving || !form.patient_id}>{t("openFullRecord")}</Button>
         </div>
       </Card>
     </div>

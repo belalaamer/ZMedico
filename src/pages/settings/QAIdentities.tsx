@@ -142,20 +142,35 @@ export default function QAIdentities() {
 
   const deleteAll = async () => {
     if (!confirm("Delete ALL QA users (emails starting with 'qa.')? This cannot be undone.")) return;
-    for (const acc of ACCOUNTS) {
-      const target = existing[acc.email];
-      if (!target) continue;
-      if (!acc.email.startsWith("qa.")) continue; // hard safety guard
-      // eslint-disable-next-line no-await-in-loop
-      const { data, error } = await supabase.functions.invoke("admin-delete-user", {
-        body: { user_id: target.id },
-      });
-      if (error || (data as any)?.error) {
-        toast.error(`${acc.email}: ${(data as any)?.error ?? error?.message}`);
-      }
+    const targets = ACCOUNTS
+      .map((acc) => ({ acc, target: existing[acc.email] }))
+      .filter(({ acc, target }) => Boolean(target) && acc.email.startsWith("qa."));
+    if (!targets.length) {
+      toast.info("No QA users to delete");
+      return;
     }
+
+    setBusy("delete-all");
+    const results = await Promise.all(targets.map(async ({ acc, target }) => {
+      try {
+        const { data, error } = await supabase.functions.invoke("admin-delete-user", {
+          body: { user_id: target!.id },
+        });
+        const message = (data as any)?.error ?? error?.message;
+        return { email: acc.email, ok: !message, message };
+      } catch (error) {
+        return { email: acc.email, ok: false, message: error instanceof Error ? error.message : "Request failed" };
+      }
+    }));
+    setBusy(null);
     setCreds({});
-    toast.success("QA users deleted");
+    const failed = results.filter((r) => !r.ok);
+    if (failed.length) {
+      failed.forEach((r) => toast.error(`${r.email}: ${r.message ?? "Failed"}`));
+      toast.warning(`Deleted ${results.length - failed.length} QA users; ${failed.length} failed`);
+    } else {
+      toast.success(`Deleted ${results.length} QA users`);
+    }
     await load();
   };
 
@@ -181,14 +196,14 @@ export default function QAIdentities() {
           <div>
             <h1 className="text-2xl font-bold">QA Identities</h1>
             <p className="text-sm text-muted-foreground">
-              Provision the four canonical QA users consumed by the Settings Shadow QA Playwright suite.
+              Provision the eight canonical QA users consumed by the Settings Shadow QA Playwright suite.
               Passwords are shown once and never persisted server-side.
             </p>
           </div>
           <div className="flex gap-2">
             <Button onClick={provisionAll} disabled={loading || !!busy}>Provision QA Identities</Button>
-            <Button variant="destructive" onClick={deleteAll} disabled={loading || !!busy}>
-              <Trash2 className="size-4 mr-1" /> Delete QA Users
+              <Button variant="destructive" onClick={deleteAll} disabled={loading || !!busy} aria-busy={busy === "delete-all"}>
+              <Trash2 className="size-4 mr-1" /> {busy === "delete-all" ? "Deleting QA Users…" : "Delete QA Users"}
             </Button>
           </div>
         </div>

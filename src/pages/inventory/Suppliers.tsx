@@ -56,7 +56,7 @@ export default function Suppliers() {
 
   const save = async () => {
     const name = form.name.trim();
-    if (!name) { toast.error("Name required"); return; }
+    if (!name) { toast.error(t("nameRequired")); return; }
     const payload: any = {
       name_en: name, name_ar: name,
       contact_person: form.contact_person || null,

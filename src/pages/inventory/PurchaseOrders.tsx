@@ -65,7 +65,7 @@ export default function PurchaseOrders() {
 
   const softDelete = async (po: any): Promise<void> => {
     if (po.status !== "draft" && !canOverride) {
-      toast.error(lang === "ar" ? "يمكن حذف المسودات فقط" : "Only draft POs can be deleted");
+      toast.error(t("onlyDraftPurchaseOrders"));
       return;
     }
     const { error } = await supabase.from("purchase_orders").update({ deleted_at: new Date().toISOString() } as any).eq("id", po.id);
@@ -86,7 +86,7 @@ export default function PurchaseOrders() {
     if (!supplierId) { toast.error(t("selectSupplier")); return; }
     if (!currentBranchId) { toast.error(t("selectBranch")); return; }
     const valid = lines.filter((l) => l.product_id && l.quantity_ordered > 0);
-    if (!valid.length) { toast.error("Add at least one item"); return; }
+    if (!valid.length) { toast.error(t("addAtLeastOneItem")); return; }
     setSaving(true);
     const { data: po, error } = await supabase.from("purchase_orders").insert({
       supplier_id: supplierId, branch_id: currentBranchId,
@@ -94,7 +94,7 @@ export default function PurchaseOrders() {
       status, subtotal, tax, notes: notes || null,
       created_by: user?.id ?? null,
     } as any).select("id, po_number").single();
-    if (error || !po) { setSaving(false); toast.error(error?.message ?? "Failed"); return; }
+    if (error || !po) { setSaving(false); toast.error(error?.message ?? t("failed")); return; }
 
     const rows = valid.map((l) => ({
       purchase_order_id: po.id, product_id: l.product_id,

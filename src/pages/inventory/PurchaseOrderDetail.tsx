@@ -65,7 +65,7 @@ export default function PurchaseOrderDetail() {
     const ops = items
       .map((it) => ({ it, d: recvData[it.id] }))
       .filter(({ d }) => d && d.qty > 0);
-    if (!ops.length) { toast.error("Enter quantities"); return; }
+    if (!ops.length) { toast.error(t("enterQuantities")); return; }
     for (const { it, d } of ops) {
       const { error } = await supabase.rpc("receive_po_item", {
         _po_item_id: it.id, _qty: Number(d.qty),

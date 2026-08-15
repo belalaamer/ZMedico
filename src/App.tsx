@@ -4,7 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { I18nProvider } from "@/contexts/I18nContext";
+import { I18nProvider, useI18n } from "@/contexts/I18nContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { BranchProvider } from "@/contexts/BranchContext";
 import ProtectedRoute from "@/components/ProtectedRoute";

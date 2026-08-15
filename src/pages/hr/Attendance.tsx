@@ -231,7 +231,7 @@ export default function Attendance() {
           {visibleStaff.length === 0 && (
             <div className="p-16 text-center text-muted-foreground flex flex-col items-center gap-2">
               <MapPin className="size-8 opacity-30" />
-              <span className="text-sm">No attendance records</span>
+              <span className="text-sm">{t("noAttendanceRecords")}</span>
             </div>
           )}
         </div>

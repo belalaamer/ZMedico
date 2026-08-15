@@ -214,7 +214,7 @@ export default function InvoiceDetail() {
             <MessageCircle className="me-2 size-4"/>WhatsApp
           </Button>
           {inv.status !== "cancelled" && (
-            <Can module="invoices" action="delete">
+            <Can permission="invoices.delete">
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="outline"><X className="me-2 size-4" />{t("cancelInvoice")}</Button>

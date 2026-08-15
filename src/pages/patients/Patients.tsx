@@ -55,7 +55,8 @@ const schema = z.object({
   phone2: z.string().trim().max(30).optional(),
   email: z.string().trim().email().max(255).optional().or(z.literal("")),
   dob: z.string().optional(),
-  gender: z.enum(["male", "female"]).optional(),
+  // Empty Select values must be normalized before validation; the database accepts NULL.
+  gender: z.preprocess((value) => value === "" ? undefined : value, z.enum(["male", "female"]).optional()),
   blood_type: z.string().trim().max(10).optional(),
   address: z.string().trim().max(255).optional(),
   notes: z.string().trim().max(1000).optional(),
@@ -228,9 +229,10 @@ export default function PatientsPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>{t("gender")}</Label>
-                  <Select value={form.gender} onValueChange={(v) => setForm({ ...form, gender: v as any })}>
+                  <Select value={form.gender || "none"} onValueChange={(v) => setForm({ ...form, gender: v === "none" ? "" : v as any })}>
                     <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="none">— {t("none")} —</SelectItem>
                       <SelectItem value="male">{t("male")}</SelectItem>
                       <SelectItem value="female">{t("female")}</SelectItem>
                     </SelectContent>
@@ -298,7 +300,7 @@ export default function PatientsPage() {
                     <TableRow key={p.id} className="hover:bg-muted/40">
                       <TableCell className="min-w-0">
                         <Link to={`/patients/${p.id}`} className="flex items-center gap-3 min-w-0">
-                          <div className="size-10 rounded-full gradient-primary text-primary-foreground flex items-center justify-center font-semibold shrink-0">
+                          <div aria-hidden="true" className="size-10 rounded-full gradient-primary text-primary-foreground flex items-center justify-center font-semibold shrink-0">
                             {name.slice(0, 1).toUpperCase()}
                           </div>
                           <div className="min-w-0">

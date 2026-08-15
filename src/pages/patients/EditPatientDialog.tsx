@@ -167,9 +167,10 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
           </div>
           <div className="space-y-2">
             <Label>{t("gender")}</Label>
-            <Select value={form.gender} onValueChange={(v) => setForm({ ...form, gender: v as any })}>
+            <Select value={form.gender || "none"} onValueChange={(v) => setForm({ ...form, gender: v === "none" ? "" : v as any })}>
               <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
               <SelectContent>
+                <SelectItem value="none">— {t("none")} —</SelectItem>
                 <SelectItem value="male">{t("male")}</SelectItem>
                 <SelectItem value="female">{t("female")}</SelectItem>
               </SelectContent>

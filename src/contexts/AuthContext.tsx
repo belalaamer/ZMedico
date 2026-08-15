@@ -122,7 +122,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(null);
         setUser(null);
         setLoading(false);
-        if ((event as string) === "USER_DELETED" || hadSession) notifySessionInvalid();
+        // A normal SIGNED_OUT event is expected user intent; only deleted or invalid users need a warning.
+        if ((event as string) === "USER_DELETED") notifySessionInvalid();
         hadSession = false;
         return;
       }

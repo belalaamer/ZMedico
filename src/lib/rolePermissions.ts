@@ -30,22 +30,20 @@ const ALL = [...ACTIONS] as string[];
 // See docs/RBAC_MATRIX.md for the authoritative matrix.
 export const DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
   admin: Object.fromEntries(MODULES.map(m => [m, [...ALL]])),
-  // Manager: branch operations oversight. No delete, no clinical writes,
-  // no financial writes.
-  // Clinical data (medical_records, vitals, treatment_plans, reports_medical)
-  // removed under the minimum-necessary principle; the database enforces the same.
+  // Manager: branch operations oversight. Clinical data is view-only;
+  // managers may not create, edit, or delete medical records.
   manager: {
     patients: ["view","create","edit","export"],
     appointments: ["view","create","edit","export"],
-    medical_records: [],
-    vitals: [],
-    treatment_plans: [],
+    medical_records: ["view"],
+    vitals: ["view"],
+    treatment_plans: ["view"],
     invoices: ["view","export"],
     treasury: ["view","export"],
     inventory: ["view","create","edit","export"],
     reports: ["view","export"],
     reports_finance: ["view","export"],
-    reports_medical: [],
+    reports_medical: ["view","export"],
     reports_operational: ["view","export"],
     reports_hr: [],
     reports_inventory: ["view","export"],

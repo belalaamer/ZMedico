@@ -118,9 +118,13 @@ const queryClient = new QueryClient({
 });
 
 function RouteLoader() {
+  const { lang } = useI18n();
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="size-10 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+    <div className="min-h-screen flex items-center justify-center bg-background" role="status" aria-live="polite">
+      <div className="flex flex-col items-center gap-3 text-muted-foreground">
+        <div className="size-10 rounded-full border-4 border-primary/20 border-t-primary animate-spin" aria-hidden="true" />
+        <span className="text-sm">{lang === "ar" ? "جارٍ تحميل الصفحة…" : "Loading page…"}</span>
+      </div>
     </div>
   );
 }

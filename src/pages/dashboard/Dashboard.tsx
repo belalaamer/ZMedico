@@ -389,6 +389,7 @@ export default function Dashboard() {
     ? Math.round((completedAppointments / trackedAppointments) * 100)
     : 0;
   const netTreasuryToday = todayTreasuryIn - todayTreasuryOut;
+  const hasAttentionItems = (canFinance && pendingInvoicesCount > 0) || (canClinical && draftRecords > 0) || (canHR && pendingLeaveRequests > 0);
 
   const fullName = (r: any) => {
     if (!r) return "—";
@@ -547,6 +548,42 @@ export default function Dashboard() {
                     <div className={`h-full rounded-full transition-all duration-300 ${netTreasuryToday < 0 ? "bg-destructive" : "bg-info"}`} style={{ width: `${netTreasuryToday === 0 ? 0 : 100}%` }} />
                   </div>
                 </div>
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {!loading && hasAttentionItems && (
+        <Card className="rounded-2xl border-warning/25 bg-warning/5 p-4 md:p-5 shadow-card">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="size-10 shrink-0 rounded-xl bg-warning/15 text-warning flex items-center justify-center">
+                <AlertCircle className="size-5" aria-hidden="true" />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold">{lang === "ar" ? "يحتاج إلى انتباهك" : "Needs your attention"}</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">{lang === "ar" ? "إجراءات مختصرة من واقع بيانات اليوم" : "Shortcuts based on today's live data"}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 w-full lg:w-auto lg:min-w-[62%]">
+              {canFinance && pendingInvoicesCount > 0 && (
+                <Link to="/invoices" className="group flex items-center justify-between gap-3 rounded-xl border border-warning/20 bg-background/70 px-3 py-2.5 transition-colors hover:bg-background focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <span className="flex items-center gap-2 min-w-0"><Receipt className="size-4 text-warning shrink-0" /><span className="text-xs font-medium truncate">{lang === "ar" ? `${pendingInvoicesCount} فاتورة معلقة` : `${pendingInvoicesCount} pending invoice${pendingInvoicesCount === 1 ? "" : "s"}`}</span></span>
+                  <ArrowUpRight className="size-4 text-muted-foreground shrink-0 transition-transform group-hover:-translate-y-0.5" aria-hidden="true" />
+                </Link>
+              )}
+              {canClinical && draftRecords > 0 && (
+                <Link to="/medical/records" className="group flex items-center justify-between gap-3 rounded-xl border border-warning/20 bg-background/70 px-3 py-2.5 transition-colors hover:bg-background focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <span className="flex items-center gap-2 min-w-0"><FileText className="size-4 text-warning shrink-0" /><span className="text-xs font-medium truncate">{lang === "ar" ? `${draftRecords} سجل يحتاج مراجعة` : `${draftRecords} record${draftRecords === 1 ? "" : "s"} to review`}</span></span>
+                  <ArrowUpRight className="size-4 text-muted-foreground shrink-0 transition-transform group-hover:-translate-y-0.5" aria-hidden="true" />
+                </Link>
+              )}
+              {canHR && pendingLeaveRequests > 0 && (
+                <Link to="/hr/leaves" className="group flex items-center justify-between gap-3 rounded-xl border border-warning/20 bg-background/70 px-3 py-2.5 transition-colors hover:bg-background focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <span className="flex items-center gap-2 min-w-0"><Clock className="size-4 text-warning shrink-0" /><span className="text-xs font-medium truncate">{lang === "ar" ? `${pendingLeaveRequests} طلب إجازة` : `${pendingLeaveRequests} leave request${pendingLeaveRequests === 1 ? "" : "s"}`}</span></span>
+                  <ArrowUpRight className="size-4 text-muted-foreground shrink-0 transition-transform group-hover:-translate-y-0.5" aria-hidden="true" />
+                </Link>
               )}
             </div>
           </div>

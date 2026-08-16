@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "react-router-dom";
 import {
-  Wallet, Receipt, CalendarCheck, FileText, Clock, Users, UserPlus, Stethoscope, Inbox, Landmark, ArrowDownUp,
+  Wallet, Receipt, CalendarCheck, FileText, Clock, Users, UserPlus, Stethoscope, Inbox, Landmark, ArrowDownUp, ArrowUpRight, Sparkles,
 } from "lucide-react";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -383,7 +383,7 @@ export default function Dashboard() {
       <>
         <div className="flex items-start justify-between">
           <div className="text-xs font-medium text-muted-foreground">{label}</div>
-          <div className={`size-8 rounded-lg bg-gradient-to-br ${tone} text-white flex items-center justify-center`}>
+          <div className={`size-10 rounded-xl bg-gradient-to-br ${tone} text-white flex items-center justify-center shadow-sm`}>
             <Icon className="size-4" />
           </div>
         </div>
@@ -394,7 +394,7 @@ export default function Dashboard() {
         )}
       </>
     );
-    const baseCls = "p-3 md:p-4 shadow-card border-border/60 transition-shadow";
+    const baseCls = "relative overflow-hidden rounded-2xl p-4 md:p-5 bg-card/90 shadow-card border-border/60 transition-all duration-200";
     if (to && !loading) {
       const ariaLabel = typeof label === "string"
         ? (value !== undefined && value !== null && value !== "" ? `${label}: ${value}` : label)
@@ -405,30 +405,39 @@ export default function Dashboard() {
           aria-label={ariaLabel}
           className="block rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
-          <Card className={`${baseCls} hover:shadow-elegant hover:border-primary/40 cursor-pointer h-full`}>
+          <Card className={`${baseCls} hover:-translate-y-0.5 hover:shadow-elegant hover:border-primary/40 cursor-pointer h-full`}>
             {inner}
           </Card>
         </Link>
       );
     }
-    return <Card className={`${baseCls} hover:shadow-elegant`}>{inner}</Card>;
+    return <Card className={`${baseCls} hover:-translate-y-0.5 hover:shadow-elegant`}>{inner}</Card>;
   };
 
   return (
     <PullToRefresh onRefresh={run}>
-    <div className="space-y-6">
-      <div className="flex items-start md:items-center justify-between gap-4 flex-wrap">
-        <div className="min-w-0">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("dashboard")}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{t("tagline")}</p>
+    <div className="space-y-7 pb-6">
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary to-primary/75 p-5 md:p-7 text-primary-foreground shadow-elegant">
+        <div className="absolute -end-10 -top-16 size-56 rounded-full bg-white/10 blur-2xl" aria-hidden="true" />
+        <div className="absolute -bottom-24 start-1/3 size-48 rounded-full bg-black/10 blur-3xl" aria-hidden="true" />
+        <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-primary-foreground/75 text-xs font-medium mb-3">
+              <Sparkles className="size-4" aria-hidden="true" />
+              <span>{lang === "ar" ? "نظرة سريعة على العيادة" : "Your clinic at a glance"}</span>
+            </div>
+            <h1 className="text-2xl md:text-4xl font-bold tracking-tight">{t("dashboard")}</h1>
+            <p className="text-sm md:text-base text-primary-foreground/80 mt-2 max-w-2xl">{t("tagline")}</p>
+            <p className="text-xs text-primary-foreground/65 mt-4">{formatDate(new Date().toISOString(), lang)}</p>
+          </div>
+          <div className="flex flex-wrap gap-2 lg:max-w-md lg:justify-end">
+            {canFrontDeskIntake && <Button asChild className="bg-white text-primary hover:bg-white/90 shadow-sm"><Link to="/patients"><UserPlus className="size-4 me-2" />{t("addPatient")}</Link></Button>}
+            <Button asChild variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white"><Link to="/calendar"><CalendarCheck className="size-4 me-2" />{t("newAppointment")}</Link></Button>
+            {canFinance && <Button asChild variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white"><Link to="/invoices"><Receipt className="size-4 me-2" />{t("createInvoice")}</Link></Button>}
+            <Button asChild variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white"><Link to="/reports"><FileText className="size-4 me-2" />{t("viewAllReports")}</Link></Button>
+          </div>
         </div>
-        <div className="hidden md:flex gap-2 flex-wrap">
-          {canFrontDeskIntake && <Button asChild><Link to="/patients">{t("addPatient")}</Link></Button>}
-          <Button asChild variant="outline"><Link to="/calendar">{t("newAppointment")}</Link></Button>
-          {canFinance && <Button asChild variant="outline"><Link to="/invoices">{t("createInvoice")}</Link></Button>}
-          <Button asChild variant="outline"><Link to="/reports">{t("viewAllReports")}</Link></Button>
-        </div>
-      </div>
+      </section>
 
       {/* Mobile quick actions — scrollable pill row */}
       <div className="md:hidden -mx-4 px-4 overflow-x-auto">
@@ -453,7 +462,7 @@ export default function Dashboard() {
       </div>
 
       {/* Date range filter */}
-      <Card className="p-3 shadow-card border-border/60 flex flex-col md:flex-row md:flex-wrap md:items-end gap-3">
+      <Card className="rounded-2xl p-3 md:p-4 bg-card/80 shadow-card border-border/60 flex flex-col md:flex-row md:flex-wrap md:items-end gap-3">
         <div className="w-full md:w-auto md:min-w-[160px]">
           <div className="text-[11px] text-muted-foreground mb-1">{t("customRange")}</div>
           <Select value={rangePreset} onValueChange={(v) => applyPreset(v as any)}>
@@ -494,7 +503,7 @@ export default function Dashboard() {
       ) : (
         <>
           <section className="space-y-3">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{lang === "ar" ? "اليوم" : "Today"}</h2>
+            <div className="flex items-center gap-3"><span className="h-6 w-1 rounded-full bg-primary" aria-hidden="true" /><h2 className="text-base font-bold tracking-tight">{lang === "ar" ? "ملخص اليوم" : "Today at a glance"}</h2><span className="text-xs text-muted-foreground">{formatDate(new Date().toISOString(), lang)}</span></div>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
             <StatCard
               label={t("todayAppointments")} value={todayAppts}
@@ -570,9 +579,9 @@ export default function Dashboard() {
 
           {canFinance && (
           <section className="space-y-3 pt-2 border-t border-border/40">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{lang === "ar" ? "الاتجاهات — هذا الأسبوع" : "Trends — This week"}</h2>
+          <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="h-6 w-1 rounded-full bg-info" aria-hidden="true" /><h2 className="text-base font-bold tracking-tight">{lang === "ar" ? "الاتجاهات — هذا الأسبوع" : "Trends — This week"}</h2></div><span className="text-xs text-muted-foreground hidden sm:block">{rangeStart} → {rangeEnd}</span></div>
           <div className="grid lg:grid-cols-3 gap-4">
-            <Card className="p-5 shadow-card border-border/60 lg:col-span-2">
+            <Card className="rounded-2xl p-5 md:p-6 shadow-card border-border/60 bg-card/90 lg:col-span-2">
               <div className="text-sm font-medium mb-3">{t("revenueLast7Days")}</div>
               {loading ? <Skeleton className="h-56 w-full" /> : (
                 <div className="h-56">
@@ -589,7 +598,7 @@ export default function Dashboard() {
               )}
             </Card>
 
-            <Card className="p-5 shadow-card border-border/60">
+            <Card className="rounded-2xl p-5 md:p-6 shadow-card border-border/60 bg-card/90">
               <div className="text-sm font-medium mb-3">{t("appointmentsByStatus")}</div>
               {loading ? <Skeleton className="h-56 w-full" /> : apptStatusAll.length === 0 ? (
                 <div className="h-56 flex items-center justify-center text-sm text-muted-foreground">{t("noDataYet")}</div>
@@ -614,9 +623,9 @@ export default function Dashboard() {
           )}
 
           <section className="space-y-3 pt-2 border-t border-border/40">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{lang === "ar" ? "الاتجاهات — هذا الشهر / النطاق" : "Trends — This month / range"}</h2>
+          <div className="flex items-center gap-3"><span className="h-6 w-1 rounded-full bg-success" aria-hidden="true" /><h2 className="text-base font-bold tracking-tight">{lang === "ar" ? "تحليل المرضى والأداء" : "Patients & performance insights"}</h2></div>
           <div className="grid lg:grid-cols-2 gap-4">
-            <Card className="p-5 shadow-card border-border/60">
+            <Card className="rounded-2xl p-5 md:p-6 shadow-card border-border/60 bg-card/90">
               <div className="text-sm font-medium mb-3">{t("patientsByAge")}</div>
               {loading ? <Skeleton className="h-56 w-full" /> : (
                 <div className="h-56">
@@ -633,7 +642,7 @@ export default function Dashboard() {
               )}
             </Card>
 
-            <Card className="p-5 shadow-card border-border/60">
+            <Card className="rounded-2xl p-5 md:p-6 shadow-card border-border/60 bg-card/90">
               <div className="text-sm font-medium mb-3">{t("patientsByReferral")}</div>
               {loading ? <Skeleton className="h-56 w-full" /> : referralGroups.length === 0 || referralGroups.every((r) => r.value === 0) ? (
                 <div className="h-56 flex items-center justify-center text-sm text-muted-foreground">{t("noDataYet")}</div>
@@ -656,7 +665,7 @@ export default function Dashboard() {
           {(canOpsReports || canFinance) && (
           <div className="grid lg:grid-cols-2 gap-4">
             {canOpsReports && (
-            <Card className="p-5 shadow-card border-border/60">
+            <Card className="rounded-2xl p-5 md:p-6 shadow-card border-border/60 bg-card/90">
               <div className="text-sm font-medium mb-3 flex items-center gap-2">
                 <Stethoscope className="size-4" /> {t("doctorPerformance")}
               </div>
@@ -679,12 +688,12 @@ export default function Dashboard() {
             )}
 
             {canFinance && (
-            <Card className="p-5 shadow-card border-border/60">
+            <Card className="rounded-2xl p-5 md:p-6 shadow-card border-border/60 bg-card/90">
               <div className="flex items-center justify-between mb-3">
                 <div className="text-sm font-medium flex items-center gap-2">
                   <Receipt className="size-4" /> {t("topRequestedServices")}
                 </div>
-                <Button asChild variant="ghost" size="sm"><Link to="/reports/financial">→</Link></Button>
+                <Button asChild variant="ghost" size="sm" className="gap-1 text-primary"><Link to="/reports/financial">{lang === "ar" ? "عرض التقرير" : "View report"}<ArrowUpRight className="size-4" /></Link></Button>
               </div>
               {loading ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full mb-2" />) :
                 topServices.length === 0 ? (
@@ -711,12 +720,12 @@ export default function Dashboard() {
           </section>
 
           <section className="space-y-3 pt-2 border-t border-border/40">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{lang === "ar" ? "العمليات اليومية — أحدث النشاط" : "Daily operations — Recent activity"}</h2>
+          <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="h-6 w-1 rounded-full bg-warning" aria-hidden="true" /><h2 className="text-base font-bold tracking-tight">{lang === "ar" ? "العمليات اليومية" : "Daily operations"}</h2></div><span className="text-xs text-muted-foreground">{lang === "ar" ? "أحدث النشاط" : "Recent activity"}</span></div>
           <div className="grid lg:grid-cols-3 gap-4">
-            <Card className="p-5 shadow-card border-border/60">
+            <Card className="rounded-2xl p-5 md:p-6 shadow-card border-border/60 bg-card/90">
               <div className="flex items-center justify-between mb-3">
                 <div className="text-sm font-medium flex items-center gap-2"><Users className="size-4" /> {t("recentPatients2")}</div>
-                <Button asChild variant="ghost" size="sm"><Link to="/patients">→</Link></Button>
+                <Button asChild variant="ghost" size="sm" className="gap-1 text-primary"><Link to="/patients">{lang === "ar" ? "عرض الكل" : "View all"}<ArrowUpRight className="size-4" /></Link></Button>
               </div>
               {loading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 w-full mb-2" />) :
                 recentPatients.length === 0 ? <div className="text-sm text-muted-foreground py-6 text-center">{t("noDataYet")}</div> :
@@ -734,10 +743,10 @@ export default function Dashboard() {
               }
             </Card>
 
-            <Card className="p-5 shadow-card border-border/60">
+            <Card className="rounded-2xl p-5 md:p-6 shadow-card border-border/60 bg-card/90">
               <div className="flex items-center justify-between mb-3">
                 <div className="text-sm font-medium flex items-center gap-2"><CalendarCheck className="size-4" /> {t("recentAppointments")}</div>
-                <Button asChild variant="ghost" size="sm"><Link to="/calendar">→</Link></Button>
+                <Button asChild variant="ghost" size="sm" className="gap-1 text-primary"><Link to="/calendar">{lang === "ar" ? "عرض الكل" : "View all"}<ArrowUpRight className="size-4" /></Link></Button>
               </div>
               {loading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 w-full mb-2" />) :
                 recentAppts.length === 0 ? <div className="text-sm text-muted-foreground py-6 text-center">{t("noDataYet")}</div> :
@@ -759,10 +768,10 @@ export default function Dashboard() {
             </Card>
 
             {canFinance && (
-            <Card className="p-5 shadow-card border-border/60">
+            <Card className="rounded-2xl p-5 md:p-6 shadow-card border-border/60 bg-card/90">
               <div className="flex items-center justify-between mb-3">
                 <div className="text-sm font-medium flex items-center gap-2"><Wallet className="size-4" /> {t("recentPayments")}</div>
-                <Button asChild variant="ghost" size="sm"><Link to="/payments">→</Link></Button>
+                <Button asChild variant="ghost" size="sm" className="gap-1 text-primary"><Link to="/payments">{lang === "ar" ? "عرض الكل" : "View all"}<ArrowUpRight className="size-4" /></Link></Button>
               </div>
               {loading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 w-full mb-2" />) :
                 recentPayments.length === 0 ? <div className="text-sm text-muted-foreground py-6 text-center">{t("noDataYet")}</div> :

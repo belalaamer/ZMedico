@@ -115,29 +115,45 @@ export default function InvoiceDetail() {
     }
   };
 
-  const downloadPdf = async () => {
+  const runPdfAction = async (mode: "download" | "print") => {
     setPdfLoading(true);
     try {
       let branch = null;
       if (inv.branch_id) {
-        const { data } = await supabase.from("branches").select("name_en,name_ar,address,phone").eq("id", inv.branch_id).maybeSingle();
+        const { data, error } = await supabase
+          .from("branches")
+          .select("name_en,name_ar,address,phone")
+          .eq("id", inv.branch_id)
+          .maybeSingle();
+        if (error) throw error;
         branch = data;
       }
+
       const logoUrl = await loadClinicLogo();
-      try {
-        await generateInvoicePdf({ invoice: inv, items, payments: pays, patient: inv.patients, branch, logoUrl, lang, t: t as any });
-      } catch (e: any) {
-        toast.error(
-          lang === "ar"
-            ? "تعذر إنشاء ملف الفاتورة. حاول مرة أخرى أو استخدم الطباعة."
-            : "Could not generate the invoice file. Try again, or use Print."
-        );
-        reportClientError({
-          kind: "error",
-          message: `invoice pdf failed: ${String(e?.message ?? e)}`,
-          component: "InvoiceDetail.pdf",
-        });
-      }
+      await generateInvoicePdf({
+        invoice: inv,
+        items,
+        payments: pays,
+        patient: inv.patients,
+        branch,
+        logoUrl,
+        lang,
+        mode,
+        t: t as any,
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(
+        lang === "ar"
+          ? "تعذر إنشاء ملف الفاتورة. حاول مرة أخرى أو استخدم الطباعة."
+          : "Could not generate the invoice file. Try again, or use Print."
+      );
+      void reportClientError({
+        kind: "error",
+        message: `invoice pdf failed: ${message}`,
+        component: "InvoiceDetail.pdf",
+        branch_id: inv.branch_id ?? undefined,
+      });
     } finally {
       setPdfLoading(false);
     }
@@ -168,34 +184,6 @@ export default function InvoiceDetail() {
     toast.success(t("save")); load();
   };
 
-  const printInvoice = async () => {
-    setPdfLoading(true);
-    try {
-      let branch = null;
-      if (inv.branch_id) {
-        const { data } = await supabase.from("branches").select("name_en,name_ar,address,phone").eq("id", inv.branch_id).maybeSingle();
-        branch = data;
-      }
-      const logoUrl = await loadClinicLogo();
-      try {
-        await generateInvoicePdf({ invoice: inv, items, payments: pays, patient: inv.patients, branch, logoUrl, lang, mode: "print", t: t as any });
-      } catch (e: any) {
-        toast.error(
-          lang === "ar"
-            ? "تعذر إنشاء ملف الفاتورة. حاول مرة أخرى أو استخدم الطباعة."
-            : "Could not generate the invoice file. Try again, or use Print."
-        );
-        reportClientError({
-          kind: "error",
-          message: `invoice pdf failed: ${String(e?.message ?? e)}`,
-          component: "InvoiceDetail.pdf",
-        });
-      }
-    } finally {
-      setPdfLoading(false);
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap print:hidden">
@@ -208,8 +196,8 @@ export default function InvoiceDetail() {
               </Button>
             </Can>
           )}
-          <Button variant="outline" onClick={printInvoice} disabled={pdfLoading}><Printer className="me-2 size-4" />{t("print")}</Button>
-          <Button variant="outline" onClick={downloadPdf} disabled={pdfLoading}><Download className="me-2 size-4" />{t("downloadPdf")}</Button>
+          <Button variant="outline" onClick={() => runPdfAction("print")} disabled={pdfLoading} aria-busy={pdfLoading}><Printer className="me-2 size-4" />{t("print")}</Button>
+          <Button variant="outline" onClick={() => runPdfAction("download")} disabled={pdfLoading} aria-busy={pdfLoading}><Download className="me-2 size-4" />{t("downloadPdf")}</Button>
           <Button variant="outline" onClick={sendWhatsApp} className="bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#128C7E] border-[#25D366]/30 dark:text-[#25D366] dark:border-[#25D366]/40">
             <MessageCircle className="me-2 size-4"/>WhatsApp
           </Button>

@@ -40,7 +40,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
       { to: "/settings/users", icon: Users, label: t("userManagement") },
       { to: "/settings/backup", icon: HardDrive, label: t("backupExport") },
       { to: "/settings/audit", icon: ScrollText, label: t("auditLogs") },
-      { to: "/settings/qa", icon: FlaskConical, label: "QA Identities" },
+      { to: "/settings/qa", icon: FlaskConical, label: t("qaIdentities") },
   ] : [];
   const systemItems = [
     { to: "/settings/system", icon: Info, label: t("systemInfo") },
@@ -69,7 +69,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
           {adminItems.length > 0 && (
             <div className="my-3 border-t border-border/60 pt-3">
               <div className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Admin
+                {t("adminSection")}
               </div>
               {adminItems.map(renderLink)}
             </div>

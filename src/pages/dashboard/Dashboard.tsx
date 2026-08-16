@@ -97,6 +97,7 @@ export default function Dashboard() {
   const [todayRevenue, setTodayRevenue] = useState(0);
   const [pendingInvoicesCount, setPendingInvoicesCount] = useState(0);
   const [pendingInvoicesAmount, setPendingInvoicesAmount] = useState(0);
+  const [pendingInvoiceId, setPendingInvoiceId] = useState<string | null>(null);
   const [todayConsults, setTodayConsults] = useState(0);
   const [draftRecords, setDraftRecords] = useState(0);
   const [pendingLeaveRequests, setPendingLeaveRequests] = useState(0);
@@ -172,7 +173,7 @@ export default function Dashboard() {
           .is("deleted_at", null)
           .gte("created_at", start.toISOString()).lte("created_at", end.toISOString())),
         branchEq(supabase.from("payments").select("amount").is("deleted_at", null).eq("payment_date", todayDate)),
-        branchEq(supabase.from("invoices").select("total,paid_amount").is("deleted_at", null).in("status", ["pending", "partial"])),
+        branchEq(supabase.from("invoices").select("id,total,paid_amount").is("deleted_at", null).in("status", ["pending", "partial"])),
         branchEq(supabase.from("medical_records").select("id", { count: "exact", head: true }).eq("visit_date", todayDate)),
         branchEq(supabase.from("medical_records").select("id", { count: "exact", head: true }).eq("status", "draft")),
         branchEq(supabase.from("payments").select("payment_date,amount").is("deleted_at", null)
@@ -249,6 +250,7 @@ export default function Dashboard() {
 
       const inv = (pendingInvRes.data ?? []) as any[];
       setPendingInvoicesCount(inv.length);
+      setPendingInvoiceId(inv.length === 1 && inv[0]?.id ? String(inv[0].id) : null);
       setPendingInvoicesAmount(inv.reduce((s, r) => s + (Number(r.total || 0) - Number(r.paid_amount || 0)), 0));
 
       setTodayConsults(consultsRes.count ?? 0);
@@ -393,10 +395,31 @@ export default function Dashboard() {
 
   const fullName = (r: any) => {
     if (!r) return "—";
-    const en = [r.first_name_en, r.last_name_en].filter(Boolean).join(" ");
-    const ar = [r.first_name_ar, r.last_name_ar].filter(Boolean).join(" ");
-    return lang === "ar" ? (ar || en || "—") : (en || ar || "—");
+    const en = [r.first_name_en, r.last_name_en].filter(Boolean).join(" ").trim();
+    const ar = [r.first_name_ar, r.last_name_ar].filter(Boolean).join(" ").trim();
+    if (!ar && !en) return "—";
+    if (!ar || !en || ar === en) return ar || en;
+
+    // Keep the language used in the entered name when the two stored fields
+    // differ. This prevents Arabic mode from translating/overriding an
+    // English-only name (and vice versa) in activity lists.
+    const arabicPattern = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+    const arHasArabic = arabicPattern.test(ar);
+    const enHasArabic = arabicPattern.test(en);
+    if (arHasArabic !== enHasArabic) return arHasArabic ? ar : en;
+
+    return lang === "ar" ? ar : en;
   };
+
+  const selectedRangeLabel = rangePreset === "7d"
+    ? (lang === "ar" ? "آخر ٧ أيام" : "Last 7 days")
+    : rangePreset === "30d"
+      ? (lang === "ar" ? "آخر ٣٠ يومًا" : "Last 30 days")
+      : rangePreset === "month"
+        ? (lang === "ar" ? "هذا الشهر" : "This month")
+        : (lang === "ar" ? "الفترة المحددة" : "Custom range");
+  const trendsTitle = lang === "ar" ? `الاتجاهات — ${selectedRangeLabel}` : `Trends — ${selectedRangeLabel}`;
+  const revenueChartTitle = lang === "ar" ? `الإيرادات (${selectedRangeLabel})` : `Revenue (${selectedRangeLabel})`;
 
   const StatCard = ({ label, value, sub, icon: Icon, tone, to, subValue }: any) => {
     const inner = (
@@ -568,7 +591,8 @@ export default function Dashboard() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 w-full lg:w-auto lg:min-w-[62%]">
               {canFinance && pendingInvoicesCount > 0 && (
-                <Link to="/invoices" className="group flex items-center justify-between gap-3 rounded-xl border border-warning/20 bg-background/70 px-3 py-2.5 transition-colors hover:bg-background focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                  <Link to={pendingInvoiceId ? `/invoices/${pendingInvoiceId}` : "/invoices"} className="group flex items-center justify-between gap-3 rounded-xl border border-warning/20 bg-background/70 px-3 py-2.5 transition-colors hover:bg-background focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+
                   <span className="flex items-center gap-2 min-w-0"><Receipt className="size-4 text-warning shrink-0" /><span className="text-xs font-medium truncate">{lang === "ar" ? `${pendingInvoicesCount} فاتورة معلقة` : `${pendingInvoicesCount} pending invoice${pendingInvoicesCount === 1 ? "" : "s"}`}</span></span>
                   <ArrowUpRight className="size-4 text-muted-foreground shrink-0 transition-transform group-hover:-translate-y-0.5" aria-hidden="true" />
                 </Link>
@@ -682,10 +706,10 @@ export default function Dashboard() {
 
           {canFinance && (
           <section className="space-y-3 pt-2 border-t border-border/40">
-          <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="h-6 w-1 rounded-full bg-info" aria-hidden="true" /><h2 className="text-base font-bold tracking-tight">{lang === "ar" ? "الاتجاهات — هذا الأسبوع" : "Trends — This week"}</h2></div><span className="text-xs text-muted-foreground hidden sm:block">{rangeStart} → {rangeEnd}</span></div>
+          <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="h-6 w-1 rounded-full bg-info" aria-hidden="true" /><h2 className="text-base font-bold tracking-tight">{trendsTitle}</h2></div><span className="text-xs text-muted-foreground hidden sm:block">{rangeStart} → {rangeEnd}</span></div>
           <div className="grid lg:grid-cols-3 gap-4">
             <Card className="rounded-2xl p-5 md:p-6 shadow-card border-border/60 bg-card/90 lg:col-span-2">
-              <div className="text-sm font-medium mb-3">{t("revenueLast7Days")}</div>
+              <div className="text-sm font-medium mb-3">{revenueChartTitle}</div>
               {loading ? <Skeleton className="h-56 w-full" /> : (
                 <div className="h-56">
                   <ResponsiveContainer>

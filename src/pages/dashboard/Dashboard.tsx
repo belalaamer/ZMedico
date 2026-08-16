@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "react-router-dom";
 import {
-  Wallet, Receipt, CalendarCheck, FileText, Clock, Users, UserPlus, Stethoscope, Inbox, Landmark, ArrowDownUp, ArrowUpRight, Sparkles,
+  Wallet, Receipt, CalendarCheck, FileText, Clock, Users, UserPlus, Stethoscope, Inbox, Landmark, ArrowDownUp, ArrowUpRight, Sparkles, Activity, CheckCircle2, AlertCircle,
 } from "lucide-react";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -383,6 +383,13 @@ export default function Dashboard() {
     (!canHR || pendingLeaveRequests === 0),
   [loading, todayAppts, newPatientsToday, todayRevenue, pendingInvoicesCount, todayConsults, draftRecords, recentPatients, recentAppts, recentPayments, revenue7d, apptStatusAll, canHR, pendingLeaveRequests]);
 
+  const completedAppointments = apptStatusToday.completed ?? 0;
+  const trackedAppointments = Object.values(apptStatusToday).reduce((sum, value) => sum + value, 0);
+  const appointmentCompletionRate = trackedAppointments > 0
+    ? Math.round((completedAppointments / trackedAppointments) * 100)
+    : 0;
+  const netTreasuryToday = todayTreasuryIn - todayTreasuryOut;
+
   const fullName = (r: any) => {
     if (!r) return "—";
     const en = [r.first_name_en, r.last_name_en].filter(Boolean).join(" ");
@@ -498,6 +505,53 @@ export default function Dashboard() {
             onChange={(e) => { setRangeEnd(e.target.value); setRangePreset("custom"); }} />
         </div>
       </Card>
+
+      {!isEmpty && !loading && (
+        <Card className="rounded-2xl border-border/60 bg-card/80 p-4 md:p-5 shadow-card">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                <Activity className="size-5" aria-hidden="true" />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold">{lang === "ar" ? "نبض التشغيل" : "Operational pulse"}</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">{lang === "ar" ? "مؤشرات سريعة تساعدك على اتخاذ القرار اليوم" : "Quick signals to help you act today"}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:min-w-[65%]">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className="flex items-center gap-1.5 text-muted-foreground"><CheckCircle2 className="size-3.5 text-success" />{lang === "ar" ? "إنجاز المواعيد" : "Appointment completion"}</span>
+                  <span className="font-semibold tabular-nums">{appointmentCompletionRate}%</span>
+                </div>
+                <div className="h-2 rounded-full bg-muted overflow-hidden" role="progressbar" aria-valuenow={appointmentCompletionRate} aria-valuemin={0} aria-valuemax={100} aria-label={lang === "ar" ? "نسبة إنجاز المواعيد" : "Appointment completion rate"}>
+                  <div className="h-full rounded-full bg-success transition-all duration-300" style={{ width: `${appointmentCompletionRate}%` }} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className="flex items-center gap-1.5 text-muted-foreground"><AlertCircle className="size-3.5 text-warning" />{lang === "ar" ? "سجلات تحتاج متابعة" : "Records needing review"}</span>
+                  <span className="font-semibold tabular-nums">{draftRecords}</span>
+                </div>
+                <div className="h-2 rounded-full bg-muted overflow-hidden" role="progressbar" aria-valuenow={draftRecords > 0 ? 100 : 0} aria-valuemin={0} aria-valuemax={100} aria-label={lang === "ar" ? "السجلات المعلقة" : "Pending clinical records"}>
+                  <div className={`h-full rounded-full transition-all duration-300 ${draftRecords > 0 ? "bg-warning" : "bg-success"}`} style={{ width: `${draftRecords > 0 ? 100 : 0}%` }} />
+                </div>
+              </div>
+              {canTreasury && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <span className="flex items-center gap-1.5 text-muted-foreground"><Landmark className="size-3.5 text-info" />{lang === "ar" ? "صافي الخزينة اليوم" : "Net treasury today"}</span>
+                    <span className={`font-semibold tabular-nums ${netTreasuryToday < 0 ? "text-destructive" : "text-success"}`}>{formatMoney(netTreasuryToday, lang)}</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-muted overflow-hidden" role="progressbar" aria-valuenow={netTreasuryToday > 0 ? 100 : 0} aria-valuemin={0} aria-valuemax={100} aria-label={lang === "ar" ? "صافي حركة الخزينة اليوم" : "Net treasury movement today"}>
+                    <div className={`h-full rounded-full transition-all duration-300 ${netTreasuryToday < 0 ? "bg-destructive" : "bg-info"}`} style={{ width: `${netTreasuryToday === 0 ? 0 : 100}%` }} />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
 
       {isEmpty ? (
         <Card className="p-10 text-center shadow-card border-border/60">

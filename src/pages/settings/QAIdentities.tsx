@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useI18n } from "@/contexts/I18nContext";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,7 @@ type ExistingMap = Record<string, { id: string; email: string } | null>;
 type CredMap = Record<string, { email: string; password: string } | undefined>;
 
 export default function QAIdentities() {
+  const { t } = useI18n();
   const { authz, loading: roleLoading } = useAuthorization();
   const isAdmin = authz.isSuperAdmin();
   const [existing, setExisting] = useState<ExistingMap>({});
@@ -114,7 +116,6 @@ export default function QAIdentities() {
 
   const provisionAll = async () => {
     for (const acc of ACCOUNTS) {
-      // eslint-disable-next-line no-await-in-loop
       await provisionOne(acc);
     }
   };
@@ -194,16 +195,15 @@ export default function QAIdentities() {
       <div className="space-y-4">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">QA Identities</h1>
+            <h1 className="text-2xl font-bold">{t("qaIdentities")}</h1>
             <p className="text-sm text-muted-foreground">
-              Provision the eight canonical QA users consumed by the Settings Shadow QA Playwright suite.
-              Passwords are shown once and never persisted server-side.
+              {t("qaDescription")}
             </p>
           </div>
           <div className="flex gap-2">
-            <Button onClick={provisionAll} disabled={loading || !!busy}>Provision QA Identities</Button>
+            <Button onClick={provisionAll} disabled={loading || !!busy}>{t("provisionQA")}</Button>
               <Button variant="destructive" onClick={deleteAll} disabled={loading || !!busy} aria-busy={busy === "delete-all"}>
-              <Trash2 className="size-4 mr-1" /> {busy === "delete-all" ? "Deleting QA Users…" : "Delete QA Users"}
+              <Trash2 className="size-4 me-1" /> {busy === "delete-all" ? t("deletingQAUsers") : t("deleteQAUsers")}
             </Button>
           </div>
         </div>
@@ -211,8 +211,7 @@ export default function QAIdentities() {
         <div className="rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200 px-3 py-2 text-sm flex gap-2">
           <ShieldAlert className="size-4 mt-0.5 shrink-0" />
           <div>
-            Displayed passwords are shown only in this browser session. Copy or download them now — they cannot be
-            retrieved later. Use <span className="font-mono">Reset Password</span> to mint a new one.
+            {t("qaSessionNotice")}
           </div>
         </div>
 
@@ -229,7 +228,7 @@ export default function QAIdentities() {
                       <span className="text-xs uppercase tracking-wide text-muted-foreground ml-2">{acc.role}</span>
                     </span>
                     <span className={"text-xs " + (ex ? "text-emerald-600" : "text-muted-foreground")}>
-                      {ex ? "Already exists" : "Not provisioned"}
+                      {ex ? t("alreadyExists") : t("notProvisioned")}
                     </span>
                   </CardTitle>
                 </CardHeader>
@@ -237,21 +236,21 @@ export default function QAIdentities() {
                   <div className="flex flex-wrap gap-2">
                     {!ex && (
                       <Button size="sm" onClick={() => provisionOne(acc)} disabled={busy === acc.email}>
-                        Provision
+                        {t("provisionQA")}
                       </Button>
                     )}
                     {ex && (
                       <Button size="sm" variant="outline" onClick={() => resetOne(acc)} disabled={busy === acc.email}>
-                        <RefreshCw className="size-4 mr-1" /> Reset Password
+                        <RefreshCw className="size-4 me-1" /> {t("resetPassword")}
                       </Button>
                     )}
                     <Button size="sm" variant="ghost" onClick={() => copy(acc.email, "Email copied")}>
-                      <Copy className="size-4 mr-1" /> Copy Email
+                      <Copy className="size-4 me-1" /> {t("copyEmail")}
                     </Button>
                     {cred && (
                       <>
                         <Button size="sm" variant="ghost" onClick={() => copy(cred.password, "Password copied")}>
-                          <Copy className="size-4 mr-1" /> Copy Password
+                          <Copy className="size-4 me-1" /> {t("copyPassword")}
                         </Button>
                         <Button
                           size="sm"
@@ -263,7 +262,7 @@ export default function QAIdentities() {
                             )
                           }
                         >
-                          <Copy className="size-4 mr-1" /> Copy All
+                          <Copy className="size-4 me-1" /> {t("copyAll")}
                         </Button>
                       </>
                     )}
@@ -283,17 +282,16 @@ ${acc.envPrefix}_PASSWORD=${cred.password}`}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center justify-between">
-              <span>Export</span>
+              <span>{t("exportCredentials")}</span>
               <Button size="sm" onClick={downloadEnv} disabled={!anyCreds}>
-                <Download className="size-4 mr-1" /> Download qa_credentials.txt
+                <Download className="size-4 me-1" /> {t("downloadQACredentials")}
               </Button>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <pre className="text-xs bg-muted rounded p-2 overflow-x-auto font-mono whitespace-pre">{envText}</pre>
             <p className="text-xs text-muted-foreground mt-2">
-              Only passwords minted in this browser session are included. Missing accounts are shown as comments —
-              use <span className="font-mono">Reset Password</span> above to include them.
+              {t("qaExportNotice")}
             </p>
           </CardContent>
         </Card>

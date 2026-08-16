@@ -325,7 +325,7 @@ export default function Dashboard() {
         ...((recentApptRes.data ?? []) as any[]).map((a) => a.doctor_id),
         ...Object.keys(docCounts),
       ].filter(Boolean)));
-      let nameMap: Record<string, string> = {};
+      const nameMap: Record<string, string> = {};
       if (doctorIds.length) {
         const { data: docs } = await supabase.from("profiles").select("id,full_name").in("id", doctorIds);
         for (const d of (docs ?? []) as any[]) nameMap[d.id] = d.full_name ?? "";
@@ -467,7 +467,7 @@ export default function Dashboard() {
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-primary-foreground/75 text-xs font-medium mb-3">
               <Sparkles className="size-4" aria-hidden="true" />
-              <span>{lang === "ar" ? "نظرة سريعة على العيادة" : "Your clinic at a glance"}</span>
+              <span>{t("dashboardEyebrow")}</span>
             </div>
             <h1 className="text-2xl md:text-4xl font-bold tracking-tight">{t("dashboard")}</h1>
             <p className="text-sm md:text-base text-primary-foreground/80 mt-2 max-w-2xl">{t("tagline")}</p>
@@ -481,28 +481,6 @@ export default function Dashboard() {
           </div>
         </div>
       </section>
-
-      {/* Mobile quick actions — scrollable pill row */}
-      <div className="md:hidden -mx-4 px-4 overflow-x-auto">
-        <div className="flex gap-2 w-max pb-1">
-          {canFrontDeskIntake && (
-            <Button asChild size="sm" className="rounded-full whitespace-nowrap">
-              <Link to="/patients"><UserPlus className="size-4 me-1" />{t("addPatient")}</Link>
-            </Button>
-          )}
-          <Button asChild size="sm" variant="outline" className="rounded-full whitespace-nowrap">
-            <Link to="/calendar"><CalendarCheck className="size-4 me-1" />{t("newAppointment")}</Link>
-          </Button>
-          {canFinance && (
-            <Button asChild size="sm" variant="outline" className="rounded-full whitespace-nowrap">
-              <Link to="/invoices"><Receipt className="size-4 me-1" />{t("createInvoice")}</Link>
-            </Button>
-          )}
-          <Button asChild size="sm" variant="outline" className="rounded-full whitespace-nowrap">
-            <Link to="/reports"><FileText className="size-4 me-1" />{t("viewAllReports")}</Link>
-          </Button>
-        </div>
-      </div>
 
       {/* Date range filter */}
       <Card className="rounded-2xl p-3 md:p-4 bg-card/80 shadow-card border-border/60 flex flex-col md:flex-row md:flex-wrap md:items-end gap-3">
@@ -538,8 +516,8 @@ export default function Dashboard() {
                 <Activity className="size-5" aria-hidden="true" />
               </div>
               <div>
-                <h2 className="text-sm font-bold">{lang === "ar" ? "نبض التشغيل" : "Operational pulse"}</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">{lang === "ar" ? "مؤشرات سريعة تساعدك على اتخاذ القرار اليوم" : "Quick signals to help you act today"}</p>
+                <h2 className="text-sm font-bold">{t("operationalPulse")}</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">{t("operationalPulseDesc")}</p>
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:min-w-[65%]">
@@ -585,8 +563,8 @@ export default function Dashboard() {
                 <AlertCircle className="size-5" aria-hidden="true" />
               </div>
               <div>
-                <h2 className="text-sm font-bold">{lang === "ar" ? "يحتاج إلى انتباهك" : "Needs your attention"}</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">{lang === "ar" ? "إجراءات مختصرة من واقع بيانات اليوم" : "Shortcuts based on today's live data"}</p>
+                <h2 className="text-sm font-bold">{t("needsAttention")}</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">{t("needsAttentionDesc")}</p>
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 w-full lg:w-auto lg:min-w-[62%]">
@@ -630,7 +608,7 @@ export default function Dashboard() {
       ) : (
         <>
           <section className="space-y-3">
-            <div className="flex items-center gap-3"><span className="h-6 w-1 rounded-full bg-primary" aria-hidden="true" /><h2 className="text-base font-bold tracking-tight">{lang === "ar" ? "ملخص اليوم" : "Today at a glance"}</h2><span className="text-xs text-muted-foreground">{formatDate(new Date().toISOString(), lang)}</span></div>
+            <div className="flex items-center gap-3"><span className="h-6 w-1 rounded-full bg-primary" aria-hidden="true" /><h2 className="text-base font-bold tracking-tight">{t("todayAtAGlance")}</h2></div>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
             <StatCard
               label={t("todayAppointments")} value={todayAppts}
@@ -639,7 +617,7 @@ export default function Dashboard() {
             />
             {canClinical && (
               <StatCard
-                label={lang === "ar" ? "مواعيدي اليوم" : "My appointments today"} value={myApptsToday}
+                label={t("myAppointmentsToday")} value={myApptsToday}
                 icon={Stethoscope} tone="from-primary-glow to-primary" to={`/calendar?date=${localToday()}`}
               />
             )}
@@ -676,7 +654,7 @@ export default function Dashboard() {
             )}
             {canHR && (
               <StatCard
-                label={lang === "ar" ? "طلبات إجازة معلقة" : "Pending leave requests"} value={pendingLeaveRequests}
+                label={t("pendingLeaveRequests")} value={pendingLeaveRequests}
                 icon={Clock} tone="from-warning to-warning" to="/hr/leaves"
               />
             )}
@@ -685,19 +663,19 @@ export default function Dashboard() {
           {canTreasury && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mt-3">
             <StatCard
-              label={lang === "ar" ? "آخر إقفال يومي" : "Last daily close"}
+              label={t("lastDailyClose")}
               value={lastClose ? formatMoney(lastClose.counted_cash, lang) : (lang === "ar" ? "—" : "—")}
               sub={lastClose
-                ? `${formatDate(lastClose.business_date, lang)} · ${lang === "ar" ? "فرق" : "variance"}: ${formatMoney(lastClose.variance, lang)}`
-                : (lang === "ar" ? "لا يوجد إقفال بعد" : "No close yet")}
+                ? `${formatDate(lastClose.business_date, lang)} · ${t("variance")}: ${formatMoney(lastClose.variance, lang)}`
+                : t("noCloseYet")}
               icon={Landmark}
               tone={lastClose && Math.abs(lastClose.variance) > 0.01 ? "from-warning to-warning" : "from-success to-success"}
               to="/treasury/daily-close"
             />
             <StatCard
-              label={lang === "ar" ? "حركات الخزينة اليوم" : "Treasury movements today"}
+              label={t("treasuryMovementsToday")}
               value={formatMoney(todayTreasuryIn - todayTreasuryOut, lang)}
-              sub={`${lang === "ar" ? "داخل" : "In"}: ${formatMoney(todayTreasuryIn, lang)} · ${lang === "ar" ? "خارج" : "Out"}: ${formatMoney(todayTreasuryOut, lang)}`}
+              sub={`${t("treasuryIn")}: ${formatMoney(todayTreasuryIn, lang)} · ${t("treasuryOut")}: ${formatMoney(todayTreasuryOut, lang)}`}
               icon={ArrowDownUp} tone="from-info to-info" to="/treasury"
             />
           </div>
@@ -728,7 +706,7 @@ export default function Dashboard() {
             <Card className="rounded-2xl p-5 md:p-6 shadow-card border-border/60 bg-card/90">
               <div className="text-sm font-medium mb-3">{t("appointmentsByStatus")}</div>
               {loading ? <Skeleton className="h-56 w-full" /> : apptStatusAll.length === 0 ? (
-                <div className="h-56 flex items-center justify-center text-sm text-muted-foreground">{t("noDataYet")}</div>
+                <div className="h-56 flex items-center justify-center text-sm text-muted-foreground">{t("noChartDataForPeriod")}</div>
               ) : (
                 <div className="h-56">
                   <ResponsiveContainer>
@@ -750,7 +728,7 @@ export default function Dashboard() {
           )}
 
           <section className="space-y-3 pt-2 border-t border-border/40">
-          <div className="flex items-center gap-3"><span className="h-6 w-1 rounded-full bg-success" aria-hidden="true" /><h2 className="text-base font-bold tracking-tight">{lang === "ar" ? "تحليل المرضى والأداء" : "Patients & performance insights"}</h2></div>
+          <div className="flex items-center gap-3"><span className="h-6 w-1 rounded-full bg-success" aria-hidden="true" /><h2 className="text-base font-bold tracking-tight">{t("patientsPerformanceInsights")}</h2></div>
           <div className="grid lg:grid-cols-2 gap-4">
             <Card className="rounded-2xl p-5 md:p-6 shadow-card border-border/60 bg-card/90">
               <div className="text-sm font-medium mb-3">{t("patientsByAge")}</div>
@@ -772,7 +750,7 @@ export default function Dashboard() {
             <Card className="rounded-2xl p-5 md:p-6 shadow-card border-border/60 bg-card/90">
               <div className="text-sm font-medium mb-3">{t("patientsByReferral")}</div>
               {loading ? <Skeleton className="h-56 w-full" /> : referralGroups.length === 0 || referralGroups.every((r) => r.value === 0) ? (
-                <div className="h-56 flex items-center justify-center text-sm text-muted-foreground">{t("noDataYet")}</div>
+                <div className="h-56 flex items-center justify-center text-sm text-muted-foreground">{t("noChartDataForPeriod")}</div>
               ) : (
                 <div className="h-56">
                   <ResponsiveContainer>
@@ -797,7 +775,7 @@ export default function Dashboard() {
                 <Stethoscope className="size-4" /> {t("doctorPerformance")}
               </div>
               {loading ? <Skeleton className="h-64 w-full" /> : doctorPerf.length === 0 ? (
-                <div className="h-64 flex items-center justify-center text-sm text-muted-foreground">{t("noDataYet")}</div>
+                <div className="h-64 flex items-center justify-center text-sm text-muted-foreground">{t("noChartDataForPeriod")}</div>
               ) : (
                 <div className="h-64">
                   <ResponsiveContainer>
@@ -820,11 +798,11 @@ export default function Dashboard() {
                 <div className="text-sm font-medium flex items-center gap-2">
                   <Receipt className="size-4" /> {t("topRequestedServices")}
                 </div>
-                <Button asChild variant="ghost" size="sm" className="gap-1 text-primary"><Link to="/reports/financial">{lang === "ar" ? "عرض التقرير" : "View report"}<ArrowUpRight className="size-4" /></Link></Button>
+                <Button asChild variant="ghost" size="icon" className="size-8 text-primary" title={t("openFinancialReport")} aria-label={t("openFinancialReport")}><Link to="/reports/financial"><ArrowUpRight className="size-4" /></Link></Button>
               </div>
               {loading ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full mb-2" />) :
                 topServices.length === 0 ? (
-                  <div className="text-sm text-muted-foreground py-6 text-center">{t("noDataYet")}</div>
+                  <div className="text-sm text-muted-foreground py-6 text-center">{t("noServicesYet")}</div>
                 ) : (
                   <ul className="divide-y divide-border">
                     {topServices.map((s, i) => (
@@ -847,15 +825,15 @@ export default function Dashboard() {
           </section>
 
           <section className="space-y-3 pt-2 border-t border-border/40">
-          <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="h-6 w-1 rounded-full bg-warning" aria-hidden="true" /><h2 className="text-base font-bold tracking-tight">{lang === "ar" ? "العمليات اليومية" : "Daily operations"}</h2></div><span className="text-xs text-muted-foreground">{lang === "ar" ? "أحدث النشاط" : "Recent activity"}</span></div>
+          <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="h-6 w-1 rounded-full bg-warning" aria-hidden="true" /><h2 className="text-base font-bold tracking-tight">{t("recentActivity")}</h2></div></div>
           <div className="grid lg:grid-cols-3 gap-4">
             <Card className="rounded-2xl p-5 md:p-6 shadow-card border-border/60 bg-card/90">
               <div className="flex items-center justify-between mb-3">
                 <div className="text-sm font-medium flex items-center gap-2"><Users className="size-4" /> {t("recentPatients2")}</div>
-                <Button asChild variant="ghost" size="sm" className="gap-1 text-primary"><Link to="/patients">{lang === "ar" ? "عرض الكل" : "View all"}<ArrowUpRight className="size-4" /></Link></Button>
+                <Button asChild variant="ghost" size="icon" className="size-8 text-primary" title={t("openPatients")} aria-label={t("openPatients")}><Link to="/patients"><ArrowUpRight className="size-4" /></Link></Button>
               </div>
               {loading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 w-full mb-2" />) :
-                recentPatients.length === 0 ? <div className="text-sm text-muted-foreground py-6 text-center">{t("noDataYet")}</div> :
+                recentPatients.length === 0 ? <div className="text-sm text-muted-foreground py-6 text-center">{t("noRecentActivity")}</div> :
                 <ul className="divide-y divide-border">
                   {recentPatients.map((p) => (
                     <li key={p.id} className="py-2 flex items-center justify-between gap-2">
@@ -873,10 +851,10 @@ export default function Dashboard() {
             <Card className="rounded-2xl p-5 md:p-6 shadow-card border-border/60 bg-card/90">
               <div className="flex items-center justify-between mb-3">
                 <div className="text-sm font-medium flex items-center gap-2"><CalendarCheck className="size-4" /> {t("recentAppointments")}</div>
-                <Button asChild variant="ghost" size="sm" className="gap-1 text-primary"><Link to="/calendar">{lang === "ar" ? "عرض الكل" : "View all"}<ArrowUpRight className="size-4" /></Link></Button>
+                <Button asChild variant="ghost" size="icon" className="size-8 text-primary" title={t("openAppointments")} aria-label={t("openAppointments")}><Link to="/calendar"><ArrowUpRight className="size-4" /></Link></Button>
               </div>
               {loading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 w-full mb-2" />) :
-                recentAppts.length === 0 ? <div className="text-sm text-muted-foreground py-6 text-center">{t("noDataYet")}</div> :
+                recentAppts.length === 0 ? <div className="text-sm text-muted-foreground py-6 text-center">{t("noRecentActivity")}</div> :
                 <ul className="divide-y divide-border">
                   {recentAppts.map((a) => (
                     <li key={a.id} className="py-2 flex items-center justify-between gap-2">
@@ -898,10 +876,10 @@ export default function Dashboard() {
             <Card className="rounded-2xl p-5 md:p-6 shadow-card border-border/60 bg-card/90">
               <div className="flex items-center justify-between mb-3">
                 <div className="text-sm font-medium flex items-center gap-2"><Wallet className="size-4" /> {t("recentPayments")}</div>
-                <Button asChild variant="ghost" size="sm" className="gap-1 text-primary"><Link to="/payments">{lang === "ar" ? "عرض الكل" : "View all"}<ArrowUpRight className="size-4" /></Link></Button>
+                <Button asChild variant="ghost" size="icon" className="size-8 text-primary" title={t("openPayments")} aria-label={t("openPayments")}><Link to="/payments"><ArrowUpRight className="size-4" /></Link></Button>
               </div>
               {loading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 w-full mb-2" />) :
-                recentPayments.length === 0 ? <div className="text-sm text-muted-foreground py-6 text-center">{t("noDataYet")}</div> :
+                recentPayments.length === 0 ? <div className="text-sm text-muted-foreground py-6 text-center">{t("noRecentActivity")}</div> :
                 <ul className="divide-y divide-border">
                   {recentPayments.map((p) => (
                     <li key={p.id} className="py-2 flex items-center justify-between gap-2">

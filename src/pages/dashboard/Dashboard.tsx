@@ -485,7 +485,7 @@ export default function Dashboard() {
       {/* Date range filter */}
       <Card className="rounded-2xl p-3 md:p-4 bg-card/80 shadow-card border-border/60 flex flex-col md:flex-row md:flex-wrap md:items-end gap-3">
         <div className="w-full md:w-auto md:min-w-[160px]">
-          <div className="text-[11px] text-muted-foreground mb-1">{t("customRange")}</div>
+          <div className="text-[11px] text-muted-foreground mb-1">{t("period")}</div>
           <Select value={rangePreset} onValueChange={(v) => applyPreset(v as any)}>
             <SelectTrigger className="h-9 w-full md:w-auto"><SelectValue /></SelectTrigger>
             <SelectContent>

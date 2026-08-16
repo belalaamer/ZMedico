@@ -47,6 +47,18 @@ function ageBucket(dob: string | null): string | null {
   return "60+";
 }
 
+function paymentMethodLabel(method: string | null | undefined, lang: "ar" | "en"): string {
+  const labels: Record<string, { ar: string; en: string }> = {
+    cash: { ar: "نقدي", en: "Cash" },
+    card: { ar: "بطاقة", en: "Card" },
+    bank_transfer: { ar: "تحويل بنكي", en: "Bank transfer" },
+    wallet: { ar: "محفظة", en: "Wallet" },
+    insurance: { ar: "تأمين", en: "Insurance" },
+    other: { ar: "أخرى", en: "Other" },
+  };
+  return labels[String(method || "").toLowerCase()]?.[lang] || method || (lang === "ar" ? "غير محدد" : "Unknown");
+}
+
 function localToday(): string {
   const d = new Date();
   const y = d.getFullYear();
@@ -780,7 +792,7 @@ export default function Dashboard() {
                     <li key={p.id} className="py-2 flex items-center justify-between gap-2">
                       <div className="min-w-0">
                         <div className="font-medium text-sm truncate">{fullName(p.patient)}</div>
-                        <div className="text-xs text-muted-foreground truncate">{p.payment_method} · {formatDate(p.payment_date, lang)}</div>
+                        <div className="text-xs text-muted-foreground truncate">{paymentMethodLabel(p.payment_method, lang)} · {formatDate(p.payment_date, lang)}</div>
                       </div>
                       <div className="font-semibold text-sm tabular-nums text-success whitespace-nowrap">{formatMoney(p.amount, lang)}</div>
                     </li>

@@ -473,11 +473,11 @@ export default function Dashboard() {
             <p className="text-sm md:text-base text-primary-foreground/80 mt-2 max-w-2xl">{t("tagline")}</p>
             <p className="text-xs text-primary-foreground/65 mt-4">{formatDate(new Date().toISOString(), lang)}</p>
           </div>
-          <div className="flex flex-wrap gap-2 lg:max-w-md lg:justify-end">
-            {canFrontDeskIntake && <Button asChild className="bg-white text-primary hover:bg-white/90 shadow-sm"><Link to="/patients"><UserPlus className="size-4 me-2" />{t("addPatient")}</Link></Button>}
-            <Button asChild variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white"><Link to="/calendar"><CalendarCheck className="size-4 me-2" />{t("newAppointment")}</Link></Button>
-            {canFinance && <Button asChild variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white"><Link to="/invoices"><Receipt className="size-4 me-2" />{t("createInvoice")}</Link></Button>}
-            <Button asChild variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white"><Link to="/reports"><FileText className="size-4 me-2" />{t("viewAllReports")}</Link></Button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap lg:max-w-md lg:justify-end">
+            {canFrontDeskIntake && <Button asChild className="min-h-11 w-full bg-white text-primary hover:bg-white/90 shadow-sm sm:w-auto"><Link to="/patients"><UserPlus className="size-4 me-2" />{t("addPatient")}</Link></Button>}
+            <Button asChild variant="outline" className="min-h-11 w-full border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white sm:w-auto"><Link to="/calendar"><CalendarCheck className="size-4 me-2" />{t("newAppointment")}</Link></Button>
+            {canFinance && <Button asChild variant="outline" className="min-h-11 w-full border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white sm:w-auto"><Link to="/invoices"><Receipt className="size-4 me-2" />{t("createInvoice")}</Link></Button>}
+            <Button asChild variant="outline" className="min-h-11 w-full border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white sm:w-auto"><Link to="/reports"><FileText className="size-4 me-2" />{t("viewAllReports")}</Link></Button>
           </div>
         </div>
       </section>
@@ -609,7 +609,7 @@ export default function Dashboard() {
         <>
           <section className="space-y-3">
             <div className="flex items-center gap-3"><span className="h-6 w-1 rounded-full bg-primary" aria-hidden="true" /><h2 className="text-base font-bold tracking-tight">{t("todayAtAGlance")}</h2></div>
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
             <StatCard
               label={t("todayAppointments")} value={todayAppts}
               sub={`${apptStatusToday.completed ?? 0} ${t("statusCompleted")} · ${apptStatusToday.scheduled ?? 0} ${t("statusScheduled")}`}

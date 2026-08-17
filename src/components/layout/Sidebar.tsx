@@ -174,8 +174,8 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
   const toggle = (k: string) => setOpenMap(m => ({ ...m, [k]: !m[k] }));
 
   return (
-    <div className="flex w-full h-full flex-col bg-sidebar text-sidebar-foreground">
-      <div className="h-16 flex items-center gap-3 px-5 border-b border-sidebar-border">
+    <div className="flex h-full min-h-0 w-full flex-col bg-sidebar text-sidebar-foreground">
+      <div className="flex h-16 min-h-16 items-center gap-3 border-b border-sidebar-border px-4 sm:px-5">
         <div className="size-9 rounded-xl bg-sidebar-accent flex items-center justify-center">
           <Stethoscope className="size-5 text-sidebar-accent-foreground" />
         </div>
@@ -184,14 +184,14 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
           <div className="text-[11px] text-sidebar-foreground/70">{t("tagline")}</div>
         </div>
       </div>
-      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-3 sm:px-3 sm:py-4 space-y-3 sm:space-y-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <NavLink
           to={dashboardItem.to}
           end
           onClick={onNavigate}
           className={({ isActive }) =>
             cn(
-              "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
+              "flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors touch-manipulation",
               isActive
                 ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold border-s-2 border-sidebar-primary rounded-s-none"
                 : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground font-medium"
@@ -211,7 +211,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
                 onClick={() => toggle(g.key)}
                 aria-expanded={isOpen}
                 aria-controls={`group-${g.key}`}
-                className="w-full flex items-center gap-2 px-2 py-1.5 text-[11px] font-bold uppercase tracking-wider text-sidebar-foreground/60 hover:text-sidebar-accent-foreground transition-colors"
+                className="w-full min-h-11 flex items-center gap-2 rounded-md px-3 py-2 text-xs font-bold uppercase tracking-wide text-sidebar-foreground/60 hover:text-sidebar-accent-foreground transition-colors"
               >
                 <g.icon className="size-3.5 shrink-0 opacity-70" />
                 <span className="flex-1 truncate text-start">{g.label}</span>
@@ -238,11 +238,11 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
                 )}
               >
                 <div className="overflow-hidden min-h-0">
-                  <div className="space-y-0.5 pt-1">
+                  <div className="space-y-1 pt-1">
                     {g.items.map((it) => (
                       <NavLink key={it.to} to={it.to} onClick={onNavigate} tabIndex={isOpen ? 0 : -1}
                         className={({ isActive }) => cn(
-                          "flex items-center gap-2.5 px-3 py-2 rounded-md text-[13px] transition-colors duration-150",
+                          "flex min-h-11 items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors duration-150 touch-manipulation",
                           isActive
                             ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold border-s-2 border-sidebar-primary rounded-s-none"
                             : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground font-medium"
@@ -261,7 +261,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
           );
         })}
       </nav>
-      <div className="p-4 text-[11px] text-sidebar-foreground/60 border-t border-sidebar-border">
+      <div className="border-t border-sidebar-border p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] text-[11px] text-sidebar-foreground/60 sm:p-4">
         v1.0 · {lang.toUpperCase()}
       </div>
     </div>

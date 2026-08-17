@@ -135,8 +135,8 @@ export function Topbar() {
     (lang === "ar" ? b.name_ar || b.name_en : b.name_en || b.name_ar) || "—";
 
   return (
-    <header className="h-16 shrink-0 flex items-center gap-3 px-4 md:px-6 border-b border-border bg-card">
-      <Button variant="ghost" size="icon" type="button" className="md:hidden" aria-label={t("menu")} onClick={() => setMobileOpen(true)}>
+    <header className="h-16 min-h-16 shrink-0 flex items-center gap-2 px-3 sm:gap-3 sm:px-4 md:px-6 border-b border-border bg-card">
+      <Button variant="ghost" size="icon" type="button" className="md:hidden size-11 shrink-0" aria-label={t("menu")} onClick={() => setMobileOpen(true)}>
         <Menu className="size-5" />
       </Button>
 
@@ -156,18 +156,18 @@ export function Topbar() {
           aria-modal="true"
           aria-label={t("appName")}
           style={{ willChange: "transform" }}
-          className={`fixed inset-y-0 ${lang === "ar" ? "right-0 rounded-l-2xl" : "left-0 rounded-r-2xl"} z-50 w-[280px] max-w-[82vw] bg-sidebar text-sidebar-foreground shadow-2xl ring-1 ring-border overflow-hidden transform-gpu transition-transform duration-150 ease-out ${
+          className={`fixed inset-y-0 ${lang === "ar" ? "right-0 rounded-l-2xl" : "left-0 rounded-r-2xl"} z-50 w-[min(320px,88vw)] max-w-[calc(100vw-1rem)] bg-sidebar text-sidebar-foreground shadow-2xl ring-1 ring-border overflow-hidden transform-gpu transition-transform duration-150 ease-out ${
             mobileOpen
               ? "translate-x-0 pointer-events-auto"
               : `${lang === "ar" ? "translate-x-full" : "-translate-x-full"} pointer-events-none`
           }`}
         >
-          <div className="flex h-16 items-center justify-start border-b border-sidebar-border px-3 py-2">
+          <div className="flex h-16 min-h-16 items-center justify-start border-b border-sidebar-border px-3 py-2 pt-[env(safe-area-inset-top,0px)]">
             <Button
               variant="ghost"
               size="icon"
               type="button"
-              className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              className="size-11 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               aria-label={t("closeMenu")}
               onClick={() => setMobileOpen(false)}
             >
@@ -188,11 +188,12 @@ export function Topbar() {
           <GlobalSearch variant="mobile" onClose={() => setSearchOpen(false)} />
         </div>
       ) : (
-        <div className="flex-1 sm:hidden flex justify-end">
+        <div className="flex-1 sm:hidden flex justify-end min-w-0">
           <Button
             variant="ghost"
             size="icon"
             type="button"
+            className="size-11 shrink-0"
             aria-label={t("search")}
             onClick={() => setSearchOpen(true)}
           >
@@ -227,14 +228,14 @@ export function Topbar() {
         </div>
       )}
 
-      <Button variant="ghost" size="icon" type="button" onClick={() => setLang(lang === "ar" ? "en" : "ar")} title={t("language")} aria-label={t("language")}>
+      <Button variant="ghost" size="icon" type="button" className="size-11 shrink-0" onClick={() => setLang(lang === "ar" ? "en" : "ar")} title={t("language")} aria-label={t("language")}>
         <Globe className="size-5" />
         <span className="sr-only">{t("language")}</span>
       </Button>
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" type="button" className="relative" aria-label={t("notifications")}>
+          <Button variant="ghost" size="icon" type="button" className="relative size-11 shrink-0" aria-label={t("notifications")}>
             <Bell className="size-5" />
             {unreadCount > 0 && (
               <Badge className="absolute -top-1 -end-1 h-5 min-w-5 px-1 text-[10px] bg-destructive text-destructive-foreground border-0">
@@ -243,7 +244,7 @@ export function Topbar() {
             )}
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-80">
+        <DropdownMenuContent align="end" className="w-[min(20rem,calc(100vw-1rem))] max-h-[min(32rem,70dvh)] overflow-hidden">
           <div className="flex items-center justify-between px-2 py-1.5">
             <DropdownMenuLabel className="p-0">{t("notifications")}</DropdownMenuLabel>
             {unreadCount > 0 && (
@@ -254,7 +255,7 @@ export function Topbar() {
           {unreadCount === 0 ? (
             <div className="px-3 py-6 text-center text-sm text-muted-foreground">{t("noNotifications")}</div>
           ) : (
-            <div className="max-h-96 overflow-y-auto">
+            <div className="max-h-[min(28rem,60dvh)] overflow-y-auto overscroll-contain">
               {notifs.map((n) => (
                 <DropdownMenuItem key={n.id} asChild className="cursor-pointer">
                   <Link to={linkFor(n)} onClick={() => markAsRead(n.id)} className="flex items-start gap-2 py-2">
@@ -273,7 +274,7 @@ export function Topbar() {
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button type="button" className="flex items-center gap-2 rounded-full hover:bg-muted px-1 py-1">
+          <button type="button" aria-label={user?.email ?? t("account")} className="flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-full px-1 py-1 hover:bg-muted touch-manipulation">
             <Avatar className="size-9">
               <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">{initials}</AvatarFallback>
             </Avatar>

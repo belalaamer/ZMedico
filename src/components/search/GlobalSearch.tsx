@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Loader2 } from "lucide-react";
+import { Search, Loader2, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger, PopoverAnchor } from "@/components/ui/popover";
 import { useI18n } from "@/contexts/I18nContext";
@@ -188,10 +188,20 @@ export function GlobalSearch({ variant = "desktop", onClose }: Props) {
             onKeyDown={onKeyDown}
             placeholder={t("search")}
             autoFocus={isMobile}
-            className="ps-9 pe-16 bg-muted/50 border-transparent focus-visible:bg-background"
+            className={`ps-9 ${isMobile ? "pe-12" : "pe-16"} bg-muted/50 border-transparent focus-visible:bg-background`}
           />
           {loading && (
             <Loader2 className="absolute end-14 top-1/2 -translate-y-1/2 size-4 text-muted-foreground animate-spin" />
+          )}
+          {isMobile && onClose && (
+            <button
+              type="button"
+              aria-label={t("closeSearch")}
+              onClick={() => { setQ(""); setOpen(false); onClose(); }}
+              className="absolute end-1 top-1/2 flex size-10 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground touch-manipulation"
+            >
+              <X className="size-4" aria-hidden="true" />
+            </button>
           )}
           {!isMobile && (
             <kbd
@@ -236,7 +246,7 @@ export function GlobalSearch({ variant = "desktop", onClose }: Props) {
                           onMouseEnter={() => setHighlight(myIdx)}
                           onClick={() => go(h.to)}
                           aria-selected={active}
-                          className={`w-full text-start px-3 py-2 rounded-md focus:outline-none ${active ? "bg-muted ring-1 ring-primary/40" : "hover:bg-muted"}`}
+                          className={`min-h-11 w-full text-start px-3 py-2.5 rounded-md focus:outline-none touch-manipulation ${active ? "bg-muted ring-1 ring-primary/40" : "hover:bg-muted"}`}
                         >
                           <div className="text-sm font-medium truncate">{h.label}</div>
                           {h.sub && <div className="text-xs text-muted-foreground truncate">{h.sub}</div>}

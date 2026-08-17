@@ -216,6 +216,12 @@ iframe[src*="lovable.dev"][title*="badge" i] {
 
 /* Mobile-friendly bottom-sheet style for popovers / select listboxes */
 @media (max-width: 640px) {
+  html,
+  body {
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+  }
+
   [data-radix-popper-content-wrapper] > [role="listbox"],
   [data-radix-popper-content-wrapper] > [data-radix-select-content] {
     position: fixed !important;
@@ -227,6 +233,8 @@ iframe[src*="lovable.dev"][title*="badge" i] {
     max-height: 50vh !important;
     border-radius: 16px !important;
     z-index: 100 !important;
+    padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+    overscroll-behavior: contain;
   }
 }
 
@@ -237,11 +245,19 @@ iframe[src*="lovable.dev"][title*="badge" i] {
   html { font-size: 16px; }
   body { font-size: 15px; line-height: 1.55; }
 
-  /* Ensure icon buttons meet 44x44 tap-target minimum */
+  /* Ensure icon and labeled controls meet a comfortable 44px tap target. */
   button[aria-label],
   a[aria-label],
   [role="button"] {
-    min-height: 40px;
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+
+  /* Avoid accidental horizontal scrolling from long labels or data cards. */
+  [data-radix-popper-content-wrapper],
+  [data-radix-dialog-content],
+  [role="dialog"] {
+    max-width: calc(100vw - 1rem);
   }
 
   /* Headings get a bit more breathing room */

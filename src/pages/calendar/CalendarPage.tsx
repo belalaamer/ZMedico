@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { useDataSync } from "@/lib/dataSync";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Fab } from "@/components/ui/fab";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

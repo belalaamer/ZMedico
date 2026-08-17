@@ -26,6 +26,7 @@ import { useAuthorization } from "@/lib/authz/useAuthorization";
 import PatientOverviewSnapshot from "./PatientOverviewSnapshot";
 import { logPhiAccess } from "@/lib/observability/phiAudit";
 import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
+import { doctorDisplayName, type DoctorNameFields } from "@/lib/doctorName";
 
 const statusClass: Record<string, string> = {
   draft: "status-cancelled", pending: "status-review", paid: "status-completed", partial: "status-progress", cancelled: "status-departed",
@@ -42,7 +43,7 @@ export default function PatientProfile() {
   const uploadFlag = searchParams.get("upload") === "1";
   const [patient, setPatient] = useState<any>(null);
   const [insurer, setInsurer] = useState<any>(null);
-  const [assignedDoctorName, setAssignedDoctorName] = useState<string>("");
+  const [assignedDoctor, setAssignedDoctor] = useState<DoctorNameFields | null>(null);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
@@ -122,9 +123,9 @@ export default function PatientProfile() {
       setInsurer(ins);
     } else { setInsurer(null); }
     if (p?.assigned_doctor_id) {
-      const { data: prof } = await supabase.from("profiles").select("full_name").eq("id", p.assigned_doctor_id).maybeSingle();
-      setAssignedDoctorName(prof?.full_name ?? "");
-    } else { setAssignedDoctorName(""); }
+      const { data: prof } = await supabase.from("profiles").select("full_name,full_name_en,full_name_ar").eq("id", p.assigned_doctor_id).maybeSingle();
+      setAssignedDoctor(prof ?? null);
+    } else { setAssignedDoctor(null); }
     // Task B: log PHI access once after data arrives, guarded against re-fires.
     if (p?.id) {
       if (!phiLogged.current) {
@@ -291,7 +292,7 @@ export default function PatientProfile() {
               <div><div className="text-muted-foreground text-xs">{t("nationality")}</div><div>{patient.nationality ?? "—"}</div></div>
               <div><div className="text-muted-foreground text-xs">{t("address")}</div><div>{patient.address ?? "—"}</div></div>
               <div><div className="text-muted-foreground text-xs">{t("referralSource")}</div><div>{patient.referral_source ?? "—"}</div></div>
-              <div><div className="text-muted-foreground text-xs">{lang === "ar" ? "الطبيب المسؤول" : "Assigned Doctor"}</div><div>{assignedDoctorName || "—"}</div></div>
+              <div><div className="text-muted-foreground text-xs">{lang === "ar" ? "الطبيب المسؤول" : "Assigned Doctor"}</div><div>{assignedDoctor ? doctorDisplayName(assignedDoctor, lang) : "—"}</div></div>
               {patient.notes && <div className="sm:col-span-2"><div className="text-muted-foreground text-xs">{t("notes")}</div><div className="whitespace-pre-wrap">{patient.notes}</div></div>}
             </div>
           </Card>

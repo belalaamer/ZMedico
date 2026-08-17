@@ -49,6 +49,8 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const email = String(body.email ?? "").trim().toLowerCase();
     const full_name = body.full_name ? String(body.full_name).trim() : null;
+    const full_name_en = body.full_name_en ? String(body.full_name_en).trim() : null;
+    const full_name_ar = body.full_name_ar ? String(body.full_name_ar).trim() : null;
     const role = String(body.role ?? "staff");
     const branch_id = body.branch_id ? String(body.branch_id) : null;
     // If the admin supplied an explicit password, use it. Otherwise generate a
@@ -102,7 +104,11 @@ Deno.serve(async (req) => {
         email,
         password: initialPassword,
         email_confirm: true,
-        user_metadata: { full_name: full_name ?? undefined },
+        user_metadata: {
+          full_name: full_name ?? full_name_en ?? full_name_ar ?? undefined,
+          full_name_en: full_name_en ?? undefined,
+          full_name_ar: full_name_ar ?? undefined,
+        },
       });
 
     if (createErr || !created?.user) {
@@ -117,7 +123,13 @@ Deno.serve(async (req) => {
     // Make sure profile + role exist (handle_new_user usually does this,
     // but if it didn't run we ensure consistency).
     await admin.from("profiles").upsert(
-      { id: created.user.id, email, full_name },
+      {
+        id: created.user.id,
+        email,
+        full_name: full_name ?? full_name_en ?? full_name_ar,
+        full_name_en,
+        full_name_ar,
+      },
       { onConflict: "id" },
     );
     await admin.from("user_roles").upsert(

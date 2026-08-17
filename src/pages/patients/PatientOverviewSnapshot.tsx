@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
+import { doctorDisplayName } from "@/lib/doctorName";
 
 type Props = {
   patientId: string;
@@ -66,11 +67,11 @@ export default function PatientOverviewSnapshot({
         .eq("prescriptions.patient_id", patientId)
         .order("id", { ascending: false }).limit(5),
       supabase.from("medical_records")
-        .select("id,visit_date,chief_complaint_en,chief_complaint_ar,status,medical_specialties(name_en,name_ar),profiles(full_name)")
+        .select("id,visit_date,chief_complaint_en,chief_complaint_ar,status,medical_specialties(name_en,name_ar),profiles(full_name,full_name_en,full_name_ar)")
         .eq("patient_id", patientId)
         .order("visit_date", { ascending: false }).limit(4),
       supabase.from("appointments")
-        .select("id,scheduled_at,status,procedure,branches(name_en,name_ar),profiles!appointments_doctor_id_fkey(full_name)")
+        .select("id,scheduled_at,status,procedure,branches(name_en,name_ar),profiles!appointments_doctor_id_fkey(full_name,full_name_en,full_name_ar)")
         .eq("patient_id", patientId).is("deleted_at", null)
         .gte("scheduled_at", nowIso)
         .in("status", ["scheduled", "confirmed", "in_progress"])
@@ -281,7 +282,7 @@ export default function PatientOverviewSnapshot({
                           <div className="text-xs text-muted-foreground mt-0.5 truncate">
                             {formatDate(r.visit_date, lang)}
                             {spec ? ` · ${spec}` : ""}
-                            {r.profiles?.full_name ? ` · ${r.profiles.full_name}` : ""}
+                            {r.profiles ? ` · ${doctorDisplayName(r.profiles, lang)}` : ""}
                           </div>
                         </Link>
                       </li>
@@ -325,7 +326,7 @@ export default function PatientOverviewSnapshot({
                             {formatDateTime(a.scheduled_at, lang)}
                           </div>
                           <div className="text-xs text-muted-foreground mt-0.5 truncate">
-                            {[a.procedure, branch, a.profiles?.full_name].filter(Boolean).join(" · ") || "—"}
+                            {[a.procedure, branch, a.profiles ? doctorDisplayName(a.profiles, lang) : null].filter(Boolean).join(" · ") || "—"}
                           </div>
                         </div>
                         <Badge variant="outline" className={statusTone[a.status] ?? ""}>{t(a.status as any) ?? a.status}</Badge>

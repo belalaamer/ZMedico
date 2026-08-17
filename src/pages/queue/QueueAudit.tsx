@@ -223,7 +223,7 @@ export default function QueueAuditPage() {
     if (apptIds.length) {
       const { data: ap } = await supabase
         .from("appointments")
-        .select("id,patient_id,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)")
+        .select("id,patient_id,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code)")
         .in("id", apptIds);
       const map = { ...patients };
       (ap ?? []).forEach((a: any) => {
@@ -337,7 +337,7 @@ export default function QueueAuditPage() {
         if (aIds.length) {
           const { data: ap } = await supabase
             .from("appointments")
-            .select("id,patient_id,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)")
+            .select("id,patient_id,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code)")
             .in("id", aIds);
           (ap ?? []).forEach((a: any) => {
             const p = a.patients; if (!p) return;

@@ -15,6 +15,7 @@ import { RowActions } from "@/components/RowActions";
 import { TablePager } from "@/components/TablePager";
 import { ListSkeleton } from "@/components/ListSkeleton";
 import { Can } from "@/components/Can";
+import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
 
 const PAGE_SIZE = 50;
 
@@ -61,7 +62,7 @@ export default function Payments() {
     const from = page * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
     let q = supabase.from("payments")
-      .select("*, patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code), invoices(invoice_number)", { count: "exact" })
+      .select("*, patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code), invoices(invoice_number)", { count: "exact" })
       .is("deleted_at", null)
       .order("created_at", { ascending: false }).range(from, to);
     if (currentBranchId) q = q.eq("branch_id", currentBranchId);
@@ -117,9 +118,8 @@ export default function Payments() {
           <div className="divide-y divide-border">
             {items.map((p) => {
               const pt = p.patients;
-              const name = lang === "ar"
-                ? `${pt?.first_name_ar ?? pt?.first_name_en ?? ""} ${pt?.last_name_ar ?? pt?.last_name_en ?? ""}`.trim()
-                : `${pt?.first_name_en ?? ""} ${pt?.last_name_en ?? ""}`.trim();
+              const name = patientDisplayName(pt, lang);
+              const nameDirection = patientDisplayDirection(pt, lang);
               const ms = methodStyle(p.payment_method);
               const MIcon = ms.Icon;
               const methodLabel = (t(p.payment_method as any) as string) ?? p.payment_method;
@@ -129,7 +129,7 @@ export default function Payments() {
                     <MIcon className="size-5" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">{name}</div>
+                    <div className="font-medium truncate" dir={nameDirection}>{name}</div>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
                       <span className="text-xs text-muted-foreground">{t("paymentDate")}: {formatDateTime(p.created_at, lang)}</span>
                       <Badge variant="outline" className={`text-[10px] font-medium ${ms.badge}`}>{methodLabel}</Badge>

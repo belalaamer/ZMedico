@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
 
 type Reminder = {
   id: string; appointment_id: string | null; patient_id: string | null;
@@ -26,7 +27,7 @@ type Reminder = {
   sent_at: string | null; error_message: string | null;
 };
 
-type Patient = { id: string; first_name_en: string | null; first_name_ar: string | null; phone: string | null };
+type Patient = { id: string; first_name_en: string | null; last_name_en: string | null; first_name_ar: string | null; last_name_ar: string | null; name_language: "ar" | "en" | null; phone: string | null };
 
 const statusColor: Record<Reminder["status"], string> = {
   pending: "bg-amber-500/10 text-amber-600 border-0",
@@ -58,7 +59,7 @@ export default function ScheduledReminders() {
     if (currentBranchId) q = q.eq("branch_id", currentBranchId);
     const { data } = await q;
     setItems((data ?? []) as Reminder[]);
-    const { data: p } = await supabase.from("patients").select("id, first_name_en, first_name_ar, phone")
+    const { data: p } = await supabase.from("patients").select("id, first_name_en, last_name_en, first_name_ar, last_name_ar, name_language, phone")
       .is("deleted_at", null).order("created_at", { ascending: false }).limit(500);
     setPatients((p ?? []) as Patient[]);
   };
@@ -83,10 +84,8 @@ export default function ScheduledReminders() {
   const pendingCount = items.filter((r) => r.status === "pending").length;
 
   const patientName = (id: string | null) => {
-    if (!id) return "—";
-    const p = patients.find((x) => x.id === id);
-    if (!p) return "—";
-    return lang === "ar" ? (p.first_name_ar || p.first_name_en || "—") : (p.first_name_en || p.first_name_ar || "—");
+    const p = id ? patients.find((x) => x.id === id) : null;
+    return patientDisplayName(p, lang);
   };
 
   const create = async () => {
@@ -190,7 +189,7 @@ export default function ScheduledReminders() {
                     <SelectContent>
                       {patients.map((p) => (
                         <SelectItem key={p.id} value={p.id}>
-                          {(lang === "ar" ? (p.first_name_ar || p.first_name_en) : (p.first_name_en || p.first_name_ar)) ?? p.id.slice(0, 8)}
+                          <span dir={patientDisplayDirection(p, lang)}>{patientDisplayName(p, lang)}</span>
                           {p.phone ? ` — ${p.phone}` : ""}
                         </SelectItem>
                       ))}
@@ -245,7 +244,7 @@ export default function ScheduledReminders() {
             <TableBody>
               {filtered.map((r) => (
                 <TableRow key={r.id}>
-                  <TableCell>{patientName(r.patient_id)}</TableCell>
+                  <TableCell dir={patientDisplayDirection(patients.find((p) => p.id === r.patient_id), lang)}>{patientName(r.patient_id)}</TableCell>
                   <TableCell><Badge variant="outline">{t(r.reminder_type as any)}</Badge></TableCell>
                   <TableCell className="text-sm">{new Date(r.scheduled_time).toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}</TableCell>
                   <TableCell className="max-w-sm truncate text-sm text-muted-foreground">{lang === "ar" ? r.message_ar : r.message_en}</TableCell>

@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatDate, formatMoney } from "@/lib/format";
 import { generatePrescriptionPdf } from "@/lib/prescriptionPdf";
+import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
 import { logPhiAccess } from "@/lib/observability/phiAudit";
 
 type Record = any;
@@ -95,9 +96,8 @@ export default function MedicalRecordEditor() {
 
   if (!record || !patient) return <div className="text-center text-muted-foreground py-10">…</div>;
 
-  const patientName = lang === "ar"
-    ? `${patient.first_name_ar ?? patient.first_name_en} ${patient.last_name_ar ?? patient.last_name_en ?? ""}`.trim()
-    : `${patient.first_name_en} ${patient.last_name_en ?? ""}`.trim();
+  const patientName = patientDisplayName(patient, lang);
+  const patientDirection = patientDisplayDirection(patient, lang);
   const age = calcAge(patient.dob);
 
   // ============ Overview save ============
@@ -151,7 +151,7 @@ export default function MedicalRecordEditor() {
             {patientName.slice(0,1).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
-            <Link to={`/patients/${patient.id}`} className="font-bold text-lg hover:underline">{patientName}</Link>
+            <Link to={`/patients/${patient.id}`} className="font-bold text-lg hover:underline" dir={patientDirection}>{patientName}</Link>
             <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-1 mt-1">
               {age != null && <span>{age} {t("yearsOld")}</span>}
               {patient.gender && <span>{t(patient.gender as any)}</span>}

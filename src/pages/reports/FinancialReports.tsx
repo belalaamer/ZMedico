@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { formatMoney, formatDate } from "@/lib/format";
+import { patientDisplayName } from "@/lib/patientName";
 import { ReportFilterBar, ReportPageHeader } from "./_shared";
 import { defaultDateRange, exportReportPDF, exportReportExcel, ageBucket, CHART_COLORS } from "@/lib/reportExport";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, PieChart, Pie, Cell, Legend } from "recharts";
@@ -81,7 +82,7 @@ function RevenueTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
   const [rows, setRows] = useState<any[]>([]);
   useEffect(() => {
     let q = supabase.from("invoices")
-      .select("id, invoice_number, invoice_date, total, paid_amount, status, patients(first_name_en, last_name_en, first_name_ar, last_name_ar)")
+      .select("id, invoice_number, invoice_date, total, paid_amount, status, patients(first_name_en, last_name_en, first_name_ar, last_name_ar, name_language)")
       .is("deleted_at", null)
       .gte("invoice_date", start).lte("invoice_date", end).order("invoice_date", { ascending: false });
     if (branchId) q = q.eq("branch_id", branchId);
@@ -104,7 +105,7 @@ function RevenueTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
   ];
   const exportRows = rows.map((r) => ({
     date: r.invoice_date, inv: r.invoice_number,
-    patient: lang === "ar" ? `${r.patients?.first_name_ar ?? ""} ${r.patients?.last_name_ar ?? ""}` : `${r.patients?.first_name_en ?? ""} ${r.patients?.last_name_en ?? ""}`,
+    patient: r.patients ? patientDisplayName(r.patients, lang) : "—",
     status: r.status, amount: Number(r.total || 0).toFixed(2),
   }));
   const summary = [
@@ -144,7 +145,7 @@ function RevenueTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
             <TableRow key={r.id} className="hover:bg-muted/40 transition-colors">
               <TableCell>{formatDate(r.invoice_date, lang)}</TableCell>
               <TableCell className="font-mono text-xs">{r.invoice_number}</TableCell>
-              <TableCell>{lang === "ar" ? `${r.patients?.first_name_ar ?? ""} ${r.patients?.last_name_ar ?? ""}` : `${r.patients?.first_name_en ?? ""} ${r.patients?.last_name_en ?? ""}`}</TableCell>
+              <TableCell>{r.patients ? patientDisplayName(r.patients, lang) : "—"}</TableCell>
               <TableCell><span className="text-xs px-2 py-0.5 rounded bg-muted">{r.status}</span></TableCell>
               <TableCell className="text-end tabular-nums font-semibold">{formatMoney(r.total, lang)}</TableCell>
             </TableRow>
@@ -160,7 +161,7 @@ function CollectionTab({ start, end, setStart, setEnd, branchId, lang, t }: any)
   const [rows, setRows] = useState<any[]>([]);
   useEffect(() => {
     let q = supabase.from("payments")
-      .select("amount, payment_method, patient_id, patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)")
+      .select("amount, payment_method, patient_id, patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code)")
       .is("deleted_at", null).gte("payment_date", start).lte("payment_date", end);
     if (branchId) q = q.eq("branch_id", branchId);
     q.then(({ data }) => setRows(data ?? []));
@@ -181,11 +182,7 @@ function CollectionTab({ start, end, setStart, setEnd, branchId, lang, t }: any)
     rows.forEach((r: any) => {
       const pid = r.patient_id || "—";
       const p = r.patients;
-      const name = p
-        ? (lang === "ar"
-            ? `${p.first_name_ar ?? p.first_name_en ?? ""} ${p.last_name_ar ?? p.last_name_en ?? ""}`.trim()
-            : `${p.first_name_en ?? ""} ${p.last_name_en ?? ""}`.trim())
-        : "—";
+      const name = p ? patientDisplayName(p, lang) : "—";
       const cur = map.get(pid) ?? { name, code: p?.patient_code ?? "", methods: new Map<string, number>(), total: 0 };
       const m = r.payment_method || "cash";
       cur.methods.set(m, (cur.methods.get(m) ?? 0) + Number(r.amount || 0));
@@ -262,7 +259,7 @@ function OutstandingTab({ branchId, lang, t }: any) {
   const [rows, setRows] = useState<any[]>([]);
   useEffect(() => {
     let q = supabase.from("invoices")
-      .select("id, invoice_number, invoice_date, total, paid_amount, status, patients(first_name_en, last_name_en, first_name_ar, last_name_ar)")
+      .select("id, invoice_number, invoice_date, total, paid_amount, status, patients(first_name_en, last_name_en, first_name_ar, last_name_ar, name_language)")
       .is("deleted_at", null)
       .in("status", ["pending", "partial"]);
     if (branchId) q = q.eq("branch_id", branchId);
@@ -286,7 +283,7 @@ function OutstandingTab({ branchId, lang, t }: any) {
   ];
   const expRows = enriched.map((e) => ({
     inv: e.invoice_number,
-    patient: lang === "ar" ? `${e.patients?.first_name_ar ?? ""} ${e.patients?.last_name_ar ?? ""}` : `${e.patients?.first_name_en ?? ""} ${e.patients?.last_name_en ?? ""}`,
+    patient: e.patients ? patientDisplayName(e.patients, lang) : "—",
     age: e.age, bucket: e.bucket, amount: e.outstanding.toFixed(2),
   }));
 
@@ -313,7 +310,7 @@ function OutstandingTab({ branchId, lang, t }: any) {
         <TableBody>{enriched.map((e) => (
           <TableRow key={e.id} className="hover:bg-muted/40 transition-colors">
             <TableCell className="font-mono text-xs">{e.invoice_number}</TableCell>
-            <TableCell className="font-medium">{lang === "ar" ? `${e.patients?.first_name_ar ?? ""} ${e.patients?.last_name_ar ?? ""}` : `${e.patients?.first_name_en ?? ""} ${e.patients?.last_name_en ?? ""}`}</TableCell>
+            <TableCell className="font-medium">{e.patients ? patientDisplayName(e.patients, lang) : "—"}</TableCell>
             <TableCell className="tabular-nums">{e.age}</TableCell>
             <TableCell><span className={cn("text-xs px-2 py-0.5 rounded-full font-medium",
               e.bucket === "0-30" && "bg-emerald-500/10 text-emerald-600",

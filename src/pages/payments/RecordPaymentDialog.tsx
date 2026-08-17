@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useDataSync } from "@/lib/dataSync";
+import { patientDisplayName } from "@/lib/patientName";
 
 type Method = "cash" | "card" | "bank_transfer" | "insurance" | "wallet";
 
@@ -116,7 +117,7 @@ export function RecordPaymentDialog({
   const loadPatients = () => {
     supabase
       .from("patients")
-      .select("id,first_name_en,last_name_en,patient_code,deleted_at")
+      .select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code,deleted_at")
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(500)
@@ -129,7 +130,7 @@ export function RecordPaymentDialog({
         // numbering stays exclusive to the main Patients list.
         setPatients(rows.map((p: any) => ({
           id: p.id,
-          label: `${p.first_name_en} ${p.last_name_en ?? ""}`.trim(),
+          label: patientDisplayName(p, lang),
         })));
       });
   };
@@ -279,7 +280,7 @@ export function RecordPaymentDialog({
             </div>
             <div className="space-y-2">
               <Label>{t("referenceNumber")}</Label>
-              <Input value={ref} onChange={(e) => setRef(e.target.value)} maxLength={60} />
+              <Input dir="auto" value={ref} onChange={(e) => setRef(e.target.value)} maxLength={60} />
             </div>
           </div>
           {!isTopup && (
@@ -315,7 +316,7 @@ export function RecordPaymentDialog({
           )}
           <div className="space-y-2">
             <Label>{t("notes")}</Label>
-            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={1000} rows={2} />
+            <Textarea dir="auto" value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={1000} rows={2} />
           </div>
         </div>
         <DialogFooter>

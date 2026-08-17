@@ -19,6 +19,7 @@ import { formatMoney } from "@/lib/format";
 import { useDataSync } from "@/lib/dataSync";
 import { fetchActiveContract, resolveAllLines, distributeClaim, type LineForCoverage } from "@/lib/insuranceContracts";
 import { Badge } from "@/components/ui/badge";
+import { patientDisplayName } from "@/lib/patientName";
 
 type Item = {
   item_type: "service" | "product" | "procedure";
@@ -74,7 +75,7 @@ export function CreateInvoiceDialog({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("patients")
-        .select("id,first_name_en,last_name_en,patient_code,phone,deleted_at")
+        .select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code,phone,deleted_at")
         .is("deleted_at", null)
         .order("first_name_en", { ascending: true })
         .order("last_name_en", { ascending: true })
@@ -100,9 +101,9 @@ export function CreateInvoiceDialog({
   const patients = useMemo(
     () => patientRows.map((p: any) => ({
       id: p.id,
-      label: `${p.first_name_en ?? ""} ${p.last_name_en ?? ""}`.trim(),
+      label: patientDisplayName(p, lang),
     })),
-    [patientRows],
+    [patientRows, lang],
   );
 
   useEffect(() => {

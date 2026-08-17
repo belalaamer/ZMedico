@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { sanitizeSearch } from "@/lib/sanitizeSearch";
+import { patientDisplayName } from "@/lib/patientName";
 
 export type SearchHit = {
   id: string;
@@ -18,10 +19,7 @@ const LIMIT = 5;
 const ASSOC_LIMIT = 10;
 
 function patientName(p: any, lang: "en" | "ar"): string {
-  if (!p) return "—";
-  const en = `${p.first_name_en ?? ""} ${p.last_name_en ?? ""}`.trim();
-  const ar = `${p.first_name_ar ?? ""} ${p.last_name_ar ?? ""}`.trim();
-  return lang === "ar" ? (ar || en || "—") : (en || ar || "—");
+  return patientDisplayName(p, lang);
 }
 
 function isDigits(q: string): boolean {
@@ -53,7 +51,7 @@ export async function searchPatients(
 
   let query = supabase
     .from("patients")
-    .select("id,patient_code,first_name_en,last_name_en,first_name_ar,last_name_ar,phone,email")
+    .select("id,patient_code,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,phone,email")
     .is("deleted_at", null)
     .or(ors.join(","))
     .limit(LIMIT);

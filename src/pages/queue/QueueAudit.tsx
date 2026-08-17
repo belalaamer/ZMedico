@@ -13,6 +13,7 @@ import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { patientDisplayName } from "@/lib/patientName";
 
 const QUEUE_ACTIONS = [
   "status_change",
@@ -228,8 +229,8 @@ export default function QueueAuditPage() {
       (ap ?? []).forEach((a: any) => {
         const p = a.patients; if (!p) return;
         const name = lang === "ar"
-          ? `${p.first_name_ar ?? p.first_name_en} ${p.last_name_ar ?? p.last_name_en ?? ""}`.trim()
-          : `${p.first_name_en} ${p.last_name_en ?? ""}`.trim();
+          ? patientDisplayName(p, "ar")
+          : patientDisplayName(p, "en");
         map[a.id] = { name, code: p.patient_code };
       });
       setPatients(map);
@@ -341,8 +342,8 @@ export default function QueueAuditPage() {
           (ap ?? []).forEach((a: any) => {
             const p = a.patients; if (!p) return;
             const name = lang === "ar"
-              ? `${p.first_name_ar ?? p.first_name_en} ${p.last_name_ar ?? p.last_name_en ?? ""}`.trim()
-              : `${p.first_name_en} ${p.last_name_en ?? ""}`.trim();
+              ? patientDisplayName(p, "ar")
+              : patientDisplayName(p, "en");
             patientMap[a.id] = { name, code: p.patient_code };
           });
         }

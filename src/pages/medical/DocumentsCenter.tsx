@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/format";
+import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
 import { Link } from "react-router-dom";
 import { useDataSync } from "@/lib/dataSync";
 
@@ -27,12 +28,12 @@ export default function DocumentsCenter() {
 
   const load = async () => {
     const { data } = await supabase.from("patient_documents")
-      .select("*, patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)")
+      .select("*, patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code)")
       .order("created_at", { ascending: false }).limit(300);
     setDocs(data ?? []);
   };
   const loadPatients = () => {
-    supabase.from("patients").select("id,first_name_en,last_name_en,patient_code").is("deleted_at", null).order("created_at", { ascending: false }).limit(500)
+    supabase.from("patients").select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code").is("deleted_at", null).order("created_at", { ascending: false }).limit(500)
       .then(({ data }) => setPatients(data ?? []));
   };
   useEffect(() => {
@@ -113,7 +114,7 @@ export default function DocumentsCenter() {
           <div className="space-y-1.5"><Label>{t("filterByPatient")}</Label>
             <Select value={uploadPatient} onValueChange={setUploadPatient}>
               <SelectTrigger><SelectValue placeholder={t("selectPatient")}/></SelectTrigger>
-              <SelectContent>{patients.map((p) => <SelectItem key={p.id} value={p.id}>#{p.patient_code} · {p.first_name_en} {p.last_name_en ?? ""}</SelectItem>)}</SelectContent>
+              <SelectContent>{patients.map((p) => <SelectItem key={p.id} value={p.id}>#{p.patient_code} · {patientDisplayName(p, lang)}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="space-y-1.5"><Label>{t("documentType")}</Label>
@@ -156,7 +157,7 @@ export default function DocumentsCenter() {
           <SelectTrigger className="w-56"><SelectValue/></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{t("filterAll")}</SelectItem>
-            {patients.map((p) => <SelectItem key={p.id} value={p.id}>#{p.patient_code} · {p.first_name_en}</SelectItem>)}
+            {patients.map((p) => <SelectItem key={p.id} value={p.id}>#{p.patient_code} · {patientDisplayName(p, lang)}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -165,13 +166,13 @@ export default function DocumentsCenter() {
         <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
           {filtered.map((d) => {
             const p = d.patients;
-            const name = lang === "ar" ? `${p?.first_name_ar ?? p?.first_name_en ?? ""} ${p?.last_name_ar ?? p?.last_name_en ?? ""}` : `${p?.first_name_en ?? ""} ${p?.last_name_en ?? ""}`;
+            const name = patientDisplayName(p, lang);
             return (
               <Card key={d.id} className="p-3 shadow-card flex items-center gap-3">
                 <div className="size-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center"><FileText className="size-5"/></div>
                 <div className="flex-1 min-w-0">
                   <button onClick={() => open(d.file_url)} className="text-sm font-medium truncate text-start hover:underline block w-full">{lang === "ar" ? d.title_ar : d.title_en}</button>
-                  <Link to={`/patients/${d.patient_id}`} className="text-xs text-muted-foreground truncate hover:underline block">{name.trim()} · {formatDate(d.created_at, lang)}</Link>
+                  <Link to={`/patients/${d.patient_id}`} className="text-xs text-muted-foreground truncate hover:underline block"><span dir={patientDisplayDirection(p, lang)}>{name}</span> · {formatDate(d.created_at, lang)}</Link>
                 </div>
                 <Button variant="ghost" size="icon" onClick={() => remove(d)}><Trash2 className="size-4 text-destructive"/></Button>
               </Card>

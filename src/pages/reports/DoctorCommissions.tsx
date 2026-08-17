@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { formatMoney } from "@/lib/format";
+import { patientDisplayName } from "@/lib/patientName";
 import { ReportPageHeader, ReportFilterBar } from "./_shared";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { Wallet, TrendingUp, Award } from "lucide-react";
@@ -43,7 +44,7 @@ export default function DoctorCommissions() {
     (async () => {
       let q = (supabase as any)
         .from("doctor_commissions")
-        .select("id, doctor_id, base_amount, collected_amount, commission_amount, commission_percent, status, created_at, branch_id, procedures(name_en,name_ar), patients(first_name_en,last_name_en,first_name_ar,last_name_ar)")
+        .select("id, doctor_id, base_amount, collected_amount, commission_amount, commission_percent, status, created_at, branch_id, procedures(name_en,name_ar), patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language)")
         .gte("created_at", start)
         .lte("created_at", end + "T23:59:59")
         .order("created_at", { ascending: false })
@@ -67,10 +68,7 @@ export default function DoctorCommissions() {
     return d?.full_name ?? id?.slice(0, 8);
   };
 
-  const patientName = (p: any) =>
-    !p ? "—" : (lang === "ar"
-      ? `${p.first_name_ar ?? ""} ${p.last_name_ar ?? ""}`.trim() || `${p.first_name_en ?? ""} ${p.last_name_en ?? ""}`.trim()
-      : `${p.first_name_en ?? ""} ${p.last_name_en ?? ""}`.trim());
+  const patientName = (p: any) => p ? patientDisplayName(p, lang) : "—";
 
   const statusColor = (s: string) => s === "paid" ? "status-completed" : s === "earned" ? "status-confirmed" : s === "partial" ? "status-pending" : "status-departed";
 

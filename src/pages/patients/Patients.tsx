@@ -300,19 +300,22 @@ export default function PatientsPage() {
                   const due = duesByPatient[p.id] ?? 0;
                   return (
                     <TableRow key={p.id} className="hover:bg-muted/40">
-                      <TableCell className="min-w-0">
-                        <Link to={`/patients/${p.id}`} className="flex items-center gap-3 min-w-0">
-                          <div aria-hidden="true" className="size-10 rounded-full gradient-primary text-primary-foreground flex items-center justify-center font-semibold shrink-0">
+                      <TableCell className="min-w-0 p-2 sm:p-3">
+                        <Link to={`/patients/${p.id}`} className="flex items-center gap-2 sm:gap-3 min-w-0">
+                          <div aria-hidden="true" className="size-9 sm:size-10 rounded-full gradient-primary text-primary-foreground flex items-center justify-center font-semibold shrink-0">
                             {name.slice(0, 1).toUpperCase()}
                           </div>
                           <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span dir={nameDir} className="font-semibold truncate text-[15px]">{name}</span>
-                              <Badge variant="outline" className="text-[10px] shrink-0">#{p.patient_code}</Badge>
+                            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                              <span dir={nameDir} className="font-semibold truncate text-sm sm:text-[15px]">{name}</span>
+                              <Badge variant="outline" className="text-[10px] leading-4 px-1.5 shrink-0">#{p.patient_code}</Badge>
                             </div>
                             <div className="md:hidden text-xs text-muted-foreground truncate mt-0.5">
                               {p.phone || p.email || "—"}
                             </div>
+                            {due > 0 && <Badge className="md:hidden mt-1 text-[10px] leading-4 px-1.5 bg-destructive/10 text-destructive border border-destructive/30 tabular-nums">
+                              {lang === "ar" ? "متبقي" : "Due"} {due.toFixed(2)}
+                            </Badge>}
                           </div>
                         </Link>
                       </TableCell>

@@ -16,6 +16,7 @@ import { TablePager } from "@/components/TablePager";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatMoney } from "@/lib/format";
+import { patientDisplayName } from "@/lib/patientName";
 import { Info, AlertTriangle, ExternalLink } from "lucide-react";
 
 const PAGE_SIZE = 10;
@@ -121,14 +122,6 @@ function personDisplayName(person: Actor, hadId: boolean, lang: "ar" | "en" | st
   return hadId ? (lang === "ar" ? "مستخدم محذوف" : "Deleted user") : null;
 }
 
-function patientDisplayName(
-  p: { first_name_en?: string | null; last_name_en?: string | null; first_name_ar?: string | null; last_name_ar?: string | null },
-  lang: "ar" | "en" | string,
-) {
-  return lang === "ar"
-    ? `${p.first_name_ar ?? p.first_name_en ?? ""} ${p.last_name_ar ?? p.last_name_en ?? ""}`.trim()
-    : `${p.first_name_en ?? ""} ${p.last_name_en ?? ""}`.trim();
-}
 
 /** Batch-resolved lookup tables, one per entity kind we know how to name. */
 type RecordMaps = {
@@ -367,11 +360,11 @@ export default function AuditLogs() {
           ? supabase.from("invoices").select("id,invoice_number").in("id", Array.from(invoiceIds))
           : Promise.resolve(noRows),
         patientIds.size
-          ? supabase.from("patients").select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code").in("id", Array.from(patientIds))
+          ? supabase.from("patients").select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code").in("id", Array.from(patientIds))
           : Promise.resolve(noRows),
         medicalRecordIds.size
           ? (supabase as any).from("medical_records")
-              .select("id,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)")
+              .select("id,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code)")
               .in("id", Array.from(medicalRecordIds))
           : Promise.resolve(noRows),
         productIds.size

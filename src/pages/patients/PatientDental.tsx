@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Can } from "@/components/Can";
 import { logPhiAccess } from "@/lib/observability/phiAudit";
+import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
 
 const STATUS = [
   "healthy", "caries", "filled", "crown", "implant", "extracted", "root_canal", "bridge",
@@ -104,14 +105,13 @@ export default function PatientDental() {
   };
 
   if (!patient) return <div className="text-center text-muted-foreground py-10">…</div>;
-  const name = lang === "ar"
-    ? `${patient.first_name_ar ?? patient.first_name_en} ${patient.last_name_ar ?? patient.last_name_en ?? ""}`.trim()
-    : `${patient.first_name_en} ${patient.last_name_en ?? ""}`.trim();
+  const name = patientDisplayName(patient, lang);
+  const nameDirection = patientDisplayDirection(patient, lang);
 
   return (
     <div className="space-y-6 print:space-y-3">
       <div className="flex items-center justify-between flex-wrap gap-3 print:hidden">
-        <Button asChild variant="ghost" size="sm"><Link to={`/patients/${id}`}><ArrowLeft className="me-2 size-4"/>{name}</Link></Button>
+        <Button asChild variant="ghost" size="sm"><Link to={`/patients/${id}`}><ArrowLeft className="me-2 size-4"/><span dir={nameDirection}>{name}</span></Link></Button>
         <div className="flex items-center gap-2">
           <Button onClick={() => window.print()} variant="outline" size="sm"><Printer className="me-2 size-4"/>{t("print")}</Button>
         </div>
@@ -119,7 +119,7 @@ export default function PatientDental() {
 
       <Card className="p-6 shadow-card">
         <div className="flex items-baseline justify-between mb-4">
-          <h1 className="text-xl md:text-2xl font-bold">{t("dentalChart")} — {name}</h1>
+          <h1 className="text-xl md:text-2xl font-bold">{t("dentalChart")} — <span dir={nameDirection}>{name}</span></h1>
           <span className="text-xs text-muted-foreground">{t("fdiNotation")}</span>
         </div>
 

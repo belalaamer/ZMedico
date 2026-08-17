@@ -21,6 +21,7 @@ import { Can } from "@/components/Can";
 import { ListSkeleton } from "@/components/ListSkeleton";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { TablePager } from "@/components/TablePager";
+import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
 
 const PAGE_SIZE = 50;
 
@@ -32,7 +33,7 @@ type Inv = {
   paid_amount: number;
   status: "draft" | "pending" | "paid" | "partial" | "cancelled";
   patient_id: string;
-  patients?: { first_name_en: string; last_name_en: string | null; first_name_ar: string | null; last_name_ar: string | null; patient_code: number };
+  patients?: { first_name_en: string; last_name_en: string | null; first_name_ar: string | null; last_name_ar: string | null; name_language: "ar" | "en" | null; patient_code: number };
 };
 
 const statusClass: Record<Inv["status"], string> = {
@@ -67,7 +68,7 @@ export default function Invoices() {
     const from = page * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
     let query = supabase.from("invoices")
-      .select("id, invoice_number, invoice_date, total, paid_amount, status, patient_id, patients!inner(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)", { count: "exact" })
+      .select("id, invoice_number, invoice_date, total, paid_amount, status, patient_id, patients!inner(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code)", { count: "exact" })
       .is("deleted_at", null)
       .order("created_at", { ascending: false }).range(from, to);
     if (currentBranchId) query = query.eq("branch_id", currentBranchId);
@@ -175,9 +176,8 @@ export default function Invoices() {
           <div className="divide-y divide-border">
             {filtered.map((i) => {
               const p = i.patients!;
-              const name = lang === "ar"
-                ? `${p.first_name_ar ?? p.first_name_en} ${p.last_name_ar ?? p.last_name_en ?? ""}`.trim()
-                : `${p.first_name_en} ${p.last_name_en ?? ""}`.trim();
+              const name = patientDisplayName(p, lang);
+              const nameDirection = patientDisplayDirection(p, lang);
               const iconClass =
                 i.status === "paid" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                 : i.status === "partial" || i.status === "pending" ? "bg-warning/10 text-warning"
@@ -196,7 +196,7 @@ export default function Invoices() {
                       <div className="font-semibold tabular-nums">{i.invoice_number}</div>
                     </div>
                     <div className="text-xs text-muted-foreground truncate">
-                      {name} · {t("invoiceDate")}: {formatDate(i.invoice_date, lang)}
+                      <span dir={nameDirection}>{name}</span> · {t("invoiceDate")}: {formatDate(i.invoice_date, lang)}
                     </div>
                   </div>
                   <div className="text-end shrink-0">

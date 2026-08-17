@@ -21,6 +21,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { supabase } from "@/integrations/supabase/client";
 import { formatMoney, formatDate, formatDateTime } from "@/lib/format";
+import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
 
 type ApptStatus = "scheduled" | "confirmed" | "in_progress" | "completed" | "cancelled" | "no_show" | "departed";
 
@@ -180,13 +181,13 @@ export default function Dashboard() {
           .gte("payment_date", rangeStart).lte("payment_date", rangeEnd)),
         branchEq(supabase.from("appointments").select("status").is("deleted_at", null).gte("scheduled_at", rs.toISOString()).lte("scheduled_at", re.toISOString())),
         branchEq(supabase.from("patients").select("dob,referral_source").is("deleted_at", null)),
-        branchEq(supabase.from("patients").select("id,first_name_en,first_name_ar,last_name_en,last_name_ar,phone,created_at")
+        branchEq(supabase.from("patients").select("id,first_name_en,first_name_ar,last_name_en,last_name_ar,name_language,phone,created_at")
           .is("deleted_at", null)
           .order("created_at", { ascending: false }).limit(5)),
-        branchEq(supabase.from("appointments").select("id,scheduled_at,status,doctor_id,patient:patients(first_name_en,first_name_ar,last_name_en,last_name_ar)")
+        branchEq(supabase.from("appointments").select("id,scheduled_at,status,doctor_id,patient:patients(first_name_en,first_name_ar,last_name_en,last_name_ar,name_language)")
           .is("deleted_at", null)
           .order("created_at", { ascending: false }).limit(5)),
-        branchEq(supabase.from("payments").select("id,amount,payment_method,payment_date,patient:patients(first_name_en,first_name_ar,last_name_en,last_name_ar)")
+        branchEq(supabase.from("payments").select("id,amount,payment_method,payment_date,patient:patients(first_name_en,first_name_ar,last_name_en,last_name_ar,name_language)")
           .is("deleted_at", null)
           .order("created_at", { ascending: false }).limit(5)),
         branchEq(supabase.from("appointments").select("doctor_id,status")
@@ -393,23 +394,6 @@ export default function Dashboard() {
   const netTreasuryToday = todayTreasuryIn - todayTreasuryOut;
   const hasAttentionItems = (canFinance && pendingInvoicesCount > 0) || (canClinical && draftRecords > 0) || (canHR && pendingLeaveRequests > 0);
 
-  const fullName = (r: any) => {
-    if (!r) return "—";
-    const en = [r.first_name_en, r.last_name_en].filter(Boolean).join(" ").trim();
-    const ar = [r.first_name_ar, r.last_name_ar].filter(Boolean).join(" ").trim();
-    if (!ar && !en) return "—";
-    if (!ar || !en || ar === en) return ar || en;
-
-    // Keep the language used in the entered name when the two stored fields
-    // differ. This prevents Arabic mode from translating/overriding an
-    // English-only name (and vice versa) in activity lists.
-    const arabicPattern = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
-    const arHasArabic = arabicPattern.test(ar);
-    const enHasArabic = arabicPattern.test(en);
-    if (arHasArabic !== enHasArabic) return arHasArabic ? ar : en;
-
-    return lang === "ar" ? ar : en;
-  };
 
   const selectedRangeLabel = rangePreset === "7d"
     ? (lang === "ar" ? "آخر ٧ أيام" : "Last 7 days")
@@ -838,7 +822,7 @@ export default function Dashboard() {
                   {recentPatients.map((p) => (
                     <li key={p.id} className="py-2 flex items-center justify-between gap-2">
                       <div className="min-w-0">
-                        <Link to={`/patients/${p.id}`} className="font-medium text-sm hover:underline truncate block">{fullName(p)}</Link>
+                        <Link to={`/patients/${p.id}`} className="font-medium text-sm hover:underline truncate block"><span dir={patientDisplayDirection(p, lang)}>{patientDisplayName(p, lang)}</span></Link>
                         <div className="text-xs text-muted-foreground truncate">{p.phone || "—"}</div>
                       </div>
                       <div className="text-xs text-muted-foreground whitespace-nowrap">{formatDate(p.created_at, lang)}</div>
@@ -859,7 +843,7 @@ export default function Dashboard() {
                   {recentAppts.map((a) => (
                     <li key={a.id} className="py-2 flex items-center justify-between gap-2">
                       <div className="min-w-0">
-                        <div className="font-medium text-sm truncate">{fullName(a.patient)}</div>
+                        <div className="font-medium text-sm truncate"><span dir={patientDisplayDirection(a.patient, lang)}>{patientDisplayName(a.patient, lang)}</span></div>
                         <div className="text-xs text-muted-foreground truncate">{(a.doctor_id && doctorNames[a.doctor_id]) || "—"}</div>
                       </div>
                       <div className="text-end shrink-0">
@@ -884,7 +868,7 @@ export default function Dashboard() {
                   {recentPayments.map((p) => (
                     <li key={p.id} className="py-2 flex items-center justify-between gap-2">
                       <div className="min-w-0">
-                        <div className="font-medium text-sm truncate">{fullName(p.patient)}</div>
+                        <div className="font-medium text-sm truncate"><span dir={patientDisplayDirection(p.patient, lang)}>{patientDisplayName(p.patient, lang)}</span></div>
                         <div className="text-xs text-muted-foreground truncate">{paymentMethodLabel(p.payment_method, lang)} · {formatDate(p.payment_date, lang)}</div>
                       </div>
                       <div className="font-semibold text-sm tabular-nums text-success whitespace-nowrap">{formatMoney(p.amount, lang)}</div>

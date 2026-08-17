@@ -2,6 +2,7 @@
 // heavy PDF renderer is only fetched when the user clicks Print/Download.
 import invoiceArabicRegularUrl from "@/assets/fonts/NotoNaskhArabic-Regular.ttf";
 import invoiceArabicBoldUrl from "@/assets/fonts/NotoNaskhArabic-Bold.ttf";
+import { patientDisplayName } from "@/lib/patientName";
 
 type Lang = "en" | "ar";
 
@@ -128,9 +129,7 @@ export async function generateInvoicePdf(opts: {
   const isAr = lang === "ar";
   const dir = isAr ? "rtl" : "ltr";
   const remaining = +(Number(invoice.total) - Number(invoice.paid_amount)).toFixed(2);
-  const patientName = isAr
-    ? `${patient?.first_name_ar ?? patient?.first_name_en ?? ""} ${patient?.last_name_ar ?? patient?.last_name_en ?? ""}`.trim()
-    : `${patient?.first_name_en ?? ""} ${patient?.last_name_en ?? ""}`.trim();
+  const patientName = patientDisplayName(patient, isAr ? "ar" : "en");
   const branchName = (isAr ? branch?.name_ar : branch?.name_en) || branch?.name_en || branch?.name_ar || "ZMedico Clinic";
   const branchAddress = transliterateInvoiceAddress(branch?.address);
 

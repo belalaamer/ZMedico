@@ -19,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { subscribeResilient } from "@/lib/realtime";
 import { toast } from "sonner";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
+import { patientDisplayName } from "@/lib/patientName";
 import { buildStatusPatch, type ApptStatus } from "@/lib/appointmentStatus";
 import { logQueueAudit } from "@/lib/queueAudit";
 import { getQueueSettings, fetchQueueSettings, type QueueSettings } from "@/lib/queueSettings";
@@ -259,28 +260,19 @@ export default function QueuePage() {
     if (!walkInOpen || patientOptions.length > 0) return;
     supabase
       .from("patients")
-      .select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code,phone")
+      .select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code,phone")
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(500)
       .then(({ data }) => setPatientOptions((data ?? []) as any));
   }, [walkInOpen, patientOptions.length]);
 
-  const patientName = (r: QueueRow) => {
-    const p = r.patients;
-    if (!p) return "—";
-    if (lang === "ar") {
-      return `${p.first_name_ar ?? p.first_name_en} ${p.last_name_ar ?? p.last_name_en ?? ""}`.trim();
-    }
-    return `${p.first_name_en} ${p.last_name_en ?? ""}`.trim();
-  };
+  const patientName = (r: QueueRow) => patientDisplayName(r.patients, lang);
 
   const doctorName = (id: string | null) => doctors.find((d) => d.id === id)?.full_name ?? "—";
 
-  const patientDisplay = (p: { first_name_en: string; last_name_en: string | null; first_name_ar: string | null; last_name_ar: string | null }) =>
-    lang === "ar"
-      ? `${p.first_name_ar ?? p.first_name_en} ${p.last_name_ar ?? p.last_name_en ?? ""}`.trim()
-      : `${p.first_name_en} ${p.last_name_en ?? ""}`.trim();
+  const patientDisplay = (p: { first_name_en: string; last_name_en: string | null; first_name_ar: string | null; last_name_ar: string | null; name_language?: "ar" | "en" | null }) =>
+    patientDisplayName(p, lang);
 
   const filtered = useMemo(() => {
     const ACTIVE: ApptStatus[] = settings.showNoShowsInDefault

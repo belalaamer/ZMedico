@@ -25,6 +25,7 @@ import { RecordPaymentDialog } from "../payments/RecordPaymentDialog";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import PatientOverviewSnapshot from "./PatientOverviewSnapshot";
 import { logPhiAccess } from "@/lib/observability/phiAudit";
+import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
 
 const statusClass: Record<string, string> = {
   draft: "status-cancelled", pending: "status-review", paid: "status-completed", partial: "status-progress", cancelled: "status-departed",
@@ -136,9 +137,8 @@ export default function PatientProfile() {
 
   if (!patient) return <div className="text-center text-muted-foreground py-10">…</div>;
 
-  const name = lang === "ar"
-    ? `${patient.first_name_ar ?? patient.first_name_en} ${patient.last_name_ar ?? patient.last_name_en ?? ""}`.trim()
-    : `${patient.first_name_en} ${patient.last_name_en ?? ""}`.trim();
+  const name = patientDisplayName(patient, lang);
+  const nameDir = patientDisplayDirection(patient, lang);
 
   const totalPaid = payments.reduce((s, p) => s + Number(p.amount), 0);
   const totalOutstanding = invoices
@@ -203,7 +203,7 @@ export default function PatientProfile() {
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-2xl font-bold">{name}</h1>
+              <h1 dir={nameDir} className="text-2xl font-bold">{name}</h1>
             </div>
             <div className="text-sm text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
               {patient.phone && <span className="flex items-center gap-1"><Phone className="size-3" />{patient.phone}</span>}

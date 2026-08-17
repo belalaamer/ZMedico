@@ -1,5 +1,6 @@
 // html2canvas + jsPDF are loaded on-demand inside the exported async function
 // so the ~600 KB PDF stack is only fetched when the user actually prints / exports.
+import { patientDisplayName } from "@/lib/patientName";
 
 type Lang = "en" | "ar";
 
@@ -51,9 +52,7 @@ export async function generatePrescriptionPdf(opts: {
     doctor: isAr ? "الطبيب" : "Doctor",
     generated: isAr ? "تم الإنشاء" : "Generated",
   };
-  const pname = isAr
-    ? `${patient?.first_name_ar ?? patient?.first_name_en ?? ""} ${patient?.last_name_ar ?? patient?.last_name_en ?? ""}`.trim()
-    : `${patient?.first_name_en ?? ""} ${patient?.last_name_en ?? ""}`.trim();
+  const pname = patientDisplayName(patient, isAr ? "ar" : "en");
 
   const rows = items.map((it, i) => {
     const name = isAr

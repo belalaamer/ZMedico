@@ -26,6 +26,7 @@ import { ReferrerPicker } from "./ReferrerPicker";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { TablePager } from "@/components/TablePager";
 import { CreateInvoiceDialog } from "../invoices/CreateInvoiceDialog";
+import { containsArabicScript, patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
 
 const PAGE_SIZE = 50;
 
@@ -47,6 +48,7 @@ type Patient = {
   notes: string | null;
   branch_id: string | null;
   created_at: string;
+  name_language: "ar" | "en" | null;
 };
 
 const schema = z.object({
@@ -99,7 +101,7 @@ export default function PatientsPage() {
     // the same "most recently registered first" ordering intent while
     // guaranteeing the visible numbers are always in consistent order.
     let query = supabase.from("patients")
-      .select("id,patient_code,first_name_en,last_name_en,first_name_ar,last_name_ar,phone,phone2,email,gender,city,address,dob,blood_type,notes,branch_id,created_at", { count: "exact" })
+      .select("id,patient_code,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,phone,phone2,email,gender,city,address,dob,blood_type,notes,branch_id,created_at", { count: "exact" })
       .is("deleted_at", null).order("patient_code", { ascending: false }).range(from, to);
     if (currentBranchId) query = query.eq("branch_id", currentBranchId);
     const { data, error, count } = await query;
@@ -146,6 +148,7 @@ export default function PatientsPage() {
     const payload: any = {
       first_name_en: d.name,
       first_name_ar: d.name,
+      name_language: containsArabicScript(d.name) ? "ar" : "en",
       phone: d.phone,
       phone2: d.phone2 || null,
       email: d.email || null,
@@ -292,9 +295,8 @@ export default function PatientsPage() {
               </TableHeader>
               <TableBody>
                 {filtered.map((p) => {
-                  const name = lang === "ar"
-                    ? `${p.first_name_ar ?? p.first_name_en} ${p.last_name_ar ?? p.last_name_en ?? ""}`.trim()
-                    : `${p.first_name_en} ${p.last_name_en ?? ""}`.trim();
+                  const name = patientDisplayName(p, lang);
+                  const nameDir = patientDisplayDirection(p, lang);
                   const due = duesByPatient[p.id] ?? 0;
                   return (
                     <TableRow key={p.id} className="hover:bg-muted/40">
@@ -305,7 +307,7 @@ export default function PatientsPage() {
                           </div>
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="font-semibold truncate text-[15px]">{name}</span>
+                              <span dir={nameDir} className="font-semibold truncate text-[15px]">{name}</span>
                               <Badge variant="outline" className="text-[10px] shrink-0">#{p.patient_code}</Badge>
                             </div>
                             <div className="md:hidden text-xs text-muted-foreground truncate mt-0.5">

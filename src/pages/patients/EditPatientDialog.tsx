@@ -9,6 +9,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ReferrerPicker } from "./ReferrerPicker";
+import { containsArabicScript } from "@/lib/patientName";
 
 export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
   open: boolean; onOpenChange: (v: boolean) => void; patient: any; onSaved: () => void;
@@ -38,6 +39,7 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
   // Keeping the raw draft separate means the box shows what was typed; first and
   // last are still derived from it for storage.
   const [nameDraft, setNameDraft] = useState("");
+  const [nameTouched, setNameTouched] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -54,6 +56,7 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
 
   useEffect(() => {
     if (!patient) return;
+    setNameTouched(false);
     setForm({
       first_name_en: patient.first_name_en ?? "",
       last_name_en: patient.last_name_en ?? "",
@@ -93,6 +96,7 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
 
   const setName = (v: string) => {
     // Show the typed text verbatim, spaces included.
+    setNameTouched(true);
     setNameDraft(v);
     // Derive first / last for storage. Trimming here is correct: it only affects
     // what is saved, never what the box displays.
@@ -119,6 +123,7 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
       last_name_en: form.last_name_en || null,
       first_name_ar: form.first_name_ar || form.first_name_en,
       last_name_ar: form.last_name_ar || null,
+      ...(nameTouched ? { name_language: containsArabicScript(nameDraft) ? "ar" : "en" } : {}),
       phone: form.phone,
       phone2: form.phone2 || null,
       email: form.email || null,

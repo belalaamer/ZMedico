@@ -20,6 +20,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { reportClientError } from "@/lib/observability/reportError";
+import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
 
 type Inv = any;
 
@@ -75,9 +76,8 @@ export default function InvoiceDetail() {
   if (!inv) return <div className="text-center text-muted-foreground py-10">…</div>;
 
   const p = inv.patients;
-  const name = lang === "ar"
-    ? `${p?.first_name_ar ?? p?.first_name_en ?? ""} ${p?.last_name_ar ?? p?.last_name_en ?? ""}`.trim()
-    : `${p?.first_name_en ?? ""} ${p?.last_name_en ?? ""}`.trim();
+  const name = patientDisplayName(p, lang);
+  const nameDirection = patientDisplayDirection(p, lang);
   const remaining = +(Number(inv.total) - Number(inv.paid_amount)).toFixed(2);
   const statusLabel = ({ draft: t("statusDraft"), pending: t("statusPending"), paid: t("statusPaid"), partial: t("statusPartial"), cancelled: t("statusCancelled") } as any)[inv.status];
 
@@ -241,7 +241,7 @@ export default function InvoiceDetail() {
             <div className="text-xs text-muted-foreground">{t("invoiceDate")}</div>
             <div className="font-medium">{formatDate(inv.invoice_date, lang)}</div>
             <div className="text-xs text-muted-foreground mt-2">{t("patientName")}</div>
-            <div className="font-medium">{name}</div>
+            <div className="font-medium" dir={nameDirection}>{name}</div>
           </div>
         </div>
 

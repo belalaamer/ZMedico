@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { useI18n } from "@/contexts/I18nContext";
 import { Combobox } from "@/components/ui/combobox";
 import { supabase } from "@/integrations/supabase/client";
+import { patientDisplayName } from "@/lib/patientName";
 
 /**
  * Searchable picker for another patient (used as "Referred by").
@@ -17,6 +19,7 @@ export function ReferrerPicker({
   placeholder?: string;
   searchPlaceholder?: string;
 }) {
+  const { lang } = useI18n();
   const [options, setOptions] = useState<{ value: string; label: string }[]>([]);
 
   useEffect(() => {
@@ -24,7 +27,7 @@ export function ReferrerPicker({
     (async () => {
       let q = (supabase as any)
         .from("patients")
-        .select("id,patient_code,first_name_en,last_name_en,first_name_ar,last_name_ar,phone,deleted_at,branch_id")
+        .select("id,patient_code,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,phone,deleted_at,branch_id")
         .is("deleted_at", null)
         .order("created_at", { ascending: false })
         .limit(500);
@@ -34,7 +37,7 @@ export function ReferrerPicker({
       const rows = (data ?? [])
         .filter((p: any) => !excludeId || p.id !== excludeId)
         .map((p: any) => {
-          const name = `${p.first_name_en ?? p.first_name_ar ?? ""} ${p.last_name_en ?? p.last_name_ar ?? ""}`.trim();
+          const name = patientDisplayName(p, lang);
           const phone = p.phone ? ` · ${p.phone}` : "";
           return { value: p.id, label: `${name}${phone}` };
         });
@@ -42,20 +45,20 @@ export function ReferrerPicker({
       if (value && !rows.find((r) => r.value === value)) {
         const { data: cur } = await (supabase as any)
           .from("patients")
-          .select("id,patient_code,first_name_en,last_name_ar,phone")
+          .select("id,patient_code,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,phone")
           .eq("id", value)
           .maybeSingle();
         if (cur) {
           rows.unshift({
             value: cur.id,
-            label: `${cur.first_name_en ?? cur.last_name_ar ?? ""}${cur.phone ? " · " + cur.phone : ""}`,
+            label: `${patientDisplayName(cur, lang)}${cur.phone ? " · " + cur.phone : ""}`,
           });
         }
       }
       setOptions(rows);
     })();
     return () => { active = false; };
-  }, [branchId, excludeId, value]);
+  }, [branchId, excludeId, value, lang]);
 
   return (
     <Combobox

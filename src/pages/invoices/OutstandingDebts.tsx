@@ -14,6 +14,7 @@ import { useDataSync } from "@/lib/dataSync";
 import { ListSkeleton } from "@/components/ListSkeleton";
 import { openWhatsApp, invoiceWhatsAppMessage } from "@/lib/whatsapp";
 import { Can } from "@/components/Can";
+import { patientDisplayName, patientDisplayDirection } from "@/lib/patientName";
 
 type Row = {
   id: string;
@@ -26,7 +27,8 @@ type Row = {
   patients?: {
     first_name_en: string; last_name_en: string | null;
     first_name_ar: string | null; last_name_ar: string | null;
-    patient_code: number; phone: string | null;
+    patient_code: number; phone: string | null; name_language?: "ar" | "en" | null;
+
   };
 };
 
@@ -41,7 +43,7 @@ export default function OutstandingDebts() {
   const load = async () => {
     setLoading(true);
     let q = supabase.from("invoices")
-      .select("id,invoice_number,invoice_date,total,paid_amount,status,patient_id,patients!inner(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code,phone)")
+      .select("id,invoice_number,invoice_date,total,paid_amount,status,patient_id,patients!inner(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code,phone)")
       .is("deleted_at", null)
       .in("status", ["pending", "partial"])
       .order("invoice_date", { ascending: false })
@@ -62,9 +64,7 @@ export default function OutstandingDebts() {
 
   const sendReminder = (r: Row) => {
     const p = r.patients!;
-    const name = lang === "ar"
-      ? `${p.first_name_ar ?? p.first_name_en} ${p.last_name_ar ?? p.last_name_en ?? ""}`.trim()
-      : `${p.first_name_en} ${p.last_name_en ?? ""}`.trim();
+    const name = patientDisplayName(p, lang);
     const remaining = (Number(r.total) - Number(r.paid_amount)).toFixed(2);
     if (!p.phone) { toast.error(lang === "ar" ? "لا يوجد رقم هاتف" : "No phone on file"); return; }
     const link = `${window.location.origin}/invoices/${r.id}`;
@@ -103,9 +103,8 @@ export default function OutstandingDebts() {
           <div className="divide-y divide-border">
             {rows.map((r) => {
               const p = r.patients!;
-              const name = lang === "ar"
-                ? `${p.first_name_ar ?? p.first_name_en} ${p.last_name_ar ?? p.last_name_en ?? ""}`.trim()
-                : `${p.first_name_en} ${p.last_name_en ?? ""}`.trim();
+              const name = patientDisplayName(p, lang);
+              const nameDirection = patientDisplayDirection(p, lang);
               const outstanding = Number(r.total) - Number(r.paid_amount);
               return (
                 <div key={r.id} className="flex items-center gap-4 p-4 hover:bg-muted/40 transition-colors flex-wrap">
@@ -121,7 +120,7 @@ export default function OutstandingDebts() {
                         </Badge>
                       </div>
                       <div className="text-xs text-muted-foreground truncate">
-                        {name} · {formatDate(r.invoice_date, lang)}
+                        <span dir={nameDirection}>{name}</span> · {formatDate(r.invoice_date, lang)}
                       </div>
                     </div>
                     <div className="text-end hidden sm:block">

@@ -8,6 +8,7 @@ import { useBranch } from "@/contexts/BranchContext";
 import { formatMoney } from "@/lib/format";
 import { ReportPageHeader, ReportFilterBar, StatCard } from "./_shared";
 import { exportReportPDF, exportReportExcel } from "@/lib/reportExport";
+import { doctorDisplayName, type DoctorNameFields } from "@/lib/doctorName";
 
 type Row = {
   doctor_id: string;
@@ -37,8 +38,8 @@ export default function DoctorPerformance() {
       const { data: roles } = await supabase.from("user_roles").select("user_id").eq("role", "doctor");
       const docIds = Array.from(new Set((roles ?? []).map((r: any) => r.user_id).filter(Boolean)));
       if (!docIds.length) { setRows([]); return; }
-      const { data: profs } = await supabase.from("profiles").select("id, full_name").in("id", docIds);
-      const nameMap = new Map<string, string>((profs ?? []).map((p: any) => [p.id, p.full_name ?? p.id.slice(0, 8)]));
+      const { data: profs } = await supabase.from("profiles").select("id, full_name, full_name_en, full_name_ar").in("id", docIds);
+      const nameMap = new Map<string, DoctorNameFields>((profs ?? []).map((p: any) => [p.id, p]));
 
       // Assigned patient counts
       let aq = supabase.from("patients").select("id, assigned_doctor_id").is("deleted_at", null).not("assigned_doctor_id", "is", null);
@@ -127,7 +128,7 @@ export default function DoctorPerformance() {
         const cm = commMap.get(id) ?? { revenue: 0, commissions: 0 };
         return {
           doctor_id: id,
-          name: nameMap.get(id) ?? id.slice(0, 8),
+          name: nameMap.has(id) ? doctorDisplayName(nameMap.get(id)!, lang) : id.slice(0, 8),
           assigned: assignedMap.get(id) ?? 0,
           unique_visits: uniquePatients,
           total_visits: totalVisits,

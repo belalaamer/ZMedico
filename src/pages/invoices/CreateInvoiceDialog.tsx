@@ -20,6 +20,7 @@ import { useDataSync } from "@/lib/dataSync";
 import { fetchActiveContract, resolveAllLines, distributeClaim, type LineForCoverage } from "@/lib/insuranceContracts";
 import { Badge } from "@/components/ui/badge";
 import { patientDisplayName } from "@/lib/patientName";
+import { doctorDisplayName } from "@/lib/doctorName";
 
 type Item = {
   item_type: "service" | "product" | "procedure";
@@ -38,7 +39,7 @@ export function CreateInvoiceDialog({
   const { user } = useAuth();
   const [products, setProducts] = useState<any[]>([]);
   const [procedures, setProcedures] = useState<any[]>([]);
-  const [doctors, setDoctors] = useState<Array<{ id: string; full_name: string | null }>>([]);
+  const [doctors, setDoctors] = useState<Array<{ id: string; full_name: string | null; full_name_en?: string | null; full_name_ar?: string | null }>>([]);
   const [doctorId, setDoctorId] = useState<string>("");
   const [stocks, setStocks] = useState<Record<string, number>>({});
   const [patientId, setPatientId] = useState<string>(presetPatientId ?? "");
@@ -454,7 +455,7 @@ export function CreateInvoiceDialog({
               onChange={(v) => setDoctorId(v === "__none__" ? "" : v)}
               options={[
                 { value: "__none__", label: lang === "ar" ? "بدون طبيب / بيع عام" : "No Doctor / General Sale" },
-                ...doctors.map((d) => ({ value: d.id, label: d.full_name || "—" })),
+                ...doctors.map((d) => ({ value: d.id, label: doctorDisplayName(d, lang) })),
               ]}
               placeholder={lang === "ar" ? "اختر الطبيب" : "Select doctor"}
               searchPlaceholder={lang === "ar" ? "ابحث عن طبيب..." : "Search doctor..."}

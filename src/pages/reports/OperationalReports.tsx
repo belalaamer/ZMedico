@@ -6,6 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { formatMoney, formatDateTime } from "@/lib/format";
+import { patientDisplayName } from "@/lib/patientName";
+import { doctorDisplayName } from "@/lib/doctorName";
 import { ReportFilterBar, ReportPageHeader, StatCard } from "./_shared";
 import { defaultDateRange, exportReportPDF, exportReportExcel, CHART_COLORS } from "@/lib/reportExport";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, Legend } from "recharts";
@@ -38,7 +40,7 @@ function ApptsTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
   const [rows, setRows] = useState<any[]>([]);
   useEffect(() => {
     let q = supabase.from("appointments")
-      .select("id, scheduled_at, status, doctor_id, patients(first_name_en, last_name_en, first_name_ar, last_name_ar), profiles!appointments_doctor_id_fkey(full_name)")
+      .select("id, scheduled_at, status, doctor_id, patients(first_name_en, last_name_en, first_name_ar, last_name_ar, name_language), profiles!appointments_doctor_id_fkey(full_name,full_name_en,full_name_ar)")
       .is("deleted_at", null)
       .gte("scheduled_at", start).lte("scheduled_at", end + "T23:59:59");
     if (branchId) q = q.eq("branch_id", branchId);
@@ -57,7 +59,7 @@ function ApptsTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
 
   const cols = [{ header: t("date"), key: "d" }, { header: t("patient"), key: "p" }, { header: t("status"), key: "s" }];
   const expRows = rows.map((r) => ({
-    d: r.scheduled_at, p: lang === "ar" ? `${r.patients?.first_name_ar ?? ""} ${r.patients?.last_name_ar ?? ""}` : `${r.patients?.first_name_en ?? ""} ${r.patients?.last_name_en ?? ""}`,
+    d: r.scheduled_at, p: patientDisplayName(r.patients, lang),
     s: r.status,
   }));
 
@@ -86,7 +88,7 @@ function ApptsTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
         <TableBody>{rows.map((r) => (
           <TableRow key={r.id}>
             <TableCell>{formatDateTime(r.scheduled_at, lang)}</TableCell>
-            <TableCell>{lang === "ar" ? `${r.patients?.first_name_ar ?? ""} ${r.patients?.last_name_ar ?? ""}` : `${r.patients?.first_name_en ?? ""} ${r.patients?.last_name_en ?? ""}`}</TableCell>
+            <TableCell>{patientDisplayName(r.patients, lang)}</TableCell>
             <TableCell><span className="text-xs px-2 py-0.5 rounded bg-muted">{r.status}</span></TableCell>
           </TableRow>
         ))}{!rows.length && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">{t("noData")}</TableCell></TableRow>}</TableBody></Table>
@@ -102,12 +104,12 @@ function DoctorTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
       // Strict role verification: fetch only users with the "doctor" role.
       const { data: doctorRoleRows } = await supabase
         .from("user_roles")
-        .select("user_id, profiles!user_roles_user_id_fkey(id, full_name)")
+        .select("user_id, profiles!user_roles_user_id_fkey(id, full_name, full_name_en, full_name_ar)")
         .eq("role", "doctor");
       const counts = new Map<string, { name: string; count: number; revenue: number }>();
       (doctorRoleRows ?? []).forEach((r: any) => {
         const id = r.user_id;
-        const name = r.profiles?.full_name ?? "—";
+        const name = doctorDisplayName(r.profiles, lang);
         if (id) counts.set(id, { name, count: 0, revenue: 0 });
       });
 

@@ -8,7 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ChevronLeft, ChevronRight, Plus, Send, CalendarDays, LayoutGrid, Clock, Filter, X, CalendarRange, Check, ChevronsUpDown, ArrowRight, Wallet as WalletIcon, AlertCircle, History } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Fab } from "@/components/ui/fab";
+import { Can } from "@/components/Can";
+import { doctorDisplayName } from "@/lib/doctorName";
+import { patientDisplayName } from "@/lib/patientName";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -134,7 +136,7 @@ export default function CalendarPage() {
   const [monthCursor, setMonthCursor] = useState<Date>(startOfMonth(new Date()));
   const [items, setItems] = useState<Appt[]>([]);
   const [highlightId, setHighlightId] = useState<string | null>(null);
-  const [doctors, setDoctors] = useState<{ id: string; full_name: string }[]>([]);
+  const [doctors, setDoctors] = useState<{ id: string; full_name: string | null; full_name_en?: string | null; full_name_ar?: string | null }[]>([]);
   const [doctorFilter, setDoctorFilter] = useState<string>("all");
   // Doctor-centric default (FINAL-03 UX audit): mirrors the existing,
   // already-shipped Queue.tsx pattern (see doctorDefaultApplied there) so a
@@ -265,7 +267,7 @@ export default function CalendarPage() {
     const start = rangeStart.toISOString();
     const end = rangeEnd.toISOString();
     let q = supabase.from("appointments")
-      .select("*, patients!inner(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code,deleted_at)")
+      .select("*, patients!inner(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code,deleted_at)")
       .gte("scheduled_at", start).lt("scheduled_at", end)
       .is("deleted_at", null)
       .is("patients.deleted_at", null)
@@ -288,6 +290,8 @@ export default function CalendarPage() {
       const list = ((data ?? []) as any[]).map((p: any) => ({
         id: p.id,
         full_name: p.full_name ?? p.id.slice(0, 8),
+        full_name_en: p.full_name_en ?? null,
+        full_name_ar: p.full_name_ar ?? null,
       }));
       list.sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
       setDoctors(list);
@@ -360,10 +364,10 @@ export default function CalendarPage() {
   useDataSync(["appointments"], () => loadMonthDots());
 
   const loadPatientOptions = () => {
-    supabase.from("patients").select("id,first_name_en,last_name_en").is("deleted_at", null).order("created_at", { ascending: false }).limit(200)
-      .then(({ data }) => setPatients((data ?? []).map((p: any) => ({ id: p.id, label: `${p.first_name_en} ${p.last_name_en ?? ""}`.trim() }))));
+    supabase.from("patients").select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language").is("deleted_at", null).order("created_at", { ascending: false }).limit(200)
+      .then(({ data }) => setPatients((data ?? []).map((p: any) => ({ id: p.id, label: patientDisplayName(p, lang) }))));
   };
-  useEffect(() => { loadPatientOptions(); }, []);
+  useEffect(() => { loadPatientOptions(); }, [lang]);
   useDataSync(["patients"], () => loadPatientOptions());
 
   // Load procedures + distinct rooms
@@ -494,8 +498,8 @@ export default function CalendarPage() {
     let reminderId = existing?.id as string | undefined;
     if (!reminderId) {
       const p = a.patients!;
-      const nameEn = `${p.first_name_en} ${p.last_name_en ?? ""}`.trim();
-      const nameAr = `${p.first_name_ar ?? p.first_name_en} ${p.last_name_ar ?? p.last_name_en ?? ""}`.trim();
+      const nameEn = patientDisplayName(p, "en");
+      const nameAr = patientDisplayName(p, "ar");
       const when = new Date(a.scheduled_at).toLocaleString();
       const { data: ins, error: insErr } = await supabase.from("reminders").insert({
         appointment_id: a.id, patient_id: a.patient_id, branch_id: currentBranchId,
@@ -665,9 +669,7 @@ export default function CalendarPage() {
 
   const timeStr = (d: Date) => d.toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US",
     { hour: "2-digit", minute: "2-digit", hour12: true });
-  const fullName = (p: NonNullable<Appt["patients"]>) => lang === "ar"
-    ? `${p.first_name_ar ?? p.first_name_en} ${p.last_name_ar ?? p.last_name_en ?? ""}`.trim()
-    : `${p.first_name_en} ${p.last_name_en ?? ""}`.trim();
+  const fullName = (p: NonNullable<Appt["patients"]>) => patientDisplayName(p, lang);
 
   const renderApptBlock = (a: Appt, lane = 0, lanes = 1) => {
     const { style, isOutOfHours } = blockStyle(a, lane, lanes);
@@ -911,7 +913,7 @@ export default function CalendarPage() {
                   <Combobox
                     value={form.doctor_id}
                     onChange={(v) => setForm({ ...form, doctor_id: v })}
-                    options={doctors.map((d) => ({ value: d.id, label: d.full_name }))}
+                    options={doctors.map((d) => ({ value: d.id, label: doctorDisplayName(d, lang) }))}
                     placeholder={lang === "ar" ? "— بدون —" : "— None —"}
                     searchPlaceholder={lang === "ar" ? "ابحث عن طبيب..." : "Search doctor..."}
                     emptyText={lang === "ar" ? "لا يوجد أطباء" : "No doctors found"}
@@ -1050,7 +1052,7 @@ export default function CalendarPage() {
               <SelectItem value={user.id}>{lang === "ar" ? "جدولي" : "My schedule"}</SelectItem>
             )}
             <SelectItem value="__none__">{lang === "ar" ? "بدون طبيب" : "Unassigned"}</SelectItem>
-            {doctors.map((d) => <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>)}
+            {doctors.map((d) => <SelectItem key={d.id} value={d.id}>{doctorDisplayName(d, lang)}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={roomFilter} onValueChange={setRoomFilter}>

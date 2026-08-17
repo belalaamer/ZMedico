@@ -12,6 +12,7 @@ import { formatDate } from "@/lib/format";
 import { generatePrescriptionPdf } from "@/lib/prescriptionPdf";
 import { openWhatsApp, prescriptionWhatsAppMessage } from "@/lib/whatsapp";
 import { logPhiAccess } from "@/lib/observability/phiAudit";
+import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
 
 export default function PrescriptionDetail() {
   const { id } = useParams();
@@ -42,9 +43,8 @@ export default function PrescriptionDetail() {
 
   if (!rx || !patient) return <div className="text-center text-muted-foreground py-10">…</div>;
 
-  const name = lang === "ar"
-    ? `${patient.first_name_ar ?? patient.first_name_en} ${patient.last_name_ar ?? patient.last_name_en ?? ""}`.trim()
-    : `${patient.first_name_en} ${patient.last_name_en ?? ""}`.trim();
+  const name = patientDisplayName(patient, lang);
+  const nameDirection = patientDisplayDirection(patient, lang);
 
   const print = () => generatePrescriptionPdf({ prescription: rx, items, patient, lang });
 
@@ -104,7 +104,7 @@ export default function PrescriptionDetail() {
         <div className="flex justify-between flex-wrap gap-3 mb-4">
           <div>
             <div className="text-xs text-muted-foreground uppercase">{t("rxFor")}</div>
-            <Link to={`/patients/${patient.id}`} className="font-bold text-lg hover:underline">{name}</Link>
+            <Link to={`/patients/${patient.id}`} className="font-bold text-lg hover:underline" dir={nameDirection}>{name}</Link>
           </div>
           <div className="text-end">
             <div className="text-xs text-muted-foreground uppercase">{t("rxDate")}</div>

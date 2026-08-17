@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { Can } from "@/components/Can";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { TablePager } from "@/components/TablePager";
+import { patientDisplayName, patientDisplayDirection } from "@/lib/patientName";
 
 const PAGE_SIZE = 50;
 
@@ -30,7 +31,7 @@ export default function MedicalRecords() {
     const from = page * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
     let q = supabase.from("medical_records")
-      .select("*, patients(id,patient_code,first_name_en,last_name_en,first_name_ar,last_name_ar), medical_specialties(name_en,name_ar)", { count: "exact" })
+      .select("*, patients(id,patient_code,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language), medical_specialties(name_en,name_ar)", { count: "exact" })
       .is("deleted_at", null).order("visit_date", { ascending: false }).range(from, to);
     if (currentBranchId) q = q.eq("branch_id", currentBranchId);
     q.then(({ data, count }) => { setItems(data ?? []); setTotal(count ?? 0); });
@@ -62,13 +63,14 @@ export default function MedicalRecords() {
           <div className="divide-y divide-border">
             {items.map((r) => {
               const p = r.patients;
-              const name = lang === "ar" ? `${p?.first_name_ar ?? p?.first_name_en ?? ""} ${p?.last_name_ar ?? p?.last_name_en ?? ""}`.trim() : `${p?.first_name_en ?? ""} ${p?.last_name_en ?? ""}`.trim();
+              const name = patientDisplayName(p, lang);
+              const nameDirection = patientDisplayDirection(p, lang);
               return (
                 <div key={r.id} className="flex items-center gap-4 p-4 hover:bg-muted/40 transition-colors">
                   <Link to={`/medical/records/${r.id}`} className="flex items-center gap-4 flex-1 min-w-0">
                   <FileText className="size-5 text-muted-foreground" />
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium">{name} <span className="text-xs text-muted-foreground">#{p?.patient_code}</span></div>
+                    <div className="font-medium" dir={nameDirection}>{name} <span className="text-xs text-muted-foreground">#{p?.patient_code}</span></div>
                     <div className="text-xs text-muted-foreground">{formatDate(r.visit_date, lang)} · {r.medical_specialties ? (lang === "ar" ? r.medical_specialties.name_ar : r.medical_specialties.name_en) : "—"}</div>
                   </div>
                   <Badge variant="outline">{t(("visit_" + r.visit_type) as any) ?? r.visit_type}</Badge>

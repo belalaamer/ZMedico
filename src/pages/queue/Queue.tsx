@@ -20,6 +20,7 @@ import { subscribeResilient } from "@/lib/realtime";
 import { toast } from "sonner";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { patientDisplayName } from "@/lib/patientName";
+import { doctorDisplayName } from "@/lib/doctorName";
 import { buildStatusPatch, type ApptStatus } from "@/lib/appointmentStatus";
 import { logQueueAudit } from "@/lib/queueAudit";
 import { getQueueSettings, fetchQueueSettings, type QueueSettings } from "@/lib/queueSettings";
@@ -111,7 +112,7 @@ export default function QueuePage() {
   // unnoticed for admin testing.
   const canMutate = authz.can("appointments.edit");
   const [rows, setRows] = useState<QueueRow[]>([]);
-  const [doctors, setDoctors] = useState<{ id: string; full_name: string }[]>([]);
+  const [doctors, setDoctors] = useState<{ id: string; full_name: string | null; full_name_en?: string | null; full_name_ar?: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<"active" | "all" | ApptStatus>("active");
   const [doctorFilter, setDoctorFilter] = useState<string>("all");
@@ -188,7 +189,7 @@ export default function QueuePage() {
     const to = endOfDay(new Date()).toISOString();
     let q: any = supabase
       .from("appointments")
-      .select("id,patient_id,doctor_id,branch_id,room,scheduled_at,status,procedure,priority,checked_in_at,started_at,is_walk_in,patients!inner(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code,deleted_at)")
+      .select("id,patient_id,doctor_id,branch_id,room,scheduled_at,status,procedure,priority,checked_in_at,started_at,is_walk_in,patients!inner(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code,deleted_at)")
       .is("deleted_at", null)
       .is("patients.deleted_at", null)
       .gte("scheduled_at", from)
@@ -221,18 +222,18 @@ export default function QueuePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentBranchId]);
 
-  // doctors for filter
+  // Doctors are loaded through the branch-scoped SECURITY DEFINER RPC so the
+  // filter cannot reveal doctors outside the caller's permitted branches.
   useEffect(() => {
-    supabase
-      .from("staff_profiles")
-      .select("id,full_name,position_id,staff_positions(name_en,is_medical)")
-      .order("full_name")
-      .then(({ data }) => {
-        const list = (data ?? [])
-          .filter((s: any) => s?.staff_positions?.is_medical)
-          .map((s: any) => ({ id: s.id, full_name: s.full_name }));
-        setDoctors(list);
-      });
+    supabase.rpc("list_doctors").then(({ data }) => {
+      const list = ((data ?? []) as any[]).map((d: any) => ({
+        id: d.id,
+        full_name: d.full_name ?? null,
+        full_name_en: d.full_name_en ?? null,
+        full_name_ar: d.full_name_ar ?? null,
+      }));
+      setDoctors(list);
+    });
   }, []);
 
   // If the signed-in user IS one of the doctors, default the view to "My queue"
@@ -269,7 +270,10 @@ export default function QueuePage() {
 
   const patientName = (r: QueueRow) => patientDisplayName(r.patients, lang);
 
-  const doctorName = (id: string | null) => doctors.find((d) => d.id === id)?.full_name ?? "—";
+  const doctorName = (id: string | null) => {
+    const doctor = doctors.find((d) => d.id === id);
+    return doctor ? doctorDisplayName(doctor, lang) : "—";
+  };
 
   const patientDisplay = (p: { first_name_en: string; last_name_en: string | null; first_name_ar: string | null; last_name_ar: string | null; name_language?: "ar" | "en" | null }) =>
     patientDisplayName(p, lang);
@@ -662,7 +666,7 @@ export default function QueuePage() {
                   <SelectItem value={user.id}>{t("queueViewMine")}</SelectItem>
                 )}
                 {doctors.map((d) => (
-                  <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>
+                  <SelectItem key={d.id} value={d.id}>{doctorDisplayName(d, lang)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -911,7 +915,7 @@ export default function QueuePage() {
             <div className="space-y-1.5">
               <Label>{t("selectDoctorOptional")}</Label>
               <Combobox
-                options={[{ value: "", label: "—" }, ...doctors.map((d) => ({ value: d.id, label: d.full_name }))]}
+                options={[{ value: "", label: "—" }, ...doctors.map((d) => ({ value: d.id, label: doctorDisplayName(d, lang) }))]}
                 value={walkInDoctor}
                 onChange={setWalkInDoctor}
                 placeholder={t("selectDoctorOptional")}
@@ -946,7 +950,7 @@ export default function QueuePage() {
             <div className="space-y-1.5">
               <Label>{t("doctor")}</Label>
               <Combobox
-                options={[{ value: "", label: `— ${t("unassigned")} —` }, ...doctors.map((d) => ({ value: d.id, label: d.full_name }))]}
+                options={[{ value: "", label: `— ${t("unassigned")} —` }, ...doctors.map((d) => ({ value: d.id, label: doctorDisplayName(d, lang) }))]}
                 value={reassignDoctor}
                 onChange={setReassignDoctor}
                 placeholder={t("selectDoctorOptional")}

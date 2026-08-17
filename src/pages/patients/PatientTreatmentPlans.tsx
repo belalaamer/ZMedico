@@ -19,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatDate, formatMoney } from "@/lib/format";
 import { toast } from "sonner";
 import { Can } from "@/components/Can";
+import { doctorDisplayName } from "@/lib/doctorName";
 
 type Plan = any;
 type Session = any;
@@ -29,7 +30,7 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
   const { user } = useAuth();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [sessionsByPlan, setSessionsByPlan] = useState<Record<string, Session[]>>({});
-  const [doctors, setDoctors] = useState<{ id: string; full_name: string }[]>([]);
+  const [doctors, setDoctors] = useState<{ id: string; full_name: string; full_name_en?: string | null; full_name_ar?: string | null }[]>([]);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name_ar: "", name_en: "", doctor_id: "", total_sessions: 10, price: 0, start_date: new Date().toISOString().slice(0, 10) });
@@ -69,6 +70,8 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
       const list = ((data ?? []) as any[]).map((p: any) => ({
         id: p.id,
         full_name: p.full_name ?? p.id.slice(0, 8),
+        full_name_en: p.full_name_en ?? null,
+        full_name_ar: p.full_name_ar ?? null,
       }));
       list.sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
       setDoctors(list);
@@ -256,7 +259,7 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
                   <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">— {lang === "ar" ? "لا يوجد" : "None"} —</SelectItem>
-                    {doctors.map((d) => <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>)}
+                    {doctors.map((d) => <SelectItem key={d.id} value={d.id}>{doctorDisplayName(d, lang)}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -291,7 +294,7 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
                       <Badge variant="outline" className={statusBadge(p.status)}>{p.status}</Badge>
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
-                      {doc?.full_name ?? "—"} · {formatDate(p.start_date, lang)} · {formatMoney(p.price, lang)}
+                      {doc ? doctorDisplayName(doc, lang) : "—"} · {formatDate(p.start_date, lang)} · {formatMoney(p.price, lang)}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">

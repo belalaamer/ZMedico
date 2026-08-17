@@ -102,7 +102,7 @@ export async function searchInvoices(
 
   let qByNumber = supabase
     .from("invoices")
-    .select("id,invoice_number,status,total,paid_amount,patient_id,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)")
+    .select("id,invoice_number,status,total,paid_amount,patient_id,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code)")
     .is("deleted_at", null)
     .ilike("invoice_number", `%${eq}%`)
     .limit(LIMIT);
@@ -112,7 +112,7 @@ export async function searchInvoices(
   if (patientIds.length) {
     let qByPatient = supabase
       .from("invoices")
-      .select("id,invoice_number,status,total,paid_amount,patient_id,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)")
+      .select("id,invoice_number,status,total,paid_amount,patient_id,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code)")
       .is("deleted_at", null)
       .in("patient_id", patientIds)
       .order("issue_date", { ascending: false })
@@ -153,7 +153,7 @@ export async function searchAppointments(
   const to = new Date(); to.setDate(to.getDate() + 90);
   let query = supabase
     .from("appointments")
-    .select("id,scheduled_at,status,procedure,patient_id,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)")
+    .select("id,scheduled_at,status,procedure,patient_id,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code)")
     .is("deleted_at", null)
     .in("patient_id", patientIds)
     .gte("scheduled_at", from.toISOString())
@@ -184,7 +184,7 @@ export async function searchPayments(
   if (!patientIds.length) return [];
   let query = supabase
     .from("payments")
-    .select("id,amount,payment_method,payment_date,patient_id,invoice_id,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code),invoices(invoice_number)")
+    .select("id,amount,payment_method,payment_date,patient_id,invoice_id,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code),invoices(invoice_number)")
     .is("deleted_at", null)
     .in("patient_id", patientIds)
     .order("payment_date", { ascending: false })
@@ -208,7 +208,7 @@ export async function searchMedicalRecords(
   if (!patientIds.length) return [];
   let query = supabase
     .from("medical_records")
-    .select("id,visit_date,status,patient_id,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)")
+    .select("id,visit_date,status,patient_id,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code)")
     .in("patient_id", patientIds)
     .order("visit_date", { ascending: false })
     .limit(LIMIT);
@@ -231,7 +231,7 @@ export async function searchPrescriptions(
   if (!patientIds.length) return [];
   let query = supabase
     .from("prescriptions")
-    .select("id,issued_date,patient_id,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)")
+    .select("id,issued_date,patient_id,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code)")
     .in("patient_id", patientIds)
     .order("issued_date", { ascending: false })
     .limit(LIMIT);

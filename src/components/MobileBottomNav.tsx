@@ -22,7 +22,7 @@ export function MobileBottomNav() {
   return (
     <nav
       aria-label={t("menu")}
-      className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-card/95 backdrop-blur border-t border-border h-16 flex items-stretch justify-around pb-[env(safe-area-inset-bottom)]"
+      className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-card/95 backdrop-blur border-t border-border min-h-16 h-[calc(4rem+env(safe-area-inset-bottom,0px))] flex items-stretch justify-around pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-8px_24px_-20px_hsl(var(--foreground)/0.45)]"
     >
       {items.map(it => (
         <NavLink
@@ -30,7 +30,7 @@ export function MobileBottomNav() {
           to={it.to}
           end={it.end}
           className={({ isActive }) => cn(
-            "flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium min-w-0 transition-colors",
+            "flex-1 flex min-h-16 min-w-0 touch-manipulation flex-col items-center justify-center gap-1 px-1 pt-1 text-[11px] font-medium leading-tight transition-colors",
             isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
           )}
         >

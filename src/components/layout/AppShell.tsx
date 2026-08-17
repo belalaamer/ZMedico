@@ -17,7 +17,7 @@ export default function AppShell() {
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <Topbar />
-        <main ref={mainRef} className="flex-1 overflow-y-auto p-4 md:p-6 pb-24 md:pb-6">
+        <main ref={mainRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 sm:p-4 md:p-6 pb-[calc(6rem+env(safe-area-inset-bottom,0px))] md:pb-6">
           <ErrorBoundary>
             <Outlet />
           </ErrorBoundary>

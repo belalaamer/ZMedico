@@ -52,7 +52,8 @@ type Patient = {
 };
 
 const schema = z.object({
-  name: z.string().trim().min(1, "Name is required").max(160),
+  name_en: z.string().trim().max(160).optional(),
+  name_ar: z.string().trim().max(160).optional(),
   phone: z.string().trim().min(1, "Phone is required").max(30),
   phone2: z.string().trim().max(30).optional(),
   email: z.string().trim().email().max(255).optional().or(z.literal("")),
@@ -62,6 +63,9 @@ const schema = z.object({
   blood_type: z.string().trim().max(10).optional(),
   address: z.string().trim().max(255).optional(),
   notes: z.string().trim().max(1000).optional(),
+}).refine((value) => Boolean(value.name_en?.trim() || value.name_ar?.trim()), {
+  path: ["name_en"],
+  message: "Name is required",
 });
 
 export default function PatientsPage() {
@@ -81,7 +85,7 @@ export default function PatientsPage() {
   const [invoiceForPatient, setInvoiceForPatient] = useState<string | null>(null);
 
   const [form, setForm] = useState({
-    name: "", phone: "", phone2: "", email: "",
+    name_en: "", name_ar: "", phone: "", phone2: "", email: "",
     dob: "", gender: "" as "" | "male" | "female",
     blood_type: "", address: "", notes: "",
     referred_by_patient_id: null as string | null,
@@ -146,9 +150,11 @@ export default function PatientsPage() {
     if (!parsed.success) { toast.error(parsed.error.issues[0]?.message ?? "Please check the form"); return; }
     const d = parsed.data;
     const payload: any = {
-      first_name_en: d.name,
-      first_name_ar: d.name,
-      name_language: containsArabicScript(d.name) ? "ar" : "en",
+      first_name_en: d.name_en?.trim() || d.name_ar?.trim() || "",
+      last_name_en: null,
+      first_name_ar: d.name_ar?.trim() || d.name_en?.trim() || "",
+      last_name_ar: null,
+      name_language: containsArabicScript(d.name_ar?.trim() || d.name_en?.trim() || "") ? "ar" : "en",
       phone: d.phone,
       phone2: d.phone2 || null,
       email: d.email || null,
@@ -164,7 +170,7 @@ export default function PatientsPage() {
     if (error) { toast.error(error.message); return; }
     toast.success(lang === "ar" ? "تمت إضافة المريض" : "Patient added");
     setOpen(false);
-    setForm({ name: "", phone: "", phone2: "", email: "", dob: "", gender: "", blood_type: "", address: "", notes: "", referred_by_patient_id: null });
+    setForm({ name_en: "", name_ar: "", phone: "", phone2: "", email: "", dob: "", gender: "", blood_type: "", address: "", notes: "", referred_by_patient_id: null });
     load();
   };
 
@@ -210,10 +216,15 @@ export default function PatientsPage() {
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>{t("newPatient")}</DialogTitle></DialogHeader>
               <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2 sm:col-span-2">
-                  <Label>{t("fullName")} *</Label>
-                  <Input dir="auto" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required maxLength={160} placeholder={t("fullName")} />
+                <div className="space-y-2">
+                  <Label>{lang === "ar" ? "الاسم بالإنجليزية" : "Name in English"}</Label>
+                  <Input dir="ltr" value={form.name_en} onChange={(e) => setForm({ ...form, name_en: e.target.value })} maxLength={160} placeholder="Mohamed Ibrahim" />
                 </div>
+                <div className="space-y-2">
+                  <Label>{lang === "ar" ? "الاسم بالعربية" : "Name in Arabic"}</Label>
+                  <Input dir="rtl" value={form.name_ar} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} maxLength={160} placeholder="محمد إبراهيم" />
+                </div>
+                <p className="sm:col-span-2 text-xs text-muted-foreground -mt-2">{lang === "ar" ? "أدخل اسمًا واحدًا على الأقل؛ ويمكنك تعبئة الاسمين معًا." : "Enter at least one name; you may provide both languages."}</p>
                 <div className="space-y-2">
                   <Label>{t("phone")} *</Label>
                   <Input dir="ltr" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required placeholder="+20..." maxLength={30} />

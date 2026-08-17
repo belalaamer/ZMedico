@@ -9,7 +9,6 @@ import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ReferrerPicker } from "./ReferrerPicker";
-import { containsArabicScript } from "@/lib/patientName";
 import { doctorDisplayName } from "@/lib/doctorName";
 
 export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
@@ -27,20 +26,8 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
     referred_by_patient_id: null as string | null,
   });
 
-  // The single name box is backed by its own draft string holding EXACTLY what the
-  // user typed.
-  //
-  // It used to be a controlled round-trip: the value was rebuilt every render as
-  // `${first} ${last}`.trim() while onChange split the text on whitespace. Typing a
-  // space after the first name produced "Ahmed " -> split -> first="Ahmed", last=""
-  // -> rebuilt as "Ahmed " -> .trim() -> "Ahmed". The space was erased on the same
-  // keystroke that created it, so the second name could never be started. Reception
-  // hit this on every patient with more than one name, which is all of them.
-  //
-  // Keeping the raw draft separate means the box shows what was typed; first and
-  // last are still derived from it for storage.
-  const [nameDraft, setNameDraft] = useState("");
-  const [nameTouched, setNameTouched] = useState(false);
+  const [nameEnDraft, setNameEnDraft] = useState("");
+  const [nameArDraft, setNameArDraft] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -49,15 +36,16 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
       const list = ((data ?? []) as any[]).map((p: any) => ({
         id: p.id,
         full_name: p.full_name ?? p.id.slice(0, 8),
+        full_name_en: p.full_name_en ?? null,
+        full_name_ar: p.full_name_ar ?? null,
       }));
-      list.sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
+      list.sort((a, b) => doctorDisplayName(a, lang).localeCompare(doctorDisplayName(b, lang)));
       setDoctors(list);
     })();
-  }, []);
+  }, [lang]);
 
   useEffect(() => {
     if (!patient) return;
-    setNameTouched(false);
     setForm({
       first_name_en: patient.first_name_en ?? "",
       last_name_en: patient.last_name_en ?? "",
@@ -76,38 +64,21 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
       assigned_doctor_id: (patient as any).assigned_doctor_id ?? "",
       referred_by_patient_id: (patient as any).referred_by_patient_id ?? null,
     });
-    setNameDraft(
-      lang === "ar"
-        ? `${patient.first_name_ar ?? ""} ${patient.last_name_ar ?? ""}`.trim()
-        : `${patient.first_name_en ?? ""} ${patient.last_name_en ?? ""}`.trim()
-    );
+    setNameEnDraft(`${patient.first_name_en ?? ""} ${patient.last_name_en ?? ""}`.trim());
+    setNameArDraft(`${patient.first_name_ar ?? ""} ${patient.last_name_ar ?? ""}`.trim());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patient, open]);
 
-  // Switching language mid-edit re-seeds the box from the values entered so far,
-  // rather than from the saved patient, so work in progress is not lost.
-  useEffect(() => {
-    setNameDraft(
-      lang === "ar"
-        ? `${form.first_name_ar} ${form.last_name_ar}`.trim()
-        : `${form.first_name_en} ${form.last_name_en}`.trim()
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lang]);
-
-  const setName = (v: string) => {
-    // Show the typed text verbatim, spaces included.
-    setNameTouched(true);
-    setNameDraft(v);
-    // Derive first / last for storage. Trimming here is correct: it only affects
-    // what is saved, never what the box displays.
-    const parts = v.trim().split(/\s+/).filter(Boolean);
+  const setLocalizedName = (value: string, language: "en" | "ar") => {
+    const parts = value.trim().split(/\s+/).filter(Boolean);
     const first = parts.shift() ?? "";
     const last = parts.join(" ");
-    if (lang === "ar") {
-      setForm((f) => ({ ...f, first_name_ar: first, last_name_ar: last, first_name_en: f.first_name_en || first, last_name_en: f.last_name_en || last }));
+    if (language === "en") {
+      setNameEnDraft(value);
+      setForm((f) => ({ ...f, first_name_en: first, last_name_en: last }));
     } else {
-      setForm((f) => ({ ...f, first_name_en: first, last_name_en: last, first_name_ar: f.first_name_ar || first, last_name_ar: f.last_name_ar || last }));
+      setNameArDraft(value);
+      setForm((f) => ({ ...f, first_name_ar: first, last_name_ar: last }));
     }
   };
 
@@ -124,7 +95,6 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
       last_name_en: form.last_name_en || null,
       first_name_ar: form.first_name_ar || form.first_name_en,
       last_name_ar: form.last_name_ar || null,
-      ...(nameTouched ? { name_language: containsArabicScript(nameDraft) ? "ar" : "en" } : {}),
       phone: form.phone,
       phone2: form.phone2 || null,
       email: form.email || null,
@@ -151,10 +121,15 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{t("editPatient")}</DialogTitle></DialogHeader>
         <form onSubmit={save} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-2 sm:col-span-2">
-            <Label>{t("fullName")} *</Label>
-            <Input dir="auto" value={nameDraft} onChange={(e) => setName(e.target.value)} required maxLength={160} />
+          <div className="space-y-2">
+            <Label>{lang === "ar" ? "الاسم بالإنجليزية" : "Name in English"}</Label>
+            <Input dir="ltr" value={nameEnDraft} onChange={(e) => setLocalizedName(e.target.value, "en")} maxLength={160} placeholder="Mohamed Ibrahim" />
           </div>
+          <div className="space-y-2">
+            <Label>{lang === "ar" ? "الاسم بالعربية" : "Name in Arabic"}</Label>
+            <Input dir="rtl" value={nameArDraft} onChange={(e) => setLocalizedName(e.target.value, "ar")} maxLength={160} placeholder="محمد إبراهيم" />
+          </div>
+          <p className="sm:col-span-2 text-xs text-muted-foreground -mt-2">{lang === "ar" ? "أدخل اسمًا واحدًا على الأقل؛ ويمكنك تعبئة الاسمين معًا." : "Enter at least one name; you may provide both languages."}</p>
           <div className="space-y-2">
             <Label>{t("phone")} *</Label>
             <Input dir="ltr" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required maxLength={30} />

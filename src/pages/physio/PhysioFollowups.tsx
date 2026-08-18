@@ -11,6 +11,8 @@ import { useBranch } from "@/contexts/BranchContext";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate } from "@/lib/format";
+import { patientDisplayName } from "@/lib/patientName";
+import { doctorDisplayName } from "@/lib/doctorName";
 
 export default function PhysioFollowups() {
   const { currentBranchId } = useBranch();
@@ -26,7 +28,7 @@ export default function PhysioFollowups() {
     setLoading(true);
     (async () => {
       const { data } = await supabase.from("physio_cases" as any)
-        .select("id,diagnosis,status,therapist_id,followup_enabled,followup_due_date,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)")
+        .select("id,diagnosis,status,therapist_id,followup_enabled,followup_due_date,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code)")
         .eq("branch_id", currentBranchId).is("deleted_at", null)
         .eq("status", "active").eq("followup_enabled", true)
         .not("followup_due_date", "is", null)
@@ -41,9 +43,9 @@ export default function PhysioFollowups() {
         // slice. The display name lives on profiles.full_name, reached the
         // same way PhysioCases.tsx already does it correctly.
         const { data: tps } = await supabase.from("staff_profiles")
-          .select("id,profile:profiles!staff_profiles_id_fkey(full_name,email)").in("id", ids);
+          .select("id,profile:profiles!staff_profiles_id_fkey(full_name,full_name_en,full_name_ar,email)").in("id", ids);
         const map: Record<string, string> = {};
-        (tps ?? []).forEach((t: any) => { map[t.id] = t.profile?.full_name || t.profile?.email || t.id.slice(0, 8); });
+        (tps ?? []).forEach((t: any) => { map[t.id] = doctorDisplayName(t.profile, lang) || t.id.slice(0, 8); });
         setTherapists(map);
       } else setTherapists({});
       setLoading(false);
@@ -61,9 +63,7 @@ export default function PhysioFollowups() {
   const overdue = filtered.filter(c => c.followup_due_date < today);
   const dueSoon = filtered.filter(c => c.followup_due_date >= today);
 
-  const patientName = (p: any) => lang === "ar"
-    ? `${p?.first_name_ar ?? p?.first_name_en ?? ""} ${p?.last_name_ar ?? p?.last_name_en ?? ""}`.trim()
-    : `${p?.first_name_en ?? ""} ${p?.last_name_en ?? ""}`.trim();
+  const patientName = (p: any) => patientDisplayName(p, lang);
 
   return (
     <div className="space-y-6">
@@ -129,7 +129,7 @@ function Section({ title, icon, items, empty, lang, therapists, patientName, acc
                     patient clinic-number badge on a card that just
                     references a patient -- missed in the earlier sweep.
                     Only the main Patients list should show it. */}
-                <div className="text-sm font-medium truncate">{patientName(c.patients)}</div>
+                <div className="text-sm font-medium truncate" dir="auto">{patientName(c.patients)}</div>
                 <div className="text-xs text-muted-foreground truncate">{c.diagnosis || "—"} · {c.therapist_id ? (therapists[c.therapist_id] ?? "—") : (lang === "ar" ? "غير محدد" : "Unassigned")}</div>
               </div>
               <Badge variant="outline" className={accent === "destructive" ? "status-cancelled" : "status-pending"}>

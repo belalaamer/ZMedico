@@ -217,9 +217,9 @@ async function sendOne(
 
   if (reminder.reminder_type === "email") {
     if (!patientEmail) return { ok: false, error: "Patient has no email" };
-    // Email sending is delegated to the platform email infra; for now we
-    // mark sent but do not actually deliver.
-    return { ok: true };
+    // No email transport is wired in this Worker yet. Never report success
+    // without an actual provider response; the UI should show the setup gap.
+    return { ok: false, error: "Email delivery provider not configured" };
   }
 
   // push: in-app only, mark sent

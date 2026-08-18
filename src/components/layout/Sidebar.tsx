@@ -40,35 +40,19 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
 
   const groups: { key: string; label: string; icon: any; items: NavItem[]; badge?: number }[] = useMemo(() => [
     {
-      key: "front_desk",
-      label: lang === "ar" ? "الاستقبال" : "Front Desk",
-      icon: CalendarDays,
+      key: "clinic_operations",
+      label: lang === "ar" ? "تشغيل العيادة" : "Clinic Operations",
+      icon: Stethoscope,
       items: [
         authz.can("appointments.view") && { to: "/calendar", icon: Calendar, label: t("calendar") },
         authz.can("appointments.view") && { to: "/queue", icon: ListChecks, label: t("queue") },
-        // Same permission as /queue (appointments.view) -- this was previously
-        // reachable only incidentally via the admin-only Branches quick-link,
-        // which left the queue/front-desk audience with no way to open it.
         authz.can("appointments.view") && { to: "/queue/audit", icon: ScrollText, label: lang === "ar" ? "تدقيق الطابور" : "Queue Audit" },
         authz.can("patients.view") && { to: "/patients", icon: Users, label: t("patients") },
         authz.can("appointments.view") && { to: "/reminders", icon: Bell, label: t("notifications") },
-      ].filter(Boolean) as NavItem[],
-    },
-    {
-      key: "clinical",
-      label: lang === "ar" ? "السريري والطبي" : "Clinical & Medical",
-      icon: Stethoscope,
-      items: [
         authz.can("medical_records.view") && { to: "/medical/records", icon: FileText, label: t("medicalRecords") },
         authz.can("medical_records.view") && { to: "/medical/quick-consult", icon: Zap, label: t("quickConsult") },
         authz.can("medical_records.view") && { to: "/medical/prescriptions", icon: Pill, label: t("prescriptions") },
         authz.can("medical_records.view") && { to: "/medical/documents", icon: FolderOpen, label: t("documentsCenter") },
-        // Moved here from "Setup & Admin" (FINAL-02.1, organizational only) --
-        // these are clinical reference catalogs gated on the same
-        // medical_records.view permission as the rest of this group; they
-        // were previously listed under an admin-labeled section even though
-        // doctors/nurses (not admins) are their actual audience. Permission
-        // gate, route, and authorization are all unchanged.
         authz.can("medical_records.view") && { to: "/medical/specialties", icon: Stethoscope, label: t("specialties") },
         authz.can("medical_records.view") && { to: "/medical/diagnoses", icon: HeartPulse, label: t("diagnoses") },
         authz.can("medical_records.view") && { to: "/medical/medications", icon: Pill, label: t("medications") },

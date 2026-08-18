@@ -10,6 +10,8 @@ import { useBranch } from "@/contexts/BranchContext";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate } from "@/lib/format";
+import { patientDisplayName } from "@/lib/patientName";
+import { doctorDisplayName } from "@/lib/doctorName";
 import { Download } from "lucide-react";
 
 function downloadCsv(filename: string, rows: any[][]) {
@@ -51,17 +53,17 @@ export default function PhysioReports() {
     // never showed a real name, only the 8-char UUID fallback. The display
     // name lives on profiles.full_name, joined the same way PhysioCases.tsx
     // already does it correctly.
-    supabase.from("staff_profiles").select("id,profile:profiles!staff_profiles_id_fkey(full_name,email)")
+    supabase.from("staff_profiles").select("id,profile:profiles!staff_profiles_id_fkey(full_name,full_name_en,full_name_ar,email)")
       .eq("branch_id", currentBranchId).limit(500).then(({ data }) => setTherapists((data as any) ?? []));
   }, [currentBranchId]);
 
-  const therapistName = (t: any) => t?.profile?.full_name || t?.profile?.email || t?.id?.slice(0, 8) || "";
+  const therapistName = (t: any) => doctorDisplayName(t?.profile, lang) || t?.id?.slice(0, 8) || "";
 
   const run = async () => {
     if (!currentBranchId) return;
     setLoading(true);
     let cQuery = supabase.from("physio_cases" as any)
-      .select("id,status,therapist_id,start_date,diagnosis,expected_sessions,patients(first_name_en,last_name_en,first_name_ar,last_name_ar)")
+      .select("id,status,therapist_id,start_date,diagnosis,expected_sessions,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language)")
       .eq("branch_id", currentBranchId).is("deleted_at", null)
       .gte("start_date", from).lte("start_date", to);
     if (status !== "_all") cQuery = cQuery.eq("status", status);
@@ -94,7 +96,7 @@ export default function PhysioReports() {
 
   const exportCsv = () => {
     const filterTag = `${from}_${to}_${therapistId}_${status}_${attendance}`;
-    const pn = (p: any) => `${p?.first_name_en ?? ""} ${p?.last_name_en ?? ""}`.trim();
+    const pn = (p: any) => patientDisplayName(p, lang);
     // Build case_id -> patient lookup so per-session/per-reassessment rows are human-readable.
     const caseLookup: Record<string, { patient: string; diagnosis: string }> = {};
     cases.forEach(c => { caseLookup[c.id] = { patient: pn(c.patients), diagnosis: c.diagnosis ?? "" }; });
@@ -134,9 +136,7 @@ export default function PhysioReports() {
     return { done, missed, improving, worsening, reassessTotal: reassess.length };
   }, [sessions, reassess]);
 
-  const patientName = (p: any) => lang === "ar"
-    ? `${p?.first_name_ar ?? p?.first_name_en ?? ""} ${p?.last_name_ar ?? p?.last_name_en ?? ""}`.trim()
-    : `${p?.first_name_en ?? ""} ${p?.last_name_en ?? ""}`.trim();
+  const patientName = (p: any) => patientDisplayName(p, lang);
 
   return (
     <div className="space-y-6">
@@ -214,7 +214,7 @@ export default function PhysioReports() {
           <div className="divide-y divide-border">
             {cases.map(c => (
               <div key={c.id} className="p-3 flex items-center gap-3 text-sm">
-                <div className="flex-1 truncate">{patientName(c.patients)} · {c.diagnosis || "—"}</div>
+                <div className="flex-1 truncate" dir="auto">{patientName(c.patients)} · {c.diagnosis || "—"}</div>
                 <div className="text-xs text-muted-foreground">{formatDate(c.start_date, lang)}</div>
                 <Badge variant="outline">{c.status}</Badge>
               </div>

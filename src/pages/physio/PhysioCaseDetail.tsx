@@ -18,6 +18,8 @@ import { subscribeResilient } from "@/lib/realtime";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate } from "@/lib/format";
+import { patientDisplayName } from "@/lib/patientName";
+import { doctorDisplayName } from "@/lib/doctorName";
 import { toast } from "sonner";
 import { logPhiAccess } from "@/lib/observability/phiAudit";
 
@@ -42,7 +44,7 @@ export default function PhysioCaseDetail() {
     if (!id) return;
     const [caseRes, sessRes, rasRes] = await Promise.all([
       supabase.from("physio_cases" as any)
-        .select("*, patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code), branches(name_en,name_ar)")
+        .select("*, patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code), branches(name_en,name_ar)")
         .eq("id", id).is("deleted_at", null).maybeSingle(),
       supabase.from("physio_sessions" as any).select("*").eq("case_id", id).is("deleted_at", null).order("session_number", { ascending: true }),
       supabase.from("physio_reassessments" as any).select("*").eq("case_id", id).is("deleted_at", null).order("assessment_date", { ascending: false }),
@@ -77,15 +79,7 @@ export default function PhysioCaseDetail() {
       // Branch-scoped therapist lookup via SECURITY DEFINER RPC so non-admin
       // physio roles (nurse/receptionist) can populate the therapist dropdown.
       const { data: tps } = await supabase.rpc("list_therapists", { _branch_id: branchId });
-      const list = ((tps ?? []) as any[]).map((t: any) => {
-        const parts = (t.full_name ?? "").trim().split(/\s+/);
-        return {
-          id: t.id,
-          first_name_en: parts[0] ?? "",
-          last_name_en: parts.slice(1).join(" "),
-        };
-      });
-      setTherapists(list);
+      setTherapists((tps ?? []) as any[]);
     }
   };
   useEffect(() => { loadAll(); }, [id]);
@@ -112,9 +106,7 @@ export default function PhysioCaseDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const patientName = (p: any) => lang === "ar"
-    ? `${p?.first_name_ar ?? p?.first_name_en ?? ""} ${p?.last_name_ar ?? p?.last_name_en ?? ""}`.trim()
-    : `${p?.first_name_en ?? ""} ${p?.last_name_en ?? ""}`.trim();
+  const patientName = (p: any) => patientDisplayName(p, lang);
 
   const done = sessions.filter(s => s.attendance === "done").length;
   const remaining = Math.max(0, (c?.expected_sessions ?? 0) - done);
@@ -183,7 +175,7 @@ export default function PhysioCaseDetail() {
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" asChild><Link to="/physio"><ArrowLeft className="size-4" /></Link></Button>
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{patientName(c.patients)}</h1>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight" dir="auto">{patientName(c.patients)}</h1>
             <p className="text-sm text-muted-foreground">{c.diagnosis || "—"} · start {formatDate(c.start_date, lang)}</p>
           </div>
         </div>
@@ -289,13 +281,14 @@ export default function PhysioCaseDetail() {
               caseId={c.id} nextNumber={(sessions[sessions.length - 1]?.session_number ?? 0) + 1}
               defaultTherapistId={c.therapist_id}
               therapists={therapists}
+              lang={lang}
               appointments={appointments}
               onSaved={loadAll}
             />
             <ReassessmentDialog
               open={reOpen} setOpen={setReOpen}
               caseId={c.id} initialFromCase={c.diagnosis ?? ""}
-              therapists={therapists} defaultTherapistId={c.therapist_id}
+              therapists={therapists} lang={lang} defaultTherapistId={c.therapist_id}
               onSaved={loadAll}
             />
           </div>
@@ -476,7 +469,7 @@ function Field({ label, value }: { label: string; value?: string | null }) {
   );
 }
 
-function SessionDialog({ open, setOpen, caseId, nextNumber, defaultTherapistId, therapists, appointments, onSaved }: any) {
+function SessionDialog({ open, setOpen, caseId, nextNumber, defaultTherapistId, therapists, lang, appointments, onSaved }: any) {
   const [form, setForm] = useState<any>({
     session_number: nextNumber, session_date: new Date().toISOString().slice(0, 10),
     therapist_id: defaultTherapistId ?? "", attendance: "done", pain_level: "",
@@ -572,7 +565,7 @@ function SessionDialog({ open, setOpen, caseId, nextNumber, defaultTherapistId, 
                     <SelectTrigger><SelectValue placeholder="Therapist" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="_none">—</SelectItem>
-                      {therapists.map((s: any) => <SelectItem key={s.id} value={s.id}>{`${s.first_name_en ?? ""} ${s.last_name_en ?? ""}`.trim() || s.id.slice(0,8)}</SelectItem>)}
+                      {therapists.map((s: any) => <SelectItem key={s.id} value={s.id}>{doctorDisplayName(s, lang) || s.id.slice(0,8)}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -620,7 +613,7 @@ function SessionDialog({ open, setOpen, caseId, nextNumber, defaultTherapistId, 
   );
 }
 
-function ReassessmentDialog({ open, setOpen, caseId, initialFromCase, therapists, defaultTherapistId, onSaved }: any) {
+function ReassessmentDialog({ open, setOpen, caseId, initialFromCase, therapists, lang, defaultTherapistId, onSaved }: any) {
   const [form, setForm] = useState<any>({
     assessment_date: new Date().toISOString().slice(0, 10),
     therapist_id: defaultTherapistId ?? "",
@@ -652,7 +645,7 @@ function ReassessmentDialog({ open, setOpen, caseId, initialFromCase, therapists
               <SelectTrigger><SelectValue placeholder="Therapist" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="_none">—</SelectItem>
-                {therapists.map((s: any) => <SelectItem key={s.id} value={s.id}>{`${s.first_name_en ?? ""} ${s.last_name_en ?? ""}`.trim() || s.id.slice(0,8)}</SelectItem>)}
+                {therapists.map((s: any) => <SelectItem key={s.id} value={s.id}>{doctorDisplayName(s, lang) || s.id.slice(0,8)}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import SettingsLayout from "./SettingsLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -52,6 +53,19 @@ export default function NotificationSettings() {
     toast.success(t("saved"));
   };
   const Toggle = ({ k, label }: any) => (<div className="flex items-center justify-between rounded-lg border p-3"><Label>{label}</Label><Switch checked={!!f[k]} onCheckedChange={v => setF({ ...f, [k]: v })} /></div>);
+  const channel = f.reminder_channel;
+  const channelReady = channel === "push"
+    ? true
+    : channel === "sms"
+      ? f.sms_enabled === true && (!!f.sms_provider || !!f.sms_api_url)
+      : channel === "whatsapp"
+        ? f.whatsapp_enabled === true && (!!f.whatsapp_provider || !!f.whatsapp_api_url)
+        : false;
+  const readinessText = channelReady
+    ? (lang === "ar" ? "القناة المختارة جاهزة للجدولة، بشرط وجود رصيد/حساب فعال لدى مزود الخدمة." : "The selected channel is ready to queue messages, provided the provider account has balance and is active.")
+    : channel === "email"
+      ? (lang === "ar" ? "البريد الإلكتروني غير موصل بمزود إرسال فعلي في النسخة الحالية؛ لن تصل الرسالة بمجرد اختيار Email." : "Email is not connected to a real delivery provider in the current build; selecting Email alone will not deliver messages.")
+      : (lang === "ar" ? "القناة غير جاهزة: فعّلها وأدخل Provider URL/المفاتيح ثم احفظ الإعدادات." : "The channel is not ready: enable it, enter the provider URL/credentials, then save the settings.");
   return (
     <SettingsLayout>
       <div className="space-y-6">
@@ -62,6 +76,14 @@ export default function NotificationSettings() {
             <SelectContent>{branches.map(b => <SelectItem key={b.id} value={b.id}>{lang === "ar" ? b.name_ar : b.name_en}</SelectItem>)}</SelectContent>
           </Select>
         </div>
+        <Card className={`p-4 flex items-start gap-3 ${channelReady ? "border-success/40 bg-success/5" : "border-warning/50 bg-warning/5"}`}>
+          {channelReady ? <CheckCircle2 className="size-5 text-success mt-0.5 shrink-0" /> : <AlertTriangle className="size-5 text-warning mt-0.5 shrink-0" />}
+          <div className="text-sm">
+            <div className="font-semibold">{lang === "ar" ? "حالة إرسال التذكيرات" : "Reminder delivery status"}</div>
+            <div className="text-muted-foreground mt-1">{readinessText}</div>
+            <div className="text-xs text-muted-foreground mt-2">{lang === "ar" ? "الجدولة الخلفية تعمل كل 15 دقيقة للتذكيرات المستحقة، والمتابعات العلاجية تُنشأ يوميًا للحالات التي فعّلت المتابعة." : "The background scheduler runs every 15 minutes for due reminders, and physiotherapy follow-ups are enqueued daily for cases with follow-up enabled."}</div>
+          </div>
+        </Card>
         <Card className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Toggle k="send_appointment_reminders" label={t("sendAppointmentReminders")} />
           <div><Label>{t("reminderChannel")}</Label>

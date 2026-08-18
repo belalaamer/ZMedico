@@ -60,7 +60,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       commissions: t("doctorCommissions"),
       doctorPerformance: t("doctorPerformance"),
     };
-    return visibleReportNavigation(authz.can).map((item) => ({
+    return visibleReportNavigation((permission) => authz.can(permission)).map((item) => ({
       to: item.to,
       icon: REPORT_ICONS[item.key],
       label: labels[item.key],

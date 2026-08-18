@@ -7,12 +7,12 @@ export default {
     const url = new URL(request.url);
     const pathname = url.pathname;
     const isHtmlRequest = request.method === "GET" && (pathname === "/" || !pathname.includes("."));
+    if (isHtmlRequest) {
+      url.searchParams.set("__zmedico_build", "deb1ea4");
+    }
     const assetRequest = isHtmlRequest
       ? new Request(url, request)
       : request;
-    if (isHtmlRequest) {
-      assetRequest.headers.set("x-zmedico-html-refresh", "c3c8fd5");
-    }
     const response = await env.ASSETS.fetch(assetRequest);
     const contentType = response.headers.get("content-type");
 

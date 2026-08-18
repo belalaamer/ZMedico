@@ -9,6 +9,8 @@ import { useBranch } from "@/contexts/BranchContext";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate } from "@/lib/format";
+import { patientDisplayName } from "@/lib/patientName";
+import { doctorDisplayName } from "@/lib/doctorName";
 
 export default function PhysioDashboard() {
   const { currentBranchId } = useBranch();
@@ -25,7 +27,7 @@ export default function PhysioDashboard() {
     const since = new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10);
     const [{ data: cs }, { data: ss }, { data: rs }] = await Promise.all([
       supabase.from("physio_cases" as any)
-        .select("id,status,therapist_id,patient_id,expected_sessions,followup_due_date,followup_enabled,start_date,diagnosis,patients(first_name_en,last_name_en,first_name_ar,last_name_ar)")
+        .select("id,status,therapist_id,patient_id,expected_sessions,followup_due_date,followup_enabled,start_date,diagnosis,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language)")
         .eq("branch_id", currentBranchId).is("deleted_at", null),
       supabase.from("physio_sessions" as any)
         .select("id,case_id,session_date,attendance,physio_cases!inner(branch_id,deleted_at)")
@@ -50,9 +52,9 @@ export default function PhysioDashboard() {
       // PhysioCases.tsx already does it (the one place in this app that
       // gets it right).
       const { data: tps } = await supabase.from("staff_profiles")
-        .select("id,profile:profiles!staff_profiles_id_fkey(full_name,email)").in("id", therapistIds);
+        .select("id,profile:profiles!staff_profiles_id_fkey(full_name,full_name_en,full_name_ar,email)").in("id", therapistIds);
       const map: Record<string, string> = {};
-      (tps ?? []).forEach((t: any) => { map[t.id] = t.profile?.full_name || t.profile?.email || t.id.slice(0, 8); });
+      (tps ?? []).forEach((t: any) => { map[t.id] = doctorDisplayName(t.profile, lang) || t.id.slice(0, 8); });
       setTherapistMap(map);
     }
     setLoading(false);
@@ -91,9 +93,7 @@ export default function PhysioDashboard() {
   overdueFollowups.forEach(c => { bump(c.therapist_id || "_none").overdue += 1; });
   const workloadRows = Object.entries(workload).sort((a, b) => b[1].active - a[1].active);
 
-  const patientName = (p: any) => lang === "ar"
-    ? `${p?.first_name_ar ?? p?.first_name_en ?? ""} ${p?.last_name_ar ?? p?.last_name_en ?? ""}`.trim()
-    : `${p?.first_name_en ?? ""} ${p?.last_name_en ?? ""}`.trim();
+  const patientName = (p: any) => patientDisplayName(p, lang);
 
   return (
     <div className="space-y-6">
@@ -187,7 +187,7 @@ export default function PhysioDashboard() {
           <div className="divide-y divide-border">
             {overdueFollowups.slice(0, 10).map(c => (
               <Link key={c.id} to={`/physio/${c.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors group">
-                <div className="flex-1 text-sm truncate">{patientName(c.patients)} · {c.diagnosis || "—"}</div>
+                <div className="flex-1 text-sm truncate" dir="auto">{patientName(c.patients)} · {c.diagnosis || "—"}</div>
                 <Badge variant="outline" className="status-cancelled">{lang === "ar" ? "حتى" : "due"} {formatDate(c.followup_due_date, lang)}</Badge>
                 <ChevronRight className="size-4 text-muted-foreground group-hover:text-foreground transition-colors" />
               </Link>

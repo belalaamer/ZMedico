@@ -16,13 +16,15 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate } from "@/lib/format";
+import { patientDisplayName } from "@/lib/patientName";
+import { doctorDisplayName } from "@/lib/doctorName";
 import { toast } from "sonner";
 
-type Patient = { id: string; first_name_en?: string; last_name_en?: string; first_name_ar?: string; last_name_ar?: string; patient_code?: number };
+type Patient = { id: string; first_name_en?: string; last_name_en?: string; first_name_ar?: string; last_name_ar?: string; name_language?: "ar" | "en" | null; patient_code?: number };
 type Therapist = {
   id: string;
   employee_id?: string | null;
-  profile?: { full_name?: string | null; email?: string | null } | null;
+  profile?: { full_name?: string | null; full_name_en?: string | null; full_name_ar?: string | null; email?: string | null } | null;
   position?: { title_en?: string | null; title_ar?: string | null } | null;
 };
 
@@ -50,7 +52,7 @@ export default function PhysioCases() {
     setLoading(true); setLoadError(null);
     const { data, error } = await supabase
       .from("physio_cases" as any)
-      .select("*, patients(first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code)")
+      .select("*, patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code)")
       .eq("branch_id", currentBranchId)
       .is("deleted_at", null)
       .order("created_at", { ascending: false });
@@ -62,7 +64,7 @@ export default function PhysioCases() {
   useEffect(() => {
     load();
     if (currentBranchId) {
-      supabase.from("patients").select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,patient_code")
+      supabase.from("patients").select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code")
         .is("deleted_at", null).eq("branch_id", currentBranchId).order("created_at", { ascending: false }).limit(500)
         .then(({ data }) => setPatients((data as any) ?? []));
       // Therapists = active staff in the current branch (from HR staff
@@ -106,10 +108,7 @@ export default function PhysioCases() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  const patientName = (p: any) =>
-    lang === "ar"
-      ? `${p?.first_name_ar ?? p?.first_name_en ?? ""} ${p?.last_name_ar ?? p?.last_name_en ?? ""}`.trim()
-      : `${p?.first_name_en ?? ""} ${p?.last_name_en ?? ""}`.trim();
+  const patientName = (p: Patient | null | undefined) => patientDisplayName(p, lang);
 
   const create = async () => {
     if (!currentBranchId) { toast.error(lang === "ar" ? "اختر فرعًا أولًا" : "Select a branch first"); return; }
@@ -158,7 +157,7 @@ export default function PhysioCases() {
   };
 
   const therapistLabel = (s: Therapist) => {
-    const name = (s.profile?.full_name || s.profile?.email || s.employee_id || s.id.slice(0, 8)).trim();
+    const name = doctorDisplayName(s.profile, lang).trim() || s.employee_id || s.id.slice(0, 8);
     const title = lang === "ar" ? s.position?.title_ar : s.position?.title_en;
     return title ? `${name} · ${title}` : name;
   };
@@ -260,7 +259,7 @@ export default function PhysioCases() {
               <Link to={`/physio/${c.id}`} key={c.id} className="flex items-center gap-4 p-4 hover:bg-muted/40 transition-colors">
                 <Activity className="size-5 text-muted-foreground" />
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{patientName(c.patients)}</div>
+                  <div className="font-medium truncate" dir="auto">{patientName(c.patients)}</div>
                   <div className="text-xs text-muted-foreground truncate">{c.diagnosis || "—"} · {lang === "ar" ? "بدء" : "start"} {formatDate(c.start_date, lang)} · {c.expected_sessions} {lang === "ar" ? "جلسة" : "sessions"}</div>
                 </div>
                 <Badge variant="outline" className={statusVariant(c.status)}>{statusLabel(c.status)}</Badge>

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { formatMoney } from "@/lib/format";
 import { StatCard, ReportPageHeader } from "./_shared";
 import { DollarSign, Users, CalendarDays, FileWarning, BarChart3, Briefcase, Stethoscope, Boxes, ClipboardList, Percent, Award, Activity } from "lucide-react";
@@ -12,6 +13,7 @@ import { DollarSign, Users, CalendarDays, FileWarning, BarChart3, Briefcase, Ste
 export default function ReportsDashboard() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
+  const { authz } = useAuthorization();
   const [stats, setStats] = useState({ revenue: 0, patients: 0, appts: 0, pending: 0 });
 
   useEffect(() => {
@@ -40,16 +42,16 @@ export default function ReportsDashboard() {
   }, [currentBranchId]);
 
   const links = [
-    { to: "/reports/financial", icon: DollarSign, label: t("financialReports"), desc: lang === "ar" ? "الإيرادات والمصروفات والتدفقات النقدية" : "Revenue, expenses, and cash flow" },
-    { to: "/reports/operational", icon: BarChart3, label: t("operationalReports"), desc: lang === "ar" ? "أداء العيادة والإنتاجية اليومية" : "Clinic performance and daily productivity" },
-    { to: "/reports/medical", icon: Stethoscope, label: t("medicalReports"), desc: lang === "ar" ? "التشخيصات والعلاجات والنتائج السريرية" : "Diagnoses, treatments, and clinical outcomes" },
-    { to: "/reports/hr", icon: Briefcase, label: t("hrReports"), desc: lang === "ar" ? "الحضور والرواتب وأداء الموظفين" : "Attendance, payroll, and staff performance" },
-    { to: "/reports/inventory", icon: Boxes, label: t("inventoryReports"), desc: lang === "ar" ? "المخزون والحركة وتنبيهات النفاد" : "Stock levels, movement, and low-stock alerts" },
-    { to: "/reports/scheduled", icon: ClipboardList, label: t("scheduledReports"), desc: lang === "ar" ? "التقارير المجدولة والمهام الدورية" : "Automated recurring report deliveries" },
-    { to: "/reports/commissions", icon: Percent, label: t("doctorCommissions"), desc: lang === "ar" ? "حساب عمولات الأطباء والمستحقات" : "Doctor commission calculations and payouts" },
-    { to: "/reports/doctor-performance", icon: Award, label: t("doctorPerformance"), desc: lang === "ar" ? "مؤشرات أداء الأطباء والإنتاجية" : "Doctor productivity and performance KPIs" },
-    { to: "/physio/reports", icon: Activity, label: lang === "ar" ? "تقارير العلاج الطبيعي" : "Physiotherapy Reports", desc: lang === "ar" ? "جلسات العلاج الطبيعي وتقدم المرضى" : "Therapy sessions and patient progress" },
-  ];
+    { to: "/reports/financial", permission: "reports_finance.view", icon: DollarSign, label: t("financialReports"), desc: lang === "ar" ? "الإيرادات والمصروفات والتدفقات النقدية" : "Revenue, expenses, and cash flow" },
+    { to: "/reports/operational", permission: "reports_operational.view", icon: BarChart3, label: t("operationalReports"), desc: lang === "ar" ? "أداء العيادة والإنتاجية اليومية" : "Clinic performance and daily productivity" },
+    { to: "/reports/medical", permission: "reports_medical.view", icon: Stethoscope, label: t("medicalReports"), desc: lang === "ar" ? "التشخيصات والعلاجات والنتائج السريرية" : "Diagnoses, treatments, and clinical outcomes" },
+    { to: "/reports/hr", permission: "reports_hr.view", icon: Briefcase, label: t("hrReports"), desc: lang === "ar" ? "الحضور والرواتب وأداء الموظفين" : "Attendance, payroll, and staff performance" },
+    { to: "/reports/inventory", permission: "reports_inventory.view", icon: Boxes, label: t("inventoryReports"), desc: lang === "ar" ? "المخزون والحركة وتنبيهات النفاد" : "Stock levels, movement, and low-stock alerts" },
+    { to: "/reports/scheduled", permission: "reports.view", icon: ClipboardList, label: t("scheduledReports"), desc: lang === "ar" ? "التقارير المجدولة والمهام الدورية" : "Automated recurring report deliveries" },
+    { to: "/reports/commissions", permission: "reports_medical.view", icon: Percent, label: t("doctorCommissions"), desc: lang === "ar" ? "حساب عمولات الأطباء والمستحقات" : "Doctor commission calculations and payouts" },
+    { to: "/reports/doctor-performance", permission: "reports_medical.view", icon: Award, label: t("doctorPerformance"), desc: lang === "ar" ? "مؤشرات أداء الأطباء والإنتاجية" : "Doctor productivity and performance KPIs" },
+    { to: "/physio/reports", permission: "medical_records.view", icon: Activity, label: lang === "ar" ? "تقارير العلاج الطبيعي" : "Physiotherapy Reports", desc: lang === "ar" ? "جلسات العلاج الطبيعي وتقدم المرضى" : "Therapy sessions and patient progress" },
+  ].filter((link) => authz.can(link.permission));
 
   const kpis = [
     {

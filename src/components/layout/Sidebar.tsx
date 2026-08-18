@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap, FolderOpen, Briefcase, UserCog, Clock, CalendarDays, DollarSign, Star, PieChart, Target, Ticket, ListChecks, ChevronDown, Wallet, ScrollText, Percent } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap, FolderOpen, Briefcase, UserCog, Clock, CalendarDays, DollarSign, Star, Target, Ticket, ListChecks, ChevronDown, Wallet, ScrollText, Percent } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { subscribeResilient } from "@/lib/realtime";
@@ -8,8 +8,20 @@ import { useBranch } from "@/contexts/BranchContext";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
+import { visibleReportNavigation, type ReportNavigationKey } from "@/lib/reportNavigation";
 
 type NavItem = { to: string; icon: any; label: string; end?: boolean; badge?: number };
+
+const REPORT_ICONS: Record<ReportNavigationKey, any> = {
+  financial: DollarSign,
+  operational: BarChart3,
+  medical: Stethoscope,
+  hr: Briefcase,
+  inventory: Boxes,
+  scheduled: ClipboardList,
+  commissions: Percent,
+  doctorPerformance: Target,
+};
 
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {}) {
   const { t, lang } = useI18n();
@@ -37,6 +49,23 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
   }, [currentBranchId]);
 
   const dashboardItem: NavItem = { to: "/", icon: LayoutDashboard, label: t("dashboard"), end: true };
+  const reportItems = useMemo(() => {
+    const labels: Record<ReportNavigationKey, string> = {
+      financial: t("financialReports"),
+      operational: t("operationalReports"),
+      medical: t("medicalReports"),
+      hr: t("hrReports"),
+      inventory: t("inventoryReports"),
+      scheduled: t("scheduledReports"),
+      commissions: t("doctorCommissions"),
+      doctorPerformance: t("doctorPerformance"),
+    };
+    return visibleReportNavigation(authz.can).map((item) => ({
+      to: item.to,
+      icon: REPORT_ICONS[item.key],
+      label: labels[item.key],
+    }));
+  }, [authz, t]);
 
   const groups: { key: string; label: string; icon: any; items: NavItem[]; badge?: number }[] = useMemo(() => [
     {
@@ -86,14 +115,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       key: "reports",
       label: lang === "ar" ? "التقارير" : "Reports",
       icon: BarChart3,
-      items: [
-        // Only the hub is linked here on purpose: ReportsDashboard.tsx already
-        // links every /reports/* sub-page (financial, operational, medical, hr,
-        // inventory, scheduled, commissions, doctor-performance) as cards for
-        // the same reports.view/reports_*.view audience. Adding them again here
-        // would duplicate navigation that already exists one click away.
-        authz.can("reports.view") && { to: "/reports", icon: PieChart, label: t("reports") },
-      ].filter(Boolean) as NavItem[],
+      items: reportItems,
     },
     {
       key: "inventory",
@@ -141,7 +163,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
         authz.isSuperAdmin() && { to: "/settings", icon: Settings, label: t("settings") },
       ].filter(Boolean) as NavItem[],
     },
-  ].filter(g => g.items.length > 0), [t, lang, authz, alertCount]);
+  ].filter(g => g.items.length > 0), [t, lang, authz, alertCount, reportItems]);
 
   const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
   const activeGroupKey = useMemo(() => {

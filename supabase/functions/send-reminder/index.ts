@@ -63,7 +63,12 @@ type NotifySettings = {
   whatsapp_enabled?: boolean;
   sms_enabled?: boolean;
   whatsapp_provider?: "twilio" | "meta" | "custom" | null;
-  sms_provider?: "twilio" | "messagebird" | "custom" | null;
+  sms_provider?: "twilio" | "messagebird" | "smsmisr" | "custom" | null;
+  smsmisr_username?: string | null;
+  smsmisr_password?: string | null;
+  smsmisr_sender_token?: string | null;
+  smsmisr_environment?: number | null;
+  smsmisr_language?: number | null;
   meta_phone_number_id?: string | null;
   twilio_account_sid?: string | null;
   twilio_auth_token?: string | null;
@@ -102,6 +107,13 @@ function validateProviderUrl(raw: string): { ok: true; url: URL } | { ok: false;
     return { ok: false, error: "Provider URL host is not allowed" };
   }
   return { ok: true, url: u };
+}
+
+function normalizeEgyptianMobile(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.startsWith("20")) return digits;
+  if (digits.startsWith("0")) return `20${digits.slice(1)}`;
+  return digits;
 }
 
 function sanitizeProviderError(text: string): string {
@@ -180,6 +192,56 @@ async function sendOne(
         return { ok: true };
       } catch {
         return { ok: false, error: "Meta request failed" };
+      }
+    }
+
+    // SMS Misr Egypt gateway. It returns HTTP 200 for several application-level
+    // errors, so code 1901 must be checked explicitly before marking sent.
+    if (!isWa && provider === "smsmisr") {
+      const username = cfg?.smsmisr_username;
+      const password = cfg?.smsmisr_password;
+      const sender = cfg?.smsmisr_sender_token || cfg?.sms_sender_id;
+      const environment = cfg?.smsmisr_environment === 1 ? 1 : 2;
+      const language = [1, 2, 3].includes(Number(cfg?.smsmisr_language))
+        ? Number(cfg?.smsmisr_language)
+        : 1;
+      if (!username || !password || !sender) {
+        return { ok: false, error: "SMS Misr not configured" };
+      }
+      const rawUrl = cfg?.sms_api_url || "https://smsmisr.com/api/SMS/";
+      const v = validateProviderUrl(rawUrl);
+      if (!v.ok) return { ok: false, error: "SMS Misr provider URL rejected" };
+      const mobile = normalizeEgyptianMobile(patientPhone);
+      if (!/^20(?:10|11|12|15)\d{8}$/.test(mobile)) {
+        return { ok: false, error: "Invalid Egyptian mobile number" };
+      }
+      try {
+        const res = await fetch(v.url.toString(), {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            environment: String(environment),
+            username,
+            password,
+            sender,
+            mobile,
+            language: String(language),
+            message,
+          }).toString(),
+        });
+        const rawBody = await res.text().catch(() => "");
+        if (!res.ok) {
+          return { ok: false, error: `SMS Misr HTTP ${res.status}: ${sanitizeProviderError(rawBody)}` };
+        }
+        let parsed: any = null;
+        try { parsed = JSON.parse(rawBody); } catch { /* provider may return plain text */ }
+        const code = String(parsed?.code ?? "");
+        if (code !== "1901") {
+          return { ok: false, error: `SMS Misr ${code || "unknown response"}: ${sanitizeProviderError(rawBody)}` };
+        }
+        return { ok: true };
+      } catch {
+        return { ok: false, error: "SMS Misr request failed" };
       }
     }
 
@@ -338,7 +400,7 @@ Deno.serve(async (req) => {
       if (!cfgCache.has(r.branch_id)) {
         const { data } = await supabase
           .from("notification_settings")
-          .select("whatsapp_api_key,whatsapp_api_url,whatsapp_business_number,sms_api_key,sms_api_url,sms_sender_id,email_sender_address,email_sender_name,whatsapp_enabled,sms_enabled,whatsapp_provider,sms_provider,meta_phone_number_id,twilio_account_sid,twilio_auth_token,twilio_from_whatsapp,twilio_from_sms")
+          .select("whatsapp_api_key,whatsapp_api_url,whatsapp_business_number,sms_api_key,sms_api_url,sms_sender_id,email_sender_address,email_sender_name,whatsapp_enabled,sms_enabled,whatsapp_provider,sms_provider,meta_phone_number_id,twilio_account_sid,twilio_auth_token,twilio_from_whatsapp,twilio_from_sms,smsmisr_username,smsmisr_password,smsmisr_sender_token,smsmisr_environment,smsmisr_language")
           .eq("branch_id", r.branch_id)
           .maybeSingle();
         cfgCache.set(r.branch_id, (data as NotifySettings) ?? null);

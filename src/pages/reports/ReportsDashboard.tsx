@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
-import { useAuthorization } from "@/lib/authz/useAuthorization";
+import { usePermissions } from "@/hooks/usePermissions";
 import { formatMoney } from "@/lib/format";
 import { StatCard, ReportPageHeader } from "./_shared";
 import { DollarSign, Users, CalendarDays, FileWarning, BarChart3, Briefcase, Stethoscope, Boxes, ClipboardList, Percent, Award, Activity } from "lucide-react";
@@ -13,7 +13,7 @@ import { DollarSign, Users, CalendarDays, FileWarning, BarChart3, Briefcase, Ste
 export default function ReportsDashboard() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
-  const { authz } = useAuthorization();
+  const { can } = usePermissions();
   const [stats, setStats] = useState({ revenue: 0, patients: 0, appts: 0, pending: 0 });
 
   useEffect(() => {
@@ -51,7 +51,10 @@ export default function ReportsDashboard() {
     { to: "/reports/commissions", permission: "reports_medical.view", icon: Percent, label: t("doctorCommissions"), desc: lang === "ar" ? "حساب عمولات الأطباء والمستحقات" : "Doctor commission calculations and payouts" },
     { to: "/reports/doctor-performance", permission: "reports_medical.view", icon: Award, label: t("doctorPerformance"), desc: lang === "ar" ? "مؤشرات أداء الأطباء والإنتاجية" : "Doctor productivity and performance KPIs" },
     { to: "/physio/reports", permission: "medical_records.view", icon: Activity, label: lang === "ar" ? "تقارير العلاج الطبيعي" : "Physiotherapy Reports", desc: lang === "ar" ? "جلسات العلاج الطبيعي وتقدم المرضى" : "Therapy sessions and patient progress" },
-  ].filter((link) => authz.can(link.permission));
+  ].filter((link) => {
+    const [module, action] = link.permission.split(".");
+    return can(module, action);
+  });
 
   const kpis = [
     {

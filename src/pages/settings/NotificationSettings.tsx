@@ -62,7 +62,10 @@ export default function NotificationSettings() {
     if (!payload.smsmisr_username) delete payload.smsmisr_username;
     if (!payload.smsmisr_password) delete payload.smsmisr_password;
     if (!payload.smsmisr_sender_token) delete payload.smsmisr_sender_token;
-    const { error } = await supabase.from("notification_settings").upsert(payload, { onConflict: "branch_id" });
+    const { error } = await (supabase as any).rpc("upsert_notification_settings", {
+      p_branch_id: branchId,
+      p_settings: payload,
+    });
     if (error) return toast.error(error.message);
     toast.success(t("saved"));
   };

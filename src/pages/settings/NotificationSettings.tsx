@@ -24,6 +24,7 @@ export default function NotificationSettings() {
     send_follow_up_reminder: true, follow_up_days_after: 7,
     email_sender_name: "", email_sender_address: "", sms_sender_id: "", whatsapp_business_number: "",
     whatsapp_api_key: "", whatsapp_api_url: "", sms_api_key: "", sms_api_url: "",
+    sms_enabled: false, whatsapp_enabled: false,
     sms_provider: "custom", smsmisr_username: "", smsmisr_password: "", smsmisr_sender_token: "",
     smsmisr_environment: 2, smsmisr_language: 1,
   });
@@ -105,6 +106,8 @@ export default function NotificationSettings() {
         </Card>
         <Card className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Toggle k="send_appointment_reminders" label={t("sendAppointmentReminders")} />
+          <Toggle k="sms_enabled" label={lang === "ar" ? "تفعيل إرسال SMS" : "Enable SMS delivery"} />
+          <Toggle k="whatsapp_enabled" label={lang === "ar" ? "تفعيل إرسال WhatsApp" : "Enable WhatsApp delivery"} />
           <div><Label>{t("reminderChannel")}</Label>
             <Select value={f.reminder_channel} onValueChange={v => setF({ ...f, reminder_channel: v })}>
               <SelectTrigger><SelectValue /></SelectTrigger>

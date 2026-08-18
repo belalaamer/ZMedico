@@ -6,7 +6,7 @@ export type PatientNameFields = {
   name_language?: "ar" | "en" | null;
 };
 
-const ARABIC_SCRIPT = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+const ARABIC_SCRIPT = /(?:[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF])/;
 const LATIN_SCRIPT = /[A-Za-z]/;
 
 function joinName(first?: string | null, last?: string | null, lang?: "ar" | "en"): string {

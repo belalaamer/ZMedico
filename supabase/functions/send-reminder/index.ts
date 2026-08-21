@@ -49,6 +49,7 @@ type Reminder = {
   message_ar: string;
   scheduled_time: string;
   status: string;
+  payload?: Record<string, unknown> | null;
 };
 
 type NotifySettings = {
@@ -127,7 +128,7 @@ async function sendOne(
   patientPhone: string | null,
   patientEmail: string | null,
   cfg: NotifySettings | null,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; provider_response?: Record<string, string> }> {
   const message = reminder.message_en || reminder.message_ar;
 
   if (reminder.reminder_type === "whatsapp" || reminder.reminder_type === "sms") {
@@ -239,7 +240,15 @@ async function sendOne(
         if (code !== "1901") {
           return { ok: false, error: `SMS Misr ${code || "unknown response"}: ${sanitizeProviderError(rawBody)}` };
         }
-        return { ok: true };
+        return {
+          ok: true,
+          provider_response: {
+            provider: "smsmisr",
+            code,
+            SMSID: String(parsed?.SMSID ?? ""),
+            Cost: String(parsed?.Cost ?? ""),
+          },
+        };
       } catch {
         return { ok: false, error: "SMS Misr request failed" };
       }
@@ -359,7 +368,7 @@ Deno.serve(async (req) => {
   // Build query
   let q = supabase
     .from("reminders")
-    .select("id,branch_id,patient_id,reminder_type,message_en,message_ar,scheduled_time,status");
+    .select("id,branch_id,patient_id,reminder_type,message_en,message_ar,scheduled_time,status,payload");
 
   if (body.reminder_id) {
     q = q.eq("id", body.reminder_id);
@@ -390,7 +399,7 @@ Deno.serve(async (req) => {
   }
   let sent = 0;
   let failed = 0;
-  const results: Array<{ id: string; ok: boolean; error?: string }> = [];
+  const results: Array<{ id: string; ok: boolean; error?: string; provider_response?: Record<string, string> }> = [];
 
   // Cache config & patient lookups
   const cfgCache = new Map<string, NotifySettings | null>();
@@ -431,7 +440,7 @@ Deno.serve(async (req) => {
     }
 
     const res = await sendOne(r, phone, email, cfg);
-    results.push({ id: r.id, ok: res.ok, error: res.error });
+    results.push({ id: r.id, ok: res.ok, error: res.error, provider_response: res.provider_response });
 
     if (res.ok) {
       sent++;
@@ -442,6 +451,9 @@ Deno.serve(async (req) => {
           sent_at: new Date().toISOString(),
           error_message: null,
           destination_phone: phone,
+          payload: res.provider_response
+            ? { ...(r.payload ?? {}), provider_response: res.provider_response }
+            : r.payload,
         })
         .eq("id", r.id);
     } else {

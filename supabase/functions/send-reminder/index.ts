@@ -11,7 +11,7 @@
 // can be wired by setting the right URL + key.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { corsHeaders, corsPreflight, jsonResponse } from "../_shared/cors.ts";
+import { corsHeaders, corsPreflight, jsonResponse } from "./_shared/cors.ts";
 
 // Sprint 1 hardening: bulk-abuse protection. Cap the number of reminders
 // processed per invocation (configurable via SEND_REMINDER_MAX_BATCH, default
@@ -306,7 +306,7 @@ Deno.serve(async (req) => {
     (!!cronSecret && authHeader === `Bearer ${cronSecret}`) ||
     (!!serviceKey && authHeader === `Bearer ${serviceKey}`);
 
-  let callerIsAdmin = false;
+  let callerCanSendReminders = false;
   let actorId: string | null = null;
   if (!isCron) {
     if (!authHeader.startsWith("Bearer ")) {
@@ -320,7 +320,9 @@ Deno.serve(async (req) => {
     if (claimsErr || !claimsData?.claims?.sub) {
       return jsonResponse({ error: "Unauthorized" }, 401);
     }
-    // Check admin role for bulk operations
+    // Manual sends are administrative operations. Keep this aligned with
+    // notification_settings access: admin and system_owner may send, while
+    // regular clinical/staff roles must use the scheduled cron path only.
     const userId = claimsData.claims.sub as string;
     actorId = userId;
     const adminCheck = createClient(SUPABASE_URL, SERVICE_KEY);
@@ -328,9 +330,9 @@ Deno.serve(async (req) => {
       .from("user_roles")
       .select("role")
       .eq("user_id", userId)
-      .eq("role", "admin")
+      .in("role", ["admin", "system_owner"])
       .maybeSingle();
-    callerIsAdmin = !!roleRow;
+    callerCanSendReminders = !!roleRow;
   }
 
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
@@ -338,11 +340,11 @@ Deno.serve(async (req) => {
   let body: { reminder_id?: string; branch_id?: string; due_only?: boolean } = {};
   try { body = await req.json(); } catch { /* allow empty body */ }
 
-  // All sends (single or bulk) require admin role or cron secret.
+  // All sends (single or bulk) require admin/system_owner role or cron secret.
   // Previously single-id sends were unrestricted, allowing any authenticated
   // user to enumerate reminders and trigger arbitrary patient messages.
-  if (!isCron && !callerIsAdmin) {
-    return jsonResponse({ error: "Forbidden: admin role required" }, 403);
+  if (!isCron && !callerCanSendReminders) {
+    return jsonResponse({ error: "Forbidden: admin or system_owner role required" }, 403);
   }
 
   // Enforce per-admin rate limit for non-cron callers.

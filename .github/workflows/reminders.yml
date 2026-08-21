@@ -1,8 +1,8 @@
 name: Send due reminders
 
+# Production scheduling is handled by Supabase cron. Keep this workflow manual-only
+# to avoid duplicate sends and repeated GitHub Actions notifications.
 on:
-  schedule:
-    - cron: "*/15 * * * *"
   workflow_dispatch:
 
 concurrency:

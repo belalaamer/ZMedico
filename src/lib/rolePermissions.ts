@@ -2,6 +2,7 @@ export const ROLES = ["system_owner", "admin", "manager", "doctor", "nurse", "re
 export const MODULES = [
   "patients",
   "appointments",
+  "leads",
   "medical_records",
   "vitals",
   "treatment_plans",
@@ -33,6 +34,7 @@ export const DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
   // Manager: branch operations oversight. Clinical data is view-only;
   // managers may not create, edit, or delete medical records.
   manager: {
+    leads: ["view","create","edit","export"],
     patients: ["view","create","edit","export"],
     appointments: ["view","create","edit","export"],
     medical_records: ["view"],
@@ -53,6 +55,7 @@ export const DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
   },
   // Doctor: clinical only. Demographics owned by front desk. No invoice access.
   doctor: {
+    leads: ["view"],
     patients: ["view"],
     appointments: ["view","create","edit"],
     medical_records: ["view","create","edit"],
@@ -79,6 +82,7 @@ export const DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
   // Clinical data (treatment_plans) removed under the minimum-necessary
   // principle; the database enforces the same.
   receptionist: {
+    leads: ["view","create","edit"],
     patients: ["view","create","edit"],
     appointments: ["view","create","edit"],
     treatment_plans: [],
@@ -122,6 +126,7 @@ export function defaultActionsFor(role: string, module: string): string[] {
 // Map route path prefixes to permission modules. Used by PermissionRoute.
 export function moduleForPath(path: string): string | null {
   // "/" is deliberately absent: the dashboard route is not permission-gated.
+  if (path.startsWith("/leads")) return "leads";
   if (path.startsWith("/calendar") || path.startsWith("/reminders")) return "appointments";
   if (path.startsWith("/queue")) return "appointments";
   if (path.startsWith("/appointments")) return "appointments";

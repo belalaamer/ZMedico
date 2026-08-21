@@ -74,6 +74,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       icon: Stethoscope,
       items: [
         authz.can("appointments.view") && { to: "/calendar", icon: Calendar, label: t("calendar") },
+        authz.can("leads.view") && { to: "/leads", icon: Target, label: lang === "ar" ? "العملاء المحتملون" : "Leads" },
         authz.can("appointments.view") && { to: "/queue", icon: ListChecks, label: t("queue") },
         authz.can("appointments.view") && { to: "/queue/audit", icon: ScrollText, label: lang === "ar" ? "تدقيق الطابور" : "Queue Audit" },
         authz.can("patients.view") && { to: "/patients", icon: Users, label: t("patients") },

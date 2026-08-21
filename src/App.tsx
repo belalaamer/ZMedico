@@ -18,9 +18,12 @@ const AuthPage = lazy(() => import("@/pages/auth/Auth"));
 const AuthCallback = lazy(() => import("@/pages/auth/AuthCallback"));
 const ResetPassword = lazy(() => import("@/pages/auth/ResetPassword"));
 const Pricing = lazy(() => import("@/pages/pricing/Pricing"));
+const PublicBooking = lazy(() => import("@/pages/booking/PublicBooking"));
 const Trust = lazy(() => import("@/pages/Trust"));
 const Dashboard = lazy(() => import("@/pages/dashboard/Dashboard"));
 const PatientsPage = lazy(() => import("@/pages/patients/Patients"));
+const LeadsPage = lazy(() => import("@/pages/leads/Leads"));
+const LeadDetailPage = lazy(() => import("@/pages/leads/LeadDetail"));
 const PatientProfile = lazy(() => import("@/pages/patients/PatientProfile"));
 const CalendarPage = lazy(() => import("@/pages/calendar/CalendarPage"));
 const QueuePage = lazy(() => import("@/pages/queue/Queue"));
@@ -143,6 +146,7 @@ function AppContent() {
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/pricing" element={<Pricing />} />
+            <Route path="/book" element={<PublicBooking />} />
             <Route path="/trust" element={<Trust />} />
             <Route
               element={
@@ -156,6 +160,8 @@ function AppContent() {
                   what each one sees inside it. */}
               <Route path="/" element={<Dashboard />} />
               <Route path="/patients" element={<PermissionRoute><PatientsPage /></PermissionRoute>} />
+              <Route path="/leads" element={<PermissionRoute><LeadsPage /></PermissionRoute>} />
+              <Route path="/leads/:id" element={<PermissionRoute><LeadDetailPage /></PermissionRoute>} />
               <Route path="/patients/:id" element={<PermissionRoute><PatientProfile /></PermissionRoute>} />
               <Route path="/calendar" element={<PermissionRoute><CalendarPage /></PermissionRoute>} />
               <Route path="/queue" element={<PermissionRoute><QueuePage /></PermissionRoute>} />

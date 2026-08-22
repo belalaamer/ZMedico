@@ -33,6 +33,17 @@ type FunctionResponse = { connection?: Connection; connections?: Connection[]; o
 type FormState = { ad_account_id: string; business_id: string; currency: string; timezone: string; api_version: string };
 const INITIAL_FORM: FormState = { ad_account_id: "", business_id: "", currency: "EGP", timezone: "Africa/Cairo", api_version: "v20.0" };
 
+async function functionErrorMessage(error: unknown, data: FunctionResponse | undefined, fallback: string) {
+  if (data?.error) return data.error;
+  const response = (error as { context?: Response } | null)?.context;
+  if (response) {
+    const body = await response.clone().json().catch(() => null) as FunctionResponse | null;
+    if (body?.error) return body.error;
+  }
+  if (error instanceof Error && error.message && !error.message.includes("non-2xx")) return error.message;
+  return fallback;
+}
+
 function statusLabel(status: Connection["status"], isArabic: boolean) {
   const labels: Record<Connection["status"], [string, string]> = {
     configured: ["تم الحفظ — يحتاج اختبار", "Saved — test required"],
@@ -75,7 +86,7 @@ export default function MetaAdsConnection() {
     setLoading(true);
     const { data, error } = await supabase.functions.invoke<FunctionResponse>("meta-ads-connection", { body: { action: "list", branch_id: currentBranchId } });
     if (error || data?.error) {
-      toast.error(data?.error ?? error?.message ?? (isArabic ? "تعذر تحميل إعدادات Meta" : "Unable to load Meta settings"));
+      toast.error(await functionErrorMessage(error, data, isArabic ? "تعذر تحميل إعدادات Meta" : "Unable to load Meta settings"));
       setConnections([]);
     } else {
       const next = data?.connections ?? [];
@@ -108,7 +119,7 @@ export default function MetaAdsConnection() {
     if (tokenSource === "new" && token.trim()) body.access_token = token.trim();
     else body.reuse_connection_id = reuseConnectionId;
     const { data, error } = await supabase.functions.invoke<FunctionResponse>("meta-ads-connection", { body });
-    if (error || data?.error) toast.error(data?.error ?? error?.message ?? (isArabic ? "تعذر حفظ الحساب" : "Unable to save account"));
+    if (error || data?.error) toast.error(await functionErrorMessage(error, data, isArabic ? "تعذر حفظ الحساب" : "Unable to save account"));
     else {
       toast.success(isArabic ? "تمت إضافة الحساب باستخدام Token العيادة" : "Ad account saved using the clinic token");
       setToken("");
@@ -122,7 +133,7 @@ export default function MetaAdsConnection() {
     if (testingId) return;
     setTestingId(connection.id);
     const { data, error } = await supabase.functions.invoke<FunctionResponse>("meta-ads-connection", { body: { action: "test", connection_id: connection.id, branch_id: connection.branch_id } });
-    if (error || data?.error) toast.error(data?.error ?? error?.message ?? (isArabic ? "فشل اختبار Meta" : "Meta test failed"));
+    if (error || data?.error) toast.error(await functionErrorMessage(error, data, isArabic ? "فشل اختبار Meta" : "Meta test failed"));
     else toast.success(isArabic ? `تم الاتصال — ${data?.rows ?? 0} صف تجريبي` : `Connected — ${data?.rows ?? 0} sample rows`);
     await load();
     setTestingId(null);
@@ -132,7 +143,7 @@ export default function MetaAdsConnection() {
     if (disconnectingId) return;
     setDisconnectingId(connection.id);
     const { data, error } = await supabase.functions.invoke<FunctionResponse>("meta-ads-connection", { body: { action: "disconnect", connection_id: connection.id, branch_id: connection.branch_id } });
-    if (error || data?.error) toast.error(data?.error ?? error?.message ?? (isArabic ? "تعذر فصل الحساب" : "Unable to disconnect account"));
+    if (error || data?.error) toast.error(await functionErrorMessage(error, data, isArabic ? "تعذر فصل الحساب" : "Unable to disconnect account"));
     else toast.success(isArabic ? "تم فصل الحساب وحذف Token هذا السجل" : "Account disconnected and its token removed");
     await load();
     setDisconnectingId(null);

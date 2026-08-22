@@ -10,7 +10,7 @@ function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 
-type Action = "get" | "save" | "test" | "sync" | "disconnect";
+type Action = "get" | "list" | "save" | "test" | "sync" | "disconnect";
 type Input = {
   action?: Action;
   branch_id?: string;
@@ -21,6 +21,7 @@ type Input = {
   timezone?: string;
   api_version?: string;
   access_token?: string;
+  reuse_connection_id?: string;
 };
 
 type Connection = {
@@ -34,6 +35,7 @@ type Connection = {
   api_version: string;
   token_ciphertext: string | null;
   token_iv: string | null;
+  token_fingerprint: string | null;
   status: string;
   last_tested_at: string | null;
   last_successful_sync_at: string | null;
@@ -102,7 +104,6 @@ function publicConnection(connection: Connection) {
     ad_account_id: connection.ad_account_id,
     business_id: connection.business_id,
     currency: connection.currency,
-    timezone: connection.timezone,
     api_version: connection.api_version,
     status: connection.status,
     token_configured: Boolean(connection.token_ciphertext && connection.token_iv),
@@ -138,12 +139,12 @@ async function requireBranchAccess(userClient: SupabaseClient, branchId: string)
 
 async function getConnection(adminClient: SupabaseClient, input: Input): Promise<Connection | null> {
   if (input.connection_id) {
-    const { data, error } = await adminClient.from("meta_ads_connections").select("id,branch_id,provider,ad_account_id,business_id,currency,timezone,api_version,token_ciphertext,token_iv,status,last_tested_at,last_successful_sync_at,last_attempted_sync_at,last_error_code,last_error_message").eq("id", input.connection_id).limit(1).maybeSingle();
+    const { data, error } = await adminClient.from("meta_ads_connections").select("id,branch_id,provider,ad_account_id,business_id,currency,timezone,api_version,token_ciphertext,token_iv,token_fingerprint,status,last_tested_at,last_successful_sync_at,last_attempted_sync_at,last_error_code,last_error_message").eq("id", input.connection_id).limit(1).maybeSingle();
     if (error || !data) throw new Error("Meta Ads connection not found");
     return data as Connection;
   }
   if (!input.branch_id) throw new Error("branch_id is required");
-  const { data, error } = await adminClient.from("meta_ads_connections").select("id,branch_id,provider,ad_account_id,business_id,currency,timezone,api_version,token_ciphertext,token_iv,status,last_tested_at,last_successful_sync_at,last_attempted_sync_at,last_error_code,last_error_message").eq("branch_id", input.branch_id).eq("provider", "meta_ads").order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const { data, error } = await adminClient.from("meta_ads_connections").select("id,branch_id,provider,ad_account_id,business_id,currency,timezone,api_version,token_ciphertext,token_iv,token_fingerprint,status,last_tested_at,last_successful_sync_at,last_attempted_sync_at,last_error_code,last_error_message").eq("branch_id", input.branch_id).eq("provider", "meta_ads").order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (error) throw new Error(errorMessage(error.message));
   return data ? data as Connection : null;
 }
@@ -183,11 +184,30 @@ Deno.serve(async (req) => {
       return jsonResponse({ connection: connection ? publicConnection(connection) : null });
     }
 
+    if (action === "list") {
+      if (!branchId) throw new Error("branch_id is required");
+      const { data, error } = await adminClient.from("meta_ads_connections").select("id,branch_id,provider,ad_account_id,business_id,currency,timezone,api_version,token_ciphertext,token_iv,token_fingerprint,status,last_tested_at,last_successful_sync_at,last_attempted_sync_at,last_error_code,last_error_message").eq("branch_id", branchId).eq("provider", "meta_ads").order("created_at", { ascending: false });
+      if (error) throw new Error(errorMessage(error.message));
+      return jsonResponse({ connections: (data ?? []).map((row) => publicConnection(row as Connection)) });
+    }
+
     if (action === "save") {
       if (!branchId) throw new Error("branch_id is required");
       if (!input.ad_account_id || !/^act_?\d+$/.test(input.ad_account_id)) throw new Error("A valid Meta Ad Account ID is required");
-      if (!input.access_token || input.access_token.length < 20) throw new Error("A valid Meta access token is required");
-      const encrypted = await encryptToken(input.access_token.trim());
+      let encrypted: { ciphertext: string; iv: string };
+      let tokenFingerprint: string | null = null;
+      if (input.access_token && input.access_token.trim().length >= 20) {
+        const token = input.access_token.trim();
+        encrypted = await encryptToken(token);
+        tokenFingerprint = await crypto.subtle.digest("SHA-256", encoder.encode(token)).then((bytes) => toBase64(new Uint8Array(bytes)).slice(0, 16));
+      } else if (input.reuse_connection_id) {
+        const source = await getConnection(adminClient, { connection_id: input.reuse_connection_id, branch_id: branchId });
+        if (!source || source.branch_id !== branchId || !source.token_ciphertext || !source.token_iv) throw new Error("A configured connection is required to reuse its token");
+        encrypted = { ciphertext: source.token_ciphertext, iv: source.token_iv };
+        tokenFingerprint = source.token_fingerprint;
+      } else {
+        throw new Error("Enter a Meta access token or choose a saved branch token");
+      }
       const normalizedAccount = `act_${input.ad_account_id.replace(/^act_/, "")}`;
       const payload = {
         branch_id: branchId,
@@ -199,13 +219,13 @@ Deno.serve(async (req) => {
         api_version: input.api_version?.trim() || "v20.0",
         token_ciphertext: encrypted.ciphertext,
         token_iv: encrypted.iv,
-        token_fingerprint: await crypto.subtle.digest("SHA-256", encoder.encode(input.access_token.trim())).then((bytes) => toBase64(new Uint8Array(bytes)).slice(0, 16)),
+        token_fingerprint: tokenFingerprint,
         status: "configured",
         last_error_code: null,
         last_error_message: null,
         updated_by: userId,
       };
-      const { data, error } = await adminClient.from("meta_ads_connections").upsert(payload, { onConflict: "branch_id,provider,ad_account_id" }).select("id,branch_id,provider,ad_account_id,business_id,currency,timezone,api_version,token_ciphertext,token_iv,status,last_tested_at,last_successful_sync_at,last_attempted_sync_at,last_error_code,last_error_message").single();
+      const { data, error } = await adminClient.from("meta_ads_connections").upsert(payload, { onConflict: "branch_id,provider,ad_account_id" }).select("id,branch_id,provider,ad_account_id,business_id,currency,timezone,api_version,token_ciphertext,token_iv,token_fingerprint,status,last_tested_at,last_successful_sync_at,last_attempted_sync_at,last_error_code,last_error_message").single();
       if (error || !data) throw new Error(errorMessage(error?.message ?? "Unable to save Meta connection"));
       return jsonResponse({ connection: publicConnection(data as Connection) });
     }

@@ -1,0 +1,47 @@
+{
+  "notes": "Apply these rules to the zone/custom hostname that fronts the domain API. Do not apply to the workers.dev hostname because it is not a managed zone.",
+  "rate_limiting": {
+    "phase": "http_ratelimit",
+    "rules": [
+      {
+        "description": "ZMedico custom domain create protection",
+        "expression": "(http.host eq \"api.zmedico.com\" and http.request.uri.path eq \"/api/domains\" and http.request.method eq \"POST\")",
+        "action": "block",
+        "action_parameters": {
+          "response": {
+            "status_code": 429,
+            "content": "Too many requests",
+            "content_type": "text/plain"
+          }
+        },
+        "ratelimit": {
+          "characteristics": ["ip.src", "cf.colo.id"],
+          "period": 60,
+          "requests_per_period": 30,
+          "mitigation_timeout": 300
+        }
+      }
+    ]
+  },
+  "custom_rules": {
+    "phase": "http_request_firewall_custom",
+    "rules": [
+      {
+        "description": "Only POST is allowed for the domain API",
+        "expression": "(http.host eq \"api.zmedico.com\" and http.request.uri.path eq \"/api/domains\" and http.request.method ne \"POST\")",
+        "action": "block"
+      },
+      {
+        "description": "Block common secret and admin probes",
+        "expression": "(http.host eq \"api.zmedico.com\" and http.request.uri.path matches \"^/(\\.env|\\.git|wp-admin|admin|server-status)(/|$)\")",
+        "action": "block"
+      }
+    ]
+  },
+  "operational_limits": {
+    "edge_function_per_actor_per_minute": 20,
+    "edge_function_create_per_actor_per_minute": 5,
+    "max_request_body_bytes": 32768,
+    "cloudflare_upstream_timeout_ms": 10000
+  }
+}

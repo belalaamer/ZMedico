@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CheckCircle2, Copy, Globe2, Loader2, Plus, RefreshCw, Trash2, XCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -27,15 +27,35 @@ export default function TenantDomains({ tenant, branches, open, onOpenChange }: 
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const createKeyRef = useRef<string | null>(null);
 
   const tenantBranches = branches.filter((branch) => branch.tenant_id === tenant?.id && branch.is_active);
 
   const invoke = useCallback(async (body: Record<string, unknown>) => {
-    const result = await supabase.functions.invoke("manage-custom-domain", { body });
-    if (result.error) throw new Error(result.error.message || (isAr ? "تعذر الاتصال بخدمة الدومينات" : "Unable to contact domain service"));
-    const payload = result.data as { error?: string };
-    if (payload?.error) throw new Error(payload.error);
-    return result.data as { domains?: Domain[]; domain?: Domain; ok?: boolean };
+    if (import.meta.env.DEV) {
+      const result = await supabase.functions.invoke("manage-custom-domain", { body });
+      if (result.error) throw new Error(result.error.message || (isAr ? "تعذر الاتصال بخدمة الدومينات" : "Unable to contact domain service"));
+      const payload = result.data as { error?: string };
+      if (payload?.error) throw new Error(payload.error);
+      return result.data as { domains?: Domain[]; domain?: Domain; ok?: boolean };
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) throw new Error(isAr ? "انتهت جلسة الدخول، سجل الدخول مرة أخرى" : "Your session has expired; sign in again");
+    const response = await fetch("/api/domains", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        "Content-Type": "application/json",
+        ...(body.idempotency_key ? { "X-Idempotency-Key": String(body.idempotency_key) } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+    const payload = await response.json().catch(() => ({})) as { error?: string };
+    if (!response.ok || payload.error) throw new Error(payload.error || (isAr ? "تعذر الاتصال بخدمة الدومينات" : "Unable to contact domain service"));
+    return payload as { domains?: Domain[]; domain?: Domain; ok?: boolean };
   }, [isAr]);
 
   const load = useCallback(async () => {
@@ -54,10 +74,12 @@ export default function TenantDomains({ tenant, branches, open, onOpenChange }: 
   const add = async () => {
     if (!tenant || !hostname.trim()) { toast({ title: isAr ? "أدخل الدومين أولًا" : "Enter a hostname first", variant: "destructive" }); return; }
     setAdding(true);
+    createKeyRef.current = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     try {
-      await invoke({ action: "create", tenant_id: tenant.id, hostname: hostname.trim(), default_branch_id: branchId || (tenantBranches[0]?.id ?? null), validation_method: "txt" });
+      await invoke({ action: "create", tenant_id: tenant.id, hostname: hostname.trim(), default_branch_id: branchId || (tenantBranches[0]?.id ?? null), validation_method: "txt", idempotency_key: createKeyRef.current });
       toast({ title: isAr ? "تم تسجيل الدومين" : "Domain registered", description: isAr ? "أضف سجلات DNS الظاهرة ثم اضغط فحص الحالة." : "Add the DNS records shown below, then check status." });
       setHostname("");
+      createKeyRef.current = null;
       await load();
     } catch (error) {
       toast({ title: error instanceof Error ? error.message : String(error), variant: "destructive" });

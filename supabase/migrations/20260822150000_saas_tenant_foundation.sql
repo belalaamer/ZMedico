@@ -88,6 +88,20 @@ CREATE TABLE IF NOT EXISTS public.tenant_domains (
 CREATE INDEX IF NOT EXISTS tenant_domains_tenant_idx
   ON public.tenant_domains(tenant_id, status);
 
+-- Public host resolution returns only routing identifiers. It never returns
+-- tenant names, billing data, credentials, or operational records.
+CREATE OR REPLACE FUNCTION public.resolve_active_tenant_domain(_hostname text)
+RETURNS TABLE(tenant_id uuid, default_branch_id uuid)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT d.tenant_id, d.default_branch_id
+  FROM public.tenant_domains d
+  WHERE d.normalized_hostname = lower(trim(_hostname))
+    AND d.status = 'active'
+    AND d.is_enabled = true
+  LIMIT 1;
+$$;
+GRANT EXECUTE ON FUNCTION public.resolve_active_tenant_domain(text) TO anon, authenticated;
+
 CREATE OR REPLACE FUNCTION public.tg_saas_tenant_updated_at()
 RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN

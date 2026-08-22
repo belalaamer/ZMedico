@@ -28,11 +28,34 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   );
   const [enabledModules, setEnabledModules] = useState<ClinicModuleKey[]>(DEFAULT_ENABLED_MODULES);
   const [modulesLoading, setModulesLoading] = useState(false);
+  const [domainTenantId, setDomainTenantId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const host = typeof window === "undefined" ? "" : window.location.hostname.toLowerCase();
+    const isPlatformHost = !host || host === "localhost" || host === "127.0.0.1" || host.endsWith(".workers.dev");
+    if (isPlatformHost) {
+      setDomainTenantId(null);
+      return () => { active = false; };
+    }
+    void supabase.rpc("resolve_active_tenant_domain", { _hostname: host }).then(({ data, error }) => {
+      if (!active) return;
+      if (error || !Array.isArray(data) || data.length === 0) {
+        setDomainTenantId(null);
+        return;
+      }
+      const resolved = data[0] as { tenant_id?: string | null };
+      setDomainTenantId(resolved.tenant_id ?? null);
+    });
+    return () => { active = false; };
+  }, [user?.id]);
 
   const loadBranches = () => {
     if (!user) { setBranches([]); return; }
+    let branchQuery = supabase.from("branches").select("id,name_en,name_ar").order("name_en");
+    if (domainTenantId && !isSystemOwner) branchQuery = branchQuery.eq("tenant_id", domainTenantId);
     withTimeout(
-      supabase.from("branches").select("id,name_en,name_ar").order("name_en"),
+      branchQuery,
       {
         ms: 8000,
         fallback: { data: [], error: null, count: null, status: 200, statusText: "timeout-fallback" },
@@ -73,7 +96,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     loadBranches();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, isSystemOwner, roleLoading]);
+  }, [user, isSystemOwner, roleLoading, domainTenantId]);
 
   useEffect(() => {
     let active = true;
@@ -125,7 +148,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     const unsub = subscribeDataSync(["branches"], () => loadBranches());
     return unsub;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, isSystemOwner, domainTenantId]);
 
   const setCurrentBranchId = (id: string) => {
     setCurrentBranchIdState(id);

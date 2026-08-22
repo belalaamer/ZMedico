@@ -1,22 +1,26 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { LayoutDashboard, Users, Calendar, FileText, ListChecks } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
+import { useBranch } from "@/contexts/BranchContext";
 import { cn } from "@/lib/utils";
 
 export function MobileBottomNav() {
   const isMobile = useIsMobile();
   const { t } = useI18n();
   const { authz } = useAuthorization();
-  if (!isMobile) return null;
+  const { isModuleEnabled } = useBranch();
+  const { pathname } = useLocation();
+  const isPlatformRoute = pathname.startsWith("/platform") && authz.holdsAnyRole("system_owner");
+  if (!isMobile || isPlatformRoute) return null;
 
   const items = [
-    { to: "/", icon: LayoutDashboard, label: t("dashboard"), end: true, show: true },
-    { to: "/patients", icon: Users, label: t("patients"), show: authz.can("patients.view") },
-    { to: "/calendar", icon: Calendar, label: t("calendar"), show: authz.can("appointments.view") },
-    { to: "/invoices", icon: FileText, label: t("invoices"), show: authz.can("invoices.view") },
-    { to: "/queue", icon: ListChecks, label: t("queue"), show: authz.can("appointments.view") },
+    { to: "/", icon: LayoutDashboard, label: t("dashboard"), end: true, show: isModuleEnabled("dashboard") },
+    { to: "/patients", icon: Users, label: t("patients"), show: authz.can("patients.view") && isModuleEnabled("patients") },
+    { to: "/calendar", icon: Calendar, label: t("calendar"), show: authz.can("appointments.view") && isModuleEnabled("appointments") },
+    { to: "/invoices", icon: FileText, label: t("invoices"), show: authz.can("invoices.view") && isModuleEnabled("invoices") },
+    { to: "/queue", icon: ListChecks, label: t("queue"), show: authz.can("appointments.view") && isModuleEnabled("appointments") },
   ].filter(i => i.show);
 
   return (

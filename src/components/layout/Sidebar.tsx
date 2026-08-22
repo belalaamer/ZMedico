@@ -167,10 +167,13 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
     },
   ].filter(g => g.items.length > 0), [t, lang, authz, alertCount, reportItems, isModuleEnabled]);
 
+  const platformOnly = pathname.startsWith("/platform") && authz.holdsAnyRole("system_owner");
+  const visibleGroups = platformOnly ? groups.filter((group) => group.key === "setup") : groups;
+
   const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
   const activeGroupKey = useMemo(() => {
-    return groups.find(g => g.items.some(it => pathname === it.to || pathname.startsWith(it.to + "/")))?.key ?? null;
-  }, [groups, pathname]);
+    return visibleGroups.find(g => g.items.some(it => pathname === it.to || pathname.startsWith(it.to + "/")))?.key ?? null;
+  }, [visibleGroups, pathname]);
 
   useEffect(() => {
     if (!activeGroupKey) return;
@@ -210,7 +213,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
           <span className="flex-1 truncate">{dashboardItem.label}</span>
         </NavLink>
 
-        {groups.map((g) => {
+            {visibleGroups.map((g) => {
           const isOpen = !!openMap[g.key];
           return (
             <div key={g.key} className="space-y-1">

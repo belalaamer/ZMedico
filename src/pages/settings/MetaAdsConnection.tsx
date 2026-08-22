@@ -33,6 +33,12 @@ type FunctionResponse = { connection?: Connection; connections?: Connection[]; o
 type FormState = { ad_account_id: string; business_id: string; currency: string; timezone: string; api_version: string };
 const INITIAL_FORM: FormState = { ad_account_id: "", business_id: "", currency: "EGP", timezone: "Africa/Cairo", api_version: "v20.0" };
 
+function normalizeMetaAdAccountId(value: string) {
+  const compact = value.trim().replace(/\s+/g, "");
+  const digits = compact.replace(/^act_/i, "");
+  return /^\d+$/.test(digits) ? `act_${digits}` : "";
+}
+
 async function functionErrorMessage(error: unknown, data: FunctionResponse | undefined, fallback: string) {
   if (data?.error) return data.error;
   const response = (error as { context?: Response } | null)?.context;
@@ -102,8 +108,9 @@ export default function MetaAdsConnection() {
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
-    if (!currentBranchId || !form.ad_account_id.trim()) {
-      toast.error(isArabic ? "أدخل Ad Account ID" : "Enter an Ad Account ID");
+    const normalizedAdAccountId = normalizeMetaAdAccountId(form.ad_account_id);
+    if (!currentBranchId || !normalizedAdAccountId) {
+      toast.error(isArabic ? "أدخل Ad Account ID صحيحًا مثل act_1771330550941297" : "Enter a valid Ad Account ID, for example act_1771330550941297");
       return;
     }
     if (tokenSource === "new" && token.trim().length < 20) {
@@ -115,7 +122,7 @@ export default function MetaAdsConnection() {
       return;
     }
     setSaving(true);
-    const body: Record<string, string | null> = { action: "save", branch_id: currentBranchId, ad_account_id: form.ad_account_id.trim(), business_id: form.business_id.trim() || null, currency: form.currency, timezone: form.timezone, api_version: form.api_version };
+    const body: Record<string, string | null> = { action: "save", branch_id: currentBranchId, ad_account_id: normalizedAdAccountId, business_id: form.business_id.trim() || null, currency: form.currency, timezone: form.timezone, api_version: form.api_version };
     if (tokenSource === "new" && token.trim()) body.access_token = token.trim();
     else body.reuse_connection_id = reuseConnectionId;
     const { data, error } = await supabase.functions.invoke<FunctionResponse>("meta-ads-connection", { body });

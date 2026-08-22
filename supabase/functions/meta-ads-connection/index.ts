@@ -193,7 +193,9 @@ Deno.serve(async (req) => {
 
     if (action === "save") {
       if (!branchId) throw new Error("branch_id is required");
-      if (!input.ad_account_id || !/^act_?\d+$/.test(input.ad_account_id)) throw new Error("A valid Meta Ad Account ID is required");
+      const rawAdAccountId = input.ad_account_id?.trim().replace(/\s+/g, "") ?? "";
+      const accountDigits = rawAdAccountId.replace(/^act_/i, "");
+      if (!/^\d+$/.test(accountDigits)) throw new Error("A valid Meta Ad Account ID is required, for example act_1771330550941297");
       let encrypted: { ciphertext: string; iv: string };
       let tokenFingerprint: string | null = null;
       if (input.access_token && input.access_token.trim().length >= 20) {
@@ -208,7 +210,7 @@ Deno.serve(async (req) => {
       } else {
         throw new Error("Enter a Meta access token or choose a saved branch token");
       }
-      const normalizedAccount = `act_${input.ad_account_id.replace(/^act_/, "")}`;
+      const normalizedAccount = `act_${accountDigits}`;
       const payload = {
         branch_id: branchId,
         provider: "meta_ads",

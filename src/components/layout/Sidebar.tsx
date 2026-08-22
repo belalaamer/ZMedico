@@ -25,7 +25,7 @@ const REPORT_ICONS: Record<ReportNavigationKey, LucideIcon> = {
 
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {}) {
   const { t, lang } = useI18n();
-  const { currentBranchId } = useBranch();
+  const { currentBranchId, isModuleEnabled } = useBranch();
   const { pathname } = useLocation();
   const [alertCount, setAlertCount] = useState(0);
   const { authz } = useAuthorization();
@@ -93,7 +93,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       key: "physio",
       label: lang === "ar" ? "العلاج الطبيعي" : "Physiotherapy",
       icon: Activity,
-      items: [
+      items: !isModuleEnabled("physio") ? [] : [
         authz.can("medical_records.view") && { to: "/physio", icon: Activity, label: lang === "ar" ? "الحالات" : "Cases" },
         authz.can("medical_records.view") && { to: "/physio/dashboard", icon: BarChart3, label: lang === "ar" ? "لوحة العلاج الطبيعي" : "Physio Dashboard" },
         authz.can("medical_records.view") && { to: "/physio/reports", icon: FileText, label: lang === "ar" ? "التقارير" : "Reports" },
@@ -123,7 +123,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       label: t("inventoryHub"),
       icon: Boxes,
       badge: alertCount,
-      items: !authz.can("inventory.view") ? [] : [
+      items: !isModuleEnabled("inventory") || !authz.can("inventory.view") ? [] : [
         { to: "/inventory/stock", icon: BarChart3, label: t("stockOverview") },
         { to: "/inventory/products", icon: Package, label: t("products") },
         { to: "/inventory/categories", icon: FolderTree, label: t("categories") },
@@ -136,7 +136,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       key: "hr",
       label: lang === "ar" ? "الموارد البشرية" : "HR & Staff",
       icon: UserCog,
-      items: !authz.can("hr.view") ? [] : [
+      items: !isModuleEnabled("hr") || !authz.can("hr.view") ? [] : [
         { to: "/hr/staff", icon: UserCog, label: t("staffDirectory") },
         { to: "/hr/departments", icon: Building2, label: t("departments") },
         { to: "/hr/positions", icon: Briefcase, label: t("positions") },
@@ -165,7 +165,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
         authz.isSuperAdmin() && { to: "/settings", icon: Settings, label: t("settings") },
       ].filter(Boolean) as NavItem[],
     },
-  ].filter(g => g.items.length > 0), [t, lang, authz, alertCount, reportItems]);
+  ].filter(g => g.items.length > 0), [t, lang, authz, alertCount, reportItems, isModuleEnabled]);
 
   const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
   const activeGroupKey = useMemo(() => {

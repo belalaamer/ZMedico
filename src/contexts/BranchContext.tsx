@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./AuthContext";
+import { useUserRole } from "@/hooks/useUserRole";
 import { withTimeout } from "@/lib/withTimeout";
 import { subscribeDataSync } from "@/lib/dataSync";
 
@@ -16,6 +17,7 @@ const BranchContext = createContext<Ctx | null>(null);
 
 export function BranchProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const { isSystemOwner, loading: roleLoading } = useUserRole();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [currentBranchId, setCurrentBranchIdState] = useState<string | null>(
     () => localStorage.getItem("zmedico.branch")
@@ -27,13 +29,20 @@ export function BranchProvider({ children }: { children: ReactNode }) {
       supabase.from("branches").select("id,name_en,name_ar").order("name_en"),
       {
         ms: 8000,
-        fallback: { data: [], error: null, count: null, status: 200, statusText: "timeout-fallback" } as any,
+        fallback: { data: [], error: null, count: null, status: 200, statusText: "timeout-fallback" },
         label: "branches.bootstrap",
       }
     ).then(({ data }) => {
       const list = (data ?? []) as Branch[];
       setBranches(list);
       setCurrentBranchIdState((prev) => {
+        // System Owner starts in the platform console, not inside the first
+        // clinic. A clinic is selected only after an explicit user action.
+        if (roleLoading) return prev;
+        if (isSystemOwner) {
+          localStorage.removeItem("zmedico.branch");
+          return null;
+        }
         // If no selection yet, pick the first.
         if (!prev) {
           const next = list[0]?.id ?? null;
@@ -58,7 +67,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     loadBranches();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, isSystemOwner, roleLoading]);
 
   // Refetch whenever any branches mutation happens elsewhere in the app
   // (create / update / delete) so sidebar, switcher and branch-scoped UI

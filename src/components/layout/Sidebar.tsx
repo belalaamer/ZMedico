@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap, FolderOpen, Briefcase, UserCog, Clock, CalendarDays, DollarSign, Star, Target, Ticket, ListChecks, ChevronDown, Wallet, ScrollText, Percent } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap, FolderOpen, Briefcase, UserCog, Clock, CalendarDays, DollarSign, Star, Target, Ticket, ListChecks, ChevronDown, Wallet, ScrollText, Percent, type LucideIcon } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { subscribeResilient } from "@/lib/realtime";
@@ -10,9 +10,9 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { visibleReportNavigation, type ReportNavigationKey } from "@/lib/reportNavigation";
 
-type NavItem = { to: string; icon: any; label: string; end?: boolean; badge?: number };
+type NavItem = { to: string; icon: LucideIcon; label: string; end?: boolean; badge?: number };
 
-const REPORT_ICONS: Record<ReportNavigationKey, any> = {
+const REPORT_ICONS: Record<ReportNavigationKey, LucideIcon> = {
   financial: DollarSign,
   operational: BarChart3,
   medical: Stethoscope,
@@ -67,7 +67,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
     }));
   }, [authz, t]);
 
-  const groups: { key: string; label: string; icon: any; items: NavItem[]; badge?: number }[] = useMemo(() => [
+  const groups: { key: string; label: string; icon: LucideIcon; items: NavItem[]; badge?: number }[] = useMemo(() => [
     {
       key: "clinic_operations",
       label: lang === "ar" ? "تشغيل العيادة" : "Clinic Operations",
@@ -156,6 +156,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       label: lang === "ar" ? "الإعداد والإدارة" : "Setup & Admin",
       icon: Settings,
       items: [
+        authz.holdsAnyRole("system_owner") && { to: "/platform", icon: Building2, label: lang === "ar" ? "إدارة المنصة" : "Platform Console" },
         authz.isSuperAdmin() && { to: "/branches", icon: Building2, label: t("branches") },
         // Same adminOnly gate as /branches (and the same audience the existing
         // "Branch dashboard" quick-link inside Branches.tsx already targets),

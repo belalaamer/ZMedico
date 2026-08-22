@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,6 +11,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { PermissionRoute } from "@/components/PermissionRoute";
 import { attachGlobalRefreshListeners } from "@/lib/dataSync";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 const AppShell = lazy(() => import("@/components/layout/AppShell"));
@@ -107,6 +108,7 @@ const QAIdentities = lazy(() => import("@/pages/settings/QAIdentities"));
 const SystemSelfAudit = lazy(() => import("@/pages/system/SystemSelfAudit"));
 const Branches = lazy(() => import("@/pages/branches/Branches"));
 const BranchDashboard = lazy(() => import("@/pages/branches/BranchDashboard"));
+const PlatformConsole = lazy(() => import("@/pages/platform/PlatformConsole"));
 const Reminders = lazy(() => import("@/pages/reminders/Reminders"));
 const ScheduledReminders = lazy(() => import("@/pages/reminders/ScheduledReminders"));
 
@@ -131,6 +133,16 @@ function RouteLoader() {
       </div>
     </div>
   );
+}
+
+function HomeEntry() {
+  const navigate = useNavigate();
+  const { authz, loading } = useAuthorization("home-entry");
+  useEffect(() => {
+    if (!loading && authz.holdsAnyRole("system_owner")) navigate("/platform", { replace: true });
+  }, [authz, loading, navigate]);
+  if (!loading && authz.holdsAnyRole("system_owner")) return <RouteLoader />;
+  return <Dashboard />;
 }
 
 function AppContent() {
@@ -159,7 +171,8 @@ function AppContent() {
               {/* The landing page is reachable by every authenticated user. No single
                   permission is held by all roles, and row-level security already limits
                   what each one sees inside it. */}
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/" element={<HomeEntry />} />
+              <Route path="/platform" element={<PermissionRoute adminOnly><PlatformConsole /></PermissionRoute>} />
               <Route path="/patients" element={<PermissionRoute><PatientsPage /></PermissionRoute>} />
               <Route path="/leads" element={<PermissionRoute><LeadsPage /></PermissionRoute>} />
               <Route path="/leads/:id" element={<PermissionRoute><LeadDetailPage /></PermissionRoute>} />

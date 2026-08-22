@@ -2,6 +2,7 @@ export type ClinicModuleKey =
   | "dashboard"
   | "patients"
   | "appointments"
+  | "medical"
   | "invoices"
   | "reports"
   | "communication"
@@ -27,6 +28,7 @@ export const CLINIC_MODULES: ClinicModuleDefinition[] = [
   { key: "dashboard", nameAr: "لوحة التحكم", nameEn: "Dashboard", descriptionAr: "ملخص تشغيل العيادة", descriptionEn: "Clinic operating summary", group: "core", alwaysOn: true },
   { key: "patients", nameAr: "المرضى", nameEn: "Patients", descriptionAr: "ملفات المرضى والبيانات الأساسية", descriptionEn: "Patient records and demographics", group: "core", alwaysOn: true },
   { key: "appointments", nameAr: "المواعيد", nameEn: "Appointments", descriptionAr: "الحجز والتقويم والطابور", descriptionEn: "Booking, calendar and queue", group: "core", alwaysOn: true },
+  { key: "medical", nameAr: "الملفات الطبية", nameEn: "Medical records", descriptionAr: "السجلات والاستشارات والوصفات", descriptionEn: "Records, consultations and prescriptions", group: "core", alwaysOn: true },
   { key: "invoices", nameAr: "الفوترة", nameEn: "Billing", descriptionAr: "الفواتير والمدفوعات والخزينة", descriptionEn: "Invoices, payments and treasury", group: "core", alwaysOn: true },
   { key: "reports", nameAr: "التقارير", nameEn: "Reports", descriptionAr: "تقارير التشغيل والماليات", descriptionEn: "Operational and financial reports", group: "core", alwaysOn: true },
   { key: "communication", nameAr: "التواصل", nameEn: "Communication", descriptionAr: "التذكيرات وقنوات الرسائل", descriptionEn: "Reminders and messaging channels", group: "core", alwaysOn: true },
@@ -56,6 +58,7 @@ export function moduleKeyForPath(path: string): ClinicModuleKey | null {
   if (path.startsWith("/patients")) return "patients";
   if (path.startsWith("/calendar") || path.startsWith("/queue") || path.startsWith("/appointments") || path.startsWith("/reminders")) return "appointments";
   if (path.startsWith("/invoices") || path.startsWith("/payments") || path.startsWith("/treasury") || path.startsWith("/expenses") || path.startsWith("/coupons")) return "invoices";
-  if (path.startsWith("/reports") || path.startsWith("/medical")) return "reports";
+  if (path.startsWith("/reports")) return "reports";
+  if (path.startsWith("/medical")) return "medical";
   return null;
 }

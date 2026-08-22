@@ -24,6 +24,7 @@ const Dashboard = lazy(() => import("@/pages/dashboard/Dashboard"));
 const PatientsPage = lazy(() => import("@/pages/patients/Patients"));
 const LeadsPage = lazy(() => import("@/pages/leads/Leads"));
 const LeadDetailPage = lazy(() => import("@/pages/leads/LeadDetail"));
+const LeadAnalyticsPage = lazy(() => import("@/pages/leads/LeadAnalytics"));
 const PatientProfile = lazy(() => import("@/pages/patients/PatientProfile"));
 const CalendarPage = lazy(() => import("@/pages/calendar/CalendarPage"));
 const QueuePage = lazy(() => import("@/pages/queue/Queue"));
@@ -162,6 +163,7 @@ function AppContent() {
               <Route path="/patients" element={<PermissionRoute><PatientsPage /></PermissionRoute>} />
               <Route path="/leads" element={<PermissionRoute><LeadsPage /></PermissionRoute>} />
               <Route path="/leads/:id" element={<PermissionRoute><LeadDetailPage /></PermissionRoute>} />
+              <Route path="/leads/analytics" element={<PermissionRoute><LeadAnalyticsPage /></PermissionRoute>} />
               <Route path="/patients/:id" element={<PermissionRoute><PatientProfile /></PermissionRoute>} />
               <Route path="/calendar" element={<PermissionRoute><CalendarPage /></PermissionRoute>} />
               <Route path="/queue" element={<PermissionRoute><QueuePage /></PermissionRoute>} />

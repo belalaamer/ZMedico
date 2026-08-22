@@ -44,3 +44,18 @@ export const DEFAULT_ENABLED_MODULES = CLINIC_MODULES.map((module) => module.key
 export function moduleDefinition(key: string) {
   return CLINIC_MODULES.find((module) => module.key === key);
 }
+
+
+/** Maps protected application paths to tenant-level module entitlements. */
+export function moduleKeyForPath(path: string): ClinicModuleKey | null {
+  if (path.startsWith("/physio")) return "physio";
+  if (path.startsWith("/inventory")) return "inventory";
+  if (path.startsWith("/hr")) return "hr";
+  if (path.startsWith("/leads")) return "marketing";
+  if (path.startsWith("/settings/communication")) return "communication";
+  if (path.startsWith("/patients")) return "patients";
+  if (path.startsWith("/calendar") || path.startsWith("/queue") || path.startsWith("/appointments") || path.startsWith("/reminders")) return "appointments";
+  if (path.startsWith("/invoices") || path.startsWith("/payments") || path.startsWith("/treasury") || path.startsWith("/expenses") || path.startsWith("/coupons")) return "invoices";
+  if (path.startsWith("/reports") || path.startsWith("/medical")) return "reports";
+  return null;
+}

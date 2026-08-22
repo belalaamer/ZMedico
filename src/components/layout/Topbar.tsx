@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Bell, Search, LogOut, Globe, Calendar, Wallet, Clock, AlertTriangle, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBranch } from "@/contexts/BranchContext";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -18,12 +19,27 @@ import { supabase } from "@/integrations/supabase/client";
 import { subscribeResilient } from "@/lib/realtime";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
 
+type NotificationRow = {
+  id: string;
+  title_en?: string | null;
+  title_ar?: string | null;
+  message_en?: string | null;
+  message_ar?: string | null;
+  type: string;
+  related_entity_type?: string | null;
+  related_entity_id?: string | null;
+  is_read: boolean;
+  created_at: string;
+};
+
 export function Topbar() {
   const { t, lang, setLang } = useI18n();
   const { user, signOut } = useAuth();
   const { branches, currentBranchId, setCurrentBranchId } = useBranch();
+  const { pathname } = useLocation();
+  const { isSystemOwner } = useUserRole();
   const [now, setNow] = useState(new Date());
-  const [notifs, setNotifs] = useState<any[]>([]);
+  const [notifs, setNotifs] = useState<NotificationRow[]>([]);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -61,7 +77,7 @@ export function Topbar() {
       .limit(10);
     // De-duplicate: collapse multiple notifications for the same related entity
     const seen = new Set<string>();
-    const unique = (data ?? []).filter((n: any) => {
+    const unique = ((data ?? []) as NotificationRow[]).filter((n) => {
       const key = n.related_entity_type && n.related_entity_id
         ? `${n.related_entity_type}:${n.related_entity_id}`
         : `id:${n.id}`;
@@ -97,7 +113,7 @@ export function Topbar() {
       default: return <Bell className="size-4 text-muted-foreground" />;
     }
   };
-  const linkFor = (n: any): string => {
+  const linkFor = (n: NotificationRow): string => {
     if (!n.related_entity_type || !n.related_entity_id) return "#";
     switch (n.related_entity_type) {
       case "appointment": return "/calendar";
@@ -133,6 +149,8 @@ export function Topbar() {
       : undefined;
   const branchLabel = (b: { name_en?: string | null; name_ar?: string | null }) =>
     (lang === "ar" ? b.name_ar || b.name_en : b.name_en || b.name_ar) || "—";
+
+  const showBranchSwitcher = !(isSystemOwner && pathname.startsWith("/platform"));
 
   return (
     <header className="h-16 min-h-16 shrink-0 flex items-center gap-2 px-3 sm:gap-3 sm:px-4 md:px-6 border-b border-border bg-card">
@@ -206,7 +224,7 @@ export function Topbar() {
         {time}
       </div>
 
-      {safeBranches.length > 0 ? (
+      {showBranchSwitcher && safeBranches.length > 0 ? (
         <Select value={branchValue} onValueChange={setCurrentBranchId}>
           <SelectTrigger className="w-[160px] hidden sm:flex">
             <SelectValue placeholder={t("branch")} />
@@ -219,14 +237,14 @@ export function Topbar() {
             ))}
           </SelectContent>
         </Select>
-      ) : (
+      ) : showBranchSwitcher ? (
         <div
           className="w-[160px] hidden sm:flex items-center h-9 px-3 rounded-md border border-input bg-muted/40 text-sm text-muted-foreground truncate"
           aria-label={t("branch")}
         >
           {t("branch")}
         </div>
-      )}
+      ) : null}
 
       <Button variant="ghost" size="icon" type="button" className="size-11 shrink-0" onClick={() => setLang(lang === "ar" ? "en" : "ar")} title={t("language")} aria-label={t("language")}>
         <Globe className="size-5" />

@@ -12,6 +12,7 @@ import { PermissionRoute } from "@/components/PermissionRoute";
 import { attachGlobalRefreshListeners } from "@/lib/dataSync";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
+import { useBranch } from "@/contexts/BranchContext";
 
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 const AppShell = lazy(() => import("@/components/layout/AppShell"));
@@ -137,11 +138,13 @@ function RouteLoader() {
 
 function HomeEntry() {
   const navigate = useNavigate();
+  const { currentBranchId } = useBranch();
   const { authz, loading } = useAuthorization("home-entry");
+  const isSystemOwner = authz.holdsAnyRole("system_owner");
   useEffect(() => {
-    if (!loading && authz.holdsAnyRole("system_owner")) navigate("/platform", { replace: true });
-  }, [authz, loading, navigate]);
-  if (!loading && authz.holdsAnyRole("system_owner")) return <RouteLoader />;
+    if (!loading && isSystemOwner && !currentBranchId) navigate("/platform", { replace: true });
+  }, [currentBranchId, isSystemOwner, loading, navigate]);
+  if (!loading && isSystemOwner && !currentBranchId) return <RouteLoader />;
   return <Dashboard />;
 }
 

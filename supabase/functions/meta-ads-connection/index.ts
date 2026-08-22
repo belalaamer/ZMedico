@@ -136,7 +136,7 @@ async function requireBranchAccess(userClient: SupabaseClient, branchId: string)
   if (error || data !== true) throw new Error("Branch access denied");
 }
 
-async function getConnection(adminClient: SupabaseClient, input: Input): Promise<Connection> {
+async function getConnection(adminClient: SupabaseClient, input: Input): Promise<Connection | null> {
   if (input.connection_id) {
     const { data, error } = await adminClient.from("meta_ads_connections").select("id,branch_id,provider,ad_account_id,business_id,currency,timezone,api_version,token_ciphertext,token_iv,status,last_tested_at,last_successful_sync_at,last_attempted_sync_at,last_error_code,last_error_message").eq("id", input.connection_id).limit(1).maybeSingle();
     if (error || !data) throw new Error("Meta Ads connection not found");
@@ -144,8 +144,8 @@ async function getConnection(adminClient: SupabaseClient, input: Input): Promise
   }
   if (!input.branch_id) throw new Error("branch_id is required");
   const { data, error } = await adminClient.from("meta_ads_connections").select("id,branch_id,provider,ad_account_id,business_id,currency,timezone,api_version,token_ciphertext,token_iv,status,last_tested_at,last_successful_sync_at,last_attempted_sync_at,last_error_code,last_error_message").eq("branch_id", input.branch_id).eq("provider", "meta_ads").order("created_at", { ascending: false }).limit(1).maybeSingle();
-  if (error || !data) throw new Error("Meta Ads connection not found");
-  return data as Connection;
+  if (error) throw new Error(errorMessage(error.message));
+  return data ? data as Connection : null;
 }
 
 async function testMetaConnection(connection: Connection, token: string) {
@@ -174,11 +174,13 @@ Deno.serve(async (req) => {
     const branchId = input.branch_id;
     if (!branchId && !input.connection_id) throw new Error("branch_id or connection_id is required");
     const connectionForAccess = input.connection_id ? await getConnection(adminClient, input) : null;
-    await requireBranchAccess(userClient, branchId ?? connectionForAccess!.branch_id);
+    const targetBranchId = branchId ?? connectionForAccess?.branch_id;
+    if (!targetBranchId) throw new Error("Unable to determine branch access");
+    await requireBranchAccess(userClient, targetBranchId);
 
     if (action === "get") {
       const connection = connectionForAccess ?? await getConnection(adminClient, input);
-      return jsonResponse({ connection: publicConnection(connection) });
+      return jsonResponse({ connection: connection ? publicConnection(connection) : null });
     }
 
     if (action === "save") {
@@ -209,6 +211,7 @@ Deno.serve(async (req) => {
     }
 
     const connection = connectionForAccess ?? await getConnection(adminClient, input);
+    if (!connection) throw new Error("Meta Ads connection not found");
     if (action === "test") {
       if (!connection.token_ciphertext || !connection.token_iv) throw new Error("No Meta token is configured");
       const token = await decryptToken(connection.token_ciphertext, connection.token_iv);

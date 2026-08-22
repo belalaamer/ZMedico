@@ -160,7 +160,7 @@ export default function PlatformConsole() {
       return;
     }
     setCurrentBranchId(branch.id);
-    navigate("/");
+    navigate("/workspace");
   };
 
   if (authLoading || loading) return <div className="flex min-h-[50vh] items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" />{isAr ? "جارٍ تحميل منصة الإدارة…" : "Loading platform console…"}</div>;

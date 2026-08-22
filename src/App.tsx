@@ -16,6 +16,7 @@ import { useBranch } from "@/contexts/BranchContext";
 
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 const AppShell = lazy(() => import("@/components/layout/AppShell"));
+const PlatformShell = lazy(() => import("@/components/layout/PlatformShell"));
 const AuthPage = lazy(() => import("@/pages/auth/Auth"));
 const AuthCallback = lazy(() => import("@/pages/auth/AuthCallback"));
 const ResetPassword = lazy(() => import("@/pages/auth/ResetPassword"));
@@ -138,13 +139,12 @@ function RouteLoader() {
 
 function HomeEntry() {
   const navigate = useNavigate();
-  const { currentBranchId } = useBranch();
   const { authz, loading } = useAuthorization("home-entry");
   const isSystemOwner = authz.holdsAnyRole("system_owner");
   useEffect(() => {
-    if (!loading && isSystemOwner && !currentBranchId) navigate("/platform", { replace: true });
-  }, [currentBranchId, isSystemOwner, loading, navigate]);
-  if (!loading && isSystemOwner && !currentBranchId) return <RouteLoader />;
+    if (!loading && isSystemOwner) navigate("/platform", { replace: true });
+  }, [isSystemOwner, loading, navigate]);
+  if (loading || isSystemOwner) return <RouteLoader />;
   return <Dashboard />;
 }
 
@@ -164,18 +164,27 @@ function AppContent() {
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/book" element={<PublicBooking />} />
             <Route path="/trust" element={<Trust />} />
-            <Route
-              element={
-                <ProtectedRoute>
-                  <AppShell />
-                </ProtectedRoute>
-              }
-            >
+              <Route
+                element={
+                  <ProtectedRoute>
+                    <PlatformShell />
+                  </ProtectedRoute>
+                }
+              >
+                <Route path="/platform" element={<PermissionRoute adminOnly><PlatformConsole /></PermissionRoute>} />
+              </Route>
+              <Route
+                element={
+                  <ProtectedRoute>
+                    <AppShell />
+                  </ProtectedRoute>
+                }
+              >
               {/* The landing page is reachable by every authenticated user. No single
                   permission is held by all roles, and row-level security already limits
                   what each one sees inside it. */}
               <Route path="/" element={<HomeEntry />} />
-              <Route path="/platform" element={<PermissionRoute adminOnly><PlatformConsole /></PermissionRoute>} />
+              <Route path="/workspace" element={<Dashboard />} />
               <Route path="/patients" element={<PermissionRoute><PatientsPage /></PermissionRoute>} />
               <Route path="/leads" element={<PermissionRoute><LeadsPage /></PermissionRoute>} />
               <Route path="/leads/:id" element={<PermissionRoute><LeadDetailPage /></PermissionRoute>} />

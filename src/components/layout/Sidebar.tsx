@@ -8,6 +8,7 @@ import { useBranch } from "@/contexts/BranchContext";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
+import { isSystemOwnerWorkspaceHandoff } from "@/lib/platformWorkspace";
 import { visibleReportNavigation, type ReportNavigationKey } from "@/lib/reportNavigation";
 
 type NavItem = { to: string; icon: LucideIcon; label: string; end?: boolean; badge?: number };
@@ -30,6 +31,8 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
   const [alertCount, setAlertCount] = useState(0);
   const { authz } = useAuthorization();
   const isSystemOwner = authz.holdsAnyRole("system_owner");
+  const isWorkspaceHandoff = isSystemOwnerWorkspaceHandoff(isSystemOwner, pathname, currentBranchId);
+  const isPlatformSurface = isSystemOwner && !isWorkspaceHandoff;
 
   useEffect(() => {
     const refresh = () => {
@@ -49,7 +52,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
     });
   }, [currentBranchId]);
 
-  const dashboardItem: NavItem = isSystemOwner
+  const dashboardItem: NavItem = isPlatformSurface
     ? { to: "/platform", icon: Building2, label: lang === "ar" ? "إدارة المنصة" : "Platform Console", end: true }
     : { to: "/", icon: LayoutDashboard, label: t("dashboard"), end: true };
   const reportItems = useMemo(() => {
@@ -159,7 +162,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       label: lang === "ar" ? "الإعداد والإدارة" : "Setup & Admin",
       icon: Settings,
       items: [
-        authz.holdsAnyRole("system_owner") && { to: "/platform", icon: Building2, label: lang === "ar" ? "إدارة المنصة" : "Platform Console" },
+        isPlatformSurface && { to: "/platform", icon: Building2, label: lang === "ar" ? "إدارة المنصة" : "Platform Console" },
         authz.isSuperAdmin() && { to: "/branches", icon: Building2, label: t("branches") },
         // Same adminOnly gate as /branches (and the same audience the existing
         // "Branch dashboard" quick-link inside Branches.tsx already targets),
@@ -168,15 +171,13 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
         authz.isSuperAdmin() && { to: "/settings", icon: Settings, label: t("settings") },
       ].filter(Boolean) as NavItem[],
     },
-  ].filter(g => g.items.length > 0), [t, lang, authz, alertCount, reportItems, isModuleEnabled]);
+  ].filter(g => g.items.length > 0), [t, lang, authz, alertCount, reportItems, isModuleEnabled, isPlatformSurface]);
 
-  const platformOnly = pathname.startsWith("/platform") && isSystemOwner;
-  // Platform administration is a separate surface. Keep this fallback sidebar
-  // empty for system owners as well, so a delayed/legacy shell can never expose
-  // clinic navigation or branch settings.
+  // Platform administration is a separate surface. A System Owner may still
+  // see the full clinic navigation after an explicit workspace handoff.
   const visibleGroups = useMemo(
-    () => isSystemOwner ? [] : (platformOnly ? groups.filter((group) => group.key === "setup") : groups),
-    [isSystemOwner, platformOnly, groups],
+    () => isPlatformSurface ? [] : groups,
+    [isPlatformSurface, groups],
   );
 
   const [openMap, setOpenMap] = useState<Record<string, boolean>>({});

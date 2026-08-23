@@ -11,13 +11,13 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { isSystemOwnerWorkspaceHandoff } from "@/lib/platformWorkspace";
 
 export default function AppShell() {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const { authz, loading: authzLoading } = useAuthorization("workspace-shell");
   const { currentBranchId, subscription, subscriptionLoading } = useBranch();
   const { lang } = useI18n();
   const workspaceHandoff = isSystemOwnerWorkspaceHandoff(
     authzLoading ? false : authz.holdsAnyRole("system_owner"),
-    pathname,
+    `${pathname}${search}`,
     currentBranchId,
   );
   const mainRef = useRef<HTMLElement>(null);

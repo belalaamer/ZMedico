@@ -17,9 +17,14 @@ export function clearPlatformWorkspaceBranch(): void {
 
 export function isSystemOwnerWorkspaceHandoff(
   isSystemOwner: boolean,
-  pathname: string,
+  path: string,
   currentBranchId: string | null,
 ): boolean {
-  if (!isSystemOwner || pathname.startsWith("/platform") || !currentBranchId) return false;
-  return getPlatformWorkspaceBranch() === currentBranchId;
+  const [pathname, search = ""] = path.split("?", 2);
+  if (!isSystemOwner || pathname.startsWith("/platform")) return false;
+  const handoffBranchId = getPlatformWorkspaceBranch();
+  if (!handoffBranchId) return false;
+  const queryBranchId = new URLSearchParams(search).get("branch");
+  const effectiveBranchId = currentBranchId ?? queryBranchId;
+  return effectiveBranchId === handoffBranchId;
 }

@@ -27,11 +27,11 @@ const REPORT_ICONS: Record<ReportNavigationKey, LucideIcon> = {
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {}) {
   const { t, lang } = useI18n();
   const { currentBranchId, isModuleEnabled } = useBranch();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const [alertCount, setAlertCount] = useState(0);
   const { authz, loading: authzLoading } = useAuthorization("sidebar");
   const isSystemOwner = authz.holdsAnyRole("system_owner");
-  const isWorkspaceHandoff = isSystemOwnerWorkspaceHandoff(isSystemOwner, pathname, currentBranchId);
+  const isWorkspaceHandoff = isSystemOwnerWorkspaceHandoff(isSystemOwner, `${pathname}${search}`, currentBranchId);
   const isPlatformSurface = isSystemOwner && !isWorkspaceHandoff;
 
   useEffect(() => {

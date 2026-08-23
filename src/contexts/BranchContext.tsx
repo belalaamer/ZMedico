@@ -5,6 +5,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { withTimeout } from "@/lib/withTimeout";
 import { subscribeDataSync } from "@/lib/dataSync";
 import { DEFAULT_ENABLED_MODULES, type ClinicModuleKey } from "@/lib/clinicModules";
+import { getPlatformWorkspaceBranch } from "@/lib/platformWorkspace";
 
 export type Branch = { id: string; name_en: string; name_ar: string };
 
@@ -96,6 +97,8 @@ export function BranchProvider({ children }: { children: ReactNode }) {
         // clinic. A clinic is selected only after an explicit user action.
         if (roleLoading) return prev;
         if (isSystemOwner) {
+          const handoffBranchId = getPlatformWorkspaceBranch();
+          if (handoffBranchId && list.some((branch) => branch.id === handoffBranchId)) return handoffBranchId;
           localStorage.removeItem("zmedico.branch");
           return null;
         }

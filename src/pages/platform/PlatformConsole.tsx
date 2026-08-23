@@ -15,6 +15,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CLINIC_MODULES, DEFAULT_ENABLED_MODULES, type ClinicModuleKey } from "@/lib/clinicModules";
+import { clearPlatformWorkspaceBranch, setPlatformWorkspaceBranch } from "@/lib/platformWorkspace";
 import OnboardingWizard from "@/pages/platform/OnboardingWizard";
 import TenantDomains from "@/pages/platform/TenantDomains";
 
@@ -86,7 +87,12 @@ export default function PlatformConsole() {
     setLoading(false);
   }, [canView, toast]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    // A platform owner must enter a clinic workspace only through the explicit
+    // Open Workspace action. Clear stale handoffs whenever the console mounts.
+    clearPlatformWorkspaceBranch();
+    void load();
+  }, [load]);
 
   const branchCount = useMemo(() => {
     const counts = new Map<string, number>();
@@ -170,7 +176,8 @@ export default function PlatformConsole() {
       return;
     }
     setCurrentBranchId(branch.id);
-    navigate("/workspace");
+    setPlatformWorkspaceBranch(branch.id);
+    navigate(`/workspace?branch=${encodeURIComponent(branch.id)}`);
   };
 
   if (authLoading || loading) return <div className="flex min-h-[50vh] items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" />{isAr ? "جارٍ تحميل منصة الإدارة…" : "Loading platform console…"}</div>;

@@ -8,12 +8,18 @@ import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { isSystemOwnerWorkspaceHandoff } from "@/lib/platformWorkspace";
 
 export default function AppShell() {
   const { pathname } = useLocation();
   const { authz, loading: authzLoading } = useAuthorization("workspace-shell");
   const { currentBranchId, subscription, subscriptionLoading } = useBranch();
   const { lang } = useI18n();
+  const workspaceHandoff = isSystemOwnerWorkspaceHandoff(
+    authzLoading ? false : authz.holdsAnyRole("system_owner"),
+    pathname,
+    currentBranchId,
+  );
   const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -24,7 +30,7 @@ export default function AppShell() {
   // This prevents a system owner from seeing a one-frame clinic dashboard/sidebar
   // while the role query is still loading.
   if (authzLoading) return <SubscriptionState loading lang={lang} />;
-  if (authz.holdsAnyRole("system_owner")) return <Navigate to="/platform" replace />;
+  if (authz.holdsAnyRole("system_owner") && !workspaceHandoff) return <Navigate to="/platform" replace />;
   if (currentBranchId && subscriptionLoading) return <SubscriptionState loading lang={lang} />;
   if (!authzLoading && currentBranchId && !subscription) {
     return <SubscriptionState

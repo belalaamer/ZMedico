@@ -29,7 +29,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
   const { currentBranchId, isModuleEnabled } = useBranch();
   const { pathname } = useLocation();
   const [alertCount, setAlertCount] = useState(0);
-  const { authz } = useAuthorization();
+  const { authz, loading: authzLoading } = useAuthorization("sidebar");
   const isSystemOwner = authz.holdsAnyRole("system_owner");
   const isWorkspaceHandoff = isSystemOwnerWorkspaceHandoff(isSystemOwner, pathname, currentBranchId);
   const isPlatformSurface = isSystemOwner && !isWorkspaceHandoff;
@@ -193,6 +193,20 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
     });
   }, [pathname, activeGroupKey]);
   const toggle = (k: string) => setOpenMap(m => ({ ...m, [k]: !m[k] }));
+
+  if (authzLoading) {
+    return (
+      <div className="flex h-full min-h-0 w-full flex-col bg-sidebar text-sidebar-foreground">
+        <div className="flex h-16 min-h-16 items-center gap-3 border-b border-sidebar-border px-4 sm:px-5">
+          <div className="size-9 animate-pulse rounded-xl bg-sidebar-accent" />
+          <div className="space-y-1.5"><div className="h-3 w-20 animate-pulse rounded bg-sidebar-accent" /><div className="h-2 w-28 animate-pulse rounded bg-sidebar-accent/70" /></div>
+        </div>
+        <div className="space-y-3 px-3 py-4" aria-label={lang === "ar" ? "جارٍ تحميل الصلاحيات" : "Loading permissions"}>
+          {["w-28", "w-36", "w-24", "w-32", "w-28", "w-36"].map((width, index) => <div key={index} className={`h-10 animate-pulse rounded-md bg-sidebar-accent/70 ${width}`} />)}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col bg-sidebar text-sidebar-foreground">

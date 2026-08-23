@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, Check, ChevronLeft, Clock3, Globe2, MapPin, Phone, ShieldCheck, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -134,6 +134,8 @@ function getInitialDate(branch?: Branch | null) {
 export default function PublicBooking() {
   const { lang, setLang } = useI18n();
   const isArabic = lang === "ar";
+  const isArabicRef = useRef(isArabic);
+  useEffect(() => { isArabicRef.current = isArabic; }, [isArabic]);
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [tenantName, setTenantName] = useState("ZMedico");
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -239,7 +241,7 @@ export default function PublicBooking() {
       if (cancelled) return;
       if (error) {
         setSlots([]);
-        toast.error(error.message || (isArabic ? "تعذر تحميل المواعيد المتاحة" : "Unable to load available times"));
+        toast.error(error.message || (isArabicRef.current ? "تعذر تحميل المواعيد المتاحة" : "Unable to load available times"));
       } else {
         setSlots((data ?? []).filter((slot) => slot.available));
       }

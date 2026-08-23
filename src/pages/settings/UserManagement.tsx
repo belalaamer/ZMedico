@@ -30,6 +30,7 @@ import {
 import { ListSkeleton } from "@/components/ListSkeleton";
 import { TablePager } from "@/components/TablePager";
 import { toast } from "sonner";
+import { roleLabel } from "@/lib/roleLabels";
 
 const ROLES = ["system_owner", "admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr"] as const;
 type Role = typeof ROLES[number];
@@ -553,7 +554,7 @@ export default function UserManagement() {
               <SelectContent>
                 <SelectItem value="all">{lang === "ar" ? "كل الأدوار" : "All roles"}</SelectItem>
                 {ROLES.map((r) => (
-                  <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>
+                  <SelectItem key={r} value={r}>{roleLabel(r, lang)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -620,7 +621,7 @@ export default function UserManagement() {
                               <span className="text-xs text-muted-foreground">—</span>
                             )}
                             {userRoles.map((r) => (
-                              <Badge key={r} variant="outline" className="capitalize">{r}</Badge>
+                              <Badge key={r} variant="outline">{roleLabel(r, lang)}</Badge>
                             ))}
                           </div>
                         </TableCell>
@@ -725,7 +726,7 @@ export default function UserManagement() {
                     <div className="font-medium truncate">{i.full_name ?? "—"}</div>
                     <div className="text-xs text-muted-foreground truncate">{i.email}</div>
                   </div>
-                  {i.role && <Badge variant="outline" className="capitalize">{i.role}</Badge>}
+                  {i.role && <Badge variant="outline">{roleLabel(i.role, lang)}</Badge>}
                   <Button
                     size="icon"
                     variant="ghost"
@@ -777,7 +778,7 @@ export default function UserManagement() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {ROLES.map((r) => (
-                      <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>
+                      <SelectItem key={r} value={r}>{roleLabel(r, lang)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -885,7 +886,7 @@ export default function UserManagement() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {ROLES.map((r) => (
-                      <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>
+                      <SelectItem key={r} value={r}>{roleLabel(r, lang)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -1026,7 +1027,7 @@ export default function UserManagement() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {ROLES.map((r) => (
-                      <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>
+                      <SelectItem key={r} value={r}>{roleLabel(r, lang)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -1205,7 +1206,7 @@ export default function UserManagement() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {ROLES.map((r) => (
-                      <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>
+                      <SelectItem key={r} value={r}>{roleLabel(r, lang)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

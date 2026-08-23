@@ -8,6 +8,29 @@ import { DEFAULT_ENABLED_MODULES, type ClinicModuleKey } from "@/lib/clinicModul
 
 export type Branch = { id: string; name_en: string; name_ar: string };
 
+export type TenantSubscriptionSnapshot = {
+  tenant_id: string;
+  tenant_name: string;
+  tenant_slug: string;
+  plan_id: string | null;
+  plan_name_ar: string | null;
+  plan_name_en: string | null;
+  plan_features: Record<string, boolean>;
+  max_branches: number | null;
+  max_staff: number | null;
+  max_patients: number | null;
+  max_invoices_monthly: number | null;
+  subscription_status: string;
+  billing_cycle: string | null;
+  trial_ends_at: string | null;
+  subscription_ends_at: string | null;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  is_active: boolean;
+  access_allowed: boolean;
+  access_reason: string;
+};
+
 type Ctx = {
   branches: Branch[];
   currentBranchId: string | null;
@@ -15,6 +38,8 @@ type Ctx = {
   enabledModules: ClinicModuleKey[];
   modulesLoading: boolean;
   isModuleEnabled: (key: ClinicModuleKey) => boolean;
+  subscription: TenantSubscriptionSnapshot | null;
+  subscriptionLoading: boolean;
 };
 
 const BranchContext = createContext<Ctx | null>(null);
@@ -28,6 +53,8 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   );
   const [enabledModules, setEnabledModules] = useState<ClinicModuleKey[]>(DEFAULT_ENABLED_MODULES);
   const [modulesLoading, setModulesLoading] = useState(false);
+  const [subscription, setSubscription] = useState<TenantSubscriptionSnapshot | null>(null);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(() => Boolean(currentBranchId));
   const [domainTenantId, setDomainTenantId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -100,6 +127,24 @@ export function BranchProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
+    const loadSubscription = async () => {
+      if (!currentBranchId) {
+        setSubscription(null);
+        setSubscriptionLoading(false);
+        return;
+      }
+      setSubscriptionLoading(true);
+      const { data, error } = await supabase.rpc("tenant_subscription_for_branch", { _branch_id: currentBranchId });
+      if (!active) return;
+      setSubscription(error ? null : (data as TenantSubscriptionSnapshot | null));
+      setSubscriptionLoading(false);
+    };
+    void loadSubscription();
+    return () => { active = false; };
+  }, [currentBranchId]);
+
+  useEffect(() => {
+    let active = true;
     const loadModules = async () => {
       if (!currentBranchId) {
         setEnabledModules(DEFAULT_ENABLED_MODULES);
@@ -129,17 +174,20 @@ export function BranchProvider({ children }: { children: ReactNode }) {
           setEnabledModules(DEFAULT_ENABLED_MODULES);
           return;
         }
+        const planFeatures = subscription?.plan_features ?? {};
+        const allowsByPlan = (key: string) => Object.keys(planFeatures).length === 0 || planFeatures[key] !== false;
         const configured = (data ?? [])
           .map((row) => String((row as { module_key: string }).module_key))
-          .filter((key): key is ClinicModuleKey => DEFAULT_ENABLED_MODULES.includes(key as ClinicModuleKey));
-        setEnabledModules(configured.length > 0 ? configured : DEFAULT_ENABLED_MODULES);
+          .filter((key): key is ClinicModuleKey => DEFAULT_ENABLED_MODULES.includes(key as ClinicModuleKey) && allowsByPlan(key));
+        const fallback = DEFAULT_ENABLED_MODULES.filter((key) => allowsByPlan(key));
+        setEnabledModules(configured.length > 0 ? configured : fallback);
       } finally {
         if (active) setModulesLoading(false);
       }
     };
     void loadModules();
     return () => { active = false; };
-  }, [currentBranchId]);
+  }, [currentBranchId, subscription]);
 
   // Refetch whenever any branches mutation happens elsewhere in the app
   // (create / update / delete) so sidebar, switcher and branch-scoped UI
@@ -155,8 +203,11 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("zmedico.branch", id);
   };
 
-  const isModuleEnabled = (key: ClinicModuleKey) => enabledModules.includes(key);
-  return <BranchContext.Provider value={{ branches, currentBranchId, setCurrentBranchId, enabledModules, modulesLoading, isModuleEnabled }}>{children}</BranchContext.Provider>;
+  const isModuleEnabled = (key: ClinicModuleKey) => {
+    const planFeatures = subscription?.plan_features ?? {};
+    return enabledModules.includes(key) && (Object.keys(planFeatures).length === 0 || planFeatures[key] !== false);
+  };
+  return <BranchContext.Provider value={{ branches, currentBranchId, setCurrentBranchId, enabledModules, modulesLoading, isModuleEnabled, subscription, subscriptionLoading }}>{children}</BranchContext.Provider>;
 }
 
 export function useBranch() {

@@ -16,9 +16,11 @@ import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ConsumablesEditor } from "@/components/ConsumablesEditor";
+import { useBranch } from "@/contexts/BranchContext";
 
 export default function Services() {
   const { t, lang } = useI18n();
+  const { subscription } = useBranch();
   const [cats, setCats] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
   const [openCat, setOC] = useState(false);
@@ -49,7 +51,8 @@ export default function Services() {
     const name = (sf.name || "").trim();
     if (!name) return toast.error(t("nameRequired"));
     const { name: _ignored, ...rest } = sf;
-    const payload = { ...rest, name_en: name, name_ar: name, category_id: sf.category_id || null, cost_price: sf.cost_price === "" ? null : sf.cost_price };
+    if (!editS && !subscription?.tenant_id) return toast.error(lang === "ar" ? "لم يتم تحديد العيادة الحالية" : "No active clinic is selected");
+    const payload = { ...rest, ...(editS ? {} : { tenant_id: subscription?.tenant_id }), name_en: name, name_ar: name, category_id: sf.category_id || null, cost_price: sf.cost_price === "" ? null : sf.cost_price };
     const { error } = editS ? await supabase.from("services").update(payload).eq("id", editS.id) : await supabase.from("services").insert(payload);
     if (error) return toast.error(error.message);
     toast.success(t("saved")); setOS(false); load();

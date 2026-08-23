@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CLINIC_MODULES, type ClinicModuleKey } from "@/lib/clinicModules";
 import { normalizeTenantSlug } from "@/lib/saasOnboarding";
 
-type Plan = { id: string; name_ar: string; name_en: string; max_branches: number; max_staff: number };
+type Plan = { id: string; name_ar: string; name_en: string; max_branches: number; max_staff: number; max_patients?: number; max_invoices_monthly?: number; price_monthly?: number; price_yearly?: number };
 type Props = { open: boolean; onOpenChange: (open: boolean) => void; plans: Plan[]; onCreated: () => Promise<void> | void };
 
 type FormState = {
@@ -24,6 +24,8 @@ type FormState = {
   phone: string;
   city: string;
   address: string;
+  durationDays: string;
+  billingCycle: "monthly" | "yearly";
 };
 
 const coreKeys = new Set<ClinicModuleKey>(CLINIC_MODULES.filter((module) => module.alwaysOn).map((module) => module.key));
@@ -34,7 +36,7 @@ export default function OnboardingWizard({ open, onOpenChange, plans, onCreated 
   const isAr = lang === "ar";
   const [saving, setSaving] = useState(false);
   const [slugEdited, setSlugEdited] = useState(false);
-  const [form, setForm] = useState<FormState>({ tenantName: "", slug: "", billingEmail: "", planId: "", branchNameEn: "", branchNameAr: "", phone: "", city: "", address: "" });
+  const [form, setForm] = useState<FormState>({ tenantName: "", slug: "", billingEmail: "", planId: "", branchNameEn: "", branchNameAr: "", phone: "", city: "", address: "", durationDays: "14", billingCycle: "monthly" });
   const [selected, setSelected] = useState<Set<ClinicModuleKey>>(() => new Set(coreKeys));
 
   const groups = useMemo(() => [
@@ -43,7 +45,7 @@ export default function OnboardingWizard({ open, onOpenChange, plans, onCreated 
   ], [isAr]);
 
   const reset = () => {
-    setForm({ tenantName: "", slug: "", billingEmail: "", planId: "", branchNameEn: "", branchNameAr: "", phone: "", city: "", address: "" });
+    setForm({ tenantName: "", slug: "", billingEmail: "", planId: "", branchNameEn: "", branchNameAr: "", phone: "", city: "", address: "", durationDays: "14", billingCycle: "monthly" });
     setSlugEdited(false);
     setSelected(new Set(coreKeys));
   };
@@ -65,9 +67,19 @@ export default function OnboardingWizard({ open, onOpenChange, plans, onCreated 
       toast({ title: isAr ? "اسم الفرع بالإنجليزية مطلوب" : "The first branch English name is required", variant: "destructive" });
       return;
     }
+    const durationDays = Number.parseInt(form.durationDays, 10);
+    if (!Number.isInteger(durationDays) || durationDays < 1 || durationDays > 3650) {
+      toast({ title: isAr ? "المدة يجب أن تكون بين يوم و3650 يومًا" : "Duration must be between 1 and 3650 days", variant: "destructive" });
+      return;
+    }
+    if (!form.planId) {
+      toast({ title: isAr ? "اختر خطة الاشتراك أولًا" : "Choose a subscription plan first", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     const payload = {
-      tenant: { name, slug, billing_email: form.billingEmail.trim() || null, plan_id: form.planId || null },
+      tenant: { name, slug, billing_email: form.billingEmail.trim() || null, plan_id: form.planId },
+      subscription: { duration_days: durationDays, billing_cycle: form.billingCycle },
       branch: { name_en: form.branchNameEn.trim(), name_ar: form.branchNameAr.trim() || form.branchNameEn.trim(), phone: form.phone.trim() || null, city: form.city.trim() || null, address: form.address.trim() || null },
       modules: Array.from(selected),
     };
@@ -99,7 +111,9 @@ export default function OnboardingWizard({ open, onOpenChange, plans, onCreated 
             <div className="space-y-1.5"><Label>{isAr ? "اسم العميل / العيادة" : "Tenant / clinic name"}</Label><Input value={form.tenantName} onChange={(e) => { update("tenantName", e.target.value); if (!slugEdited) update("slug", normalizeTenantSlug(e.target.value)); }} placeholder={isAr ? "عيادة النور" : "Al Noor Clinic"} /></div>
             <div className="space-y-1.5"><Label>Slug</Label><Input dir="ltr" value={form.slug} onChange={(e) => { setSlugEdited(true); update("slug", normalizeTenantSlug(e.target.value)); }} placeholder="al-noor-clinic" /><p className="text-xs text-muted-foreground">{isAr ? "حروف إنجليزية صغيرة وأرقام وشرطات فقط." : "Lowercase letters, numbers and hyphens only."}</p></div>
             <div className="space-y-1.5"><Label>{isAr ? "بريد الفوترة (اختياري)" : "Billing email (optional)"}</Label><Input type="email" value={form.billingEmail} onChange={(e) => update("billingEmail", e.target.value)} /></div>
-            <div className="space-y-1.5"><Label>{isAr ? "خطة الاشتراك" : "Subscription plan"}</Label><Select value={form.planId || "none"} onValueChange={(value) => update("planId", value === "none" ? "" : value)}><SelectTrigger><SelectValue placeholder={isAr ? "اختر الخطة" : "Choose a plan"} /></SelectTrigger><SelectContent><SelectItem value="none">{isAr ? "بدون خطة الآن" : "No plan yet"}</SelectItem>{plans.map((plan) => <SelectItem key={plan.id} value={plan.id}>{isAr ? plan.name_ar : plan.name_en}</SelectItem>)}</SelectContent></Select></div>
+            <div className="space-y-1.5"><Label>{isAr ? "خطة الاشتراك" : "Subscription plan"}</Label><Select value={form.planId || "none"} onValueChange={(value) => update("planId", value === "none" ? "" : value)}><SelectTrigger><SelectValue placeholder={isAr ? "اختر الخطة" : "Choose a plan"} /></SelectTrigger><SelectContent><SelectItem value="none">{isAr ? "اختر الخطة" : "Choose a plan"}</SelectItem>{plans.map((plan) => <SelectItem key={plan.id} value={plan.id}>{isAr ? plan.name_ar : plan.name_en}</SelectItem>)}</SelectContent></Select>{form.planId ? <p className="text-xs text-muted-foreground">{(() => { const plan = plans.find((item) => item.id === form.planId); return plan ? `${plan.max_branches} ${isAr ? "فروع" : "branches"} · ${plan.max_staff} ${isAr ? "موظفين" : "staff"}` : ""; })()}</p> : null}</div>
+            <div className="space-y-1.5"><Label>{isAr ? "مدة التجربة / الاشتراك بالأيام" : "Trial / subscription duration (days)"}</Label><Input type="number" min={1} max={3650} value={form.durationDays} onChange={(e) => update("durationDays", e.target.value)} /></div>
+            <div className="space-y-1.5"><Label>{isAr ? "دورة الفوترة" : "Billing cycle"}</Label><Select value={form.billingCycle} onValueChange={(value) => update("billingCycle", value as FormState["billingCycle"])}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="monthly">{isAr ? "شهري" : "Monthly"}</SelectItem><SelectItem value="yearly">{isAr ? "سنوي" : "Yearly"}</SelectItem></SelectContent></Select></div>
           </div>
         </section>
 

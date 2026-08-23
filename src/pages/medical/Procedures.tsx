@@ -15,9 +15,11 @@ import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
 import { RowActions } from "@/components/RowActions";
 import { ConsumablesEditor } from "@/components/ConsumablesEditor";
+import { useBranch } from "@/contexts/BranchContext";
 
 export default function Procedures() {
   const { t, lang } = useI18n();
+  const { subscription } = useBranch();
   const [items, setItems] = useState<any[]>([]);
   const [specs, setSpecs] = useState<any[]>([]);
   const [q, setQ] = useState("");
@@ -58,7 +60,9 @@ export default function Procedures() {
     // UX fix: hardcoded English regardless of `lang`, in a file where every
     // other message goes through t(...) or a lang === "ar" ternary.
     if (!name) return toast.error(lang === "ar" ? "الاسم مطلوب" : "Name required");
+    if (!edit && !subscription?.tenant_id) return toast.error(lang === "ar" ? "لم يتم تحديد العيادة الحالية" : "No active clinic is selected");
     const payload = {
+      ...(edit ? {} : { tenant_id: subscription?.tenant_id }),
       specialty_id: form.specialty_id || null, code: form.code || null,
       name_en: name, name_ar: name,
       description_en: desc || null, description_ar: desc || null,

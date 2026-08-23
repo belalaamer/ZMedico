@@ -4,7 +4,8 @@ import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { moduleForPath } from "@/lib/rolePermissions";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
-import { moduleKeyForPath, type ClinicModuleKey } from "@/lib/clinicModules";
+import { moduleKeyForPath } from "@/lib/clinicModules";
+import { shouldBlockRouteForEntitlement } from "@/lib/subscriptionEntitlements";
 import { ShieldAlert } from "lucide-react";
 import { useSettingsShadowProbe } from "@/lib/authz/settingsShadowProbe";
 import { usePatientsShadowProbe } from "@/lib/authz/patientsShadowProbe";
@@ -75,7 +76,7 @@ export function PermissionRoute({ children, module, adminOnly, systemOwnerOnly }
   const { currentBranchId, modulesLoading, isModuleEnabled } = useBranch();
   const mod = module ?? moduleForPath(pathname);
   const entitlement = moduleKeyForPath(pathname);
-  const entitlementBlocked = Boolean(entitlement && currentBranchId && !isModuleEnabled(entitlement as ClinicModuleKey));
+  const entitlementBlocked = shouldBlockRouteForEntitlement(entitlement, currentBranchId, isModuleEnabled);
   // Shadow-probe telemetry for the Settings vertical slice. Mounted
   // regardless of the gate outcome so denied roles (e.g. staff) also
   // record shadow decisions — required for the slice's

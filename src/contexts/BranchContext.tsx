@@ -6,6 +6,7 @@ import { withTimeout } from "@/lib/withTimeout";
 import { subscribeDataSync } from "@/lib/dataSync";
 import { DEFAULT_ENABLED_MODULES, type ClinicModuleKey } from "@/lib/clinicModules";
 import { getPlatformWorkspaceBranch } from "@/lib/platformWorkspace";
+import { filterModulesByPlan, isModuleEnabledForEntitlement, planAllowsModule } from "@/lib/subscriptionEntitlements";
 
 export type Branch = { id: string; name_en: string; name_ar: string };
 
@@ -178,11 +179,10 @@ export function BranchProvider({ children }: { children: ReactNode }) {
           return;
         }
         const planFeatures = subscription?.plan_features ?? {};
-        const allowsByPlan = (key: string) => Object.keys(planFeatures).length === 0 || planFeatures[key] !== false;
         const configured = (data ?? [])
           .map((row) => String((row as { module_key: string }).module_key))
-          .filter((key): key is ClinicModuleKey => DEFAULT_ENABLED_MODULES.includes(key as ClinicModuleKey) && allowsByPlan(key));
-        const fallback = DEFAULT_ENABLED_MODULES.filter((key) => allowsByPlan(key));
+          .filter((key): key is ClinicModuleKey => DEFAULT_ENABLED_MODULES.includes(key as ClinicModuleKey) && planAllowsModule(key, planFeatures));
+        const fallback = filterModulesByPlan(DEFAULT_ENABLED_MODULES, planFeatures);
         setEnabledModules(configured.length > 0 ? configured : fallback);
       } finally {
         if (active) setModulesLoading(false);
@@ -206,10 +206,8 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("zmedico.branch", id);
   };
 
-  const isModuleEnabled = (key: ClinicModuleKey) => {
-    const planFeatures = subscription?.plan_features ?? {};
-    return enabledModules.includes(key) && (Object.keys(planFeatures).length === 0 || planFeatures[key] !== false);
-  };
+  const isModuleEnabled = (key: ClinicModuleKey) =>
+    isModuleEnabledForEntitlement(key, enabledModules, subscription?.plan_features ?? {});
   return <BranchContext.Provider value={{ branches, currentBranchId, setCurrentBranchId, enabledModules, modulesLoading, isModuleEnabled, subscription, subscriptionLoading }}>{children}</BranchContext.Provider>;
 }
 

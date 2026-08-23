@@ -18,24 +18,69 @@ import { toast } from "sonner";
 import { ConsumablesEditor } from "@/components/ConsumablesEditor";
 import { useBranch } from "@/contexts/BranchContext";
 
+type ServiceCategoryRow = {
+  id: string;
+  name_en: string | null;
+  name_ar: string | null;
+  icon: string | null;
+  color: string | null;
+  display_order: number;
+  is_active: boolean;
+  deleted_at: string | null;
+};
+
+type ServiceRow = {
+  id: string;
+  tenant_id: string | null;
+  category_id: string | null;
+  name_en: string | null;
+  name_ar: string | null;
+  code: string | null;
+  default_duration_minutes: number | null;
+  default_price: number | null;
+  cost_price: number | null;
+  requires_appointment: boolean;
+  available_online: boolean;
+  display_order: number;
+  is_active: boolean;
+  deleted_at: string | null;
+};
+
+type CategoryForm = { name: string; icon: string; color: string; display_order: number; is_active: boolean };
+type ServiceForm = {
+  category_id: string;
+  name: string;
+  code: string;
+  default_duration_minutes: number;
+  default_price: number;
+  cost_price: number | null;
+  requires_appointment: boolean;
+  available_online: boolean;
+  display_order: number;
+  is_active: boolean;
+};
+
+const emptyCategoryForm = (display_order = 0): CategoryForm => ({ name: "", icon: "", color: "#7c3aed", display_order, is_active: true });
+const emptyServiceForm = (display_order = 0): ServiceForm => ({ category_id: "", name: "", code: "", default_duration_minutes: 30, default_price: 0, cost_price: null, requires_appointment: true, available_online: true, display_order, is_active: true });
+
 export default function Services() {
   const { t, lang } = useI18n();
   const { subscription } = useBranch();
-  const [cats, setCats] = useState<any[]>([]);
-  const [services, setServices] = useState<any[]>([]);
+  const [cats, setCats] = useState<ServiceCategoryRow[]>([]);
+  const [services, setServices] = useState<ServiceRow[]>([]);
   const [openCat, setOC] = useState(false);
   const [openSv, setOS] = useState(false);
-  const [editC, setEC] = useState<any>(null);
-  const [editS, setES] = useState<any>(null);
-  const [cf, setCF] = useState<any>({ name: "", icon: "", color: "#7c3aed", display_order: 0, is_active: true });
-  const [sf, setSF] = useState<any>({ category_id: "", name: "", code: "", default_duration_minutes: 30, default_price: 0, cost_price: null, requires_appointment: true, available_online: true, display_order: 0, is_active: true });
+  const [editC, setEC] = useState<ServiceCategoryRow | null>(null);
+  const [editS, setES] = useState<ServiceRow | null>(null);
+  const [cf, setCF] = useState<CategoryForm>(emptyCategoryForm());
+  const [sf, setSF] = useState<ServiceForm>(emptyServiceForm());
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState<string>("all");
 
   const load = async () => {
     const { data: c } = await supabase.from("service_categories").select("*").is("deleted_at", null).order("display_order");
     const { data: s } = await supabase.from("services").select("*").is("deleted_at", null).order("display_order");
-    setCats(c ?? []); setServices(s ?? []);
+    setCats((c ?? []) as ServiceCategoryRow[]); setServices((s ?? []) as ServiceRow[]);
   };
   useEffect(() => { load(); }, []);
 
@@ -57,23 +102,23 @@ export default function Services() {
     if (error) return toast.error(error.message);
     toast.success(t("saved")); setOS(false); load();
   };
-  const toggleSv = async (s: any) => { await supabase.from("services").update({ is_active: !s.is_active }).eq("id", s.id); load(); };
-  const toggleCat = async (c: any) => { await supabase.from("service_categories").update({ is_active: !c.is_active }).eq("id", c.id); load(); };
+  const toggleSv = async (s: ServiceRow) => { await supabase.from("services").update({ is_active: !s.is_active }).eq("id", s.id); load(); };
+  const toggleCat = async (c: ServiceCategoryRow) => { await supabase.from("service_categories").update({ is_active: !c.is_active }).eq("id", c.id); load(); };
 
-  const delCat = async (c: any): Promise<void> => {
+  const delCat = async (c: ServiceCategoryRow): Promise<void> => {
     if (services.some(s => s.category_id === c.id)) { toast.error(t("servicesHaveItems")); return; }
-    const { error } = await supabase.from("service_categories").update({ deleted_at: new Date().toISOString() } as any).eq("id", c.id);
+    const { error } = await supabase.from("service_categories").update({ deleted_at: new Date().toISOString() }).eq("id", c.id);
     if (error) { toast.error(error.message); return; }
     toast.success(t("delete")); load();
   };
-  const delSv = async (s: any): Promise<void> => {
-    const { error } = await supabase.from("services").update({ deleted_at: new Date().toISOString() } as any).eq("id", s.id);
+  const delSv = async (s: ServiceRow): Promise<void> => {
+    const { error } = await supabase.from("services").update({ deleted_at: new Date().toISOString() }).eq("id", s.id);
     if (error) { toast.error(error.message); return; }
     toast.success(t("delete")); load();
   };
 
   const catById = useMemo(() => {
-    const m = new Map<string, any>();
+    const m = new Map<string, ServiceCategoryRow>();
     cats.forEach(c => m.set(c.id, c));
     return m;
   }, [cats]);
@@ -88,8 +133,8 @@ export default function Services() {
     });
   }, [services, search, catFilter]);
 
-  const openEditCat = (c: any) => { setEC(c); setCF({ ...c, name: c.name_en || c.name_ar || "" }); setOC(true); };
-  const openEditSv = (s: any) => { setES(s); setSF({ ...s, name: s.name_en || s.name_ar || "" }); setOS(true); };
+  const openEditCat = (c: ServiceCategoryRow) => { setEC(c); setCF({ name: c.name_en || c.name_ar || "", icon: c.icon ?? "", color: c.color ?? "#7c3aed", display_order: c.display_order, is_active: c.is_active }); setOC(true); };
+  const openEditSv = (s: ServiceRow) => { setES(s); setSF({ category_id: s.category_id ?? "", name: s.name_en || s.name_ar || "", code: s.code ?? "", default_duration_minutes: s.default_duration_minutes ?? 30, default_price: Number(s.default_price ?? 0), cost_price: s.cost_price, requires_appointment: s.requires_appointment, available_online: s.available_online, display_order: s.display_order, is_active: s.is_active }); setOS(true); };
 
   return (
     <SettingsLayout>
@@ -103,7 +148,7 @@ export default function Services() {
           <TabsContent value="categories" className="space-y-3">
             <div className="flex justify-end">
               <Dialog open={openCat} onOpenChange={setOC}>
-                <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground" onClick={() => { setEC(null); setCF({ name: "", icon: "", color: "#7c3aed", display_order: cats.length, is_active: true }); setOC(true); }}><Plus className="me-2 size-4" />{t("addCategory")}</Button></DialogTrigger>
+                <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground" onClick={() => { setEC(null); setCF(emptyCategoryForm(cats.length)); setOC(true); }}><Plus className="me-2 size-4" />{t("addCategory")}</Button></DialogTrigger>
                 <DialogContent>
                   <DialogHeader><DialogTitle>{editC ? t("edit") : t("addCategory")}</DialogTitle></DialogHeader>
                   <div className="grid grid-cols-2 gap-3">
@@ -182,7 +227,7 @@ export default function Services() {
                 </Select>
               </div>
               <Dialog open={openSv} onOpenChange={setOS}>
-                <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground" onClick={() => { setES(null); setSF({ category_id: "", name: "", code: "", default_duration_minutes: 30, default_price: 0, cost_price: null, requires_appointment: true, available_online: true, display_order: services.length, is_active: true }); setOS(true); }}><Plus className="me-2 size-4" />{t("addService")}</Button></DialogTrigger>
+                <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground" onClick={() => { setES(null); setSF(emptyServiceForm(services.length)); setOS(true); }}><Plus className="me-2 size-4" />{t("addService")}</Button></DialogTrigger>
                 <DialogContent>
                   <DialogHeader><DialogTitle>{editS ? t("edit") : t("addService")}</DialogTitle></DialogHeader>
                   <div className="grid grid-cols-2 gap-3">

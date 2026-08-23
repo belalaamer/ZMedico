@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { getPublicBookingLocator } from "@/lib/publicBookingTenant";
 import { toast } from "sonner";
 
  type Lang = "ar" | "en";
@@ -160,31 +161,28 @@ export default function PublicBooking() {
     const load = async () => {
       setLoadingOptions(true);
       setOptionsError(null);
-      const host = window.location.hostname.toLowerCase();
-      const workerHost = !host || host === "localhost" || host === "127.0.0.1" || host.endsWith(".workers.dev");
+      const locator = getPublicBookingLocator(window.location.hostname, window.location.search);
       let resolvedTenantId: string | null = null;
-      if (!workerHost) {
-        const resolved = await publicRpc<Array<{ tenant_id?: string | null }>>("resolve_active_tenant_domain", { _hostname: host });
+      if (locator.mode === "custom-domain") {
+        const resolved = await publicRpc<Array<{ tenant_id?: string | null }>>("resolve_active_tenant_domain", { _hostname: locator.hostname });
         resolvedTenantId = resolved.data?.[0]?.tenant_id ?? null;
         if (resolved.error || !resolvedTenantId) {
           setOptionsError(isArabic ? "رابط الحجز غير مرتبط بعيادة نشطة" : "This booking link is not linked to an active clinic");
           setLoadingOptions(false);
           return;
         }
-      } else {
-        const slug = new URLSearchParams(window.location.search).get("tenant")?.trim();
-        if (!slug) {
-          setOptionsError(isArabic ? "رابط الحجز يحتاج إلى معرف العيادة" : "This booking link needs a clinic identifier");
-          setLoadingOptions(false);
-          return;
-        }
-        const resolved = await publicRpc<Array<{ tenant_id?: string | null }>>("public_booking_tenant_by_slug", { p_slug: slug });
+      } else if (locator.mode === "tenant-query") {
+        const resolved = await publicRpc<Array<{ tenant_id?: string | null }>>("public_booking_tenant_by_slug", { p_slug: locator.slug });
         resolvedTenantId = resolved.data?.[0]?.tenant_id ?? null;
         if (resolved.error || !resolvedTenantId) {
           setOptionsError(isArabic ? "العيادة غير موجودة أو اشتراكها منتهٍ" : "The clinic does not exist or its subscription is inactive");
           setLoadingOptions(false);
           return;
         }
+      } else {
+        setOptionsError(isArabic ? "رابط الحجز يحتاج إلى معرف العيادة" : "This booking link needs a clinic identifier");
+        setLoadingOptions(false);
+        return;
       }
       const { data, error } = await publicRpc<PublicBookingOptions>("public_booking_options_for_tenant", { p_tenant_id: resolvedTenantId });
       if (cancelled) return;
@@ -249,7 +247,13 @@ export default function PublicBooking() {
     };
     void loadSlots();
     return () => { cancelled = true; };
-  }, [tenantId, branchId, serviceId, doctorId, date, isArabic]);
+  }, [tenantId, branchId, serviceId, doctorId, date]);
+
+  // A slot is ephemeral; if it disappears while the user is on the details
+  // step, return to the time picker instead of rendering a null slot.
+  useEffect(() => {
+    if (step === 3 && !selectedSlot) setStep(2);
+  }, [step, selectedSlot]);
 
   const minDate = localDateInputValue(new Date(Date.now() + 86_400_000));
   const maxDate = useMemo(() => {
@@ -479,7 +483,7 @@ export default function PublicBooking() {
                     </section>
                   ) : null}
 
-                  {step === 3 ? (
+                  {step === 3 && selectedSlot ? (
                     <form className="space-y-5" onSubmit={submitBooking} aria-labelledby="booking-step-three">
                       <div className="flex items-start justify-between gap-3">
                         <div>

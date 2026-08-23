@@ -17,30 +17,58 @@ import { RowActions } from "@/components/RowActions";
 import { ConsumablesEditor } from "@/components/ConsumablesEditor";
 import { useBranch } from "@/contexts/BranchContext";
 
+type SpecialtyRow = { id: string; name_en: string | null; name_ar: string | null; is_active: boolean };
+type ProcedureRow = {
+  id: string;
+  tenant_id: string | null;
+  specialty_id: string | null;
+  code: string | null;
+  name_en: string | null;
+  name_ar: string | null;
+  description_en: string | null;
+  description_ar: string | null;
+  default_duration: number | null;
+  default_price: number | null;
+  doctor_commission_percent: number | null;
+  is_active: boolean;
+  deleted_at: string | null;
+};
+type ProcedureForm = {
+  specialty_id: string;
+  code: string;
+  name: string;
+  description: string;
+  default_duration: number;
+  default_price: number;
+  doctor_commission_percent: number;
+  is_active: boolean;
+};
+const emptyProcedureForm = (): ProcedureForm => ({ specialty_id: "", code: "", name: "", description: "", default_duration: 30, default_price: 0, doctor_commission_percent: 0, is_active: true });
+
 export default function Procedures() {
   const { t, lang } = useI18n();
   const { subscription } = useBranch();
-  const [items, setItems] = useState<any[]>([]);
-  const [specs, setSpecs] = useState<any[]>([]);
+  const [items, setItems] = useState<ProcedureRow[]>([]);
+  const [specs, setSpecs] = useState<SpecialtyRow[]>([]);
   const [q, setQ] = useState("");
   const [specFilter, setSpecFilter] = useState("all");
   const [open, setOpen] = useState(false);
-  const [edit, setEdit] = useState<any>(null);
-  const [form, setForm] = useState({ specialty_id: "", code: "", name: "", description: "", default_duration: 30, default_price: 0, doctor_commission_percent: 0, is_active: true });
+  const [edit, setEdit] = useState<ProcedureRow | null>(null);
+  const [form, setForm] = useState<ProcedureForm>(emptyProcedureForm());
 
   const load = async () => {
     const [{ data }, { data: s }] = await Promise.all([
       supabase.from("procedures").select("*").is("deleted_at", null).order("name_en").limit(2000),
       supabase.from("medical_specialties").select("*").eq("is_active", true).order("name_en"),
     ]);
-    setItems(data ?? []); setSpecs(s ?? []);
+    setItems((data ?? []) as ProcedureRow[]); setSpecs((s ?? []) as SpecialtyRow[]);
   };
   useEffect(() => { load(); }, []);
 
-  const remove = async (p: any): Promise<void> => {
+  const remove = async (p: ProcedureRow): Promise<void> => {
     const { count } = await supabase.from("record_procedures").select("id", { count: "exact", head: true }).eq("procedure_id", p.id);
     if ((count ?? 0) > 0) { toast.error(lang === "ar" ? "لا يمكن الحذف: الإجراء مستخدم في سجلات طبية" : "Cannot delete: procedure is used in medical records"); return; }
-    const { error } = await supabase.from("procedures").update({ deleted_at: new Date().toISOString() } as any).eq("id", p.id);
+    const { error } = await supabase.from("procedures").update({ deleted_at: new Date().toISOString() }).eq("id", p.id);
     if (error) { toast.error(error.message); return; }
     toast.success(t("delete")); load();
   };
@@ -51,8 +79,8 @@ export default function Procedures() {
     return true;
   }), [items, q, specFilter]);
 
-  const openNew = () => { setEdit(null); setForm({ specialty_id: "", code: "", name: "", description: "", default_duration: 30, default_price: 0, doctor_commission_percent: 0, is_active: true }); setOpen(true); };
-  const openEdit = (p: any) => { setEdit(p); setForm({ specialty_id: p.specialty_id ?? "", code: p.code ?? "", name: p.name_en || p.name_ar || "", description: p.description_en || p.description_ar || "", default_duration: p.default_duration ?? 30, default_price: Number(p.default_price ?? 0), doctor_commission_percent: Number(p.doctor_commission_percent ?? 0), is_active: p.is_active }); setOpen(true); };
+  const openNew = () => { setEdit(null); setForm(emptyProcedureForm()); setOpen(true); };
+  const openEdit = (p: ProcedureRow) => { setEdit(p); setForm({ specialty_id: p.specialty_id ?? "", code: p.code ?? "", name: p.name_en || p.name_ar || "", description: p.description_en || p.description_ar || "", default_duration: p.default_duration ?? 30, default_price: Number(p.default_price ?? 0), doctor_commission_percent: Number(p.doctor_commission_percent ?? 0), is_active: p.is_active }); setOpen(true); };
 
   const save = async () => {
     const name = form.name.trim();

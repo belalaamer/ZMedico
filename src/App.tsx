@@ -171,7 +171,7 @@ function AppContent() {
                   </ProtectedRoute>
                 }
               >
-                <Route path="/platform" element={<PermissionRoute adminOnly><PlatformConsole /></PermissionRoute>} />
+                <Route path="/platform" element={<PermissionRoute systemOwnerOnly><PlatformConsole /></PermissionRoute>} />
               </Route>
               <Route
                 element={

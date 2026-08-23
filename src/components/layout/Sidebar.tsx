@@ -29,6 +29,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
   const { pathname } = useLocation();
   const [alertCount, setAlertCount] = useState(0);
   const { authz } = useAuthorization();
+  const isSystemOwner = authz.holdsAnyRole("system_owner");
 
   useEffect(() => {
     const refresh = () => {
@@ -48,7 +49,9 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
     });
   }, [currentBranchId]);
 
-  const dashboardItem: NavItem = { to: "/", icon: LayoutDashboard, label: t("dashboard"), end: true };
+  const dashboardItem: NavItem = isSystemOwner
+    ? { to: "/platform", icon: Building2, label: lang === "ar" ? "إدارة المنصة" : "Platform Console", end: true }
+    : { to: "/", icon: LayoutDashboard, label: t("dashboard"), end: true };
   const reportItems = useMemo(() => {
     const labels: Record<ReportNavigationKey, string> = {
       financial: t("financialReports"),
@@ -168,7 +171,10 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
   ].filter(g => g.items.length > 0), [t, lang, authz, alertCount, reportItems, isModuleEnabled]);
 
   const platformOnly = pathname.startsWith("/platform") && authz.holdsAnyRole("system_owner");
-  const visibleGroups = platformOnly ? groups.filter((group) => group.key === "setup") : groups;
+  // Platform administration is a separate surface. Keep this fallback sidebar
+  // empty for system owners as well, so a delayed/legacy shell can never expose
+  // clinic navigation or branch settings.
+  const visibleGroups = isSystemOwner ? [] : (platformOnly ? groups.filter((group) => group.key === "setup") : groups);
 
   const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
   const activeGroupKey = useMemo(() => {

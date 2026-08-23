@@ -20,8 +20,12 @@ export default function AppShell() {
     mainRef.current?.scrollTo({ top: 0, behavior: "auto" });
   }, [pathname]);
 
-  if (!authzLoading && authz.holdsAnyRole("system_owner")) return <Navigate to="/platform" replace />;
-  if (!authzLoading && currentBranchId && subscriptionLoading) return <SubscriptionState loading lang={lang} />;
+  // Resolve the platform/workspace boundary before mounting any workspace chrome.
+  // This prevents a system owner from seeing a one-frame clinic dashboard/sidebar
+  // while the role query is still loading.
+  if (authzLoading) return <SubscriptionState loading lang={lang} />;
+  if (authz.holdsAnyRole("system_owner")) return <Navigate to="/platform" replace />;
+  if (currentBranchId && subscriptionLoading) return <SubscriptionState loading lang={lang} />;
   if (!authzLoading && currentBranchId && !subscription) {
     return <SubscriptionState
       lang={lang}

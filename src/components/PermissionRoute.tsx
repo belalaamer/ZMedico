@@ -68,7 +68,7 @@ function InvoicesShadowProbeMount({ path }: { path: string }) {
  * Gates a route element based on the user's permission for the module
  * inferred from the current path. Admin always passes.
  */
-export function PermissionRoute({ children, module, adminOnly }: { children: ReactNode; module?: string; adminOnly?: boolean }) {
+export function PermissionRoute({ children, module, adminOnly, systemOwnerOnly }: { children: ReactNode; module?: string; adminOnly?: boolean; systemOwnerOnly?: boolean }) {
   const { pathname } = useLocation();
   const { authz, loading } = useAuthorization();
   const { t } = useI18n();
@@ -115,7 +115,11 @@ export function PermissionRoute({ children, module, adminOnly }: { children: Rea
     );
   }
 
-  if (adminOnly) {
+  if (systemOwnerOnly) {
+    if (authz.holdsAnyRole("system_owner")) {
+      return children;
+    }
+  } else if (adminOnly) {
     if (authz.isSuperAdmin()) {
       return (
         <>

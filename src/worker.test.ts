@@ -25,6 +25,19 @@ describe("custom domain gateway", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("blocks an unregistered provider subdomain on the index document", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("[]", { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const assetsFetch = vi.fn();
+
+    const response = await worker.fetch(new Request("https://probe.belalaamer.com/index.html", { method: "GET" }), { ASSETS: { fetch: assetsFetch } as unknown as Fetcher });
+
+    expect(response.status).toBe(404);
+    expect(await response.text()).toBe("Tenant subdomain is not active");
+    expect(assetsFetch).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("forwards the authenticated request to the Supabase function", async () => {
     const upstream = new Response(JSON.stringify({ domains: [] }), { status: 200, headers: { "Content-Type": "application/json" } });
     const fetchMock = vi.fn().mockResolvedValue(upstream);

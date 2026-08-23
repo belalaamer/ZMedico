@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 const DEFAULT_ORIGIN = "https://zmedico2.belalaamer.workers.dev";
+const PROVIDER_SUBDOMAIN_SUFFIX = (Deno.env.get("CUSTOM_DOMAIN_SUBDOMAIN_SUFFIX") ?? "belalaamer.com").trim().toLowerCase();
 const MAX_BODY_BYTES = 32 * 1024;
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = Math.max(1, Number(Deno.env.get("CUSTOM_DOMAIN_RL_PER_MIN") ?? "20"));
@@ -46,13 +47,14 @@ function isRateLimited(actorId: string, action: string): boolean {
   return false;
 }
 
-type Action = "list" | "create" | "status" | "disable" | "remove";
+type Action = "list" | "create" | "create_subdomain" | "status" | "disable" | "remove";
 type Input = {
   action?: Action;
   tenant_id?: string;
   default_branch_id?: string;
   domain_id?: string;
   hostname?: string;
+  subdomain_slug?: string;
   validation_method?: "txt" | "http" | "email" | "prevalidation";
   idempotency_key?: string;
 };
@@ -75,6 +77,7 @@ type DomainRow = {
   provider_error_code: string | null;
   last_checked_at: string | null;
   last_error: string | null;
+  provisioning_mode: string;
   created_at: string;
 };
 
@@ -107,6 +110,17 @@ function normalizeHostname(value: string): string {
   }
   if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/.test(candidate)) {
     throw new Error("Enter a valid hostname, for example clinic.example.com");
+  }
+  return candidate;
+}
+
+function normalizeSubdomainSlug(value: string): string {
+  const candidate = value.trim().toLowerCase();
+  if (!candidate || candidate.length > 63 || !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(candidate)) {
+    throw new Error("Enter a valid subdomain slug, for example blitz-physio");
+  }
+  if (!PROVIDER_SUBDOMAIN_SUFFIX || !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(PROVIDER_SUBDOMAIN_SUFFIX)) {
+    throw new Error("Provider subdomain configuration is invalid");
   }
   return candidate;
 }
@@ -158,6 +172,7 @@ function publicDomain(row: DomainRow) {
     verified_at: row.verified_at,
     last_checked_at: row.last_checked_at,
     last_error: row.last_error,
+    provisioning_mode: row.provisioning_mode,
     created_at: row.created_at,
   };
 }
@@ -216,7 +231,7 @@ async function cloudflareRequest(path: string, init?: RequestInit): Promise<Clou
 
 async function findDomain(db: SupabaseClient, input: Input): Promise<DomainRow> {
   if (!input.domain_id) throw new Error("domain_id is required");
-  const { data, error } = await db.from("tenant_domains").select("id,tenant_id,hostname,normalized_hostname,default_branch_id,status,validation_method,validation_records,cname_target,cloudflare_hostname_id,hostname_status,ssl_status,is_enabled,verified_at,provider_error_code,last_checked_at,last_error,created_at").eq("id", input.domain_id).limit(1).maybeSingle();
+  const { data, error } = await db.from("tenant_domains").select("id,tenant_id,hostname,normalized_hostname,default_branch_id,status,validation_method,validation_records,cname_target,cloudflare_hostname_id,hostname_status,ssl_status,is_enabled,verified_at,provider_error_code,last_checked_at,last_error,provisioning_mode,created_at").eq("id", input.domain_id).limit(1).maybeSingle();
   if (error || !data) throw new Error("Custom domain not found");
   return data as DomainRow;
 }
@@ -245,6 +260,42 @@ async function writeAudit(db: SupabaseClient, action: string, row: Partial<Domai
 }
 
 async function refreshDomain(db: SupabaseClient, row: DomainRow, userId: string) {
+  if (row.provisioning_mode === "provider_subdomain") {
+    let reachable = false;
+    if (row.is_enabled) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5_000);
+      try {
+        const response = await fetch(`https://${row.hostname}/_zmedico/provisioning-check`, {
+          method: "GET",
+          redirect: "manual",
+          headers: { Accept: "text/plain" },
+          signal: controller.signal,
+        });
+        reachable = response.status === 204;
+      } catch {
+        reachable = false;
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+    const checkedAt = new Date().toISOString();
+    const active = row.is_enabled && reachable;
+    const { data, error } = await db.from("tenant_domains").update({
+      status: active ? "active" : (row.is_enabled ? "pending" : "disabled"),
+      hostname_status: active ? "active" : "pending",
+      ssl_status: active ? "active" : "pending",
+      verified_at: active ? (row.verified_at ?? checkedAt) : null,
+      last_checked_at: checkedAt,
+      last_error: active ? null : (row.is_enabled ? "Provider subdomain is not reachable over HTTPS yet" : null),
+      operation: "status",
+      updated_by: userId,
+    }).eq("id", row.id).select("id,tenant_id,hostname,normalized_hostname,default_branch_id,status,validation_method,validation_records,cname_target,cloudflare_hostname_id,hostname_status,ssl_status,is_enabled,verified_at,provider_error_code,last_checked_at,last_error,provisioning_mode,created_at").single();
+    if (error || !data) throw new Error("Unable to save subdomain status");
+    const updated = data as DomainRow;
+    await writeAudit(db, "provider_subdomain_status", updated, userId, { status: row.status }, { status: updated.status, hostname_status: updated.hostname_status, ssl_status: updated.ssl_status });
+    return updated;
+  }
   if (!row.cloudflare_hostname_id) throw new Error("This domain has not been provisioned with Cloudflare yet");
   const result = await cloudflareRequest(`/zones/${encodeURIComponent(providerConfig().zoneId)}/custom_hostnames/${encodeURIComponent(row.cloudflare_hostname_id)}`);
   const hostnameStatus = result.status ?? null;
@@ -264,7 +315,7 @@ async function refreshDomain(db: SupabaseClient, row: DomainRow, userId: string)
     last_error: null,
     operation: "status",
     updated_by: userId,
-  }).eq("id", row.id).select("id,tenant_id,hostname,normalized_hostname,default_branch_id,status,validation_method,validation_records,cname_target,cloudflare_hostname_id,hostname_status,ssl_status,is_enabled,verified_at,provider_error_code,last_checked_at,last_error,created_at").single();
+  }).eq("id", row.id).select("id,tenant_id,hostname,normalized_hostname,default_branch_id,status,validation_method,validation_records,cname_target,cloudflare_hostname_id,hostname_status,ssl_status,is_enabled,verified_at,provider_error_code,last_checked_at,last_error,provisioning_mode,created_at").single();
   if (error || !data) throw new Error("Unable to save Cloudflare domain status");
   const updated = data as DomainRow;
   await writeAudit(db, "custom_domain_status", updated, userId, { status: row.status, hostname_status: row.hostname_status, ssl_status: row.ssl_status }, { status: updated.status, hostname_status: updated.hostname_status, ssl_status: updated.ssl_status });
@@ -283,16 +334,66 @@ Deno.serve(async (req) => {
     const input = JSON.parse(rawBody) as Input;
     const action = input.action ?? "list";
     const { userId, db } = await requireSystemOwner(req);
-    const durableLimit = action === "create" ? 5 : 20;
+    const durableLimit = action === "create" || action === "create_subdomain" ? 5 : 20;
     const { data: durableAllowed, error: durableRateError } = await db.rpc("consume_custom_domain_rate_limit", { _actor_id: userId, _action: action, _limit: durableLimit });
     if (durableRateError) console.warn("[custom-domain] durable rate limit unavailable", durableRateError.code ?? "unknown");
     if (durableAllowed === false || isRateLimited(userId, action)) return json({ error: "Too many domain requests; try again later" }, 429, req);
 
     if (action === "list") {
       if (!input.tenant_id) throw new Error("tenant_id is required");
-      const { data, error } = await db.from("tenant_domains").select("id,tenant_id,hostname,normalized_hostname,default_branch_id,status,validation_method,validation_records,cname_target,cloudflare_hostname_id,hostname_status,ssl_status,is_enabled,verified_at,provider_error_code,last_checked_at,last_error,created_at").eq("tenant_id", input.tenant_id).order("created_at", { ascending: false });
+      const { data, error } = await db.from("tenant_domains").select("id,tenant_id,hostname,normalized_hostname,default_branch_id,status,validation_method,validation_records,cname_target,cloudflare_hostname_id,hostname_status,ssl_status,is_enabled,verified_at,provider_error_code,last_checked_at,last_error,provisioning_mode,created_at").eq("tenant_id", input.tenant_id).order("created_at", { ascending: false });
       if (error) throw new Error("Unable to load custom domains");
       return json({ domains: (data ?? []).map((row) => publicDomain(row as DomainRow)) }, 200, req);
+    }
+
+    if (action === "create_subdomain") {
+      if (!input.tenant_id) throw new Error("tenant_id is required");
+      const slug = normalizeSubdomainSlug(input.subdomain_slug ?? input.hostname ?? "");
+      const hostname = `${slug}.${PROVIDER_SUBDOMAIN_SUFFIX}`;
+      const idempotencyKey = (input.idempotency_key ?? req.headers.get("X-Idempotency-Key") ?? "").trim();
+      if (idempotencyKey && (idempotencyKey.length > 128 || !/^[a-zA-Z0-9._:-]+$/.test(idempotencyKey))) throw new Error("Invalid idempotency key");
+      await assertTenantBranch(db, input.tenant_id, input.default_branch_id);
+      if (idempotencyKey) {
+        const { data: replay } = await db.from("tenant_domains").select("id,tenant_id,hostname,normalized_hostname,default_branch_id,status,validation_method,validation_records,cname_target,cloudflare_hostname_id,hostname_status,ssl_status,is_enabled,verified_at,provider_error_code,last_checked_at,last_error,provisioning_mode,created_at").eq("tenant_id", input.tenant_id).eq("idempotency_key", idempotencyKey).limit(1).maybeSingle();
+        if (replay) {
+          if (replay.normalized_hostname !== hostname) throw new Error("Idempotency key was already used for another hostname");
+          return json({ domain: publicDomain(replay as DomainRow), replayed: true }, 200, req);
+        }
+      }
+      const { data: existing } = await db.from("tenant_domains").select("id,status").eq("normalized_hostname", hostname).limit(1).maybeSingle();
+      if (existing) throw new Error("This subdomain is already registered");
+      const now = new Date().toISOString();
+      const { data, error } = await db.from("tenant_domains").insert({
+        tenant_id: input.tenant_id,
+        hostname,
+        normalized_hostname: hostname,
+        default_branch_id: input.default_branch_id ?? null,
+        status: "pending",
+        validation_method: "prevalidation",
+        validation_records: [],
+        cname_target: null,
+        cloudflare_hostname_id: null,
+        hostname_status: "pending",
+        ssl_status: "pending",
+        is_enabled: true,
+        verified_at: null,
+        provider_error_code: null,
+        provisioning_mode: "provider_subdomain",
+        operation: "create_subdomain",
+        created_by: userId,
+        updated_by: userId,
+        idempotency_key: idempotencyKey || null,
+        request_fingerprint: hostname,
+      }).select("id,tenant_id,hostname,normalized_hostname,default_branch_id,status,validation_method,validation_records,cname_target,cloudflare_hostname_id,hostname_status,ssl_status,is_enabled,verified_at,provider_error_code,last_checked_at,last_error,provisioning_mode,created_at").single();
+      if (error || !data) {
+        if (error?.code === "23505" && idempotencyKey) {
+          const { data: replay } = await db.from("tenant_domains").select("id,tenant_id,hostname,normalized_hostname,default_branch_id,status,validation_method,validation_records,cname_target,cloudflare_hostname_id,hostname_status,ssl_status,is_enabled,verified_at,provider_error_code,last_checked_at,last_error,provisioning_mode,created_at").eq("tenant_id", input.tenant_id).eq("idempotency_key", idempotencyKey).limit(1).maybeSingle();
+          if (replay) return json({ domain: publicDomain(replay as DomainRow), replayed: true }, 200, req);
+        }
+        throw new Error("Unable to save the provider subdomain");
+      }
+      await writeAudit(db, "provider_subdomain_created", data as DomainRow, userId, null, { hostname, status: "pending" });
+      return json({ domain: publicDomain(data as DomainRow), subdomain_suffix: PROVIDER_SUBDOMAIN_SUFFIX }, 200, req);
     }
 
     if (action === "create") {
@@ -302,7 +403,7 @@ Deno.serve(async (req) => {
       if (idempotencyKey && (idempotencyKey.length > 128 || !/^[a-zA-Z0-9._:-]+$/.test(idempotencyKey))) throw new Error("Invalid idempotency key");
       await assertTenantBranch(db, input.tenant_id, input.default_branch_id);
       if (idempotencyKey) {
-        const { data: replay } = await db.from("tenant_domains").select("id,tenant_id,hostname,normalized_hostname,default_branch_id,status,validation_method,validation_records,cname_target,cloudflare_hostname_id,hostname_status,ssl_status,is_enabled,verified_at,provider_error_code,last_checked_at,last_error,created_at").eq("tenant_id", input.tenant_id).eq("idempotency_key", idempotencyKey).limit(1).maybeSingle();
+        const { data: replay } = await db.from("tenant_domains").select("id,tenant_id,hostname,normalized_hostname,default_branch_id,status,validation_method,validation_records,cname_target,cloudflare_hostname_id,hostname_status,ssl_status,is_enabled,verified_at,provider_error_code,last_checked_at,last_error,provisioning_mode,created_at").eq("tenant_id", input.tenant_id).eq("idempotency_key", idempotencyKey).limit(1).maybeSingle();
         if (replay) {
           if (replay.normalized_hostname !== hostname) throw new Error("Idempotency key was already used for another hostname");
           return json({ domain: publicDomain(replay as DomainRow), replayed: true }, 200, req);
@@ -337,10 +438,10 @@ Deno.serve(async (req) => {
         updated_by: userId,
         idempotency_key: idempotencyKey || null,
         request_fingerprint: hostname,
-      }).select("id,tenant_id,hostname,normalized_hostname,default_branch_id,status,validation_method,validation_records,cname_target,cloudflare_hostname_id,hostname_status,ssl_status,is_enabled,verified_at,provider_error_code,last_checked_at,last_error,created_at").single();
+      }).select("id,tenant_id,hostname,normalized_hostname,default_branch_id,status,validation_method,validation_records,cname_target,cloudflare_hostname_id,hostname_status,ssl_status,is_enabled,verified_at,provider_error_code,last_checked_at,last_error,provisioning_mode,created_at").single();
       if (error || !data) {
         if (error?.code === "23505" && idempotencyKey) {
-          const { data: replay } = await db.from("tenant_domains").select("id,tenant_id,hostname,normalized_hostname,default_branch_id,status,validation_method,validation_records,cname_target,cloudflare_hostname_id,hostname_status,ssl_status,is_enabled,verified_at,provider_error_code,last_checked_at,last_error,created_at").eq("tenant_id", input.tenant_id).eq("idempotency_key", idempotencyKey).limit(1).maybeSingle();
+          const { data: replay } = await db.from("tenant_domains").select("id,tenant_id,hostname,normalized_hostname,default_branch_id,status,validation_method,validation_records,cname_target,cloudflare_hostname_id,hostname_status,ssl_status,is_enabled,verified_at,provider_error_code,last_checked_at,last_error,provisioning_mode,created_at").eq("tenant_id", input.tenant_id).eq("idempotency_key", idempotencyKey).limit(1).maybeSingle();
           if (replay) {
             await cloudflareRequest(`/zones/${encodeURIComponent(zoneId)}/custom_hostnames/${encodeURIComponent(provider.id)}`, { method: "DELETE" }).catch(() => undefined);
             return json({ domain: publicDomain(replay as DomainRow), replayed: true }, 200, req);
@@ -358,15 +459,17 @@ Deno.serve(async (req) => {
     if (action === "status") return json({ domain: publicDomain(await refreshDomain(db, row, userId)) }, 200, req);
 
     if (action === "disable") {
-      const { data, error } = await db.from("tenant_domains").update({ is_enabled: false, status: "disabled", operation: "disable", updated_by: userId }).eq("id", row.id).select("id,tenant_id,hostname,normalized_hostname,default_branch_id,status,validation_method,validation_records,cname_target,cloudflare_hostname_id,hostname_status,ssl_status,is_enabled,verified_at,provider_error_code,last_checked_at,last_error,created_at").single();
+      const { data, error } = await db.from("tenant_domains").update({ is_enabled: false, status: "disabled", operation: "disable", updated_by: userId }).eq("id", row.id).select("id,tenant_id,hostname,normalized_hostname,default_branch_id,status,validation_method,validation_records,cname_target,cloudflare_hostname_id,hostname_status,ssl_status,is_enabled,verified_at,provider_error_code,last_checked_at,last_error,provisioning_mode,created_at").single();
       if (error || !data) throw new Error("Unable to disable this custom domain");
       await writeAudit(db, "custom_domain_disabled", data as DomainRow, userId, { status: row.status, is_enabled: row.is_enabled }, { status: "disabled", is_enabled: false });
       return json({ domain: publicDomain(data as DomainRow) }, 200, req);
     }
 
     if (action === "remove") {
-      const { zoneId } = providerConfig();
-      if (row.cloudflare_hostname_id) await cloudflareRequest(`/zones/${encodeURIComponent(zoneId)}/custom_hostnames/${encodeURIComponent(row.cloudflare_hostname_id)}`, { method: "DELETE" });
+      if (row.provisioning_mode === "custom_hostname" && row.cloudflare_hostname_id) {
+        const { zoneId } = providerConfig();
+        await cloudflareRequest(`/zones/${encodeURIComponent(zoneId)}/custom_hostnames/${encodeURIComponent(row.cloudflare_hostname_id)}`, { method: "DELETE" });
+      }
       const { error } = await db.from("tenant_domains").delete().eq("id", row.id);
       if (error) throw new Error("Unable to remove this custom domain from ZMedico");
       await writeAudit(db, "custom_domain_removed", row, userId, { hostname: row.hostname, status: row.status }, null);

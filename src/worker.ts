@@ -3,7 +3,11 @@ export interface Env {
 }
 
 const DOMAIN_FUNCTION_URL = "https://rqcmnfzfytyyicelvifk.supabase.co/functions/v1/manage-custom-domain";
+const SUPABASE_REST_URL = "https://rqcmnfzfytyyicelvifk.supabase.co/rest/v1/rpc/resolve_active_tenant_domain";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_Vu3oi0N4hmxPzTsScwrwFA_Wt3-CUyU";
+const PROVIDER_SUBDOMAIN_SUFFIX = "belalaamer.com";
 const DOMAIN_GATEWAY_PATH = "/api/domains";
+const PROVIDER_SUBDOMAIN_HEALTH_PATH = "/_zmedico/provisioning-check";
 const MAX_GATEWAY_BODY_BYTES = 32 * 1024;
 const DEFAULT_ORIGIN = "https://zmedico2.belalaamer.workers.dev";
 
@@ -18,6 +22,33 @@ function gatewayHeaders(request: Request): Headers {
     "X-Content-Type-Options": "nosniff",
   });
   return headers;
+}
+
+function isProviderSubdomainHost(hostname: string): boolean {
+  const suffix = `.${PROVIDER_SUBDOMAIN_SUFFIX}`;
+  if (!hostname.endsWith(suffix)) return false;
+  const slug = hostname.slice(0, -suffix.length);
+  return /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(slug);
+}
+
+async function hasActiveTenantDomain(hostname: string): Promise<boolean> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 2_000);
+  try {
+    const response = await fetch(SUPABASE_REST_URL, {
+      method: "POST",
+      headers: { apikey: SUPABASE_PUBLISHABLE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ _hostname: hostname }),
+      signal: controller.signal,
+    });
+    if (!response.ok) return false;
+    const payload = await response.json() as unknown;
+    return Array.isArray(payload) && payload.length > 0;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function proxyDomainRequest(request: Request): Promise<Response> {
@@ -52,7 +83,15 @@ export default {
     if (url.pathname === DOMAIN_GATEWAY_PATH) return proxyDomainRequest(request);
 
     const pathname = url.pathname;
-    const isHtmlRequest = request.method === "GET" && (pathname === "/" || !pathname.includes("."));
+    const hostname = url.hostname.toLowerCase();
+    if (request.method === "GET" && pathname === PROVIDER_SUBDOMAIN_HEALTH_PATH && isProviderSubdomainHost(hostname)) {
+      return new Response(null, { status: 204, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+    }
+    const isHtmlRequest = request.method === "GET" && (pathname === "/" || pathname === "/index.html" || !pathname.includes("."));
+    if (isHtmlRequest && isProviderSubdomainHost(hostname)) {
+      const active = await hasActiveTenantDomain(hostname);
+      if (!active) return new Response("Tenant subdomain is not active", { status: 404, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+    }
     if (isHtmlRequest) {
       url.searchParams.set("__zmedico_build", "deb1ea4");
     }

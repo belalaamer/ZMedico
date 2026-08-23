@@ -14,7 +14,9 @@ import { useI18n } from "@/contexts/I18nContext";
 import { toast } from "sonner";
 import { hasPersistedAuthSession, persistAuthSessionForPreview } from "@/lib/authSessionPersistence";
 
-const AUTH_DEBUG_PREFIX = "[auth-debug]";
+function authDebug(message: string, details?: Record<string, unknown>) {
+  if (import.meta.env.DEV) console.info("[auth-debug]", message, details ?? {});
+}
 
 function isValidEmailAddress(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 255;
@@ -59,7 +61,7 @@ export default function AuthPage() {
   const [resetLoading, setResetLoading] = useState(false);
 
   useEffect(() => {
-    console.info(AUTH_DEBUG_PREFIX, "auth page mounted", {
+    authDebug( "auth page mounted", {
       path: window.location.pathname + window.location.search,
       redirectAfterLogin: from,
       authLoading,
@@ -70,7 +72,7 @@ export default function AuthPage() {
 
   useEffect(() => {
     if (authLoading || !user) return;
-    console.info(AUTH_DEBUG_PREFIX, "auth page detected existing session", { redirectAfterLogin: from });
+    authDebug( "auth page detected existing session", { redirectAfterLogin: from });
     nav(from, { replace: true });
   }, [authLoading, from, nav, user]);
 
@@ -96,7 +98,7 @@ export default function AuthPage() {
     };
 
     setLoading(true);
-    console.info(AUTH_DEBUG_PREFIX, "password sign-in started", {
+    authDebug( "password sign-in started", {
       redirectAfterLogin: from,
       client: {
         hasAuthClient: Boolean(supabase?.auth),
@@ -106,20 +108,13 @@ export default function AuthPage() {
       payload: {
         email: credentials.email,
         passwordLength: credentials.password.length,
-        passwordFirstCharCode: credentials.password.length ? credentials.password.charCodeAt(0) : null,
-        passwordLastCharCode: credentials.password.length ? credentials.password.charCodeAt(credentials.password.length - 1) : null,
       },
-    });
-    console.log(AUTH_DEBUG_PREFIX, "signInWithPassword payload", {
-      email: credentials.email,
-      password: "[redacted]",
-      passwordLength: credentials.password.length,
     });
 
     const { data, error } = await supabase.auth.signInWithPassword(credentials);
 
     setLoading(false);
-    console.info(AUTH_DEBUG_PREFIX, "password sign-in completed", {
+    authDebug( "password sign-in completed", {
       hasSession: Boolean(data.session),
       hasUser: Boolean(data.user),
       error: error?.message ?? null,
@@ -128,7 +123,7 @@ export default function AuthPage() {
     persistAuthSessionForPreview(data.session, "password-login-result");
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     persistAuthSessionForPreview(sessionData.session, "password-login-get-session");
-    console.info(AUTH_DEBUG_PREFIX, "session after password login", {
+    authDebug( "session after password login", {
       hasSession: Boolean(sessionData.session),
       hasUser: Boolean(sessionData.session?.user),
       error: sessionError?.message ?? null,

@@ -158,45 +158,40 @@ export function Topbar() {
         <Menu className="size-5" />
       </Button>
 
-      <div className="md:hidden" aria-hidden={!mobileOpen}>
-        <button
-          type="button"
-          aria-label={t("closeMenuOverlay")}
-          tabIndex={mobileOpen ? 0 : -1}
-          className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px] transition-opacity duration-150 ease-out ${
-            mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-          }`}
-          onClick={() => setMobileOpen(false)}
-        />
+      {mobileOpen ? (
+        <div className="md:hidden">
+          <button
+            type="button"
+            aria-label={t("closeMenuOverlay")}
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px]"
+            onClick={() => setMobileOpen(false)}
+          />
 
-        <aside
-          role="dialog"
-          aria-modal="true"
-          aria-label={t("appName")}
-          style={{ willChange: "transform" }}
-          className={`fixed inset-y-0 ${lang === "ar" ? "right-0 rounded-l-2xl" : "left-0 rounded-r-2xl"} z-50 w-[min(320px,88vw)] max-w-[calc(100vw-1rem)] bg-sidebar text-sidebar-foreground shadow-2xl ring-1 ring-border overflow-hidden transform-gpu transition-transform duration-150 ease-out ${
-            mobileOpen
-              ? "translate-x-0 pointer-events-auto"
-              : `${lang === "ar" ? "translate-x-full" : "-translate-x-full"} pointer-events-none`
-          }`}
-        >
-          <div className="flex h-16 min-h-16 items-center justify-start border-b border-sidebar-border px-3 py-2 pt-[env(safe-area-inset-top,0px)]">
-            <Button
-              variant="ghost"
-              size="icon"
-              type="button"
-              className="size-11 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              aria-label={t("closeMenu")}
-              onClick={() => setMobileOpen(false)}
-            >
-              <X className="size-5" />
-            </Button>
-          </div>
-          <div className="h-[calc(100%-4rem)] overflow-y-auto py-2">
-            <SidebarContent onNavigate={() => setMobileOpen(false)} />
-          </div>
-        </aside>
-      </div>
+          <aside
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("appName")}
+            style={{ willChange: "transform" }}
+            className={`fixed inset-y-0 ${lang === "ar" ? "right-0 rounded-l-2xl" : "left-0 rounded-r-2xl"} z-50 w-[min(320px,88vw)] max-w-[calc(100vw-1rem)] bg-sidebar text-sidebar-foreground shadow-2xl ring-1 ring-border overflow-hidden transform-gpu`}
+          >
+            <div className="flex h-16 min-h-16 items-center justify-start border-b border-sidebar-border px-3 py-2 pt-[env(safe-area-inset-top,0px)]">
+              <Button
+                variant="ghost"
+                size="icon"
+                type="button"
+                className="size-11 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                aria-label={t("closeMenu")}
+                onClick={() => setMobileOpen(false)}
+              >
+                <X className="size-5" />
+              </Button>
+            </div>
+            <div className="h-[calc(100%-4rem)] overflow-y-auto py-2">
+              <SidebarContent onNavigate={() => setMobileOpen(false)} />
+            </div>
+          </aside>
+        </div>
+      ) : null}
 
       <div className="hidden sm:flex flex-1 max-w-xl">
         <GlobalSearch variant="desktop" />

@@ -19,6 +19,7 @@ type Domain = { id: string; tenant_id: string; hostname: string; default_branch_
 const ZMEDICO_SUBDOMAIN_SUFFIX = "belalaamer.com";
 
 type Props = { tenant: Tenant | null; branches: Branch[]; open: boolean; onOpenChange: (open: boolean) => void };
+type PlatformChangePayload = { tenant_id: string; category: "domains"; action: string; summary: string; after_values?: Record<string, unknown> };
 
 export default function TenantDomains({ tenant, branches, open, onOpenChange }: Props) {
   const { lang } = useI18n();
@@ -35,6 +36,11 @@ export default function TenantDomains({ tenant, branches, open, onOpenChange }: 
   const createKeyRef = useRef<string | null>(null);
 
   const tenantBranches = branches.filter((branch) => branch.tenant_id === tenant?.id && branch.is_active);
+
+  const logChange = async (payload: PlatformChangePayload) => {
+    const { error } = await supabase.rpc("platform_log_change" as never, { payload } as never);
+    if (error && import.meta.env.DEV) console.warn("[Platform] domain change log unavailable", error.message);
+  };
 
   const invoke = useCallback(async (body: Record<string, unknown>) => {
     if (import.meta.env.DEV) {
@@ -84,6 +90,7 @@ export default function TenantDomains({ tenant, branches, open, onOpenChange }: 
     try {
       await invoke({ action: provisioningMode === "provider_subdomain" ? "create_subdomain" : "create", tenant_id: tenant.id, ...(provisioningMode === "provider_subdomain" ? { subdomain_slug: value } : { hostname: value, validation_method: "txt" }), default_branch_id: branchId || (tenantBranches[0]?.id ?? null), idempotency_key: createKeyRef.current });
       toast({ title: provisioningMode === "provider_subdomain" ? (isAr ? "تم إنشاء Subdomain العيادة" : "Clinic subdomain created") : (isAr ? "تم تسجيل الدومين" : "Domain registered"), description: provisioningMode === "provider_subdomain" ? `${value}.${ZMEDICO_SUBDOMAIN_SUFFIX}` : (isAr ? "أضف سجلات DNS الظاهرة ثم اضغط فحص الحالة." : "Add the DNS records shown below, then check status.") });
+      void logChange({ tenant_id: tenant.id, category: "domains", action: "create", summary: provisioningMode === "provider_subdomain" ? (isAr ? `تم إنشاء Subdomain ${value}` : `Subdomain ${value} created`) : (isAr ? `تم تسجيل الدومين ${value}` : `Domain ${value} registered`), after_values: { provisioning_mode: provisioningMode, hostname: provisioningMode === "provider_subdomain" ? `${value}.${ZMEDICO_SUBDOMAIN_SUFFIX}` : value } });
       setHostname("");
       setSubdomainSlug("");
       createKeyRef.current = null;
@@ -99,6 +106,7 @@ export default function TenantDomains({ tenant, branches, open, onOpenChange }: 
     try {
       await invoke({ action: name, domain_id: domain.id });
       toast({ title: name === "status" ? (isAr ? "تم تحديث الحالة" : "Status refreshed") : (isAr ? "تم تحديث الدومين" : "Domain updated") });
+      void logChange({ tenant_id: domain.tenant_id, category: "domains", action: name, summary: name === "status" ? (isAr ? `تم فحص حالة ${domain.hostname}` : `${domain.hostname} status checked`) : (isAr ? `تم تنفيذ ${name} على ${domain.hostname}` : `${name} applied to ${domain.hostname}`), after_values: { hostname: domain.hostname } });
       await load();
     } catch (error) {
       toast({ title: error instanceof Error ? error.message : String(error), variant: "destructive" });

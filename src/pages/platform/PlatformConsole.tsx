@@ -19,6 +19,9 @@ import { planAllowsModule } from "@/lib/subscriptionEntitlements";
 import { clearPlatformWorkspaceBranch, setPlatformWorkspaceBranch } from "@/lib/platformWorkspace";
 import OnboardingWizard from "@/pages/platform/OnboardingWizard";
 import TenantDomains from "@/pages/platform/TenantDomains";
+import TenantHealthDialog from "@/pages/platform/TenantHealthDialog";
+import { TablePager } from "@/components/TablePager";
+import { sanitizeSearch } from "@/lib/sanitizeSearch";
 
 type Plan = { id: string; name_ar: string; name_en: string; max_branches: number; max_staff: number; max_patients?: number; max_invoices_monthly?: number; price_monthly?: number; price_yearly?: number; features?: Record<string, boolean> };
 type Tenant = {
@@ -33,6 +36,22 @@ type Tenant = {
   subscription_plans?: Plan | null;
 };
 type Branch = { id: string; name_en: string; name_ar: string; is_active: boolean; tenant_id?: string | null };
+
+const TENANT_PAGE_SIZE = 20;
+
+type PlatformChangePayload = {
+  tenant_id: string;
+  category: "subscription" | "modules" | "domains" | "tenant";
+  action: string;
+  summary: string;
+  before_values?: Record<string, unknown>;
+  after_values?: Record<string, unknown>;
+};
+
+async function writePlatformChange(payload: PlatformChangePayload) {
+  const { error } = await supabase.rpc("platform_log_change" as never, { payload } as never);
+  if (error && import.meta.env.DEV) console.warn("[Platform] change log unavailable", error.message);
+}
 
 function statusTone(status: string, active: boolean) {
   if (!active || ["cancelled", "expired"].includes(status)) return "secondary" as const;
@@ -52,12 +71,17 @@ export default function PlatformConsole() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [search, setSearch] = useState("");
+  const [serverSearch, setServerSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "needs_review">("all");
   const [planFilter, setPlanFilter] = useState("all");
+  const [tenantPage, setTenantPage] = useState(0);
+  const [tenantTotal, setTenantTotal] = useState(0);
+  const [tenantCounts, setTenantCounts] = useState({ total: 0, active: 0, needsReview: 0 });
   const [loading, setLoading] = useState(true);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [moduleTenant, setModuleTenant] = useState<Tenant | null>(null);
   const [domainTenant, setDomainTenant] = useState<Tenant | null>(null);
+  const [healthTenant, setHealthTenant] = useState<Tenant | null>(null);
   const [subscriptionTenant, setSubscriptionTenant] = useState<Tenant | null>(null);
   const [subscriptionForm, setSubscriptionForm] = useState({ planId: "", status: "active", billingCycle: "monthly", durationDays: "30" });
   const [subscriptionSaving, setSubscriptionSaving] = useState(false);
@@ -70,12 +94,27 @@ export default function PlatformConsole() {
   const load = useCallback(async () => {
     if (!canView) { setLoading(false); return; }
     setLoading(true);
-    const [tenantRes, planRes, branchWithTenantRes] = await Promise.all([
-      supabase.from("tenants").select("id,name,slug,subscription_status,is_active,plan_id,trial_ends_at,subscription_ends_at,subscription_plans(id,name_ar,name_en,max_branches,max_staff,features)").order("created_at"),
+    let tenantQuery = supabase
+      .from("tenants")
+      .select("id,name,slug,subscription_status,is_active,plan_id,trial_ends_at,subscription_ends_at,subscription_plans(id,name_ar,name_en,max_branches,max_staff,features)", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(tenantPage * TENANT_PAGE_SIZE, (tenantPage + 1) * TENANT_PAGE_SIZE - 1);
+    if (serverSearch) tenantQuery = tenantQuery.or(`name.ilike.%${serverSearch}%,slug.ilike.%${serverSearch}%,subscription_status.ilike.%${serverSearch}%`);
+    if (statusFilter === "active") tenantQuery = tenantQuery.eq("is_active", true).not("subscription_status", "in", "(cancelled,expired)");
+    if (statusFilter === "needs_review") tenantQuery = tenantQuery.or("is_active.eq.false,subscription_status.eq.cancelled,subscription_status.eq.expired");
+    if (planFilter !== "all") tenantQuery = tenantQuery.eq("plan_id", planFilter);
+
+    const [tenantRes, planRes, branchWithTenantRes, allCountRes, activeCountRes, reviewCountRes] = await Promise.all([
+      tenantQuery,
       supabase.from("subscription_plans").select("id,name_ar,name_en,max_branches,max_staff,max_patients,max_invoices_monthly,price_monthly,price_yearly,features").eq("is_active", true).order("display_order"),
       supabase.from("branches").select("id,name_en,name_ar,is_active,tenant_id").order("name_en"),
+      supabase.from("tenants").select("id", { count: "exact", head: true }),
+      supabase.from("tenants").select("id", { count: "exact", head: true }).eq("is_active", true).not("subscription_status", "in", "(cancelled,expired)"),
+      supabase.from("tenants").select("id", { count: "exact", head: true }).or("is_active.eq.false,subscription_status.eq.cancelled,subscription_status.eq.expired"),
     ]);
     if (tenantRes.error) toast({ title: tenantRes.error.message, variant: "destructive" });
+    setTenantTotal(tenantRes.count ?? 0);
+    setTenantCounts({ total: allCountRes.count ?? 0, active: activeCountRes.count ?? 0, needsReview: reviewCountRes.count ?? 0 });
     setTenants((tenantRes.data ?? []) as unknown as Tenant[]);
     setPlans((planRes.data ?? []) as Plan[]);
     if (branchWithTenantRes.error) {
@@ -88,14 +127,27 @@ export default function PlatformConsole() {
       setBranches((branchWithTenantRes.data ?? []) as Branch[]);
     }
     setLoading(false);
-  }, [canView, toast]);
+  }, [canView, planFilter, serverSearch, statusFilter, tenantPage, toast]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setServerSearch(sanitizeSearch(search));
+      setTenantPage(0);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    setTenantPage(0);
+  }, [planFilter, statusFilter]);
 
   useEffect(() => {
     // A platform owner must enter a clinic workspace only through the explicit
     // Open Workspace action. Clear stale handoffs whenever the console mounts.
     clearPlatformWorkspaceBranch();
-    void load();
-  }, [load]);
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
 
   const branchCount = useMemo(() => {
     const counts = new Map<string, number>();
@@ -103,16 +155,7 @@ export default function PlatformConsole() {
     return counts;
   }, [branches]);
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return tenants.filter((tenant) => {
-      const matchesSearch = !q || `${tenant.name} ${tenant.slug} ${tenant.subscription_status}`.toLowerCase().includes(q);
-      const isActive = tenant.is_active && !["cancelled", "expired"].includes(tenant.subscription_status);
-      const matchesStatus = statusFilter === "all" || (statusFilter === "active" ? isActive : !isActive);
-      const matchesPlan = planFilter === "all" || tenant.plan_id === planFilter;
-      return matchesSearch && matchesStatus && matchesPlan;
-    });
-  }, [planFilter, search, statusFilter, tenants]);
+  const filtered = tenants;
 
   const planForModuleTenant = moduleTenant
     ? plans.find((plan) => plan.id === moduleTenant.plan_id) ?? moduleTenant.subscription_plans ?? null
@@ -162,6 +205,7 @@ export default function PlatformConsole() {
     if (error) toast({ title: error.message, variant: "destructive" });
     else {
       toast({ title: isAr ? "تم تحديث خطة العميل" : "Tenant subscription updated" });
+      void writePlatformChange({ tenant_id: subscriptionTenant.id, category: "subscription", action: "update", summary: isAr ? "تم تحديث خطة ومدة الاشتراك" : "Subscription plan and term updated", before_values: { plan_id: subscriptionTenant.plan_id, status: subscriptionTenant.subscription_status }, after_values: { plan_id: subscriptionForm.planId, status: subscriptionForm.status, billing_cycle: subscriptionForm.billingCycle, duration_days: durationDays } });
       setSubscriptionTenant(null);
       await load();
     }
@@ -177,6 +221,7 @@ export default function PlatformConsole() {
       toast({ title: error.message, variant: "destructive" });
     } else {
       toast({ title: isAr ? "تم حفظ وحدات العميل" : "Tenant modules saved" });
+      void writePlatformChange({ tenant_id: moduleTenant.id, category: "modules", action: "update", summary: isAr ? "تم تحديث وحدات العميل" : "Tenant modules updated", after_values: { enabled_modules: Object.entries(moduleValues).filter(([, enabled]) => enabled).map(([key]) => key) } });
       setModuleTenant(null);
     }
     setModuleSaving(false);
@@ -205,9 +250,9 @@ export default function PlatformConsole() {
       <Button onClick={() => setOnboardingOpen(true)}><Plus className="me-2 size-4" />{isAr ? "إضافة عيادة" : "Add clinic"}</Button>
     </div>
 
-    <div className="grid gap-3 sm:grid-cols-3"><Stat icon={<Building2 className="size-4" />} label={isAr ? "كل العملاء" : "All tenants"} value={tenants.length} /><Stat icon={<CheckCircle2 className="size-4 text-emerald-600" />} label={isAr ? "نشط" : "Active"} value={activeCount} /><Stat icon={<XCircle className="size-4 text-muted-foreground" />} label={isAr ? "يحتاج مراجعة" : "Needs review"} value={inactiveCount} /></div>
+    <div className="grid gap-3 sm:grid-cols-3"><Stat icon={<Building2 className="size-4" />} label={isAr ? "كل العملاء" : "All tenants"} value={tenantCounts.total} /><Stat icon={<CheckCircle2 className="size-4 text-emerald-600" />} label={isAr ? "نشط" : "Active"} value={tenantCounts.active} /><Stat icon={<XCircle className="size-4 text-muted-foreground" />} label={isAr ? "يحتاج مراجعة" : "Needs review"} value={tenantCounts.needsReview} /></div>
 
-    <Card><CardHeader className="pb-3"><div className="flex flex-wrap items-center justify-between gap-3"><CardTitle className="text-base">{isAr ? "دليل العملاء" : "Tenant directory"}<span className="ms-2 text-xs font-normal text-muted-foreground">{filtered.length}/{tenants.length}</span></CardTitle><div className="flex w-full flex-wrap gap-2 sm:w-auto"><div className="relative min-w-[220px] flex-1 sm:max-w-sm"><Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input className="ps-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={isAr ? "ابحث بالاسم أو المعرف" : "Search by name or slug"} /></div><Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}><SelectTrigger className="w-full sm:w-[150px]"><SelectValue placeholder={isAr ? "الحالة" : "Status"} /></SelectTrigger><SelectContent><SelectItem value="all">{isAr ? "كل الحالات" : "All statuses"}</SelectItem><SelectItem value="active">{isAr ? "نشط" : "Active"}</SelectItem><SelectItem value="needs_review">{isAr ? "يحتاج مراجعة" : "Needs review"}</SelectItem></SelectContent></Select><Select value={planFilter} onValueChange={setPlanFilter}><SelectTrigger className="w-full sm:w-[170px]"><SelectValue placeholder={isAr ? "الخطة" : "Plan"} /></SelectTrigger><SelectContent><SelectItem value="all">{isAr ? "كل الخطط" : "All plans"}</SelectItem>{plans.map((plan) => <SelectItem key={plan.id} value={plan.id}>{isAr ? plan.name_ar : plan.name_en}</SelectItem>)}</SelectContent></Select></div></div></CardHeader><CardContent className="space-y-3">{filtered.length === 0 ? <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">{isAr ? "لا يوجد عملاء بعد." : "No tenants yet."}</div> : filtered.map((tenant) => { const plan = tenant.subscription_plans; const count = branchCount.get(tenant.id) ?? 0; return <div key={tenant.id} className="flex flex-wrap items-center gap-3 rounded-xl border p-4"><div className="flex min-w-0 flex-1 items-center gap-3"><div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Building2 className="size-5" /></div><div className="min-w-0"><div className="truncate font-semibold">{tenant.name}</div><div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><span className="font-mono">{tenant.slug}</span><span>·</span><span className="inline-flex items-center gap-1"><Users className="size-3" />{count} {isAr ? "فرع" : "branch(es)"}</span></div></div></div><Badge variant={statusTone(tenant.subscription_status, tenant.is_active)}>{tenant.is_active ? tenant.subscription_status : (isAr ? "متوقف" : "Inactive")}</Badge><Badge variant="outline">{plan ? (isAr ? plan.name_ar : plan.name_en) : (isAr ? "بدون خطة" : "No plan")}</Badge><span className="text-xs text-muted-foreground">{tenant.subscription_ends_at || tenant.trial_ends_at ? `${isAr ? "حتى" : "until"} ${new Date(tenant.subscription_ends_at ?? tenant.trial_ends_at!).toLocaleDateString(isAr ? "ar-EG" : "en-EG")}` : (isAr ? "بدون مدة محددة" : "No term set")}</span><div className="flex flex-wrap gap-2"><Button size="sm" onClick={() => openTenant(tenant)} disabled={!count}>{isAr ? "فتح مساحة التشغيل" : "Open workspace"}</Button><Button size="sm" variant="outline" onClick={() => void openModuleManager(tenant)}><Settings2 className="me-1 size-3.5" />{isAr ? "الوحدات" : "Modules"}</Button><Button size="sm" variant="outline" onClick={() => openSubscriptionManager(tenant)}><CalendarClock className="me-1 size-3.5" />{isAr ? "الخطة والمدة" : "Plan & term"}</Button><Button size="sm" variant="outline" onClick={() => setDomainTenant(tenant)}><Globe2 className="me-1 size-3.5" />{isAr ? "الدومينات" : "Domains"}</Button></div></div>; })}</CardContent></Card>
+    <Card><CardHeader className="pb-3"><div className="flex flex-wrap items-center justify-between gap-3"><CardTitle className="text-base">{isAr ? "دليل العملاء" : "Tenant directory"}<span className="ms-2 text-xs font-normal text-muted-foreground">{tenantTotal}/{tenantCounts.total}</span></CardTitle><div className="flex w-full flex-wrap gap-2 sm:w-auto"><div className="relative min-w-[220px] flex-1 sm:max-w-sm"><Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input className="ps-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={isAr ? "ابحث بالاسم أو المعرف" : "Search by name or slug"} /></div><Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}><SelectTrigger className="w-full sm:w-[150px]"><SelectValue placeholder={isAr ? "الحالة" : "Status"} /></SelectTrigger><SelectContent><SelectItem value="all">{isAr ? "كل الحالات" : "All statuses"}</SelectItem><SelectItem value="active">{isAr ? "نشط" : "Active"}</SelectItem><SelectItem value="needs_review">{isAr ? "يحتاج مراجعة" : "Needs review"}</SelectItem></SelectContent></Select><Select value={planFilter} onValueChange={setPlanFilter}><SelectTrigger className="w-full sm:w-[170px]"><SelectValue placeholder={isAr ? "الخطة" : "Plan"} /></SelectTrigger><SelectContent><SelectItem value="all">{isAr ? "كل الخطط" : "All plans"}</SelectItem>{plans.map((plan) => <SelectItem key={plan.id} value={plan.id}>{isAr ? plan.name_ar : plan.name_en}</SelectItem>)}</SelectContent></Select></div></div></CardHeader><CardContent className="space-y-3">{filtered.length === 0 ? <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">{isAr ? "لا يوجد عملاء بعد." : "No tenants yet."}</div> : filtered.map((tenant) => { const plan = tenant.subscription_plans; const count = branchCount.get(tenant.id) ?? 0; return <div key={tenant.id} className="flex flex-wrap items-center gap-3 rounded-xl border p-4"><div className="flex min-w-0 flex-1 items-center gap-3"><div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Building2 className="size-5" /></div><div className="min-w-0"><div className="truncate font-semibold">{tenant.name}</div><div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><span className="font-mono">{tenant.slug}</span><span>·</span><span className="inline-flex items-center gap-1"><Users className="size-3" />{count} {isAr ? "فرع" : "branch(es)"}</span></div></div></div><Badge variant={statusTone(tenant.subscription_status, tenant.is_active)}>{tenant.is_active ? tenant.subscription_status : (isAr ? "متوقف" : "Inactive")}</Badge><Badge variant="outline">{plan ? (isAr ? plan.name_ar : plan.name_en) : (isAr ? "بدون خطة" : "No plan")}</Badge><span className="text-xs text-muted-foreground">{tenant.subscription_ends_at || tenant.trial_ends_at ? `${isAr ? "حتى" : "until"} ${new Date(tenant.subscription_ends_at ?? tenant.trial_ends_at!).toLocaleDateString(isAr ? "ar-EG" : "en-EG")}` : (isAr ? "بدون مدة محددة" : "No term set")}</span><div className="flex flex-wrap gap-2"><Button size="sm" onClick={() => openTenant(tenant)} disabled={!count}>{isAr ? "فتح مساحة التشغيل" : "Open workspace"}</Button><Button size="sm" variant="outline" onClick={() => setHealthTenant(tenant)}><ShieldAlert className="me-1 size-3.5" />{isAr ? "الصحة" : "Health"}</Button><Button size="sm" variant="outline" onClick={() => void openModuleManager(tenant)}><Settings2 className="me-1 size-3.5" />{isAr ? "الوحدات" : "Modules"}</Button><Button size="sm" variant="outline" onClick={() => openSubscriptionManager(tenant)}><CalendarClock className="me-1 size-3.5" />{isAr ? "الخطة والمدة" : "Plan & term"}</Button><Button size="sm" variant="outline" onClick={() => setDomainTenant(tenant)}><Globe2 className="me-1 size-3.5" />{isAr ? "الدومينات" : "Domains"}</Button></div></div>; })}</CardContent><TablePager page={tenantPage} pageSize={TENANT_PAGE_SIZE} total={tenantTotal} onPageChange={setTenantPage} /></Card>
 
     <Card className="border-primary/20 bg-primary/5"><CardContent className="p-4 text-sm"><div className="font-semibold">{isAr ? "إدارة المنصة" : "Platform controls"}</div><p className="mt-1 text-muted-foreground">{isAr ? "أنشئ العميل كاملًا من المعالج الذري، ثم أدر الوحدات والدومينات من هنا. إعدادات التشغيل اليومية تبقى داخل مساحة العيادة." : "Create the tenant atomically, then manage modules and domains here. Daily operational settings remain inside the clinic workspace."}</p></CardContent></Card>
 
@@ -216,6 +261,7 @@ export default function PlatformConsole() {
     <Dialog open={!!subscriptionTenant} onOpenChange={(value) => !value && setSubscriptionTenant(null)}><DialogContent className="max-w-lg" dir={isAr ? "rtl" : "ltr"}><DialogHeader><DialogTitle className="flex items-center gap-2"><CalendarClock className="size-5 text-primary" />{isAr ? "إدارة الخطة والاشتراك" : "Plan & subscription management"} · {subscriptionTenant?.name}</DialogTitle></DialogHeader><div className="space-y-4"><div className="grid gap-3 sm:grid-cols-2"><div className="space-y-1.5"><Label>{isAr ? "الخطة" : "Plan"}</Label><Select value={subscriptionForm.planId} onValueChange={(value) => setSubscriptionForm((current) => ({ ...current, planId: value }))}><SelectTrigger><SelectValue placeholder={isAr ? "اختر الخطة" : "Choose plan"} /></SelectTrigger><SelectContent>{plans.map((plan) => <SelectItem key={plan.id} value={plan.id}>{isAr ? plan.name_ar : plan.name_en}</SelectItem>)}</SelectContent></Select></div><div className="space-y-1.5"><Label>{isAr ? "الحالة" : "Status"}</Label><Select value={subscriptionForm.status} onValueChange={(value) => setSubscriptionForm((current) => ({ ...current, status: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="trial">{isAr ? "تجربة" : "Trial"}</SelectItem><SelectItem value="active">{isAr ? "نشط" : "Active"}</SelectItem><SelectItem value="past_due">{isAr ? "متأخر السداد" : "Past due"}</SelectItem><SelectItem value="cancelled">{isAr ? "ملغى" : "Cancelled"}</SelectItem><SelectItem value="expired">{isAr ? "منتهٍ" : "Expired"}</SelectItem></SelectContent></Select></div><div className="space-y-1.5"><Label>{isAr ? "المدة بالأيام" : "Term length (days)"}</Label><Input type="number" min={1} max={3650} value={subscriptionForm.durationDays} onChange={(event) => setSubscriptionForm((current) => ({ ...current, durationDays: event.target.value }))} /></div><div className="space-y-1.5"><Label>{isAr ? "دورة الفوترة" : "Billing cycle"}</Label><Select value={subscriptionForm.billingCycle} onValueChange={(value) => setSubscriptionForm((current) => ({ ...current, billingCycle: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="monthly">{isAr ? "شهري" : "Monthly"}</SelectItem><SelectItem value="yearly">{isAr ? "سنوي" : "Yearly"}</SelectItem></SelectContent></Select></div></div><p className="text-xs text-muted-foreground">{isAr ? "عند انتهاء المدة أو إيقاف العميل، تُغلق مساحة التشغيل ولا تُحذف البيانات." : "When the term ends or the tenant is paused, the workspace closes without deleting data."}</p></div><DialogFooter><Button variant="outline" onClick={() => setSubscriptionTenant(null)}>{isAr ? "إلغاء" : "Cancel"}</Button><Button onClick={() => void saveSubscription()} disabled={subscriptionSaving || !subscriptionForm.planId}>{subscriptionSaving ? <Loader2 className="me-2 size-4 animate-spin" /> : null}{isAr ? "حفظ التغيير" : "Save change"}</Button></DialogFooter></DialogContent></Dialog>
     <OnboardingWizard open={onboardingOpen} onOpenChange={setOnboardingOpen} plans={plans} onCreated={load} />
     <TenantDomains tenant={domainTenant} branches={branches} open={!!domainTenant} onOpenChange={(value) => { if (!value) setDomainTenant(null); }} />
+    <TenantHealthDialog tenant={healthTenant} branches={branches} plans={plans} open={!!healthTenant} onOpenChange={(value) => { if (!value) setHealthTenant(null); }} />
   </div>;
 }
 

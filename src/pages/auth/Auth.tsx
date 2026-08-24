@@ -13,6 +13,7 @@ import {
 import { useI18n } from "@/contexts/I18nContext";
 import { toast } from "sonner";
 import { hasPersistedAuthSession, persistAuthSessionForPreview } from "@/lib/authSessionPersistence";
+import { resolvePostAuthRedirect } from "@/lib/authRedirect";
 
 function authDebug(message: string, details?: Record<string, unknown>) {
   if (import.meta.env.DEV) console.info("[auth-debug]", message, details ?? {});
@@ -20,6 +21,15 @@ function authDebug(message: string, details?: Record<string, unknown>) {
 
 function isValidEmailAddress(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 255;
+}
+
+async function getRolesForRedirect(userId: string): Promise<string[]> {
+  const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+  if (error) {
+    authDebug("post-auth role lookup failed", { error: error.message });
+    return [];
+  }
+  return (data ?? []).map((row) => String(row.role ?? ""));
 }
 
 function safeRedirectPath(value?: string | null) {
@@ -74,8 +84,16 @@ export default function AuthPage() {
 
   useEffect(() => {
     if (authLoading || !user) return;
-    authDebug( "auth page detected existing session", { redirectAfterLogin: from });
-    nav(from, { replace: true });
+    let active = true;
+    const redirectExistingSession = async () => {
+      const roles = await getRolesForRedirect(user.id);
+      if (!active) return;
+      const destination = resolvePostAuthRedirect(from, roles);
+      authDebug("auth page detected existing session", { redirectAfterLogin: destination, roles });
+      nav(destination, { replace: true });
+    };
+    void redirectExistingSession();
+    return () => { active = false; };
   }, [authLoading, from, nav, user]);
 
   const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -135,7 +153,10 @@ export default function AuthPage() {
       toast.error(sessionError?.message ?? (lang === "ar" ? "لم يتم حفظ جلسة تسجيل الدخول" : "Sign-in session was not saved"));
       return;
     }
-    nav(from, { replace: true });
+    const roles = await getRolesForRedirect(sessionData.session.user.id);
+    const destination = resolvePostAuthRedirect(from, roles);
+    authDebug("post-auth redirect resolved", { destination, roles });
+    nav(destination, { replace: true });
   };
 
   const handleSendReset = async (e: React.FormEvent) => {

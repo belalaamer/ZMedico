@@ -5,7 +5,7 @@
 // no_show_rate), and reconcile queue_alerts so alerts exist independent of any
 // open dashboard session. Heartbeat written to queue_alert_runs.
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { corsHeaders, corsPreflight, jsonResponse } from "../_shared/cors.ts";
+import { corsPreflight, jsonResponse } from "./cors.ts";
 
 type AlertType = "long_wait" | "no_show_rate" | "busy_queue";
 type Condition = { type: AlertType; active: boolean; detail: Record<string, unknown> };
@@ -147,14 +147,16 @@ Deno.serve(async (req) => {
   // Auth guard: only the scheduled cron job (or a service-role caller) may
   // invoke this function. It writes to queue_alerts using the service role
   // key and would otherwise be callable anonymously.
-  // Sprint 1 hardening: this function now has its own dedicated secret and
-  // no longer falls back to SEND_REMINDER_CRON_SECRET (least-privilege).
-  // See docs/security/SPRINT1_DEFINER_HARDENING.md and the edge-function
-  // audit report for context.
+  // Prefer the dedicated queue-alert secret. The shared reminder secret is
+  // accepted only as a compatibility path because the pg_cron Vault helper
+  // currently exposes that existing secret and cannot read Edge Function-only
+  // secrets. The dedicated secret remains the preferred production path.
   const CRON_SECRET = Deno.env.get("DETECT_QUEUE_ALERTS_CRON_SECRET");
+  const COMPAT_CRON_SECRET = Deno.env.get("SEND_REMINDER_CRON_SECRET");
   const auth = req.headers.get("Authorization") ?? "";
   const isCron =
     (!!CRON_SECRET && auth === `Bearer ${CRON_SECRET}`) ||
+    (!!COMPAT_CRON_SECRET && auth === `Bearer ${COMPAT_CRON_SECRET}`) ||
     (!!SERVICE_ROLE && auth === `Bearer ${SERVICE_ROLE}`);
   if (!isCron) {
     return jsonResponse({ error: "Unauthorized" }, 401);

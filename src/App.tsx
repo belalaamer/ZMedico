@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,10 +11,10 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { PermissionRoute } from "@/components/PermissionRoute";
 import { attachGlobalRefreshListeners } from "@/lib/dataSync";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { useBranch } from "@/contexts/BranchContext";
 
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
+const LandingPage = lazy(() => import("./pages/Index.tsx"));
 const AppShell = lazy(() => import("@/components/layout/AppShell"));
 const PlatformShell = lazy(() => import("@/components/layout/PlatformShell"));
 const AuthPage = lazy(() => import("@/pages/auth/Auth"));
@@ -23,6 +23,7 @@ const ResetPassword = lazy(() => import("@/pages/auth/ResetPassword"));
 const Pricing = lazy(() => import("@/pages/pricing/Pricing"));
 const PublicBooking = lazy(() => import("@/pages/booking/PublicBooking"));
 const SelfCheckin = lazy(() => import("@/pages/checkin/SelfCheckin"));
+const RequestTrial = lazy(() => import("@/pages/subscription/RequestTrial"));
 const Trust = lazy(() => import("@/pages/Trust"));
 const Dashboard = lazy(() => import("@/pages/dashboard/Dashboard"));
 const PatientsPage = lazy(() => import("@/pages/patients/Patients"));
@@ -138,17 +139,6 @@ function RouteLoader() {
   );
 }
 
-function HomeEntry() {
-  const navigate = useNavigate();
-  const { authz, loading } = useAuthorization("home-entry");
-  const isSystemOwner = authz.holdsAnyRole("system_owner");
-  useEffect(() => {
-    if (!loading && isSystemOwner) navigate("/platform", { replace: true });
-  }, [isSystemOwner, loading, navigate]);
-  if (loading || isSystemOwner) return <RouteLoader />;
-  return <Dashboard />;
-}
-
 function AppContent() {
   useEffect(() => attachGlobalRefreshListeners(), []);
 
@@ -159,12 +149,14 @@ function AppContent() {
       <BrowserRouter>
         <Suspense fallback={<RouteLoader />}>
           <Routes>
+            <Route path="/" element={<LandingPage />} />
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/book" element={<PublicBooking />} />
             <Route path="/check-in" element={<SelfCheckin />} />
+            <Route path="/request-trial" element={<RequestTrial />} />
             <Route path="/trust" element={<Trust />} />
               <Route
                 element={
@@ -182,10 +174,6 @@ function AppContent() {
                   </ProtectedRoute>
                 }
               >
-              {/* The landing page is reachable by every authenticated user. No single
-                  permission is held by all roles, and row-level security already limits
-                  what each one sees inside it. */}
-              <Route path="/" element={<HomeEntry />} />
               <Route path="/workspace" element={<Dashboard />} />
               <Route path="/patients" element={<PermissionRoute><PatientsPage /></PermissionRoute>} />
               <Route path="/leads" element={<PermissionRoute><LeadsPage /></PermissionRoute>} />

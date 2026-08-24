@@ -89,7 +89,7 @@ export default function Pricing() {
           <Link to="/" className="text-xl font-bold text-primary">ZMedico</Link>
           <div className="flex items-center gap-2">
             <Button asChild variant="ghost"><Link to="/auth">{isAr ? "تسجيل الدخول" : "Sign in"}</Link></Button>
-            <Button asChild><Link to="/auth">{isAr ? "ابدأ مجاناً" : "Start free"}</Link></Button>
+            <Button asChild><Link to="/request-trial">{isAr ? "اطلب تجربة مجانية" : "Request a free trial"}</Link></Button>
           </div>
         </div>
       </header>
@@ -105,8 +105,8 @@ export default function Pricing() {
         </h1>
         <p className="text-muted-foreground max-w-2xl mx-auto mb-8">
           {isAr
-            ? "اختر الخطة المناسبة لحجم عيادتك. يمكنك الترقية أو التخفيض في أي وقت."
-            : "Pick the plan that fits your clinic. Upgrade or downgrade anytime."}
+            ? "اختر الخطة المناسبة لحجم عيادتك. يراجع الفريق المدة والخطة ويفعّل مساحة العمل يدويًا."
+            : "Pick the plan that fits your clinic. We confirm the term and activate your workspace manually."}
         </p>
 
         <div className="inline-flex items-center gap-3 rounded-full border bg-card px-4 py-2">
@@ -212,7 +212,7 @@ export default function Pricing() {
                       })}
                     </ul>
                     <Button asChild className="w-full mt-auto" variant={p.is_popular ? "default" : "outline"}>
-                      <Link to={`/auth?plan=${p.id}`}>
+                      <Link to={`/request-trial?plan=${encodeURIComponent(p.id)}`}>
                         {isAr ? "ابدأ التجربة المجانية" : "Start free trial"}
                       </Link>
                     </Button>
@@ -277,11 +277,11 @@ export default function Pricing() {
             },
             {
               q: isAr ? "هل يمكنني تغيير خطتي لاحقاً؟" : "Can I change plans later?",
-              a: isAr ? "نعم، يمكنك الترقية أو التخفيض في أي وقت من لوحة الفوترة." : "Yes, upgrade or downgrade anytime from the billing dashboard.",
+              a: isAr ? "نعم، يراجع System Owner الخطة والمدة ويحدّثهما لك يدويًا من Platform Console." : "Yes. The System Owner can change the plan and term manually from the Platform Console.",
             },
             {
               q: isAr ? "ما طرق الدفع المدعومة؟" : "Which payment methods do you support?",
-              a: isAr ? "ندعم البطاقات وفوري والمحافظ الإلكترونية عبر Paymob، بالإضافة إلى التحويل البنكي." : "Cards, Fawry, and e-wallets via Paymob, plus bank transfer.",
+              a: isAr ? "الدفع الإلكتروني غير مفعل حاليًا. أرسل طلب التجربة وسيتواصل معك الفريق لتأكيد الخطة والدفع يدويًا." : "Online payment is not enabled yet. Send a trial request and the team will confirm the plan and manual payment details.",
             },
             {
               q: isAr ? "هل بياناتي آمنة؟" : "Is my data secure?",

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Stethoscope, Globe } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -43,10 +43,12 @@ export default function AuthPage() {
   const { user, loading: authLoading } = useAuth();
   const nav = useNavigate();
   const location = useLocation();
+  const selectedPlan = useMemo(() => new URLSearchParams(location.search).get("plan"), [location.search]);
+  const requestTrialHref = selectedPlan ? `/request-trial?plan=${encodeURIComponent(selectedPlan)}` : "/request-trial";
   const from = useMemo(() => {
     const params = new URLSearchParams(location.search);
     const next = params.get("next");
-    const stateFrom = (location.state as any)?.from;
+    const stateFrom = (location.state as { from?: { pathname?: string; search?: string; hash?: string } } | null)?.from;
     const statePath = stateFrom
       ? `${stateFrom.pathname ?? "/"}${stateFrom.search ?? ""}${stateFrom.hash ?? ""}`
       : null;
@@ -230,11 +232,14 @@ export default function AuthPage() {
                     </Dialog>
                   </div>
                 </form>
-              <p className="text-xs text-muted-foreground text-center mt-4">
-                {lang === "ar"
-                  ? "التسجيل عن طريق دعوة المسؤول فقط."
-                  : "New accounts are created by an administrator."}
-              </p>
+              <div className="mt-5 border-t pt-4 text-center">
+                <p className="text-xs text-muted-foreground">
+                  {lang === "ar" ? "ليس لديك حساب؟ اطلب تجربة لعيادتك وسيتواصل معك فريق ZMedico." : "New clinic? Request a trial and the ZMedico team will contact you."}
+                </p>
+                <Button asChild variant="outline" className="mt-3 w-full">
+                  <Link to={requestTrialHref}>{lang === "ar" ? "اطلب تجربة مجانية" : "Request a free trial"}</Link>
+                </Button>
+              </div>
             </div>
           </Card>
         </div>

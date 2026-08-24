@@ -6376,6 +6376,7 @@ export type Database = {
           name_en: string
           price_monthly: number
           price_yearly: number
+          updated_at: string
         }
         Insert: {
           created_at?: string
@@ -6395,6 +6396,7 @@ export type Database = {
           name_en: string
           price_monthly?: number
           price_yearly?: number
+          updated_at?: string
         }
         Update: {
           created_at?: string
@@ -6414,8 +6416,68 @@ export type Database = {
           name_en?: string
           price_monthly?: number
           price_yearly?: number
+          updated_at?: string
         }
         Relationships: []
+      }
+      subscription_requests: {
+        Row: {
+          clinic_name: string
+          created_at: string
+          email: string
+          id: string
+          message: string | null
+          notes: string | null
+          owner_name: string
+          phone: string | null
+          plan_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          clinic_name: string
+          created_at?: string
+          email: string
+          id?: string
+          message?: string | null
+          notes?: string | null
+          owner_name: string
+          phone?: string | null
+          plan_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          clinic_name?: string
+          created_at?: string
+          email?: string
+          id?: string
+          message?: string | null
+          notes?: string | null
+          owner_name?: string
+          phone?: string | null
+          plan_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_requests_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscriptions: {
         Row: {
@@ -8295,7 +8357,33 @@ export type Database = {
         Args: { payload: Json }
         Returns: Json
       }
+      platform_list_subscription_requests: {
+        Args: { p_status?: string }
+        Returns: {
+          clinic_name: string
+          created_at: string
+          email: string
+          id: string
+          message: string
+          notes: string
+          owner_name: string
+          phone: string
+          plan_id: string
+          plan_name_ar: string
+          plan_name_en: string
+          status: string
+          updated_at: string
+        }[]
+      }
       platform_log_change: { Args: { payload: Json }; Returns: string }
+      platform_update_subscription_plan: {
+        Args: { p_payload: Json; p_plan_id: string }
+        Returns: Json
+      }
+      platform_update_subscription_request: {
+        Args: { p_notes?: string; p_request_id: string; p_status: string }
+        Returns: boolean
+      }
       platform_update_tenant_subscription: {
         Args: { payload: Json }
         Returns: Json
@@ -8371,6 +8459,10 @@ export type Database = {
           p_source?: string
           p_tenant_id: string
         }
+        Returns: Json
+      }
+      public_create_subscription_request: {
+        Args: { p_payload: Json }
         Returns: Json
       }
       public_self_checkin: {

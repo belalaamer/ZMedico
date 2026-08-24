@@ -80,15 +80,27 @@ export default function TenantDomains({ tenant, branches, open, onOpenChange }: 
     } finally { setLoading(false); }
   }, [invoke, tenant, toast]);
 
-  useEffect(() => { if (open && tenant) void load(); }, [open, tenant, load]);
+  useEffect(() => {
+    if (open && tenant) {
+      setBranchId("");
+      void load();
+    }
+  }, [open, tenant, load]);
 
   const add = async () => {
     const value = provisioningMode === "provider_subdomain" ? subdomainSlug.trim() : hostname.trim();
     if (!tenant || !value) { toast({ title: provisioningMode === "provider_subdomain" ? (isAr ? "أدخل اسم الـSubdomain أولًا" : "Enter a subdomain slug first") : (isAr ? "أدخل الدومين أولًا" : "Enter a hostname first"), variant: "destructive" }); return; }
+    if (!branchId) { toast({ title: isAr ? "اختر الفرع الافتراضي أولًا" : "Choose the default branch first", variant: "destructive" }); return; }
+    const selectedBranch = tenantBranches.find((branch) => branch.id === branchId);
+    const finalHostname = provisioningMode === "provider_subdomain" ? `${value}.${ZMEDICO_SUBDOMAIN_SUFFIX}` : value;
+    const confirmation = isAr
+      ? `سيتم تسجيل ${finalHostname} للعميل ${tenant.name} وربطه بالفرع ${selectedBranch?.name_ar || selectedBranch?.name_en || "المحدد"}. هل تريد المتابعة؟`
+      : `Register ${finalHostname} for ${tenant.name} and map it to ${selectedBranch?.name_en || selectedBranch?.name_ar || "the selected branch"}?`;
+    if (!window.confirm(confirmation)) return;
     setAdding(true);
     createKeyRef.current = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     try {
-      await invoke({ action: provisioningMode === "provider_subdomain" ? "create_subdomain" : "create", tenant_id: tenant.id, ...(provisioningMode === "provider_subdomain" ? { subdomain_slug: value } : { hostname: value, validation_method: "txt" }), default_branch_id: branchId || (tenantBranches[0]?.id ?? null), idempotency_key: createKeyRef.current });
+      await invoke({ action: provisioningMode === "provider_subdomain" ? "create_subdomain" : "create", tenant_id: tenant.id, ...(provisioningMode === "provider_subdomain" ? { subdomain_slug: value } : { hostname: value, validation_method: "txt" }), default_branch_id: branchId, idempotency_key: createKeyRef.current });
       toast({ title: provisioningMode === "provider_subdomain" ? (isAr ? "تم إنشاء Subdomain العيادة" : "Clinic subdomain created") : (isAr ? "تم تسجيل الدومين" : "Domain registered"), description: provisioningMode === "provider_subdomain" ? `${value}.${ZMEDICO_SUBDOMAIN_SUFFIX}` : (isAr ? "أضف سجلات DNS الظاهرة ثم اضغط فحص الحالة." : "Add the DNS records shown below, then check status.") });
       void logChange({ tenant_id: tenant.id, category: "domains", action: "create", summary: provisioningMode === "provider_subdomain" ? (isAr ? `تم إنشاء Subdomain ${value}` : `Subdomain ${value} created`) : (isAr ? `تم تسجيل الدومين ${value}` : `Domain ${value} registered`), after_values: { provisioning_mode: provisioningMode, hostname: provisioningMode === "provider_subdomain" ? `${value}.${ZMEDICO_SUBDOMAIN_SUFFIX}` : value } });
       setHostname("");
@@ -128,8 +140,8 @@ export default function TenantDomains({ tenant, branches, open, onOpenChange }: 
           <p className="text-xs text-muted-foreground">{provisioningMode === "provider_subdomain" ? (isAr ? `يُنشأ فورًا تحت .${ZMEDICO_SUBDOMAIN_SUFFIX} ولا يحتاج حصة SSL for SaaS.` : `Created instantly under .${ZMEDICO_SUBDOMAIN_SUFFIX}; no SSL for SaaS quota required.`) : (isAr ? "يحتاج تفعيل Cloudflare for SaaS وشهادات SSL والتحقق من DNS." : "Requires Cloudflare for SaaS, SSL certificate quota, and DNS validation.")}</p>
           <div className="grid gap-3 sm:grid-cols-[1fr_220px_auto] sm:items-end">
           <div className="space-y-1.5"><Label>{provisioningMode === "provider_subdomain" ? (isAr ? "اسم الـSubdomain" : "Subdomain slug") : (isAr ? "الدومين" : "Hostname")}</Label>{provisioningMode === "provider_subdomain" ? <div className="flex items-center gap-2"><Input dir="ltr" value={subdomainSlug} onChange={(e) => setSubdomainSlug(e.target.value)} placeholder="blitz-physio" /><span dir="ltr" className="shrink-0 text-xs text-muted-foreground">.{ZMEDICO_SUBDOMAIN_SUFFIX}</span></div> : <Input dir="ltr" value={hostname} onChange={(e) => setHostname(e.target.value)} placeholder="portal.client.com" />}</div>
-          <div className="space-y-1.5"><Label>{isAr ? "الفرع الافتراضي" : "Default branch"}</Label><Select value={branchId || (tenantBranches[0]?.id ?? "none")} onValueChange={(value) => setBranchId(value === "none" ? "" : value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{tenantBranches.length === 0 ? <SelectItem value="none">{isAr ? "لا يوجد فرع نشط" : "No active branch"}</SelectItem> : tenantBranches.map((branch) => <SelectItem key={branch.id} value={branch.id}>{isAr ? branch.name_ar || branch.name_en : branch.name_en || branch.name_ar}</SelectItem>)}</SelectContent></Select></div>
-          <Button onClick={() => void add()} disabled={adding || tenantBranches.length === 0}>{adding ? <Loader2 className="me-2 size-4 animate-spin" /> : <Plus className="me-2 size-4" />}{provisioningMode === "provider_subdomain" ? (isAr ? "إنشاء Subdomain" : "Create subdomain") : (isAr ? "إضافة" : "Add domain")}</Button>
+          <div className="space-y-1.5"><Label>{isAr ? "الفرع الافتراضي" : "Default branch"}</Label><Select value={branchId || "none"} onValueChange={(value) => setBranchId(value === "none" ? "" : value)}><SelectTrigger><SelectValue placeholder={isAr ? "اختر الفرع" : "Choose branch"} /></SelectTrigger><SelectContent><SelectItem value="none">{isAr ? "اختر الفرع" : "Choose a branch"}</SelectItem>{tenantBranches.map((branch) => <SelectItem key={branch.id} value={branch.id}>{isAr ? branch.name_ar || branch.name_en : branch.name_en || branch.name_ar}</SelectItem>)}</SelectContent></Select></div>
+          <Button onClick={() => void add()} disabled={adding || tenantBranches.length === 0 || !branchId}>{adding ? <Loader2 className="me-2 size-4 animate-spin" /> : <Plus className="me-2 size-4" />}{provisioningMode === "provider_subdomain" ? (isAr ? "إنشاء Subdomain" : "Create subdomain") : (isAr ? "إضافة" : "Add domain")}</Button>
           </div>
         </section>
 

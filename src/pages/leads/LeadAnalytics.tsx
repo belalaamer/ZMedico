@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BarChart3, CalendarCheck, Clock3, Download, Info, PhoneCall, RefreshCw, Target, TrendingUp, UserCheck, UserX, Users, XCircle } from "lucide-react";
+import { AlertTriangle, BarChart3, CalendarCheck, Clock3, Download, Info, PhoneCall, RefreshCw, Target, TrendingUp, UserCheck, UserX, Users, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -80,24 +80,33 @@ export default function LeadAnalytics() {
   const [data, setData] = useState<AnalyticsResponse>({ summary: EMPTY_SUMMARY, sources: [], campaigns: [], trend: [], assignees: [] });
   const [staff, setStaff] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
+  const [analyticsError, setAnalyticsError] = useState(false);
 
   const load = useCallback(async () => {
     if (!currentBranchId) {
       setData({ summary: EMPTY_SUMMARY, sources: [], campaigns: [], trend: [], assignees: [] });
+      setAnalyticsError(false);
       setLoading(false);
       return;
     }
     setLoading(true);
+    setAnalyticsError(false);
     const period = dateRange(Number(range));
     const [analyticsResponse, staffResponse] = await Promise.all([
       supabase.rpc("get_lead_analytics", { p_branch_id: currentBranchId, p_start_at: period.start.toISOString(), p_end_at: period.end.toISOString() }) as unknown as Promise<{ data: AnalyticsResponse | null; error: { message: string } | null }>,
       supabase.from("profiles").select("id,full_name,full_name_en,full_name_ar").limit(100),
     ]);
-    if (analyticsResponse.error) toast.error(analyticsResponse.error.message);
-    setData(analyticsResponse.data ?? { summary: EMPTY_SUMMARY, sources: [], campaigns: [], trend: [], assignees: [] });
+    if (analyticsResponse.error) {
+      setAnalyticsError(true);
+      setData({ summary: EMPTY_SUMMARY, sources: [], campaigns: [], trend: [], assignees: [] });
+      toast.error(isArabic ? "تعذر تحميل تحليلات العملاء المحتملين. اضغط تحديث للمحاولة مرة أخرى." : "Lead analytics could not be loaded. Press Refresh to try again.");
+      if (import.meta.env.DEV) console.error("[LeadAnalytics] RPC failed", analyticsResponse.error.message);
+    } else {
+      setData(analyticsResponse.data ?? { summary: EMPTY_SUMMARY, sources: [], campaigns: [], trend: [], assignees: [] });
+    }
     setStaff((staffResponse.data ?? []) as Staff[]);
     setLoading(false);
-  }, [currentBranchId, range]);
+  }, [currentBranchId, isArabic, range]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -159,7 +168,8 @@ export default function LeadAnalytics() {
 
       {loading ? <Card className="p-10 text-center text-sm text-muted-foreground">{isArabic ? "جارٍ حساب المؤشرات…" : "Calculating metrics…"}</Card> : null}
       {!loading && !currentBranchId ? <Card className="p-10 text-center text-sm text-muted-foreground">{isArabic ? "اختر فرعًا لعرض التحليلات" : "Choose a branch to view analytics"}</Card> : null}
-      {!loading && currentBranchId ? <>
+      {!loading && currentBranchId && analyticsError ? <Card role="alert" className="border-amber-300 bg-amber-50 p-6 text-amber-950 dark:border-amber-900 dark:bg-amber-950/20 dark:text-amber-100"><div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 size-5 shrink-0" /><div className="space-y-3"><div><h2 className="font-semibold">{isArabic ? "التحليلات غير متاحة حاليًا" : "Analytics are temporarily unavailable"}</h2><p className="mt-1 text-sm leading-6">{isArabic ? "لم نعرض أرقامًا صفرية حتى لا تُفهم على أنها نتيجة حقيقية. تحقق من اتصال قاعدة البيانات ثم أعد المحاولة." : "We did not show zero values because they could be mistaken for real results. Check the database connection and try again."}</p></div><Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}><RefreshCw className="me-2 size-4" />{isArabic ? "إعادة المحاولة" : "Retry"}</Button></div></div></Card> : null}
+      {!loading && currentBranchId && !analyticsError ? <>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">{cards.map(({ label, value, suffix, icon: Icon, color }) => <Card key={label} className="border-border/70 p-4 shadow-sm"><div className="flex items-start justify-between gap-2"><span className="text-xs leading-4 text-muted-foreground">{label}</span><Icon className={cn("size-4 shrink-0", color)} /></div><p className="mt-3 text-2xl font-bold tracking-tight">{value}</p>{suffix ? <p className="mt-1 text-[11px] font-medium text-muted-foreground">{suffix}</p> : null}</Card>)}</div>
 
         <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">

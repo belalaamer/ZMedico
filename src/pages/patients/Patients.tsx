@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useDataSync } from "@/lib/dataSync";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Phone, Mail, MapPin, MoreHorizontal, Calendar as CalendarIcon, FileText, Eye, Trash2 } from "lucide-react";
+import { Plus, Search, Phone, Mail, MapPin, MoreHorizontal, Calendar as CalendarIcon, FileText, Eye, Trash2, UserRound } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -91,7 +91,7 @@ export default function PatientsPage() {
     referred_by_patient_id: null as string | null,
   });
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     const from = page * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
@@ -112,12 +112,11 @@ export default function PatientsPage() {
     setLoading(false);
     if (error) { toast.error(error.message); return; }
     setItems((data ?? []) as Patient[]);
-    setTotal(count ?? 0);
-  };
-
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId, page]);
+        setTotal(count ?? 0);
+  }, [currentBranchId, page]);
+  useEffect(() => { void load(); }, [load]);
   useEffect(() => { setPage(0); }, [currentBranchId]);
-  useDataSync(["patients"], () => { load(); });
+  useDataSync(["patients"], () => { void load(); });
 
   // Lightweight batched outstanding-debt badge: a single query for the visible
   // patients, no per-row work, no joins.
@@ -126,7 +125,7 @@ export default function PatientsPage() {
     let active = true;
     const ids = items.map((p) => p.id);
     (async () => {
-      let q = supabase
+      const q = supabase
         .from("invoices")
         .select("patient_id,total,paid_amount,status,deleted_at")
         .in("patient_id", ids)
@@ -135,7 +134,7 @@ export default function PatientsPage() {
       const { data } = await q;
       if (!active) return;
       const map: Record<string, number> = {};
-      for (const r of (data ?? []) as any[]) {
+      for (const r of (data ?? []) as Array<{ patient_id: string; total: number | null; paid_amount: number | null }>) {
         const due = Number(r.total || 0) - Number(r.paid_amount || 0);
         if (due > 0.009) map[r.patient_id] = (map[r.patient_id] ?? 0) + due;
       }
@@ -149,7 +148,7 @@ export default function PatientsPage() {
     const parsed = schema.safeParse(form);
     if (!parsed.success) { toast.error(parsed.error.issues[0]?.message ?? "Please check the form"); return; }
     const d = parsed.data;
-    const payload: any = {
+    const payload = {
       first_name_en: d.name_en?.trim() || d.name_ar?.trim() || "",
       last_name_en: null,
       first_name_ar: d.name_ar?.trim() || d.name_en?.trim() || "",
@@ -175,7 +174,7 @@ export default function PatientsPage() {
   };
 
   const handleDelete = async (p: Patient) => {
-    const { error } = await supabase.from("patients").update({ deleted_at: new Date().toISOString() } as any).eq("id", p.id);
+    const { error } = await supabase.from("patients").update({ deleted_at: new Date().toISOString() }).eq("id", p.id);
     if (error) { toast.error(error.message); return; }
     toast.success(lang === "ar" ? "تم حذف المريض" : "Patient deleted");
     setConfirmDel(null);
@@ -243,7 +242,7 @@ export default function PatientsPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>{t("gender")}</Label>
-                  <Select value={form.gender || "none"} onValueChange={(v) => setForm({ ...form, gender: v === "none" ? "" : v as any })}>
+                  <Select value={form.gender || "none"} onValueChange={(v) => setForm({ ...form, gender: v === "none" ? "" : v as "male" | "female" })}>
                     <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">— {t("none")} —</SelectItem>
@@ -314,7 +313,7 @@ export default function PatientsPage() {
                       <TableCell className="min-w-0 p-2 sm:p-3">
                         <Link to={`/patients/${p.id}`} className="flex items-center gap-2 sm:gap-3 min-w-0">
                           <div aria-hidden="true" className="size-9 sm:size-10 rounded-full gradient-primary text-primary-foreground flex items-center justify-center font-semibold shrink-0">
-                            {name.slice(0, 1).toUpperCase()}
+                            <UserRound className="size-4 sm:size-5" />
                           </div>
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">

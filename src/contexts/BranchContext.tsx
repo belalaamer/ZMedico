@@ -98,8 +98,12 @@ export function BranchProvider({ children }: { children: ReactNode }) {
         // clinic. A clinic is selected only after an explicit user action.
         if (roleLoading) return prev;
         if (isSystemOwner) {
-          const handoffBranchId = getPlatformWorkspaceBranch();
-          if (handoffBranchId && list.some((branch) => branch.id === handoffBranchId)) return handoffBranchId;
+          const queryBranchId = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("branch") : null;
+          const handoffBranchId = getPlatformWorkspaceBranch() ?? queryBranchId;
+          if (handoffBranchId && list.some((branch) => branch.id === handoffBranchId)) {
+            setPlatformWorkspaceBranch(handoffBranchId);
+            return handoffBranchId;
+          }
           localStorage.removeItem("zmedico.branch");
           return null;
         }

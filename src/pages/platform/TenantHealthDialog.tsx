@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { CLINIC_MODULES, type ClinicModuleKey } from "@/lib/clinicModules";
-import { planAllowsModule } from "@/lib/subscriptionEntitlements";
+import { filterModulesByPlan, planAllowsModule } from "@/lib/subscriptionEntitlements";
 
 type Tenant = {
   id: string;
@@ -58,6 +58,9 @@ export default function TenantHealthDialog({ tenant, branches, plans, open, onOp
   const plan = tenant ? plans.find((item) => item.id === tenant.plan_id) ?? tenant.subscription_plans ?? null : null;
   const planFeatures = plan?.features ?? {};
   const enabledModules = modules.filter((item) => item.enabled).map((item) => item.module_key);
+  const effectiveModules = modules.length > 0
+    ? enabledModules.filter((key) => planAllowsModule(key as ClinicModuleKey, planFeatures))
+    : filterModulesByPlan(CLINIC_MODULES.map((module) => module.key), planFeatures);
   const unsupportedEnabled = enabledModules.filter((key) => !planAllowsModule(key as ClinicModuleKey, planFeatures));
   const activeBranches = tenantBranches.filter((branch) => branch.is_active).length;
 
@@ -109,7 +112,7 @@ export default function TenantHealthDialog({ tenant, branches, plans, open, onOp
           <HealthMetric icon={<CheckCircle2 className="size-4" />} label={isAr ? "الاشتراك" : "Subscription"} value={tenant ? statusLabel(tenant.subscription_status, isAr) : "—"} tone={tenant?.is_active && !["expired", "cancelled"].includes(tenant.subscription_status) ? "good" : "warn"} />
           <HealthMetric icon={<Clock3 className="size-4" />} label={isAr ? "ينتهي في" : "Ends"} value={formatDate(tenant?.subscription_ends_at ?? tenant?.trial_ends_at ?? null, lang)} />
           <HealthMetric icon={<Building2 className="size-4" />} label={isAr ? "الفروع النشطة" : "Active branches"} value={`${activeBranches}/${tenantBranches.length}`} tone={activeBranches ? "good" : "warn"} />
-          <HealthMetric icon={<Puzzle className="size-4" />} label={isAr ? "الوحدات" : "Modules"} value={`${enabledModules.length}/${CLINIC_MODULES.length}`} />
+          <HealthMetric icon={<Puzzle className="size-4" />} label={isAr ? "الوحدات الفعالة" : "Effective modules"} value={`${effectiveModules.length}/${CLINIC_MODULES.length}`} />
         </div>
         <div className="grid gap-4 lg:grid-cols-2">
           <Card><CardContent className="space-y-3 p-4"><SectionTitle icon={<AlertTriangle className="size-4" />} title={isAr ? "التنبيهات" : "Alerts"} />{alerts.length ? <div className="space-y-2">{alerts.map((item) => <div key={item} className="rounded-md bg-amber-50 p-2 text-sm text-amber-900 dark:bg-amber-950/20 dark:text-amber-200">{item}</div>)}</div> : <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-300"><CheckCircle2 className="size-4" />{isAr ? "لا توجد تنبيهات حرجة." : "No critical alerts."}</div>}</CardContent></Card>

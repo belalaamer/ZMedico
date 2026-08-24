@@ -27,4 +27,9 @@ describe("platform workspace handoff", () => {
     expect(isSystemOwnerWorkspaceHandoff(true, "/workspace?branch=branch-1", null)).toBe(true);
     expect(isSystemOwnerWorkspaceHandoff(true, "/workspace?branch=branch-2", null)).toBe(false);
   });
+
+  it("falls back to an explicit branch query without a stored handoff", () => {
+    expect(isSystemOwnerWorkspaceHandoff(true, "/workspace?branch=branch-1", null)).toBe(true);
+    expect(isSystemOwnerWorkspaceHandoff(true, "/workspace?branch=branch-1", "branch-1")).toBe(true);
+  });
 });

@@ -5,7 +5,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { withTimeout } from "@/lib/withTimeout";
 import { subscribeDataSync } from "@/lib/dataSync";
 import { DEFAULT_ENABLED_MODULES, type ClinicModuleKey } from "@/lib/clinicModules";
-import { getPlatformWorkspaceBranch } from "@/lib/platformWorkspace";
+import { getPlatformWorkspaceBranch, setPlatformWorkspaceBranch } from "@/lib/platformWorkspace";
 import { filterModulesByPlan, isModuleEnabledForEntitlement, planAllowsModule } from "@/lib/subscriptionEntitlements";
 
 export type Branch = { id: string; name_en: string; name_ar: string };

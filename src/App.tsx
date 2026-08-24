@@ -281,7 +281,8 @@ function AppContent() {
               <Route path="/settings/audit-logs" element={<Navigate to="/settings/audit" replace />} />
               <Route path="/settings/system" element={<PermissionRoute adminOnly><SystemInfo /></PermissionRoute>} />
               <Route path="/settings/system-info" element={<Navigate to="/settings/system" replace />} />
-              <Route path="/settings/qa" element={<PermissionRoute adminOnly><QAIdentities /></PermissionRoute>} />
+              {/* QA identities are an internal platform tool, never a clinic-admin setting. */}
+              <Route path="/settings/qa" element={<PermissionRoute systemOwnerOnly><QAIdentities /></PermissionRoute>} />
               <Route path="/commissions" element={<Navigate to="/reports/commissions" replace />} />
               <Route path="/medical-records" element={<Navigate to="/medical/records" replace />} />
               <Route path="/system/self-audit" element={<PermissionRoute adminOnly><SystemSelfAudit /></PermissionRoute>} />

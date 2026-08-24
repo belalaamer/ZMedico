@@ -1,6 +1,6 @@
 import { ReactNode, createContext, useContext } from "react";
 import { NavLink } from "react-router-dom";
-import { Settings, Building2, Calendar, FileText, CreditCard, Briefcase, Bell, Languages, ShieldCheck, Users, HardDrive, ScrollText, Info, GitBranch, Shield, FileSignature, FlaskConical } from "lucide-react";
+import { Settings, Building2, Calendar, FileText, CreditCard, Briefcase, Bell, Languages, ShieldCheck, Users, HardDrive, ScrollText, Info, GitBranch, Shield, FileSignature, FlaskConical, type LucideIcon } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { cn } from "@/lib/utils";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
@@ -23,6 +23,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
   useSettingsShadowProbe(pathname);
   if (embedded) return <>{children}</>;
   const showAdminSettings = authz.isSuperAdmin();
+  const showPlatformTools = authz.holdsAnyRole("system_owner");
   const coreItems = [
     { to: "/settings/general", icon: Building2, label: t("clinicProfile") },
     { to: "/settings/branches", icon: GitBranch, label: t("branches") },
@@ -40,12 +41,12 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
       { to: "/settings/users", icon: Users, label: t("userManagement") },
       { to: "/settings/backup", icon: HardDrive, label: t("backupExport") },
       { to: "/settings/audit", icon: ScrollText, label: t("auditLogs") },
-      { to: "/settings/qa", icon: FlaskConical, label: t("qaIdentities") },
+      ...(showPlatformTools ? [{ to: "/settings/qa", icon: FlaskConical, label: t("qaIdentities") }] : []),
   ] : [];
   const systemItems = [
     { to: "/settings/system", icon: Info, label: t("systemInfo") },
   ];
-  const renderLink = (it: { to: string; icon: any; label: string }) => (
+  const renderLink = (it: { to: string; icon: LucideIcon; label: string }) => (
     <NavLink key={it.to} to={it.to}
       className={({ isActive }) => cn(
         "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors",

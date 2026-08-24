@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Bell, Search, LogOut, Globe, Calendar, Wallet, Clock, AlertTriangle, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBranch } from "@/contexts/BranchContext";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -18,12 +19,27 @@ import { supabase } from "@/integrations/supabase/client";
 import { subscribeResilient } from "@/lib/realtime";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
 
+type NotificationRow = {
+  id: string;
+  title_en?: string | null;
+  title_ar?: string | null;
+  message_en?: string | null;
+  message_ar?: string | null;
+  type: string;
+  related_entity_type?: string | null;
+  related_entity_id?: string | null;
+  is_read: boolean;
+  created_at: string;
+};
+
 export function Topbar() {
   const { t, lang, setLang } = useI18n();
   const { user, signOut } = useAuth();
   const { branches, currentBranchId, setCurrentBranchId } = useBranch();
+  const { pathname } = useLocation();
+  const { isSystemOwner } = useUserRole();
   const [now, setNow] = useState(new Date());
-  const [notifs, setNotifs] = useState<any[]>([]);
+  const [notifs, setNotifs] = useState<NotificationRow[]>([]);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -61,7 +77,7 @@ export function Topbar() {
       .limit(10);
     // De-duplicate: collapse multiple notifications for the same related entity
     const seen = new Set<string>();
-    const unique = (data ?? []).filter((n: any) => {
+    const unique = ((data ?? []) as NotificationRow[]).filter((n) => {
       const key = n.related_entity_type && n.related_entity_id
         ? `${n.related_entity_type}:${n.related_entity_id}`
         : `id:${n.id}`;
@@ -97,7 +113,7 @@ export function Topbar() {
       default: return <Bell className="size-4 text-muted-foreground" />;
     }
   };
-  const linkFor = (n: any): string => {
+  const linkFor = (n: NotificationRow): string => {
     if (!n.related_entity_type || !n.related_entity_id) return "#";
     switch (n.related_entity_type) {
       case "appointment": return "/calendar";
@@ -134,51 +150,48 @@ export function Topbar() {
   const branchLabel = (b: { name_en?: string | null; name_ar?: string | null }) =>
     (lang === "ar" ? b.name_ar || b.name_en : b.name_en || b.name_ar) || "—";
 
+  const showBranchSwitcher = !(isSystemOwner && pathname.startsWith("/platform"));
+
   return (
     <header className="h-16 min-h-16 shrink-0 flex items-center gap-2 px-3 sm:gap-3 sm:px-4 md:px-6 border-b border-border bg-card">
       <Button variant="ghost" size="icon" type="button" className="md:hidden size-11 shrink-0" aria-label={t("menu")} onClick={() => setMobileOpen(true)}>
         <Menu className="size-5" />
       </Button>
 
-      <div className="md:hidden" aria-hidden={!mobileOpen}>
-        <button
-          type="button"
-          aria-label={t("closeMenuOverlay")}
-          tabIndex={mobileOpen ? 0 : -1}
-          className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px] transition-opacity duration-150 ease-out ${
-            mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-          }`}
-          onClick={() => setMobileOpen(false)}
-        />
+      {mobileOpen ? (
+        <div className="md:hidden">
+          <button
+            type="button"
+            aria-label={t("closeMenuOverlay")}
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px]"
+            onClick={() => setMobileOpen(false)}
+          />
 
-        <aside
-          role="dialog"
-          aria-modal="true"
-          aria-label={t("appName")}
-          style={{ willChange: "transform" }}
-          className={`fixed inset-y-0 ${lang === "ar" ? "right-0 rounded-l-2xl" : "left-0 rounded-r-2xl"} z-50 w-[min(320px,88vw)] max-w-[calc(100vw-1rem)] bg-sidebar text-sidebar-foreground shadow-2xl ring-1 ring-border overflow-hidden transform-gpu transition-transform duration-150 ease-out ${
-            mobileOpen
-              ? "translate-x-0 pointer-events-auto"
-              : `${lang === "ar" ? "translate-x-full" : "-translate-x-full"} pointer-events-none`
-          }`}
-        >
-          <div className="flex h-16 min-h-16 items-center justify-start border-b border-sidebar-border px-3 py-2 pt-[env(safe-area-inset-top,0px)]">
-            <Button
-              variant="ghost"
-              size="icon"
-              type="button"
-              className="size-11 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              aria-label={t("closeMenu")}
-              onClick={() => setMobileOpen(false)}
-            >
-              <X className="size-5" />
-            </Button>
-          </div>
-          <div className="h-[calc(100%-4rem)] overflow-y-auto py-2">
-            <SidebarContent onNavigate={() => setMobileOpen(false)} />
-          </div>
-        </aside>
-      </div>
+          <aside
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("appName")}
+            style={{ willChange: "transform" }}
+            className={`fixed inset-y-0 ${lang === "ar" ? "right-0 rounded-l-2xl" : "left-0 rounded-r-2xl"} z-50 w-[min(320px,88vw)] max-w-[calc(100vw-1rem)] bg-sidebar text-sidebar-foreground shadow-2xl ring-1 ring-border overflow-hidden transform-gpu`}
+          >
+            <div className="flex h-16 min-h-16 items-center justify-start border-b border-sidebar-border px-3 py-2 pt-[env(safe-area-inset-top,0px)]">
+              <Button
+                variant="ghost"
+                size="icon"
+                type="button"
+                className="size-11 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                aria-label={t("closeMenu")}
+                onClick={() => setMobileOpen(false)}
+              >
+                <X className="size-5" />
+              </Button>
+            </div>
+            <div className="h-[calc(100%-4rem)] overflow-y-auto py-2">
+              <SidebarContent onNavigate={() => setMobileOpen(false)} />
+            </div>
+          </aside>
+        </div>
+      ) : null}
 
       <div className="hidden sm:flex flex-1 max-w-xl">
         <GlobalSearch variant="desktop" />
@@ -206,7 +219,7 @@ export function Topbar() {
         {time}
       </div>
 
-      {safeBranches.length > 0 ? (
+      {showBranchSwitcher && safeBranches.length > 0 ? (
         <Select value={branchValue} onValueChange={setCurrentBranchId}>
           <SelectTrigger className="w-[160px] hidden sm:flex">
             <SelectValue placeholder={t("branch")} />
@@ -219,14 +232,14 @@ export function Topbar() {
             ))}
           </SelectContent>
         </Select>
-      ) : (
+      ) : showBranchSwitcher ? (
         <div
           className="w-[160px] hidden sm:flex items-center h-9 px-3 rounded-md border border-input bg-muted/40 text-sm text-muted-foreground truncate"
           aria-label={t("branch")}
         >
           {t("branch")}
         </div>
-      )}
+      ) : null}
 
       <Button variant="ghost" size="icon" type="button" className="size-11 shrink-0" onClick={() => setLang(lang === "ar" ? "en" : "ar")} title={t("language")} aria-label={t("language")}>
         <Globe className="size-5" />

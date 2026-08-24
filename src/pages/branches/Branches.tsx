@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDataSync } from "@/lib/dataSync";
 import { Plus, Search, Pencil, Trash2, Building2, Star, MapPin, ListChecks, Users, ScrollText, CalendarDays, Clock, LayoutDashboard, Archive, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,16 +29,18 @@ type Branch = {
   id: string; name_ar: string; name_en: string; code: string | null;
   phone: string | null; email: string | null; address: string | null; city: string | null;
   is_main_branch: boolean; is_active: boolean; manager_id: string | null;
+  tenant_id: string | null;
   working_hours_start: string | null; working_hours_end: string | null;
   working_days?: number[] | null;
   allowed_latitude: number | null; allowed_longitude: number | null; allowed_radius: number | null;
 };
 
 type Staff = { id: string; full_name: string | null; email: string | null };
+type TenantOption = { id: string; name: string; slug: string };
 
 const empty = {
   name: "", code: "", phone: "", email: "", address: "", city: "",
-  manager_id: "", working_hours_start: "09:00", working_hours_end: "21:00",
+  manager_id: "", tenant_id: "", working_hours_start: "09:00", working_hours_end: "21:00",
   working_days: [...ALL_DAYS] as number[],
   is_main_branch: false, is_active: true,
 };
@@ -51,6 +53,7 @@ export default function Branches() {
   const { currentBranchId } = useBranch();
   const [items, setItems] = useState<Branch[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
+  const [tenants, setTenants] = useState<TenantOption[]>([]);
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ ...empty });
@@ -103,13 +106,21 @@ export default function Branches() {
     setQsBranch(null);
   };
 
-  const load = async () => {
-    const { data } = await supabase.from("branches").select("*").order("created_at");
+  const load = useCallback(async () => {
+    const [{ data }, { data: s }] = await Promise.all([
+      supabase.from("branches").select("*").order("created_at"),
+      supabase.from("profiles").select("id, full_name, email").order("full_name"),
+    ]);
     setItems((data ?? []) as Branch[]);
-    const { data: s } = await supabase.from("profiles").select("id, full_name, email").order("full_name");
     setStaff((s ?? []) as Staff[]);
-  };
-  useEffect(() => { load(); }, []);
+    if (isSystemOwner) {
+      const { data: tenantData } = await supabase.from("tenants").select("id,name,slug").order("name");
+      setTenants((tenantData ?? []) as TenantOption[]);
+    } else {
+      setTenants([]);
+    }
+  }, [isSystemOwner]);
+  useEffect(() => { void load(); }, [load]);
   useDataSync(["branches"], () => { load(); });
 
   const filtered = useMemo(() => {
@@ -119,7 +130,13 @@ export default function Branches() {
       (b.code ?? "").toLowerCase().includes(q) || (b.city ?? "").toLowerCase().includes(q));
   }, [items, search]);
 
-  const openNew = () => { setEditId(null); setForm({ ...empty }); setOpen(true); };
+  const openNew = () => {
+    const currentTenantId = items.find((branch) => branch.id === currentBranchId)?.tenant_id ?? "";
+    const defaultTenantId = isSystemOwner && tenants.length === 1 ? tenants[0].id : currentTenantId;
+    setEditId(null);
+    setForm({ ...empty, tenant_id: defaultTenantId });
+    setOpen(true);
+  };
   const openEdit = (b: Branch) => {
     setEditId(b.id);
     setForm({
@@ -130,6 +147,7 @@ export default function Branches() {
       address: b.address ?? "",
       city: b.city ?? "",
       manager_id: b.manager_id ?? "",
+      tenant_id: b.tenant_id ?? "",
       working_hours_start: b.working_hours_start ?? "09:00",
       working_hours_end: b.working_hours_end ?? "21:00",
       working_days: normalizeDays(b.working_days),
@@ -141,8 +159,13 @@ export default function Branches() {
 
   const save = async () => {
     if (!form.name.trim()) { toast({ title: t("name"), variant: "destructive" }); return; }
-    const payload: any = {
+    if (!form.tenant_id) {
+      toast({ title: lang === "ar" ? "اختر العميل المرتبط بالفرع" : "Choose the tenant for this branch", variant: "destructive" });
+      return;
+    }
+    const payload = {
       name_en: form.name, name_ar: form.name,
+      tenant_id: form.tenant_id,
       code: form.code || null,
       phone: form.phone || null, email: form.email || null,
       address: form.address || null, city: form.city || null,
@@ -153,17 +176,28 @@ export default function Branches() {
       is_main_branch: form.is_main_branch, is_active: form.is_active,
     };
     let error;
+    let savedBranchId = editId;
     if (editId) {
       ({ error } = await supabase.from("branches").update(payload).eq("id", editId));
     } else {
-      ({ error } = await supabase.from("branches").insert(payload));
+      const created = await supabase.from("branches").insert(payload).select("id").single();
+      error = created.error;
+      savedBranchId = created.data?.id ?? null;
     }
     if (error) { toast({ title: error.message, variant: "destructive" }); return; }
-    // ensure single main branch
-    if (form.is_main_branch) {
-      await supabase.from("branches").update({ is_main_branch: false }).neq("id", editId ?? "00000000-0000-0000-0000-000000000000");
+    // Keep the main-branch invariant inside this tenant only.
+    if (form.is_main_branch && savedBranchId) {
+      const { error: mainBranchError } = await supabase
+        .from("branches")
+        .update({ is_main_branch: false })
+        .eq("tenant_id", form.tenant_id)
+        .neq("id", savedBranchId);
+      if (mainBranchError) {
+        toast({ title: mainBranchError.message, variant: "destructive" });
+        return;
+      }
     }
-    setOpen(false); load();
+    setOpen(false); void load();
     toast({ title: t("saved") });
   };
 
@@ -180,7 +214,7 @@ export default function Branches() {
       }
       // FK violation → offer force-cascade (system_owner only) or archive.
       const msg = (error.message || "").toLowerCase();
-      const isFk = msg.includes("foreign key") || msg.includes("violates") || (error as any).code === "23503";
+      const isFk = msg.includes("foreign key") || msg.includes("violates") || (error as { code?: string }).code === "23503";
       if (isFk && !forceMode) {
         setForceMode(true);
         toast({
@@ -199,7 +233,7 @@ export default function Branches() {
   const archiveBranch = async () => {
     if (!delId) return;
     setDeleteBusy(true);
-    const { error } = await supabase.rpc("admin_archive_branch" as any, { _branch_id: delId });
+    const { error } = await supabase.rpc("admin_archive_branch" as never, { _branch_id: delId });
     setDeleteBusy(false);
     if (error) { toast({ title: error.message, variant: "destructive" }); return; }
     toast({ title: lang === "ar" ? "تمت الأرشفة" : "Branch archived" });
@@ -209,7 +243,7 @@ export default function Branches() {
   const forceDeleteBranch = async () => {
     if (!delId) return;
     setDeleteBusy(true);
-    const { error } = await supabase.rpc("admin_force_delete_branch" as any, { _branch_id: delId });
+    const { error } = await supabase.rpc("admin_force_delete_branch" as never, { _branch_id: delId });
     setDeleteBusy(false);
     if (error) { toast({ title: error.message, variant: "destructive" }); return; }
     toast({ title: lang === "ar" ? "تم الحذف نهائيًا" : "Branch and all linked data deleted" });
@@ -231,8 +265,9 @@ export default function Branches() {
     try {
       const c = await getCurrentLocation();
       setLocCenter({ lat: c.lat, lon: c.lon });
-    } catch (e: any) {
-      toast({ title: e.message, variant: "destructive" });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      toast({ title: message, variant: "destructive" });
     } finally {
       setLocLoading(false);
     }
@@ -244,7 +279,7 @@ export default function Branches() {
       allowed_latitude: locCenter.lat,
       allowed_longitude: locCenter.lon,
       allowed_radius: locRadius,
-    } as any).eq("id", locBranch.id);
+    } as never).eq("id", locBranch.id);
     if (error) { toast({ title: error.message, variant: "destructive" }); return; }
     toast({ title: t("locationSaved") });
     setLocBranch(null); load();
@@ -278,6 +313,23 @@ export default function Branches() {
                 <Label>{t("code")}</Label>
                 <Input value={form.code} placeholder="auto" onChange={(e) => setForm({ ...form, code: e.target.value })} />
               </div>
+              {isSystemOwner ? (
+                <div>
+                  <Label>{lang === "ar" ? "العميل المرتبط" : "Tenant"}</Label>
+                  <Select value={form.tenant_id || "none"} onValueChange={(v) => setForm({ ...form, tenant_id: v === "none" ? "" : v })}>
+                    <SelectTrigger><SelectValue placeholder={lang === "ar" ? "اختر العميل" : "Choose tenant"} /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">{lang === "ar" ? "اختر العميل" : "Choose tenant"}</SelectItem>
+                      {tenants.map((tenant) => <SelectItem key={tenant.id} value={tenant.id}>{tenant.name} · {tenant.slug}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="rounded-md border bg-muted/30 p-3 text-sm">
+                  <Label>{lang === "ar" ? "العميل المرتبط" : "Tenant"}</Label>
+                  <div className="mt-1 text-muted-foreground">{form.tenant_id || (lang === "ar" ? "سيتم تحديده من الفرع الحالي" : "Inherited from the current branch")}</div>
+                </div>
+              )}
               <div>
                 <Label>{t("phone")}</Label>
                 <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
@@ -459,6 +511,7 @@ export default function Branches() {
             <TableHeader>
               <TableRow>
                 <TableHead>{t("name")}</TableHead>
+                {isSystemOwner && <TableHead>{lang === "ar" ? "العميل" : "Tenant"}</TableHead>}
                 <TableHead>{t("code")}</TableHead>
                 <TableHead>{t("city")}</TableHead>
                 <TableHead>{t("manager")}</TableHead>
@@ -474,6 +527,7 @@ export default function Branches() {
                     {lang === "ar" ? b.name_ar : b.name_en}
                     {b.is_main_branch && <Badge className="ms-2" variant="secondary"><Star className="size-3 me-1" />{t("mainBranch") ?? "Main"}</Badge>}
                   </TableCell>
+                  {isSystemOwner && <TableCell><div className="text-sm">{tenants.find((tenant) => tenant.id === b.tenant_id)?.name ?? "—"}</div><div className="font-mono text-[11px] text-muted-foreground">{tenants.find((tenant) => tenant.id === b.tenant_id)?.slug ?? "—"}</div></TableCell>}
                   <TableCell className="font-mono text-xs">{b.code ?? "—"}</TableCell>
                   <TableCell>{b.city ?? "—"}</TableCell>
                   <TableCell>{staffName(b.manager_id)}</TableCell>
@@ -505,7 +559,7 @@ export default function Branches() {
                 </TableRow>
               ))}
               {filtered.length === 0 && (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-10">{t("noData") ?? "No data"}</TableCell></TableRow>
+                <TableRow><TableCell colSpan={isSystemOwner ? 8 : 7} className="text-center text-muted-foreground py-10">{t("noData") ?? "No data"}</TableCell></TableRow>
               )}
             </TableBody>
           </Table>

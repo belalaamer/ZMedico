@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap, FolderOpen, Briefcase, UserCog, Clock, CalendarDays, DollarSign, Star, Target, Ticket, ListChecks, ChevronDown, Wallet, ScrollText, Percent } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap, FolderOpen, Briefcase, UserCog, Clock, CalendarDays, DollarSign, Star, Target, Ticket, ListChecks, ChevronDown, Wallet, ScrollText, Percent, type LucideIcon } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { subscribeResilient } from "@/lib/realtime";
@@ -8,11 +8,12 @@ import { useBranch } from "@/contexts/BranchContext";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
+import { isSystemOwnerWorkspaceHandoff } from "@/lib/platformWorkspace";
 import { visibleReportNavigation, type ReportNavigationKey } from "@/lib/reportNavigation";
 
-type NavItem = { to: string; icon: any; label: string; end?: boolean; badge?: number };
+type NavItem = { to: string; icon: LucideIcon; label: string; end?: boolean; badge?: number };
 
-const REPORT_ICONS: Record<ReportNavigationKey, any> = {
+const REPORT_ICONS: Record<ReportNavigationKey, LucideIcon> = {
   financial: DollarSign,
   operational: BarChart3,
   medical: Stethoscope,
@@ -25,10 +26,13 @@ const REPORT_ICONS: Record<ReportNavigationKey, any> = {
 
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {}) {
   const { t, lang } = useI18n();
-  const { currentBranchId } = useBranch();
-  const { pathname } = useLocation();
+  const { currentBranchId, isModuleEnabled } = useBranch();
+  const { pathname, search } = useLocation();
   const [alertCount, setAlertCount] = useState(0);
-  const { authz } = useAuthorization();
+  const { authz, loading: authzLoading } = useAuthorization("sidebar");
+  const isSystemOwner = authz.holdsAnyRole("system_owner");
+  const isWorkspaceHandoff = isSystemOwnerWorkspaceHandoff(isSystemOwner, `${pathname}${search}`, currentBranchId);
+  const isPlatformSurface = isSystemOwner && !isWorkspaceHandoff;
 
   useEffect(() => {
     const refresh = () => {
@@ -48,7 +52,9 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
     });
   }, [currentBranchId]);
 
-  const dashboardItem: NavItem = { to: "/", icon: LayoutDashboard, label: t("dashboard"), end: true };
+  const dashboardItem: NavItem = isPlatformSurface
+    ? { to: "/platform", icon: Building2, label: lang === "ar" ? "إدارة المنصة" : "Platform Console", end: true }
+    : { to: "/", icon: LayoutDashboard, label: t("dashboard"), end: true };
   const reportItems = useMemo(() => {
     const labels: Record<ReportNavigationKey, string> = {
       financial: t("financialReports"),
@@ -67,33 +73,33 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
     }));
   }, [authz, t]);
 
-  const groups: { key: string; label: string; icon: any; items: NavItem[]; badge?: number }[] = useMemo(() => [
+  const groups: { key: string; label: string; icon: LucideIcon; items: NavItem[]; badge?: number }[] = useMemo(() => [
     {
       key: "clinic_operations",
       label: lang === "ar" ? "تشغيل العيادة" : "Clinic Operations",
       icon: Stethoscope,
       items: [
         authz.can("appointments.view") && { to: "/calendar", icon: Calendar, label: t("calendar") },
-        authz.can("leads.view") && { to: "/leads", icon: Target, label: lang === "ar" ? "العملاء المحتملون" : "Leads" },
+        authz.can("leads.view") && isModuleEnabled("marketing") && { to: "/leads", icon: Target, label: lang === "ar" ? "العملاء المحتملون" : "Leads" },
         authz.can("appointments.view") && { to: "/queue", icon: ListChecks, label: t("queue") },
         authz.can("appointments.view") && { to: "/queue/audit", icon: ScrollText, label: lang === "ar" ? "تدقيق الطابور" : "Queue Audit" },
         authz.can("patients.view") && { to: "/patients", icon: Users, label: t("patients") },
         authz.can("appointments.view") && { to: "/reminders", icon: Bell, label: t("notifications") },
-        authz.can("medical_records.view") && { to: "/medical/records", icon: FileText, label: t("medicalRecords") },
-        authz.can("medical_records.view") && { to: "/medical/quick-consult", icon: Zap, label: t("quickConsult") },
-        authz.can("medical_records.view") && { to: "/medical/prescriptions", icon: Pill, label: t("prescriptions") },
-        authz.can("medical_records.view") && { to: "/medical/documents", icon: FolderOpen, label: t("documentsCenter") },
-        authz.can("medical_records.view") && { to: "/medical/specialties", icon: Stethoscope, label: t("specialties") },
-        authz.can("medical_records.view") && { to: "/medical/diagnoses", icon: HeartPulse, label: t("diagnoses") },
-        authz.can("medical_records.view") && { to: "/medical/medications", icon: Pill, label: t("medications") },
-        authz.can("medical_records.view") && { to: "/medical/procedures", icon: Activity, label: t("proceduresCatalog") },
+        authz.can("medical_records.view") && isModuleEnabled("medical") && { to: "/medical/records", icon: FileText, label: t("medicalRecords") },
+        authz.can("medical_records.view") && isModuleEnabled("medical") && { to: "/medical/quick-consult", icon: Zap, label: t("quickConsult") },
+        authz.can("medical_records.view") && isModuleEnabled("medical") && { to: "/medical/prescriptions", icon: Pill, label: t("prescriptions") },
+        authz.can("medical_records.view") && isModuleEnabled("medical") && { to: "/medical/documents", icon: FolderOpen, label: t("documentsCenter") },
+        authz.can("medical_records.view") && isModuleEnabled("medical") && { to: "/medical/specialties", icon: Stethoscope, label: t("specialties") },
+        authz.can("medical_records.view") && isModuleEnabled("medical") && { to: "/medical/diagnoses", icon: HeartPulse, label: t("diagnoses") },
+        authz.can("medical_records.view") && isModuleEnabled("medical") && { to: "/medical/medications", icon: Pill, label: t("medications") },
+        authz.can("medical_records.view") && isModuleEnabled("medical") && { to: "/medical/procedures", icon: Activity, label: t("proceduresCatalog") },
       ].filter(Boolean) as NavItem[],
     },
     {
       key: "physio",
       label: lang === "ar" ? "العلاج الطبيعي" : "Physiotherapy",
       icon: Activity,
-      items: [
+      items: !isModuleEnabled("physio") ? [] : [
         authz.can("medical_records.view") && { to: "/physio", icon: Activity, label: lang === "ar" ? "الحالات" : "Cases" },
         authz.can("medical_records.view") && { to: "/physio/dashboard", icon: BarChart3, label: lang === "ar" ? "لوحة العلاج الطبيعي" : "Physio Dashboard" },
         authz.can("medical_records.view") && { to: "/physio/reports", icon: FileText, label: lang === "ar" ? "التقارير" : "Reports" },
@@ -123,7 +129,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       label: t("inventoryHub"),
       icon: Boxes,
       badge: alertCount,
-      items: !authz.can("inventory.view") ? [] : [
+      items: !isModuleEnabled("inventory") || !authz.can("inventory.view") ? [] : [
         { to: "/inventory/stock", icon: BarChart3, label: t("stockOverview") },
         { to: "/inventory/products", icon: Package, label: t("products") },
         { to: "/inventory/categories", icon: FolderTree, label: t("categories") },
@@ -136,7 +142,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       key: "hr",
       label: lang === "ar" ? "الموارد البشرية" : "HR & Staff",
       icon: UserCog,
-      items: !authz.can("hr.view") ? [] : [
+      items: !isModuleEnabled("hr") || !authz.can("hr.view") ? [] : [
         { to: "/hr/staff", icon: UserCog, label: t("staffDirectory") },
         { to: "/hr/departments", icon: Building2, label: t("departments") },
         { to: "/hr/positions", icon: Briefcase, label: t("positions") },
@@ -156,6 +162,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       label: lang === "ar" ? "الإعداد والإدارة" : "Setup & Admin",
       icon: Settings,
       items: [
+        isPlatformSurface && { to: "/platform", icon: Building2, label: lang === "ar" ? "إدارة المنصة" : "Platform Console" },
         authz.isSuperAdmin() && { to: "/branches", icon: Building2, label: t("branches") },
         // Same adminOnly gate as /branches (and the same audience the existing
         // "Branch dashboard" quick-link inside Branches.tsx already targets),
@@ -164,12 +171,19 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
         authz.isSuperAdmin() && { to: "/settings", icon: Settings, label: t("settings") },
       ].filter(Boolean) as NavItem[],
     },
-  ].filter(g => g.items.length > 0), [t, lang, authz, alertCount, reportItems]);
+  ].filter(g => g.items.length > 0), [t, lang, authz, alertCount, reportItems, isModuleEnabled, isPlatformSurface]);
+
+  // Platform administration is a separate surface. A System Owner may still
+  // see the full clinic navigation after an explicit workspace handoff.
+  const visibleGroups = useMemo(
+    () => isPlatformSurface ? [] : groups,
+    [isPlatformSurface, groups],
+  );
 
   const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
   const activeGroupKey = useMemo(() => {
-    return groups.find(g => g.items.some(it => pathname === it.to || pathname.startsWith(it.to + "/")))?.key ?? null;
-  }, [groups, pathname]);
+    return visibleGroups.find(g => g.items.some(it => pathname === it.to || pathname.startsWith(it.to + "/")))?.key ?? null;
+  }, [visibleGroups, pathname]);
 
   useEffect(() => {
     if (!activeGroupKey) return;
@@ -179,6 +193,20 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
     });
   }, [pathname, activeGroupKey]);
   const toggle = (k: string) => setOpenMap(m => ({ ...m, [k]: !m[k] }));
+
+  if (authzLoading) {
+    return (
+      <div className="flex h-full min-h-0 w-full flex-col bg-sidebar text-sidebar-foreground">
+        <div className="flex h-16 min-h-16 items-center gap-3 border-b border-sidebar-border px-4 sm:px-5">
+          <div className="size-9 animate-pulse rounded-xl bg-sidebar-accent" />
+          <div className="space-y-1.5"><div className="h-3 w-20 animate-pulse rounded bg-sidebar-accent" /><div className="h-2 w-28 animate-pulse rounded bg-sidebar-accent/70" /></div>
+        </div>
+        <div className="space-y-3 px-3 py-4" aria-label={lang === "ar" ? "جارٍ تحميل الصلاحيات" : "Loading permissions"}>
+          {["w-28", "w-36", "w-24", "w-32", "w-28", "w-36"].map((width, index) => <div key={index} className={`h-10 animate-pulse rounded-md bg-sidebar-accent/70 ${width}`} />)}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col bg-sidebar text-sidebar-foreground">
@@ -209,7 +237,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
           <span className="flex-1 truncate">{dashboardItem.label}</span>
         </NavLink>
 
-        {groups.map((g) => {
+            {visibleGroups.map((g) => {
           const isOpen = !!openMap[g.key];
           return (
             <div key={g.key} className="space-y-1">

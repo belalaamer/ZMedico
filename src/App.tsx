@@ -11,19 +11,25 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { PermissionRoute } from "@/components/PermissionRoute";
 import { attachGlobalRefreshListeners } from "@/lib/dataSync";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { useBranch } from "@/contexts/BranchContext";
 
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
+const LandingPage = lazy(() => import("./pages/Index.tsx"));
 const AppShell = lazy(() => import("@/components/layout/AppShell"));
+const PlatformShell = lazy(() => import("@/components/layout/PlatformShell"));
 const AuthPage = lazy(() => import("@/pages/auth/Auth"));
 const AuthCallback = lazy(() => import("@/pages/auth/AuthCallback"));
 const ResetPassword = lazy(() => import("@/pages/auth/ResetPassword"));
 const Pricing = lazy(() => import("@/pages/pricing/Pricing"));
 const PublicBooking = lazy(() => import("@/pages/booking/PublicBooking"));
+const SelfCheckin = lazy(() => import("@/pages/checkin/SelfCheckin"));
+const RequestTrial = lazy(() => import("@/pages/subscription/RequestTrial"));
 const Trust = lazy(() => import("@/pages/Trust"));
 const Dashboard = lazy(() => import("@/pages/dashboard/Dashboard"));
 const PatientsPage = lazy(() => import("@/pages/patients/Patients"));
 const LeadsPage = lazy(() => import("@/pages/leads/Leads"));
 const LeadDetailPage = lazy(() => import("@/pages/leads/LeadDetail"));
+const LeadAnalyticsPage = lazy(() => import("@/pages/leads/LeadAnalytics"));
 const PatientProfile = lazy(() => import("@/pages/patients/PatientProfile"));
 const CalendarPage = lazy(() => import("@/pages/calendar/CalendarPage"));
 const QueuePage = lazy(() => import("@/pages/queue/Queue"));
@@ -106,6 +112,7 @@ const QAIdentities = lazy(() => import("@/pages/settings/QAIdentities"));
 const SystemSelfAudit = lazy(() => import("@/pages/system/SystemSelfAudit"));
 const Branches = lazy(() => import("@/pages/branches/Branches"));
 const BranchDashboard = lazy(() => import("@/pages/branches/BranchDashboard"));
+const PlatformConsole = lazy(() => import("@/pages/platform/PlatformConsole"));
 const Reminders = lazy(() => import("@/pages/reminders/Reminders"));
 const ScheduledReminders = lazy(() => import("@/pages/reminders/ScheduledReminders"));
 
@@ -142,26 +149,36 @@ function AppContent() {
       <BrowserRouter>
         <Suspense fallback={<RouteLoader />}>
           <Routes>
+            <Route path="/" element={<LandingPage />} />
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/book" element={<PublicBooking />} />
+            <Route path="/check-in" element={<SelfCheckin />} />
+            <Route path="/request-trial" element={<RequestTrial />} />
             <Route path="/trust" element={<Trust />} />
-            <Route
-              element={
-                <ProtectedRoute>
-                  <AppShell />
-                </ProtectedRoute>
-              }
-            >
-              {/* The landing page is reachable by every authenticated user. No single
-                  permission is held by all roles, and row-level security already limits
-                  what each one sees inside it. */}
-              <Route path="/" element={<Dashboard />} />
+              <Route
+                element={
+                  <ProtectedRoute>
+                    <PlatformShell />
+                  </ProtectedRoute>
+                }
+              >
+                <Route path="/platform" element={<PermissionRoute systemOwnerOnly><PlatformConsole /></PermissionRoute>} />
+              </Route>
+              <Route
+                element={
+                  <ProtectedRoute>
+                    <AppShell />
+                  </ProtectedRoute>
+                }
+              >
+              <Route path="/workspace" element={<Dashboard />} />
               <Route path="/patients" element={<PermissionRoute><PatientsPage /></PermissionRoute>} />
               <Route path="/leads" element={<PermissionRoute><LeadsPage /></PermissionRoute>} />
               <Route path="/leads/:id" element={<PermissionRoute><LeadDetailPage /></PermissionRoute>} />
+              <Route path="/leads/analytics" element={<PermissionRoute><LeadAnalyticsPage /></PermissionRoute>} />
               <Route path="/patients/:id" element={<PermissionRoute><PatientProfile /></PermissionRoute>} />
               <Route path="/calendar" element={<PermissionRoute><CalendarPage /></PermissionRoute>} />
               <Route path="/queue" element={<PermissionRoute><QueuePage /></PermissionRoute>} />
@@ -254,7 +271,8 @@ function AppContent() {
               <Route path="/settings/audit-logs" element={<Navigate to="/settings/audit" replace />} />
               <Route path="/settings/system" element={<PermissionRoute adminOnly><SystemInfo /></PermissionRoute>} />
               <Route path="/settings/system-info" element={<Navigate to="/settings/system" replace />} />
-              <Route path="/settings/qa" element={<PermissionRoute adminOnly><QAIdentities /></PermissionRoute>} />
+              {/* QA identities are an internal platform tool, never a clinic-admin setting. */}
+              <Route path="/settings/qa" element={<PermissionRoute systemOwnerOnly><QAIdentities /></PermissionRoute>} />
               <Route path="/commissions" element={<Navigate to="/reports/commissions" replace />} />
               <Route path="/medical-records" element={<Navigate to="/medical/records" replace />} />
               <Route path="/system/self-audit" element={<PermissionRoute adminOnly><SystemSelfAudit /></PermissionRoute>} />

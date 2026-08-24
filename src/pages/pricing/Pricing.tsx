@@ -45,18 +45,32 @@ export default function Pricing() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [yearly, setYearly] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    (async () => {
-      const { data } = await supabase
+    let cancelled = false;
+    const loadPlans = async () => {
+      setLoading(true);
+      setLoadError(null);
+      const { data, error } = await supabase
         .from("subscription_plans")
         .select("*")
         .eq("is_active", true)
         .order("display_order", { ascending: true });
-      setPlans((data as any) || []);
+      if (cancelled) return;
+      if (error) {
+        setPlans([]);
+        setLoadError(isAr
+          ? "تعذر تحميل الخطط الآن. حاول تحديث الصفحة مرة أخرى."
+          : "Plans are temporarily unavailable. Please refresh and try again.");
+      } else {
+        setPlans((data as Plan[]) || []);
+      }
       setLoading(false);
-    })();
-  }, []);
+    };
+    void loadPlans();
+    return () => { cancelled = true; };
+  }, [isAr]);
 
   const yearlyDiscountPct = (p: Plan) => {
     const full = p.price_monthly * 12;
@@ -75,7 +89,7 @@ export default function Pricing() {
           <Link to="/" className="text-xl font-bold text-primary">ZMedico</Link>
           <div className="flex items-center gap-2">
             <Button asChild variant="ghost"><Link to="/auth">{isAr ? "تسجيل الدخول" : "Sign in"}</Link></Button>
-            <Button asChild><Link to="/auth">{isAr ? "ابدأ مجاناً" : "Start free"}</Link></Button>
+            <Button asChild><Link to="/request-trial">{isAr ? "اطلب تجربة مجانية" : "Request a free trial"}</Link></Button>
           </div>
         </div>
       </header>
@@ -91,8 +105,8 @@ export default function Pricing() {
         </h1>
         <p className="text-muted-foreground max-w-2xl mx-auto mb-8">
           {isAr
-            ? "اختر الخطة المناسبة لحجم عيادتك. يمكنك الترقية أو التخفيض في أي وقت."
-            : "Pick the plan that fits your clinic. Upgrade or downgrade anytime."}
+            ? "اختر الخطة المناسبة لحجم عيادتك. يراجع الفريق المدة والخطة ويفعّل مساحة العمل يدويًا."
+            : "Pick the plan that fits your clinic. We confirm the term and activate your workspace manually."}
         </p>
 
         <div className="inline-flex items-center gap-3 rounded-full border bg-card px-4 py-2">
@@ -110,9 +124,20 @@ export default function Pricing() {
       {/* Plans */}
       <section className="container mx-auto px-4 pb-16">
         {loading ? (
-          <div className="text-center text-muted-foreground py-12">Loading…</div>
+          <div className="py-12 text-center text-muted-foreground" role="status" aria-live="polite">{isAr ? "جارٍ تحميل الخطط…" : "Loading plans…"}</div>
+        ) : loadError ? (
+          <Card className="mx-auto max-w-xl border-destructive/30 bg-destructive/5 p-6 text-center">
+            <p role="alert" className="text-sm text-destructive">{loadError}</p>
+            <Button type="button" variant="outline" className="mt-4" onClick={() => window.location.reload()}>
+              {isAr ? "إعادة المحاولة" : "Try again"}
+            </Button>
+          </Card>
+        ) : plans.length === 0 ? (
+          <Card className="mx-auto max-w-xl p-6 text-center text-sm text-muted-foreground">
+            {isAr ? "لا توجد خطط متاحة حاليًا." : "No plans are currently available."}
+          </Card>
         ) : (
-          <div className="grid gap-6 md:grid-cols-3 max-w-5xl mx-auto">
+          <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-3">
             {plans.map((p) => {
               const price = yearly ? p.price_yearly / 12 : p.price_monthly;
               const totalNow = yearly ? p.price_yearly : p.price_monthly;
@@ -187,7 +212,7 @@ export default function Pricing() {
                       })}
                     </ul>
                     <Button asChild className="w-full mt-auto" variant={p.is_popular ? "default" : "outline"}>
-                      <Link to={`/auth?plan=${p.id}`}>
+                      <Link to={`/request-trial?plan=${encodeURIComponent(p.id)}`}>
                         {isAr ? "ابدأ التجربة المجانية" : "Start free trial"}
                       </Link>
                     </Button>
@@ -204,8 +229,13 @@ export default function Pricing() {
         <h2 className="text-2xl font-bold text-center mb-6">
           {isAr ? "مقارنة الخطط" : "Compare plans"}
         </h2>
-        <div className="overflow-x-auto rounded-lg border">
-          <table className="w-full text-sm">
+        <div
+          role="region"
+          tabIndex={0}
+          aria-label={isAr ? "جدول مقارنة الخطط" : "Plan comparison table"}
+          className="overflow-x-auto rounded-lg border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <table className="min-w-[640px] w-full text-sm">
             <thead className="bg-muted/50">
               <tr>
                 <th className="text-start p-3">{isAr ? "الميزة" : "Feature"}</th>
@@ -247,11 +277,11 @@ export default function Pricing() {
             },
             {
               q: isAr ? "هل يمكنني تغيير خطتي لاحقاً؟" : "Can I change plans later?",
-              a: isAr ? "نعم، يمكنك الترقية أو التخفيض في أي وقت من لوحة الفوترة." : "Yes, upgrade or downgrade anytime from the billing dashboard.",
+              a: isAr ? "نعم، يراجع System Owner الخطة والمدة ويحدّثهما لك يدويًا من Platform Console." : "Yes. The System Owner can change the plan and term manually from the Platform Console.",
             },
             {
               q: isAr ? "ما طرق الدفع المدعومة؟" : "Which payment methods do you support?",
-              a: isAr ? "ندعم البطاقات وفوري والمحافظ الإلكترونية عبر Paymob، بالإضافة إلى التحويل البنكي." : "Cards, Fawry, and e-wallets via Paymob, plus bank transfer.",
+              a: isAr ? "الدفع الإلكتروني غير مفعل حاليًا. أرسل طلب التجربة وسيتواصل معك الفريق لتأكيد الخطة والدفع يدويًا." : "Online payment is not enabled yet. Send a trial request and the team will confirm the plan and manual payment details.",
             },
             {
               q: isAr ? "هل بياناتي آمنة؟" : "Is my data secure?",

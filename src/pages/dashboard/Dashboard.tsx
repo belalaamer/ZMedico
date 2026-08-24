@@ -21,6 +21,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { supabase } from "@/integrations/supabase/client";
 import { formatMoney, formatDate, formatDateTime } from "@/lib/format";
+import { localDateOnly } from "@/lib/localDate";
 import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
 
 type ApptStatus = "scheduled" | "confirmed" | "in_progress" | "completed" | "cancelled" | "no_show" | "departed";
@@ -60,13 +61,7 @@ function paymentMethodLabel(method: string | null | undefined, lang: "ar" | "en"
   return labels[String(method || "").toLowerCase()]?.[lang] || method || (lang === "ar" ? "غير محدد" : "Unknown");
 }
 
-function localToday(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
+const localToday = localDateOnly;
 
 export default function Dashboard() {
   const { t, lang } = useI18n();
@@ -118,9 +113,9 @@ export default function Dashboard() {
   // Date range for charts
   const [rangePreset, setRangePreset] = useState<"7d" | "30d" | "month" | "custom">("7d");
   const [rangeStart, setRangeStart] = useState<string>(() => {
-    const d = new Date(); d.setDate(d.getDate() - 6); return d.toISOString().slice(0, 10);
+    const d = new Date(); d.setDate(d.getDate() - 6); return localDateOnly(d);
   });
-  const [rangeEnd, setRangeEnd] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [rangeEnd, setRangeEnd] = useState<string>(() => localDateOnly());
 
   const applyPreset = (p: "7d" | "30d" | "month" | "custom") => {
     setRangePreset(p);
@@ -130,8 +125,8 @@ export default function Dashboard() {
     if (p === "7d") start.setDate(end.getDate() - 6);
     else if (p === "30d") start.setDate(end.getDate() - 29);
     else if (p === "month") start.setDate(1);
-    setRangeStart(start.toISOString().slice(0, 10));
-    setRangeEnd(end.toISOString().slice(0, 10));
+    setRangeStart(localDateOnly(start));
+    setRangeEnd(localDateOnly(end));
   };
 
   const [recentPatients, setRecentPatients] = useState<any[]>([]);
@@ -144,7 +139,7 @@ export default function Dashboard() {
 
     const start = new Date(); start.setHours(0, 0, 0, 0);
     const end = new Date(); end.setHours(23, 59, 59, 999);
-    const todayDate = new Date().toISOString().slice(0, 10);
+    const todayDate = localDateOnly();
     const rs = new Date(rangeStart + "T00:00:00");
     const re = new Date(rangeEnd + "T23:59:59");
 
@@ -266,7 +261,7 @@ export default function Dashboard() {
       const days = Math.max(1, Math.round((endMs - startMs) / dayMs) + 1);
       for (let i = 0; i < days; i++) {
         const d = new Date(startMs + i * dayMs);
-        buckets.set(d.toISOString().slice(0, 10), 0);
+        buckets.set(localDateOnly(d), 0);
       }
       for (const r of (rev7Res.data ?? []) as any[]) {
         const k = String(r.payment_date).slice(0, 10);
@@ -455,7 +450,7 @@ export default function Dashboard() {
             </div>
             <h1 className="text-2xl md:text-4xl font-bold tracking-tight">{t("dashboard")}</h1>
             <p className="text-sm md:text-base text-primary-foreground/80 mt-2 max-w-2xl">{t("tagline")}</p>
-            <p className="text-xs text-primary-foreground/65 mt-4">{formatDate(new Date().toISOString(), lang)}</p>
+            <p className="text-xs text-primary-foreground/65 mt-4">{formatDate(new Date(), lang)}</p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap lg:max-w-md lg:justify-end">
             {canFrontDeskIntake && <Button asChild className="min-h-11 w-full bg-white text-primary hover:bg-white/90 shadow-sm sm:w-auto"><Link to="/patients"><UserPlus className="size-4 me-2" />{t("addPatient")}</Link></Button>}

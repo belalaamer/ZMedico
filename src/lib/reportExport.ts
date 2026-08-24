@@ -1,6 +1,7 @@
 // jsPDF, html2canvas and xlsx are heavy (>800 KB combined) and only needed when
 // the user triggers an export. They are dynamically imported inside the
 // exporter functions so route bundles stay lean.
+import { localDateOnly } from "@/lib/localDate";
 
 export type ReportColumn = { header: string; key: string; width?: number };
 
@@ -128,7 +129,7 @@ export function defaultDateRange(days = 30) {
   const end = new Date();
   const start = new Date();
   start.setDate(end.getDate() - days);
-  return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+  return { start: localDateOnly(start), end: localDateOnly(end) };
 }
 
 export function ageBucket(daysOld: number): "0-30" | "31-60" | "61-90" | "90+" {

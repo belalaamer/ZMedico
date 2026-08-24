@@ -7,8 +7,9 @@ import NotificationSettings from "./NotificationSettings";
 import RemindersSettings from "./RemindersSettings";
 import AutomatedCommunication from "./AutomatedCommunication";
 import Templates from "./Templates";
+import MetaAdsConnection from "./MetaAdsConnection";
 
-const TABS = ["notifications", "reminders", "automated", "email", "sms", "whatsapp"] as const;
+const TABS = ["notifications", "reminders", "automated", "email", "sms", "whatsapp", "meta"] as const;
 type TabId = typeof TABS[number];
 
 export default function Communication() {
@@ -35,6 +36,7 @@ export default function Communication() {
             <TabsTrigger value="email">{t("emailTemplates")}</TabsTrigger>
             <TabsTrigger value="sms">{t("smsTemplates")}</TabsTrigger>
             <TabsTrigger value="whatsapp">{t("whatsappTemplates")}</TabsTrigger>
+            <TabsTrigger value="meta">Meta Ads</TabsTrigger>
           </TabsList>
           <EmbeddedSettingsProvider value={true}>
             <TabsContent value="notifications" className="mt-4"><NotificationSettings /></TabsContent>
@@ -43,6 +45,7 @@ export default function Communication() {
             <TabsContent value="email" className="mt-4"><Templates kind="email" /></TabsContent>
             <TabsContent value="sms" className="mt-4"><Templates kind="sms" /></TabsContent>
             <TabsContent value="whatsapp" className="mt-4"><Templates kind="whatsapp" /></TabsContent>
+            <TabsContent value="meta" className="mt-4"><MetaAdsConnection /></TabsContent>
           </EmbeddedSettingsProvider>
         </Tabs>
       </div>

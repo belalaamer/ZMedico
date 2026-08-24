@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 import { RowActions } from "@/components/RowActions";
 import { ListSkeleton } from "@/components/ListSkeleton";
-import { AlertTriangle, CheckCircle2, Clock, Flag, ListChecks, Play, UserPlus, X, ExternalLink, RotateCcw, Plus, Stethoscope, Users, Activity, CheckCheck, UserX, Timer, UserCog, DoorOpen, Settings as SettingsIcon, ScrollText } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, Flag, ListChecks, Play, UserPlus, X, ExternalLink, RotateCcw, Plus, Stethoscope, Users, Activity, CheckCheck, UserX, Timer, UserCog, DoorOpen, Settings as SettingsIcon, ScrollText, Link2 as Link2Icon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
@@ -23,9 +23,27 @@ import { patientDisplayName } from "@/lib/patientName";
 import { doctorDisplayName } from "@/lib/doctorName";
 import { buildStatusPatch, type ApptStatus } from "@/lib/appointmentStatus";
 import { logQueueAudit } from "@/lib/queueAudit";
+import type { DictKey } from "@/lib/i18n";
 import { getQueueSettings, fetchQueueSettings, type QueueSettings } from "@/lib/queueSettings";
 import { listOpenAlerts, effectiveState, type QueueAlert } from "@/lib/queueAlerts";
 import { Switch } from "@/components/ui/switch";
+
+type PatientOption = {
+  id: string;
+  first_name_en: string;
+  last_name_en: string | null;
+  first_name_ar: string | null;
+  last_name_ar: string | null;
+  patient_code: number;
+  phone: string | null;
+};
+
+type QueueDoctor = {
+  id: string;
+  full_name: string | null;
+  full_name_en?: string | null;
+  full_name_ar?: string | null;
+};
 
 type QueueRow = {
   id: string;
@@ -77,7 +95,7 @@ const STATUS_BADGE: Record<ApptStatus, string> = {
   departed:    "bg-muted text-muted-foreground border border-border",
 };
 
-function uiStatusLabel(s: ApptStatus, t: (k: any) => string) {
+function uiStatusLabel(s: ApptStatus, t: (k: DictKey) => string) {
   switch (s) {
     case "scheduled":   return t("queueWaiting");
     case "confirmed":   return t("queueCheckedIn");
@@ -112,7 +130,7 @@ export default function QueuePage() {
   // unnoticed for admin testing.
   const canMutate = authz.can("appointments.edit");
   const [rows, setRows] = useState<QueueRow[]>([]);
-  const [doctors, setDoctors] = useState<{ id: string; full_name: string | null; full_name_en?: string | null; full_name_ar?: string | null }[]>([]);
+  const [doctors, setDoctors] = useState<QueueDoctor[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<"active" | "all" | ApptStatus>("active");
   const [doctorFilter, setDoctorFilter] = useState<string>("all");
@@ -128,7 +146,11 @@ export default function QueuePage() {
   const [walkInRoom, setWalkInRoom] = useState("");
   const [walkInProcedure, setWalkInProcedure] = useState("");
   const [walkInSaving, setWalkInSaving] = useState(false);
-  const [patientOptions, setPatientOptions] = useState<{ id: string; first_name_en: string; last_name_en: string | null; first_name_ar: string | null; last_name_ar: string | null; patient_code: number; phone: string | null }[]>([]);
+  const [selfCheckinRow, setSelfCheckinRow] = useState<QueueRow | null>(null);
+  const [selfCheckinUrl, setSelfCheckinUrl] = useState<string | null>(null);
+  const [selfCheckinExpiresAt, setSelfCheckinExpiresAt] = useState<string | null>(null);
+  const [selfCheckinSaving, setSelfCheckinSaving] = useState(false);
+  const [patientOptions, setPatientOptions] = useState<PatientOption[]>([]);
   // Reassign doctor dialog state
   const [reassignRow, setReassignRow] = useState<QueueRow | null>(null);
   const [reassignDoctor, setReassignDoctor] = useState<string>("");
@@ -169,7 +191,7 @@ export default function QueuePage() {
     return subscribeResilient({
       name: `queue_alerts_queue:${currentBranchId}`,
       bind: (ch) => ch.on(
-        "postgres_changes" as any,
+        "postgres_changes" as never,
         { event: "*", schema: "public", table: "queue_alerts", filter: `branch_id=eq.${currentBranchId}` },
         () => { void refresh(); }
       ),
@@ -187,7 +209,7 @@ export default function QueuePage() {
     setLoading(true);
     const from = startOfDay(new Date()).toISOString();
     const to = endOfDay(new Date()).toISOString();
-    let q: any = supabase
+    let q = supabase
       .from("appointments")
       .select("id,patient_id,doctor_id,branch_id,room,scheduled_at,status,procedure,priority,checked_in_at,started_at,is_walk_in,patients!inner(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code,deleted_at)")
       .is("deleted_at", null)
@@ -214,7 +236,7 @@ export default function QueuePage() {
       name: `queue-appts:${currentBranchId ?? "all"}`,
       bind: (ch) => ch.on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "appointments", ...(filter ? { filter } : {}) } as any,
+        { event: "*", schema: "public", table: "appointments", ...(filter ? { filter } : {}) } as never,
         () => { load(); }
       ),
       onReconnect: () => { load(); },
@@ -226,7 +248,7 @@ export default function QueuePage() {
   // filter cannot reveal doctors outside the caller's permitted branches.
   useEffect(() => {
     supabase.rpc("list_doctors").then(({ data }) => {
-      const list = ((data ?? []) as any[]).map((d: any) => ({
+      const list = ((data ?? []) as QueueDoctor[]).map((d) => ({
         id: d.id,
         full_name: d.full_name ?? null,
         full_name_en: d.full_name_en ?? null,
@@ -265,7 +287,7 @@ export default function QueuePage() {
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(500)
-      .then(({ data }) => setPatientOptions((data ?? []) as any));
+      .then(({ data }) => setPatientOptions((data ?? []) as PatientOption[]));
   }, [walkInOpen, patientOptions.length]);
 
   const patientName = (r: QueueRow) => patientDisplayName(r.patients, lang);
@@ -310,9 +332,9 @@ export default function QueuePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered, tick]);
 
-  const updateRow = async (id: string, patch: Record<string, any>) => {
+  const updateRow = async (id: string, patch: Record<string, unknown>) => {
     if (!canMutate) { toast.error(lang === "ar" ? "غير مسموح" : "Not allowed"); return; }
-    const { error } = await supabase.from("appointments").update(patch as any).eq("id", id);
+    const { error } = await supabase.from("appointments").update(patch as never).eq("id", id);
     if (error) { toast.error(error.message); return; }
     toast.success(t("saved"));
     load();
@@ -336,6 +358,43 @@ export default function QueuePage() {
   const doNoShow   = (r: QueueRow) => transition(r, "no_show");
   const doCancel   = (r: QueueRow) => transition(r, "cancelled");
   const doReopen   = (r: QueueRow) => transition(r, "scheduled");
+
+  const generateSelfCheckinLink = async (r: QueueRow) => {
+    if (!canMutate) { toast.error(lang === "ar" ? "غير مسموح" : "Not allowed"); return; }
+    setSelfCheckinRow(r);
+    setSelfCheckinUrl(null);
+    setSelfCheckinExpiresAt(null);
+    setSelfCheckinSaving(true);
+    const { data, error } = await supabase.rpc("create_self_checkin_link", {
+      p_appointment_id: r.id,
+      p_ttl_minutes: 180,
+    });
+    setSelfCheckinSaving(false);
+    if (error) {
+      setSelfCheckinRow(null);
+      toast.error(error.message || t("selfCheckinLinkError"));
+      return;
+    }
+    const result = (Array.isArray(data) ? data[0] : data) as { token?: string; expires_at?: string } | null;
+    if (!result?.token) {
+      setSelfCheckinRow(null);
+      toast.error(t("selfCheckinLinkError"));
+      return;
+    }
+    setSelfCheckinUrl(`${window.location.origin}/check-in?token=${encodeURIComponent(result.token)}`);
+    setSelfCheckinExpiresAt(result.expires_at ?? null);
+  };
+
+  const copySelfCheckinLink = async () => {
+    if (!selfCheckinUrl) return;
+    try {
+      await navigator.clipboard.writeText(selfCheckinUrl);
+      toast.success(t("linkCopied"));
+    } catch {
+      toast.error(t("selfCheckinLinkError"));
+    }
+  };
+
   // priority is binary today (0 / 1); column kept numeric for future tiers.
   const togglePriority = (r: QueueRow) => updateRow(r.id, { priority: (r.priority ?? 0) > 0 ? 0 : 1 });
 
@@ -387,7 +446,7 @@ export default function QueuePage() {
     // Reuses the same appointments row shape so it flows through every existing
     // queue/calendar/permissions path without a parallel system.
     const patch = buildStatusPatch("confirmed", { checked_in_at: nowIso, started_at: null }, nowIso);
-    const payload: any = {
+    const payload: Record<string, unknown> = {
       patient_id: walkInPatient,
       doctor_id: walkInDoctor || null,
       branch_id: currentBranchId ?? null,
@@ -430,7 +489,7 @@ export default function QueuePage() {
   const openConsultation = async (r: QueueRow) => {
     if (canMutate && r.status !== "in_progress" && r.status !== "completed") {
       const patch = buildStatusPatch("in_progress", { checked_in_at: r.checked_in_at, started_at: r.started_at });
-      const { error } = await supabase.from("appointments").update(patch as any).eq("id", r.id);
+      const { error } = await supabase.from("appointments").update(patch as never).eq("id", r.id);
       if (error) {
         toast.error(error.message);
         navigate(`/patients/${r.patient_id}?tab=clinical`);
@@ -456,7 +515,7 @@ export default function QueuePage() {
           appointment_id: r.id,
           visit_type: "consultation",
           status: "draft",
-        } as any)
+        } as never)
         .select("id")
         .single();
       if (insErr) {
@@ -496,7 +555,7 @@ export default function QueuePage() {
     if (next === (r.doctor_id ?? null)) { setReassignRow(null); return; }
     setReassignSaving(true);
     // Status + timestamps intentionally untouched — only the assignee changes.
-    const { error } = await supabase.from("appointments").update({ doctor_id: next } as any).eq("id", r.id);
+    const { error } = await supabase.from("appointments").update({ doctor_id: next } as never).eq("id", r.id);
     setReassignSaving(false);
     if (error) { toast.error(error.message); return; }
     toast.success(t("saved"));
@@ -523,7 +582,7 @@ export default function QueuePage() {
     const next = roomValue.trim() ? roomValue.trim() : null;
     if (next === (r.room ?? null)) { setRoomRow(null); return; }
     setRoomSaving(true);
-    const { error } = await supabase.from("appointments").update({ room: next } as any).eq("id", r.id);
+    const { error } = await supabase.from("appointments").update({ room: next } as never).eq("id", r.id);
     setRoomSaving(false);
     if (error) { toast.error(error.message); return; }
     toast.success(t("saved"));
@@ -565,6 +624,13 @@ export default function QueuePage() {
         items.push({ label: t("moveBackToWaiting"), icon: <RotateCcw className="size-4" />, onClick: () => moveBackToWaiting(r) });
       }
       items.push({ label: t("reopen"), icon: <RotateCcw className="size-4" />, onClick: () => doReopen(r) });
+    }
+    if (canMutate && (r.status === "scheduled" || r.status === "confirmed")) {
+      items.push({
+        label: t("generateSelfCheckinLink"),
+        icon: <UserPlus className="size-4" />,
+        onClick: () => { void generateSelfCheckinLink(r); },
+      });
     }
     if (canMutate) {
       items.push({
@@ -642,7 +708,7 @@ export default function QueuePage() {
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">{t("statusFilter")}</span>
-            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "active" | "all" | ApptStatus)}>
               <SelectTrigger className="h-9 w-[170px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="active">{t("queue")}</SelectItem>
@@ -887,6 +953,39 @@ export default function QueuePage() {
           })
         )}
       </div>
+
+      {/* Patient self check-in link dialog */}
+      <Dialog open={!!selfCheckinRow} onOpenChange={(open) => { if (!open && !selfCheckinSaving) setSelfCheckinRow(null); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t("selfCheckinLinkTitle")}</DialogTitle>
+            <DialogDescription>{t("selfCheckinLinkDesc")}</DialogDescription>
+          </DialogHeader>
+          {selfCheckinSaving ? (
+            <div className="py-6 text-center text-sm text-muted-foreground" role="status" aria-live="polite">
+              {lang === "ar" ? "جارٍ إنشاء الرابط…" : "Creating link…"}
+            </div>
+          ) : selfCheckinUrl ? (
+            <div className="space-y-3">
+              <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+                <div className="font-medium">{patientName(selfCheckinRow!)}</div>
+                <div className="text-muted-foreground">{formatTime(selfCheckinRow?.scheduled_at)} · {doctorName(selfCheckinRow?.doctor_id ?? null)}</div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="self-checkin-link">{t("selfCheckinLinkReady")}</Label>
+                <Input id="self-checkin-link" value={selfCheckinUrl} readOnly onFocus={(e) => e.currentTarget.select()} dir="ltr" className="text-xs" />
+              </div>
+              {selfCheckinExpiresAt && (
+                <p className="text-xs text-muted-foreground">{t("linkExpires")}: {new Date(selfCheckinExpiresAt).toLocaleString()}</p>
+              )}
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setSelfCheckinRow(null)} disabled={selfCheckinSaving}>{t("cancel")}</Button>
+            {selfCheckinUrl && <Button type="button" onClick={() => void copySelfCheckinLink()}><Link2Icon className="size-4 me-1" />{t("copyLink")}</Button>}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Walk-in dialog */}
       <Dialog open={walkInOpen} onOpenChange={setWalkInOpen}>

@@ -3,6 +3,9 @@ import { useLocation } from "react-router-dom";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { moduleForPath } from "@/lib/rolePermissions";
 import { useI18n } from "@/contexts/I18nContext";
+import { useBranch } from "@/contexts/BranchContext";
+import { moduleKeyForPath } from "@/lib/clinicModules";
+import { shouldBlockRouteForEntitlement } from "@/lib/subscriptionEntitlements";
 import { ShieldAlert } from "lucide-react";
 import { useSettingsShadowProbe } from "@/lib/authz/settingsShadowProbe";
 import { usePatientsShadowProbe } from "@/lib/authz/patientsShadowProbe";
@@ -66,11 +69,14 @@ function InvoicesShadowProbeMount({ path }: { path: string }) {
  * Gates a route element based on the user's permission for the module
  * inferred from the current path. Admin always passes.
  */
-export function PermissionRoute({ children, module, adminOnly }: { children: ReactNode; module?: string; adminOnly?: boolean }) {
+export function PermissionRoute({ children, module, adminOnly, systemOwnerOnly }: { children: ReactNode; module?: string; adminOnly?: boolean; systemOwnerOnly?: boolean }) {
   const { pathname } = useLocation();
   const { authz, loading } = useAuthorization();
   const { t } = useI18n();
+  const { currentBranchId, modulesLoading, isModuleEnabled } = useBranch();
   const mod = module ?? moduleForPath(pathname);
+  const entitlement = moduleKeyForPath(pathname);
+  const entitlementBlocked = shouldBlockRouteForEntitlement(entitlement, currentBranchId, isModuleEnabled);
   // Shadow-probe telemetry for the Settings vertical slice. Mounted
   // regardless of the gate outcome so denied roles (e.g. staff) also
   // record shadow decisions — required for the slice's
@@ -83,7 +89,7 @@ export function PermissionRoute({ children, module, adminOnly }: { children: Rea
   const isHrPath = pathname.startsWith("/hr");
   const isInvoicesPath = pathname.startsWith("/invoices") || pathname.startsWith("/payments");
 
-  if (loading) {
+  if (loading || (currentBranchId && modulesLoading)) {
     return (
       <div className="min-h-[40vh] flex items-center justify-center" role="status" aria-live="polite">
         <div className="flex flex-col items-center gap-3 text-muted-foreground">
@@ -94,7 +100,27 @@ export function PermissionRoute({ children, module, adminOnly }: { children: Rea
     );
   }
 
-  if (adminOnly) {
+  if (entitlementBlocked) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center p-6">
+        <div className="max-w-md text-center space-y-4">
+          <div className="mx-auto size-14 rounded-full bg-muted text-muted-foreground flex items-center justify-center">
+            <ShieldAlert className="size-7" />
+          </div>
+          <h2 className="text-xl font-bold">{t("accessDenied")}</h2>
+          <p className="text-sm text-muted-foreground">
+            {t("accessDeniedDescription")}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (systemOwnerOnly) {
+    if (authz.holdsAnyRole("system_owner")) {
+      return children;
+    }
+  } else if (adminOnly) {
     if (authz.isSuperAdmin()) {
       return (
         <>

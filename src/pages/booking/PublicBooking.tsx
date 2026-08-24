@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, Check, ChevronLeft, Clock3, Globe2, MapPin, Phone, ShieldCheck, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { getPublicBookingLocator } from "@/lib/publicBookingTenant";
 import { toast } from "sonner";
 
  type Lang = "ar" | "en";
@@ -53,12 +54,16 @@ type BookingResult = {
   booking_reference: string;
   scheduled_at: string;
   status: string;
-  service_name: string;
+  service_name_en: string;
+  service_name_ar: string;
   branch_name_en: string;
   branch_name_ar: string;
 };
 
 type PublicBookingOptions = {
+  tenant_id: string;
+  tenant_name: string;
+  tenant_slug: string;
   branches: Branch[];
   services: BookingOption[];
   procedures: BookingOption[];
@@ -129,6 +134,10 @@ function getInitialDate(branch?: Branch | null) {
 export default function PublicBooking() {
   const { lang, setLang } = useI18n();
   const isArabic = lang === "ar";
+  const isArabicRef = useRef(isArabic);
+  useEffect(() => { isArabicRef.current = isArabic; }, [isArabic]);
+  const [tenantId, setTenantId] = useState<string | null>(null);
+  const [tenantName, setTenantName] = useState("ZMedico");
   const [branches, setBranches] = useState<Branch[]>([]);
   const [services, setServices] = useState<BookingOption[]>([]);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -154,14 +163,39 @@ export default function PublicBooking() {
     const load = async () => {
       setLoadingOptions(true);
       setOptionsError(null);
-      const { data, error } = await publicRpc<PublicBookingOptions>("public_booking_options");
-      if (cancelled) return;
-      if (error) {
-        setOptionsError(error.message || (isArabic ? "تعذر تحميل خيارات الحجز" : "Unable to load booking options"));
+      const locator = getPublicBookingLocator(window.location.hostname, window.location.search);
+      let resolvedTenantId: string | null = null;
+      if (locator.mode === "custom-domain") {
+        const resolved = await publicRpc<Array<{ tenant_id?: string | null }>>("resolve_active_tenant_domain", { _hostname: locator.hostname });
+        resolvedTenantId = resolved.data?.[0]?.tenant_id ?? null;
+        if (resolved.error || !resolvedTenantId) {
+          setOptionsError(isArabic ? "رابط الحجز غير مرتبط بعيادة نشطة" : "This booking link is not linked to an active clinic");
+          setLoadingOptions(false);
+          return;
+        }
+      } else if (locator.mode === "tenant-query") {
+        const resolved = await publicRpc<Array<{ tenant_id?: string | null }>>("public_booking_tenant_by_slug", { p_slug: locator.slug });
+        resolvedTenantId = resolved.data?.[0]?.tenant_id ?? null;
+        if (resolved.error || !resolvedTenantId) {
+          setOptionsError(isArabic ? "العيادة غير موجودة أو اشتراكها منتهٍ" : "The clinic does not exist or its subscription is inactive");
+          setLoadingOptions(false);
+          return;
+        }
+      } else {
+        setOptionsError(isArabic ? "رابط الحجز يحتاج إلى معرف العيادة" : "This booking link needs a clinic identifier");
         setLoadingOptions(false);
         return;
       }
-      const nextBranches = (data?.branches ?? []) as Branch[];
+      const { data, error } = await publicRpc<PublicBookingOptions>("public_booking_options_for_tenant", { p_tenant_id: resolvedTenantId });
+      if (cancelled) return;
+      if (error || !data) {
+        setOptionsError(error?.message || (isArabic ? "تعذر تحميل خيارات الحجز" : "Unable to load booking options"));
+        setLoadingOptions(false);
+        return;
+      }
+      setTenantId(data.tenant_id ?? resolvedTenantId);
+      setTenantName(data.tenant_name || "ZMedico");
+      const nextBranches = (data.branches ?? []) as Branch[];
       const nextServices = [
         ...((data?.services ?? []) as BookingOption[]),
         ...((data?.procedures ?? []) as BookingOption[]),
@@ -190,9 +224,15 @@ export default function PublicBooking() {
         setSlots([]);
         return;
       }
+      if (!tenantId) {
+        setSlots([]);
+        setSlotsLoading(false);
+        return;
+      }
       setSlotsLoading(true);
       setSelectedSlot(null);
-      const { data, error } = await publicRpc<Slot[]>("public_booking_slots", {
+      const { data, error } = await publicRpc<Slot[]>("public_booking_slots_for_tenant", {
+        p_tenant_id: tenantId,
         p_branch_id: branchId,
         p_service_id: serviceId,
         p_date: date,
@@ -201,7 +241,7 @@ export default function PublicBooking() {
       if (cancelled) return;
       if (error) {
         setSlots([]);
-        toast.error(error.message || (isArabic ? "تعذر تحميل المواعيد المتاحة" : "Unable to load available times"));
+        toast.error(error.message || (isArabicRef.current ? "تعذر تحميل المواعيد المتاحة" : "Unable to load available times"));
       } else {
         setSlots((data ?? []).filter((slot) => slot.available));
       }
@@ -209,7 +249,13 @@ export default function PublicBooking() {
     };
     void loadSlots();
     return () => { cancelled = true; };
-  }, [branchId, serviceId, doctorId, date, isArabic]);
+  }, [tenantId, branchId, serviceId, doctorId, date]);
+
+  // A slot is ephemeral; if it disappears while the user is on the details
+  // step, return to the time picker instead of rendering a null slot.
+  useEffect(() => {
+    if (step === 3 && !selectedSlot) setStep(2);
+  }, [step, selectedSlot]);
 
   const minDate = localDateInputValue(new Date(Date.now() + 86_400_000));
   const maxDate = useMemo(() => {
@@ -255,7 +301,9 @@ export default function PublicBooking() {
     }
     setSubmitting(true);
     const params = new URLSearchParams(window.location.search);
-    const { data, error } = await publicRpc<BookingResult>("public_create_booking", {
+    if (!tenantId) return;
+    const { data, error } = await publicRpc<BookingResult>("public_create_booking_for_tenant", {
+      p_tenant_id: tenantId,
       p_branch_id: branchId,
       p_service_id: serviceId,
       p_slot_start: selectedSlot.slot_start,
@@ -302,7 +350,7 @@ export default function PublicBooking() {
               <div className="mb-4 inline-flex size-14 items-center justify-center rounded-full bg-primary-foreground/15">
                 <Check className="size-8" />
               </div>
-              <p className="text-sm opacity-80">Blitz Physio</p>
+                  <p className="text-sm opacity-80">{tenantName}</p>
               <h1 className="mt-1 text-2xl font-bold">{statusText}</h1>
             </div>
             <div className="space-y-5 p-6">
@@ -314,7 +362,7 @@ export default function PublicBooking() {
                 <div className="flex items-center gap-3"><CalendarDays className="size-4 text-primary" /><span>{formatBookingDate(result.scheduled_at, lang)}</span></div>
                 <div className="flex items-center gap-3"><Clock3 className="size-4 text-primary" /><span>{formatSlot(result.scheduled_at, lang)}</span></div>
                 <div className="flex items-center gap-3"><MapPin className="size-4 text-primary" /><span>{displayName({ name_en: result.branch_name_en, name_ar: result.branch_name_ar }, lang)}</span></div>
-                <div className="flex items-center gap-3"><ShieldCheck className="size-4 text-primary" /><span>{displayName({ name_en: result.service_name, name_ar: result.service_name }, lang)}</span></div>
+                <div className="flex items-center gap-3"><ShieldCheck className="size-4 text-primary" /><span>{displayName({ name_en: result.service_name_en, name_ar: result.service_name_ar }, lang)}</span></div>
               </div>
               <p className="rounded-xl bg-muted/60 p-4 text-sm leading-6 text-muted-foreground">
                 {result.status === "confirmed"
@@ -340,7 +388,7 @@ export default function PublicBooking() {
               <ShieldCheck className="size-3.5" />
               {isArabic ? "حجز آمن ومباشر" : "Secure direct booking"}
             </div>
-            <p className="text-sm font-semibold text-primary">Blitz Physio</p>
+            <p className="text-sm font-semibold text-primary">{tenantName}</p>
             <h1 className="mt-1 text-3xl font-black tracking-tight md:text-5xl">
               {isArabic ? "احجز موعدك بسهولة" : "Book your appointment"}
             </h1>
@@ -437,7 +485,7 @@ export default function PublicBooking() {
                     </section>
                   ) : null}
 
-                  {step === 3 ? (
+                  {step === 3 && selectedSlot ? (
                     <form className="space-y-5" onSubmit={submitBooking} aria-labelledby="booking-step-three">
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -481,7 +529,7 @@ export default function PublicBooking() {
             </Card>
           </aside>
         </div>
-        <footer className="mt-8 text-center text-xs text-muted-foreground">{isArabic ? "Blitz Physio · حجز المواعيد" : "Blitz Physio · Appointment booking"}</footer>
+        <footer className="mt-8 text-center text-xs text-muted-foreground">{isArabic ? `${tenantName} · حجز المواعيد` : `${tenantName} · Appointment booking`}</footer>
       </div>
     </main>
   );

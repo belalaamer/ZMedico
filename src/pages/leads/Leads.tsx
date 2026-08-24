@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarPlus, CheckCircle2, Clock3, Filter, MessageCircle, Phone, Plus, Search, Target, UserRound, UsersRound, XCircle } from "lucide-react";
+import { CalendarPlus, CheckCircle2, Clock3, Filter, MessageCircle, Phone, Plus, Search, Target, TrendingUp, UserRound, UsersRound, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -237,7 +237,10 @@ export default function Leads() {
           <h1 className="text-2xl font-bold tracking-tight md:text-3xl">{isArabic ? "لوحة الاستقبال" : "Reception dashboard"}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{isArabic ? "كل عميل محتمل في مكان واحد، من أول تواصل حتى حجز الموعد." : "Every lead in one place, from first contact to booked appointment."}</p>
         </div>
-        {canCreate ? <Button onClick={() => setNewOpen(true)} className="gap-2"><Plus className="size-4" />{isArabic ? "عميل محتمل جديد" : "New lead"}</Button> : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={() => navigate("/leads/analytics")} className="gap-2"><TrendingUp className="size-4" />{isArabic ? "التحليلات وKPI" : "Analytics & KPI"}</Button>
+          {canCreate ? <Button onClick={() => setNewOpen(true)} className="gap-2"><Plus className="size-4" />{isArabic ? "عميل محتمل جديد" : "New lead"}</Button> : null}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">

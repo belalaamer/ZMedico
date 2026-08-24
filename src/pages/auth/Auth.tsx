@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Stethoscope, Globe } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,11 +13,23 @@ import {
 import { useI18n } from "@/contexts/I18nContext";
 import { toast } from "sonner";
 import { hasPersistedAuthSession, persistAuthSessionForPreview } from "@/lib/authSessionPersistence";
+import { resolvePostAuthRedirect } from "@/lib/authRedirect";
 
-const AUTH_DEBUG_PREFIX = "[auth-debug]";
+function authDebug(message: string, details?: Record<string, unknown>) {
+  if (import.meta.env.DEV) console.info("[auth-debug]", message, details ?? {});
+}
 
 function isValidEmailAddress(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 255;
+}
+
+async function getRolesForRedirect(userId: string): Promise<string[]> {
+  const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+  if (error) {
+    authDebug("post-auth role lookup failed", { error: error.message });
+    return [];
+  }
+  return (data ?? []).map((row) => String(row.role ?? ""));
 }
 
 function safeRedirectPath(value?: string | null) {
@@ -41,10 +53,12 @@ export default function AuthPage() {
   const { user, loading: authLoading } = useAuth();
   const nav = useNavigate();
   const location = useLocation();
+  const selectedPlan = useMemo(() => new URLSearchParams(location.search).get("plan"), [location.search]);
+  const requestTrialHref = selectedPlan ? `/request-trial?plan=${encodeURIComponent(selectedPlan)}` : "/request-trial";
   const from = useMemo(() => {
     const params = new URLSearchParams(location.search);
     const next = params.get("next");
-    const stateFrom = (location.state as any)?.from;
+    const stateFrom = (location.state as { from?: { pathname?: string; search?: string; hash?: string } } | null)?.from;
     const statePath = stateFrom
       ? `${stateFrom.pathname ?? "/"}${stateFrom.search ?? ""}${stateFrom.hash ?? ""}`
       : null;
@@ -59,7 +73,7 @@ export default function AuthPage() {
   const [resetLoading, setResetLoading] = useState(false);
 
   useEffect(() => {
-    console.info(AUTH_DEBUG_PREFIX, "auth page mounted", {
+    authDebug( "auth page mounted", {
       path: window.location.pathname + window.location.search,
       redirectAfterLogin: from,
       authLoading,
@@ -70,8 +84,16 @@ export default function AuthPage() {
 
   useEffect(() => {
     if (authLoading || !user) return;
-    console.info(AUTH_DEBUG_PREFIX, "auth page detected existing session", { redirectAfterLogin: from });
-    nav(from, { replace: true });
+    let active = true;
+    const redirectExistingSession = async () => {
+      const roles = await getRolesForRedirect(user.id);
+      if (!active) return;
+      const destination = resolvePostAuthRedirect(from, roles);
+      authDebug("auth page detected existing session", { redirectAfterLogin: destination, roles });
+      nav(destination, { replace: true });
+    };
+    void redirectExistingSession();
+    return () => { active = false; };
   }, [authLoading, from, nav, user]);
 
   const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -96,7 +118,7 @@ export default function AuthPage() {
     };
 
     setLoading(true);
-    console.info(AUTH_DEBUG_PREFIX, "password sign-in started", {
+    authDebug( "password sign-in started", {
       redirectAfterLogin: from,
       client: {
         hasAuthClient: Boolean(supabase?.auth),
@@ -106,20 +128,13 @@ export default function AuthPage() {
       payload: {
         email: credentials.email,
         passwordLength: credentials.password.length,
-        passwordFirstCharCode: credentials.password.length ? credentials.password.charCodeAt(0) : null,
-        passwordLastCharCode: credentials.password.length ? credentials.password.charCodeAt(credentials.password.length - 1) : null,
       },
-    });
-    console.log(AUTH_DEBUG_PREFIX, "signInWithPassword payload", {
-      email: credentials.email,
-      password: "[redacted]",
-      passwordLength: credentials.password.length,
     });
 
     const { data, error } = await supabase.auth.signInWithPassword(credentials);
 
     setLoading(false);
-    console.info(AUTH_DEBUG_PREFIX, "password sign-in completed", {
+    authDebug( "password sign-in completed", {
       hasSession: Boolean(data.session),
       hasUser: Boolean(data.user),
       error: error?.message ?? null,
@@ -128,7 +143,7 @@ export default function AuthPage() {
     persistAuthSessionForPreview(data.session, "password-login-result");
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     persistAuthSessionForPreview(sessionData.session, "password-login-get-session");
-    console.info(AUTH_DEBUG_PREFIX, "session after password login", {
+    authDebug( "session after password login", {
       hasSession: Boolean(sessionData.session),
       hasUser: Boolean(sessionData.session?.user),
       error: sessionError?.message ?? null,
@@ -138,7 +153,10 @@ export default function AuthPage() {
       toast.error(sessionError?.message ?? (lang === "ar" ? "لم يتم حفظ جلسة تسجيل الدخول" : "Sign-in session was not saved"));
       return;
     }
-    nav(from, { replace: true });
+    const roles = await getRolesForRedirect(sessionData.session.user.id);
+    const destination = resolvePostAuthRedirect(from, roles);
+    authDebug("post-auth redirect resolved", { destination, roles });
+    nav(destination, { replace: true });
   };
 
   const handleSendReset = async (e: React.FormEvent) => {
@@ -235,11 +253,14 @@ export default function AuthPage() {
                     </Dialog>
                   </div>
                 </form>
-              <p className="text-xs text-muted-foreground text-center mt-4">
-                {lang === "ar"
-                  ? "التسجيل عن طريق دعوة المسؤول فقط."
-                  : "New accounts are created by an administrator."}
-              </p>
+              <div className="mt-5 border-t pt-4 text-center">
+                <p className="text-xs text-muted-foreground">
+                  {lang === "ar" ? "ليس لديك حساب؟ اطلب تجربة لعيادتك وسيتواصل معك فريق ZMedico." : "New clinic? Request a trial and the ZMedico team will contact you."}
+                </p>
+                <Button asChild variant="outline" className="mt-3 w-full">
+                  <Link to={requestTrialHref}>{lang === "ar" ? "اطلب تجربة مجانية" : "Request a free trial"}</Link>
+                </Button>
+              </div>
             </div>
           </Card>
         </div>

@@ -27,7 +27,7 @@ export function useAuthorization(component?: string) {
   // `hasRole` / `hasRoleAny` questions without any component touching a
   // role string directly. Behavior remains byte-identical to
   // `isAdmin || roles.includes(...)`.
-  const { roles } = useUserRole();
+  const { roles, loading: rolesLoading } = useUserRole();
   const { fingerprint, enabled: r1 } = useAuthzState();
   const service = useMemo(
     () =>
@@ -43,5 +43,7 @@ export function useAuthorization(component?: string) {
     // `can` closes over perms; re-derive when identity or fingerprint changes.
     [can, isAdmin, roles, r1, fingerprint, component],
   );
-  return { authz: service, loading };
+  // Authorization decisions must not run while the raw role query is still
+  // resolving. Otherwise a valid System Owner can briefly see Access Denied.
+  return { authz: service, loading: loading || rolesLoading };
 }

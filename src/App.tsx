@@ -22,6 +22,7 @@ const AuthCallback = lazy(() => import("@/pages/auth/AuthCallback"));
 const ResetPassword = lazy(() => import("@/pages/auth/ResetPassword"));
 const Pricing = lazy(() => import("@/pages/pricing/Pricing"));
 const PublicBooking = lazy(() => import("@/pages/booking/PublicBooking"));
+const SelfCheckin = lazy(() => import("@/pages/checkin/SelfCheckin"));
 const Trust = lazy(() => import("@/pages/Trust"));
 const Dashboard = lazy(() => import("@/pages/dashboard/Dashboard"));
 const PatientsPage = lazy(() => import("@/pages/patients/Patients"));
@@ -163,6 +164,7 @@ function AppContent() {
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/book" element={<PublicBooking />} />
+            <Route path="/check-in" element={<SelfCheckin />} />
             <Route path="/trust" element={<Trust />} />
               <Route
                 element={

@@ -49,7 +49,8 @@ type ServiceRow = {
 type CategoryForm = { name: string; icon: string; color: string; display_order: number; is_active: boolean };
 type ServiceForm = {
   category_id: string;
-  name: string;
+  name_en: string;
+  name_ar: string;
   code: string;
   default_duration_minutes: number;
   default_price: number;
@@ -61,7 +62,7 @@ type ServiceForm = {
 };
 
 const emptyCategoryForm = (display_order = 0): CategoryForm => ({ name: "", icon: "", color: "#7c3aed", display_order, is_active: true });
-const emptyServiceForm = (display_order = 0): ServiceForm => ({ category_id: "", name: "", code: "", default_duration_minutes: 30, default_price: 0, cost_price: null, requires_appointment: true, available_online: true, display_order, is_active: true });
+const emptyServiceForm = (display_order = 0): ServiceForm => ({ category_id: "", name_en: "", name_ar: "", code: "", default_duration_minutes: 30, default_price: 0, cost_price: null, requires_appointment: true, available_online: true, display_order, is_active: true });
 
 export default function Services() {
   const { t, lang } = useI18n();
@@ -93,11 +94,21 @@ export default function Services() {
     toast.success(t("saved")); setOC(false); load();
   };
   const saveSv = async () => {
-    const name = (sf.name || "").trim();
-    if (!name) return toast.error(t("nameRequired"));
-    const { name: _ignored, ...rest } = sf;
+    const nameEn = (sf.name_en || "").trim();
+    const nameAr = (sf.name_ar || "").trim();
+    if (!nameEn && !nameAr) return toast.error(t("nameRequired"));
     if (!editS && !subscription?.tenant_id) return toast.error(lang === "ar" ? "لم يتم تحديد العيادة الحالية" : "No active clinic is selected");
-    const payload = { ...rest, ...(editS ? {} : { tenant_id: subscription?.tenant_id }), name_en: name, name_ar: name, category_id: sf.category_id || null, cost_price: sf.cost_price === "" ? null : sf.cost_price };
+    const { name_en: _nameEn, name_ar: _nameAr, ...rest } = sf;
+    const payload = {
+      ...rest,
+      ...(editS ? {} : { tenant_id: subscription?.tenant_id }),
+      // Database columns are required; if only one language is supplied,
+      // use it as a temporary fallback until the second translation is added.
+      name_en: nameEn || nameAr,
+      name_ar: nameAr || nameEn,
+      category_id: sf.category_id || null,
+      cost_price: sf.cost_price === "" ? null : sf.cost_price,
+    };
     const { error } = editS ? await supabase.from("services").update(payload).eq("id", editS.id) : await supabase.from("services").insert(payload);
     if (error) return toast.error(error.message);
     toast.success(t("saved")); setOS(false); load();
@@ -134,7 +145,7 @@ export default function Services() {
   }, [services, search, catFilter]);
 
   const openEditCat = (c: ServiceCategoryRow) => { setEC(c); setCF({ name: c.name_en || c.name_ar || "", icon: c.icon ?? "", color: c.color ?? "#7c3aed", display_order: c.display_order, is_active: c.is_active }); setOC(true); };
-  const openEditSv = (s: ServiceRow) => { setES(s); setSF({ category_id: s.category_id ?? "", name: s.name_en || s.name_ar || "", code: s.code ?? "", default_duration_minutes: s.default_duration_minutes ?? 30, default_price: Number(s.default_price ?? 0), cost_price: s.cost_price, requires_appointment: s.requires_appointment, available_online: s.available_online, display_order: s.display_order, is_active: s.is_active }); setOS(true); };
+  const openEditSv = (s: ServiceRow) => { setES(s); setSF({ category_id: s.category_id ?? "", name_en: s.name_en ?? "", name_ar: s.name_ar ?? "", code: s.code ?? "", default_duration_minutes: s.default_duration_minutes ?? 30, default_price: Number(s.default_price ?? 0), cost_price: s.cost_price, requires_appointment: s.requires_appointment, available_online: s.available_online, display_order: s.display_order, is_active: s.is_active }); setOS(true); };
 
   return (
     <SettingsLayout>
@@ -237,7 +248,9 @@ export default function Services() {
                         <SelectContent><SelectItem value="none">—</SelectItem>{cats.map(c => <SelectItem key={c.id} value={c.id}>{lang === "ar" ? c.name_ar : c.name_en}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
-                    <div className="col-span-2"><Label>{t("name")} / الاسم</Label><Input value={sf.name} onChange={e => setSF({ ...sf, name: e.target.value })} /></div>
+                    <div><Label>اسم الخدمة بالعربية (name_ar)</Label><Input dir="rtl" value={sf.name_ar} onChange={e => setSF({ ...sf, name_ar: e.target.value })} placeholder="مثال: جلسة علاج طبيعي" /></div>
+                    <div><Label>اسم الخدمة بالإنجليزية (name_en)</Label><Input dir="ltr" value={sf.name_en} onChange={e => setSF({ ...sf, name_en: e.target.value })} placeholder="Example: Physiotherapy Session" /></div>
+                    <div className="col-span-2 text-xs text-muted-foreground">{lang === "ar" ? "يظهر الاسم العربي عند اختيار العربية، والاسم الإنجليزي عند اختيار English. اكتب الاثنين للحفاظ على ترجمة صحيحة." : "Arabic is shown in Arabic mode and English is shown in English mode. Enter both for an accurate translation."}</div>
                     <div><Label>{t("code")}</Label><Input value={sf.code ?? ""} onChange={e => setSF({ ...sf, code: e.target.value })} /></div>
                     <div><Label>{t("durationMinutes")}</Label><Input type="number" value={sf.default_duration_minutes} onChange={e => setSF({ ...sf, default_duration_minutes: +e.target.value })} /></div>
                     <div><Label>{t("defaultPrice")}</Label><Input type="number" step="0.01" value={sf.default_price} onChange={e => setSF({ ...sf, default_price: +e.target.value })} /></div>
@@ -274,6 +287,7 @@ export default function Services() {
                         <TableRow key={s.id}>
                           <TableCell className="min-w-0">
                             <div className="font-medium truncate">{lang === "ar" ? s.name_ar : s.name_en}</div>
+                            <div className="text-xs text-muted-foreground truncate">{lang === "ar" ? `EN: ${s.name_en}` : `AR: ${s.name_ar}`}</div>
                             {s.code && <div className="text-xs text-muted-foreground">{s.code}</div>}
                           </TableCell>
                           <TableCell>

@@ -40,6 +40,7 @@ export default function MedicalRecordEditor() {
   const [record, setRecord] = useState<Record | null>(null);
   const [patient, setPatient] = useState<any>(null);
   const [specialty, setSpecialty] = useState<any>(null);
+  const [appointmentService, setAppointmentService] = useState<any | null>(null);
   const [specs, setSpecs] = useState<any[]>([]);
   const [vitals, setVitals] = useState<any[]>([]); // history
   const [diagnoses, setDiagnoses] = useState<any[]>([]); // record diagnoses with join
@@ -68,6 +69,16 @@ export default function MedicalRecordEditor() {
       supabase.from("patient_documents").select("*").eq("medical_record_id", r.id).order("created_at", { ascending: false }),
     ]);
     setPatient(p);
+    if (r.appointment_id) {
+      const { data: appointment } = await supabase
+        .from("appointments")
+        .select("service_id,procedure,services(name_en,name_ar)")
+        .eq("id", r.appointment_id)
+        .maybeSingle();
+      setAppointmentService(appointment ?? null);
+    } else {
+      setAppointmentService(null);
+    }
     setSpecs(sp ?? []);
     setSpecialty((sp ?? []).find((s) => s.id === r.specialty_id) ?? null);
     setVitals(vs ?? []);
@@ -162,6 +173,17 @@ export default function MedicalRecordEditor() {
             <div>{formatDate(record.visit_date, lang)}</div>
             {specialty && <div className="font-medium text-foreground">{lang === "ar" ? specialty.name_ar : specialty.name_en}</div>}
           </div>
+          {appointmentService && (
+            <div className="w-full rounded-lg border border-primary/20 bg-primary/5 p-3">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{lang === "ar" ? "الخدمة المحجوزة" : "Booked service"}</div>
+              <div className="mt-1 font-semibold">
+                {appointmentService.services
+                  ? (lang === "ar" ? (appointmentService.services.name_ar || appointmentService.services.name_en) : (appointmentService.services.name_en || appointmentService.services.name_ar))
+                  : appointmentService.procedure || "—"}
+              </div>
+              <div className="mt-1 text-xs text-muted-foreground">{lang === "ar" ? "أضف الإجراءات التي تم تنفيذها فعليًا من تبويب الإجراءات بعد حضور المريض." : "Add the procedures actually performed from the Procedures tab after the patient visit."}</div>
+            </div>
+          )}
         </div>
       </Card>
 
@@ -533,6 +555,7 @@ function ProceduresTab({ record, specialty, catalog, items, reload, userId }: an
   return (
     <div className="space-y-4">
       <Card className="p-4 shadow-card space-y-3">
+        <p className="text-xs text-muted-foreground">{lang === "ar" ? "الخدمة المحجوزة تحدد نوع الزيارة. أضف هنا الإجراءات السريرية التي تم تنفيذها فعليًا أثناء الزيارة؛ يمكن تسجيل أكثر من إجراء." : "The booked service identifies the visit type. Add the clinical procedures actually performed during the visit here; more than one procedure can be recorded."}</p>
         <div className="space-y-1.5"><Label>{t("selectProcedure")}</Label>
           <Input placeholder={t("searchPlaceholder")} value={selected ? (lang === "ar" ? selected.name_ar : selected.name_en) : search} onChange={(e) => { setSearch(e.target.value); setSelected(null); }} />
         </div>

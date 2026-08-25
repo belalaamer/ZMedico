@@ -36,6 +36,7 @@ export default function ConsultationDashboard() {
   const T = (en: string, ar: string) => (isAr ? ar : en);
 
   const [record, setRecord] = useState<any>(null);
+  const [appointmentService, setAppointmentService] = useState<any | null>(null);
   const [patient, setPatient] = useState<any>(null);
   const [lastVisits, setLastVisits] = useState<any[]>([]);
   const [activeDx, setActiveDx] = useState<any[]>([]);
@@ -58,6 +59,16 @@ export default function ConsultationDashboard() {
     const { data: r } = await supabase.from("medical_records").select("*").eq("id", recordId).maybeSingle();
     if (!r) { toast.error(T("Record not found", "السجل غير موجود")); return; }
     setRecord(r);
+    if (r.appointment_id) {
+      const { data: appointment } = await supabase
+        .from("appointments")
+        .select("service_id,procedure,services(name_en,name_ar)")
+        .eq("id", r.appointment_id)
+        .maybeSingle();
+      setAppointmentService(appointment ?? null);
+    } else {
+      setAppointmentService(null);
+    }
 
     const [
       { data: p },
@@ -225,6 +236,17 @@ export default function ConsultationDashboard() {
               {T("Visit date", "تاريخ الزيارة")}: {formatDate(record.visit_date, lang)}
             </div>
           </div>
+          {appointmentService && (
+            <div className="w-full rounded-lg border border-primary/20 bg-primary/5 p-3">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{T("Booked service", "الخدمة المحجوزة")}</div>
+              <div className="mt-1 font-semibold">
+                {appointmentService.services
+                  ? (isAr ? (appointmentService.services.name_ar || appointmentService.services.name_en) : (appointmentService.services.name_en || appointmentService.services.name_ar))
+                  : appointmentService.procedure || "—"}
+              </div>
+              <div className="mt-1 text-xs text-muted-foreground">{T("Document performed procedures below after the patient arrives.", "سجّل الإجراءات التي تم تنفيذها فعليًا بالأسفل بعد حضور المريض.")}</div>
+            </div>
+          )}
           {draftInvoice && (
             <Link to={`/invoices/${draftInvoice.id}`} className="text-sm">
               <Badge variant="outline" className="status-progress">

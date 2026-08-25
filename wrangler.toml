@@ -16,6 +16,7 @@
 #
 # `vite build` writes to ./dist (Vite's default; vite.config.ts sets no outDir).
 #
+# Cloudflare Workers Builds deploy marker: connect GitHub and publish main.
 # not_found_handling = "single-page-application" is required: this is a React
 # Router SPA, so any deep link (for example /patients/<id>) must be served
 # index.html rather than a 404.

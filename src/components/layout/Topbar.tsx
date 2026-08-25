@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Bell, Search, LogOut, Globe, Calendar, Wallet, Clock, AlertTriangle, Menu, X } from "lucide-react";
+import { Bell, Search, LogOut, Globe, Calendar, Wallet, Clock, AlertTriangle, Menu, X, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,8 @@ import { SidebarContent } from "./Sidebar";
 import { supabase } from "@/integrations/supabase/client";
 import { subscribeResilient } from "@/lib/realtime";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
+import { shouldShowPlatformReturnLink } from "@/lib/platformNavigation";
+import { clearPlatformWorkspaceBranch } from "@/lib/platformWorkspace";
 
 type NotificationRow = {
   id: string;
@@ -151,6 +153,7 @@ export function Topbar() {
     (lang === "ar" ? b.name_ar || b.name_en : b.name_en || b.name_ar) || "—";
 
   const showBranchSwitcher = !(isSystemOwner && pathname.startsWith("/platform"));
+  const showPlatformReturn = shouldShowPlatformReturnLink(isSystemOwner, pathname);
 
   return (
     <header className="h-16 min-h-16 shrink-0 flex items-center gap-2 px-3 sm:gap-3 sm:px-4 md:px-6 border-b border-border bg-card">
@@ -239,6 +242,22 @@ export function Topbar() {
         >
           {t("branch")}
         </div>
+      ) : null}
+
+      {showPlatformReturn ? (
+        <Button asChild variant="outline" size="sm" className="hidden h-10 shrink-0 gap-2 md:flex">
+          <Link to="/platform" onClick={clearPlatformWorkspaceBranch} aria-label={lang === "ar" ? "العودة إلى إدارة المنصة" : "Return to Platform Administration"}>
+            <LayoutDashboard className="size-4" />
+            <span className="hidden lg:inline">{lang === "ar" ? "إدارة المنصة" : "Platform Administration"}</span>
+          </Link>
+        </Button>
+      ) : null}
+      {showPlatformReturn ? (
+        <Button asChild variant="ghost" size="icon" className="size-11 shrink-0 md:hidden">
+          <Link to="/platform" onClick={clearPlatformWorkspaceBranch} aria-label={lang === "ar" ? "العودة إلى إدارة المنصة" : "Return to Platform Administration"}>
+            <LayoutDashboard className="size-5" />
+          </Link>
+        </Button>
       ) : null}
 
       <Button variant="ghost" size="icon" type="button" className="size-11 shrink-0" onClick={() => setLang(lang === "ar" ? "en" : "ar")} title={t("language")} aria-label={t("language")}>

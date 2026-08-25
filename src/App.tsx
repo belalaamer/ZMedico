@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { I18nProvider, useI18n } from "@/contexts/I18nContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { BranchProvider } from "@/contexts/BranchContext";
+import { TenantBrandingProvider } from "@/contexts/TenantBrandingContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { PermissionRoute } from "@/components/PermissionRoute";
 import { attachGlobalRefreshListeners } from "@/lib/dataSync";
@@ -290,9 +291,11 @@ const App = () => (
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
         <AuthProvider>
-          <BranchProvider>
-            <AppContent />
-          </BranchProvider>
+          <TenantBrandingProvider>
+            <BranchProvider>
+              <AppContent />
+            </BranchProvider>
+          </TenantBrandingProvider>
         </AuthProvider>
       </I18nProvider>
     </QueryClientProvider>

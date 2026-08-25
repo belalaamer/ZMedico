@@ -14,6 +14,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { toast } from "sonner";
 import { hasPersistedAuthSession, persistAuthSessionForPreview } from "@/lib/authSessionPersistence";
 import { resolvePostAuthRedirect } from "@/lib/authRedirect";
+import { useTenantBranding } from "@/contexts/TenantBrandingContext";
 
 function authDebug(message: string, details?: Record<string, unknown>) {
   if (import.meta.env.DEV) console.info("[auth-debug]", message, details ?? {});
@@ -51,10 +52,12 @@ function safeRedirectPath(value?: string | null) {
 export default function AuthPage() {
   const { t, lang, setLang } = useI18n();
   const { user, loading: authLoading } = useAuth();
+  const { branding, isBrandedTenantHost } = useTenantBranding();
   const nav = useNavigate();
   const location = useLocation();
   const selectedPlan = useMemo(() => new URLSearchParams(location.search).get("plan"), [location.search]);
   const requestTrialHref = selectedPlan ? `/request-trial?plan=${encodeURIComponent(selectedPlan)}` : "/request-trial";
+  const brandName = branding?.display_name || (isBrandedTenantHost ? window.location.hostname.split(".")[0] : t("appName"));
   const from = useMemo(() => {
     const params = new URLSearchParams(location.search);
     const next = params.get("next");
@@ -183,8 +186,8 @@ export default function AuthPage() {
             <Stethoscope className="size-6" />
           </div>
           <div>
-            <div className="text-xl font-bold">{t("appName")}</div>
-            <div className="text-sm text-white/70">{t("tagline")}</div>
+            <div className="text-xl font-bold">{brandName}</div>
+            {!isBrandedTenantHost ? <div className="text-sm text-white/70">{t("tagline")}</div> : null}
           </div>
         </div>
         <div className="space-y-4 max-w-md">
@@ -199,7 +202,7 @@ export default function AuthPage() {
               : "Patients, appointments, billing, and multi-branch — all in one place."}
           </p>
         </div>
-        <div className="text-xs text-white/60">© {new Date().getFullYear()} {t("appName")}</div>
+        {!isBrandedTenantHost || branding?.show_powered_by ? <div className="text-xs text-white/60">© {new Date().getFullYear()} {brandName}</div> : null}
         <div className="absolute -right-32 -bottom-32 size-96 rounded-full bg-white/10 blur-3xl" />
       </div>
 
@@ -215,7 +218,10 @@ export default function AuthPage() {
           <Card className="p-6 shadow-elegant border-border/60">
             <div>
               <h2 className="text-2xl font-bold mb-1">{t("welcomeBack")}</h2>
-              <p className="text-sm text-muted-foreground mb-6">{t("appName")}</p>
+              <div className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
+                {branding?.logo_url ? <img src={branding.logo_url} alt={brandName} className="size-8 rounded-lg object-contain" /> : null}
+                <span>{brandName}</span>
+              </div>
               <form onSubmit={handleSignIn} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="email">{t("email")}</Label>
@@ -253,14 +259,14 @@ export default function AuthPage() {
                     </Dialog>
                   </div>
                 </form>
-              <div className="mt-5 border-t pt-4 text-center">
+              {!isBrandedTenantHost ? <div className="mt-5 border-t pt-4 text-center">
                 <p className="text-xs text-muted-foreground">
                   {lang === "ar" ? "ليس لديك حساب؟ اطلب تجربة لعيادتك وسيتواصل معك فريق ZMedico." : "New clinic? Request a trial and the ZMedico team will contact you."}
                 </p>
                 <Button asChild variant="outline" className="mt-3 w-full">
                   <Link to={requestTrialHref}>{lang === "ar" ? "اطلب تجربة مجانية" : "Request a free trial"}</Link>
                 </Button>
-              </div>
+              </div> : null}
             </div>
           </Card>
         </div>

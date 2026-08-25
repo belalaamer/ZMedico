@@ -137,6 +137,26 @@ All colors MUST be HSL.
   .text-balance { text-wrap: balance; }
 }
 
+/* Tenant White-Label overrides. The values are validated as six-digit colors
+   by the database before they reach this surface. */
+html[data-tenant-branded="true"] .gradient-primary {
+  background: linear-gradient(135deg, var(--tenant-brand-primary), var(--tenant-brand-secondary));
+}
+html[data-tenant-branded="true"] .text-primary {
+  color: var(--tenant-brand-primary) !important;
+}
+html[data-tenant-branded="true"] .border-primary,
+html[data-tenant-branded="true"] .border-sidebar-primary {
+  border-color: var(--tenant-brand-accent) !important;
+}
+html[data-tenant-branded="true"] .bg-sidebar {
+  background: var(--tenant-brand-primary) !important;
+}
+html[data-tenant-branded="true"] .bg-sidebar-accent {
+  background: color-mix(in srgb, var(--tenant-brand-secondary) 78%, white 22%) !important;
+}
+
+
 html { font-family: "Inter", system-ui, sans-serif; }
 
 /* Hide the injected "Edit with Lovable" badge on published deployments */

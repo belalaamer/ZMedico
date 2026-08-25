@@ -88,12 +88,16 @@ export default {
       return new Response(null, { status: 204, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
     }
     const isHtmlRequest = request.method === "GET" && (pathname === "/" || pathname === "/index.html" || !pathname.includes("."));
-    if (isHtmlRequest && isProviderSubdomainHost(hostname)) {
+    const providerSubdomain = isProviderSubdomainHost(hostname);
+    if (isHtmlRequest && providerSubdomain) {
       const active = await hasActiveTenantDomain(hostname);
       if (!active) return new Response("Tenant subdomain is not active", { status: 404, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+      // A tenant-owned hostname is an application portal, not the public
+      // marketing site. Keep deep links intact but make the root open login.
+      if (pathname === "/" || pathname === "/index.html") url.pathname = "/auth";
     }
     if (isHtmlRequest) {
-      url.searchParams.set("__zmedico_build", "deb1ea4");
+      url.searchParams.set("__zmedico_build", "whitelabel-20260825");
     }
     const assetRequest = isHtmlRequest ? new Request(url, request) : request;
     const response = await env.ASSETS.fetch(assetRequest);

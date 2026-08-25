@@ -6711,6 +6711,50 @@ export type Database = {
           },
         ]
       }
+      tenant_branding: {
+        Row: {
+          accent_color: string
+          created_at: string
+          display_name: string | null
+          logo_url: string | null
+          primary_color: string
+          secondary_color: string
+          show_powered_by: boolean
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          accent_color?: string
+          created_at?: string
+          display_name?: string | null
+          logo_url?: string | null
+          primary_color?: string
+          secondary_color?: string
+          show_powered_by?: boolean
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          accent_color?: string
+          created_at?: string
+          display_name?: string | null
+          logo_url?: string | null
+          primary_color?: string
+          secondary_color?: string
+          show_powered_by?: boolean
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_branding_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_domains: {
         Row: {
           cloudflare_hostname_id: string | null

@@ -192,14 +192,14 @@ export default function AuthPage() {
         </div>
         <div className="space-y-4 max-w-md">
           <h1 className="text-4xl font-bold leading-tight text-balance">
-            {lang === "ar"
-              ? "نظام إدارة العيادات الذي يفهم احتياجاتك."
-              : "A clinic management system built for every specialty."}
+            {isBrandedTenantHost
+              ? (lang === "ar" ? `مرحبًا بك في ${brandName}` : `Welcome to ${brandName}`)
+              : (lang === "ar" ? "نظام إدارة العيادات الذي يفهم احتياجاتك." : "A clinic management system built for every specialty.")}
           </h1>
-          <p className="text-white/80">
-            {lang === "ar"
-              ? "إدارة المرضى، المواعيد، الفواتير، والفروع في مكان واحد."
-              : "Patients, appointments, billing, and multi-branch — all in one place."}
+            <p className="text-white/80">
+            {isBrandedTenantHost
+              ? (lang === "ar" ? "مساحة تشغيل آمنة ومخصصة لفريق العيادة." : "A secure operational workspace for your clinic team.")
+              : (lang === "ar" ? "إدارة المرضى، المواعيد، الفواتير، والفروع في مكان واحد." : "Patients, appointments, billing, and multi-branch — all in one place.")}
           </p>
         </div>
         {!isBrandedTenantHost || branding?.show_powered_by ? <div className="text-xs text-white/60">© {new Date().getFullYear()} {brandName}</div> : null}

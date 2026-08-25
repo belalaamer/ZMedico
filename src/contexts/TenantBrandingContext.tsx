@@ -57,6 +57,11 @@ export function TenantBrandingProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    document.title = branding?.display_name || "ZMedico";
+    return () => { document.title = "ZMedico"; };
+  }, [branding]);
+
+  useEffect(() => {
     const root = document.documentElement;
     if (!branding) {
       root.removeAttribute("data-tenant-branded");

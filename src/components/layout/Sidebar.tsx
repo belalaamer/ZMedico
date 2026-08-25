@@ -214,7 +214,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
   return (
     <div className="flex h-full min-h-0 w-full flex-col bg-sidebar text-sidebar-foreground">
       <div className="flex h-16 min-h-16 items-center gap-3 border-b border-sidebar-border px-4 sm:px-5">
-        {branding?.logo_url ? <img src={branding.logo_url} alt={brandName} className="size-9 rounded-xl bg-sidebar-accent object-contain p-1" /> : branding && !branding.show_powered_by ? <div className="size-9 rounded-xl border border-sidebar-border bg-sidebar-accent/40" aria-hidden="true" /> : <div className="size-9 rounded-xl bg-sidebar-accent flex items-center justify-center"><Stethoscope className="size-5 text-sidebar-accent-foreground" /></div>}
+        {branding ? (branding.logo_url ? <img src={branding.logo_url} alt={brandName} className="size-9 rounded-xl bg-sidebar-accent object-contain p-1" /> : <div className="size-9 rounded-xl border border-sidebar-border bg-sidebar-accent/40" aria-hidden="true" />) : <div className="size-9 rounded-xl bg-sidebar-accent flex items-center justify-center"><Stethoscope className="size-5 text-sidebar-accent-foreground" /></div>}
         <div className="min-w-0">
           <div className="truncate text-base font-bold text-sidebar-primary leading-tight">{brandName}</div>
           {branding ? (branding.show_powered_by ? <div className="text-[11px] text-sidebar-foreground/70">{lang === "ar" ? "مدعوم بواسطة ZMedico" : "Powered by ZMedico"}</div> : null) : <div className="text-[11px] text-sidebar-foreground/70">{t("tagline")}</div>}

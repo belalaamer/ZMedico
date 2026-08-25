@@ -217,7 +217,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
         {branding?.logo_url ? <img src={branding.logo_url} alt={brandName} className="size-9 rounded-xl bg-sidebar-accent object-contain p-1" /> : <div className="size-9 rounded-xl bg-sidebar-accent flex items-center justify-center"><Stethoscope className="size-5 text-sidebar-accent-foreground" /></div>}
         <div className="min-w-0">
           <div className="truncate text-base font-bold text-sidebar-primary leading-tight">{brandName}</div>
-          {branding?.show_powered_by !== false ? <div className="text-[11px] text-sidebar-foreground/70">{t("tagline")}</div> : null}
+          {branding ? (branding.show_powered_by ? <div className="text-[11px] text-sidebar-foreground/70">{lang === "ar" ? "مدعوم بواسطة ZMedico" : "Powered by ZMedico"}</div> : null) : <div className="text-[11px] text-sidebar-foreground/70">{t("tagline")}</div>}
         </div>
       </div>
       <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-3 sm:px-3 sm:py-4 space-y-3 sm:space-y-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">

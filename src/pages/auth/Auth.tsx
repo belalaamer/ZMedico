@@ -202,7 +202,10 @@ export default function AuthPage() {
               : (lang === "ar" ? "إدارة المرضى، المواعيد، الفواتير، والفروع في مكان واحد." : "Patients, appointments, billing, and multi-branch — all in one place.")}
           </p>
         </div>
-        {!isBrandedTenantHost || branding?.show_powered_by ? <div className="text-xs text-white/60">© {new Date().getFullYear()} {brandName}</div> : null}
+        <div className="flex items-center justify-between gap-3 text-xs text-white/60">
+          <span>© {new Date().getFullYear()} {brandName}</span>
+          {isBrandedTenantHost && branding?.show_powered_by ? <span>{lang === "ar" ? "مدعوم بواسطة ZMedico" : "Powered by ZMedico"}</span> : null}
+        </div>
         <div className="absolute -right-32 -bottom-32 size-96 rounded-full bg-white/10 blur-3xl" />
       </div>
 

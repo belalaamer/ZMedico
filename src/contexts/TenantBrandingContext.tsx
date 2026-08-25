@@ -5,6 +5,7 @@ export type TenantBranding = {
   tenant_id: string;
   display_name: string;
   logo_url: string | null;
+  favicon_url: string | null;
   primary_color: string;
   secondary_color: string;
   accent_color: string;
@@ -60,6 +61,23 @@ export function TenantBrandingProvider({ children }: { children: ReactNode }) {
     document.title = branding?.display_name || "ZMedico";
     return () => { document.title = "ZMedico"; };
   }, [branding]);
+
+  useEffect(() => {
+    const existing = document.head.querySelector<HTMLLinkElement>('link[data-tenant-favicon="true"]');
+    const link = existing ?? document.head.appendChild(document.createElement("link"));
+    link.setAttribute("data-tenant-favicon", "true");
+    link.rel = "icon";
+    const faviconUrl = branding?.favicon_url?.toLowerCase() || "";
+    link.type = faviconUrl.includes(".ico") ? "image/x-icon" : faviconUrl.includes(".svg") ? "image/svg+xml" : faviconUrl.includes(".webp") ? "image/webp" : "image/png";
+    if (branding?.favicon_url) {
+      link.href = branding.favicon_url;
+    } else {
+      link.removeAttribute("href");
+    }
+    return () => {
+      link.remove();
+    };
+  }, [branding?.favicon_url]);
 
   useEffect(() => {
     const root = document.documentElement;

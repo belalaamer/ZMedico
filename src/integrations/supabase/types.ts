@@ -6717,6 +6717,7 @@ export type Database = {
           created_at: string
           display_name: string | null
           logo_url: string | null
+          favicon_url: string | null
           primary_color: string
           secondary_color: string
           show_powered_by: boolean
@@ -6728,6 +6729,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           logo_url?: string | null
+          favicon_url?: string | null
           primary_color?: string
           secondary_color?: string
           show_powered_by?: boolean
@@ -6739,6 +6741,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           logo_url?: string | null
+          favicon_url?: string | null
           primary_color?: string
           secondary_color?: string
           show_powered_by?: boolean

@@ -15,6 +15,7 @@ export type BrandingTenant = { id: string; name: string };
 type BrandingForm = {
   display_name: string;
   logo_url: string;
+  favicon_url: string;
   primary_color: string;
   secondary_color: string;
   accent_color: string;
@@ -24,6 +25,7 @@ type BrandingForm = {
 const DEFAULT_FORM: BrandingForm = {
   display_name: "",
   logo_url: "",
+  favicon_url: "",
   primary_color: "#3a1a5e",
   secondary_color: "#6d3bb3",
   accent_color: "#d7b86e",
@@ -43,7 +45,7 @@ export default function TenantBrandingDialog({ tenant, open, onOpenChange, onSav
     if (!open || !tenant) return;
     let active = true;
     setLoading(true);
-    void supabase.from("tenant_branding").select("display_name,logo_url,primary_color,secondary_color,accent_color,show_powered_by").eq("tenant_id", tenant.id).maybeSingle()
+    void supabase.from("tenant_branding").select("display_name,logo_url,favicon_url,primary_color,secondary_color,accent_color,show_powered_by").eq("tenant_id", tenant.id).maybeSingle()
       .then(({ data, error }) => {
         if (!active) return;
         if (error) {
@@ -54,6 +56,7 @@ export default function TenantBrandingDialog({ tenant, open, onOpenChange, onSav
           setForm({
             display_name: row?.display_name ?? tenant.name,
             logo_url: row?.logo_url ?? "",
+            favicon_url: row?.favicon_url ?? "",
             primary_color: row?.primary_color ?? DEFAULT_FORM.primary_color,
             secondary_color: row?.secondary_color ?? DEFAULT_FORM.secondary_color,
             accent_color: row?.accent_color ?? DEFAULT_FORM.accent_color,
@@ -90,11 +93,38 @@ export default function TenantBrandingDialog({ tenant, open, onOpenChange, onSav
     setUploading(false);
   };
 
+  const uploadFavicon = async (file: File | undefined) => {
+    if (!file || !tenant) return;
+    const extension = file.name.split(".").pop()?.toLowerCase() || "png";
+    const isIco = extension === "ico";
+    const allowed = ["image/png", "image/jpeg", "image/webp", "image/svg+xml", "image/x-icon", "image/vnd.microsoft.icon"];
+    if (!allowed.includes(file.type) && !(isIco && !file.type)) {
+      toast({ title: isAr ? "اختر PNG أو JPG أو WEBP أو SVG أو ICO فقط" : "Choose PNG, JPG, WEBP, SVG, or ICO only", variant: "destructive" });
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: isAr ? "حجم أيقونة المتصفح يجب ألا يتجاوز 2MB" : "Favicon must be 2MB or smaller", variant: "destructive" });
+      return;
+    }
+    setUploading(true);
+    const path = `${tenant.id}/favicon-${Date.now()}.${extension}`;
+    const contentType = file.type || (isIco ? "image/x-icon" : "image/png");
+    const { error } = await supabase.storage.from("tenant-branding").upload(path, file, { upsert: true, contentType });
+    if (error) {
+      toast({ title: error.message, variant: "destructive" });
+    } else {
+      const { data } = supabase.storage.from("tenant-branding").getPublicUrl(path);
+      setForm((current) => ({ ...current, favicon_url: data.publicUrl }));
+      toast({ title: isAr ? "تم تحميل أيقونة المتصفح" : "Favicon uploaded" });
+    }
+    setUploading(false);
+  };
+
   const save = async () => {
     if (!tenant) return;
     setSaving(true);
     const displayName = form.display_name.trim() || tenant.name;
-    const { error } = await supabase.from("tenant_branding").upsert({ tenant_id: tenant.id, display_name: displayName, logo_url: form.logo_url.trim() || null, primary_color: form.primary_color, secondary_color: form.secondary_color, accent_color: form.accent_color, show_powered_by: form.show_powered_by }, { onConflict: "tenant_id" });
+    const { error } = await supabase.from("tenant_branding").upsert({ tenant_id: tenant.id, display_name: displayName, logo_url: form.logo_url.trim() || null, favicon_url: form.favicon_url.trim() || null, primary_color: form.primary_color, secondary_color: form.secondary_color, accent_color: form.accent_color, show_powered_by: form.show_powered_by }, { onConflict: "tenant_id" });
     if (error) {
       toast({ title: error.message, variant: "destructive" });
     } else {
@@ -111,7 +141,8 @@ export default function TenantBrandingDialog({ tenant, open, onOpenChange, onSav
       {loading ? <div className="py-10 text-center text-sm text-muted-foreground"><Loader2 className="me-2 inline size-4 animate-spin" />{isAr ? "جارٍ تحميل الهوية…" : "Loading branding…"}</div> : <div className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5 sm:col-span-2"><Label>{isAr ? "اسم العرض داخل النظام" : "Display name"}</Label><Input value={form.display_name} onChange={(event) => setForm((current) => ({ ...current, display_name: event.target.value }))} placeholder={tenant?.name} maxLength={160} /></div>
-          <div className="space-y-1.5 sm:col-span-2"><Label>{isAr ? "الشعار" : "Logo"}</Label><div className="flex flex-wrap items-center gap-3"><Input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(event) => { void uploadLogo(event.target.files?.[0]); event.currentTarget.value = ""; }} disabled={uploading} className="max-w-sm" /><span className="text-xs text-muted-foreground">{isAr ? "حتى 2MB" : "Up to 2MB"}</span></div><Input dir="ltr" value={form.logo_url} onChange={(event) => setForm((current) => ({ ...current, logo_url: event.target.value }))} placeholder="https://…/logo.png" /></div>
+          <div className="space-y-1.5 sm:col-span-2"><Label>{isAr ? "الشعار الرئيسي" : "Main logo"}</Label><div className="flex flex-wrap items-center gap-3"><Input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(event) => { void uploadLogo(event.target.files?.[0]); event.currentTarget.value = ""; }} disabled={uploading} className="max-w-sm" /><span className="text-xs text-muted-foreground">{isAr ? "PNG أو JPG أو WEBP أو SVG حتى 2MB" : "PNG, JPG, WEBP, or SVG up to 2MB"}</span></div><Input dir="ltr" value={form.logo_url} onChange={(event) => setForm((current) => ({ ...current, logo_url: event.target.value }))} placeholder="https://…/logo.png" /></div>
+          <div className="space-y-1.5 sm:col-span-2"><Label>{isAr ? "أيقونة المتصفح (Favicon)" : "Browser icon (Favicon)"}</Label><div className="flex flex-wrap items-center gap-3"><Input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,image/x-icon,.ico" onChange={(event) => { void uploadFavicon(event.target.files?.[0]); event.currentTarget.value = ""; }} disabled={uploading} className="max-w-sm" /><span className="text-xs text-muted-foreground">{isAr ? "PNG أو JPG أو WEBP أو SVG أو ICO حتى 2MB" : "PNG, JPG, WEBP, SVG, or ICO up to 2MB"}</span></div><Input dir="ltr" value={form.favicon_url} onChange={(event) => setForm((current) => ({ ...current, favicon_url: event.target.value }))} placeholder="https://…/favicon.ico" /><p className="text-xs text-muted-foreground">{isAr ? "تظهر في علامة تبويب المتصفح لكل نطاق عيادة." : "Shown in the browser tab for the clinic domain."}</p></div>
           {(["primary_color", "secondary_color", "accent_color"] as const).map((key) => <div key={key} className="space-y-1.5"><Label>{key === "primary_color" ? (isAr ? "اللون الأساسي" : "Primary color") : key === "secondary_color" ? (isAr ? "اللون الثانوي" : "Secondary color") : (isAr ? "لون التمييز" : "Accent color")}</Label><div className="flex items-center gap-2"><input type="color" value={form[key]} onChange={(event) => setForm((current) => ({ ...current, [key]: event.target.value }))} className="size-10 cursor-pointer rounded-md border bg-background p-1" /><Input dir="ltr" value={form[key]} onChange={(event) => setForm((current) => ({ ...current, [key]: event.target.value }))} pattern="^#[0-9a-fA-F]{6}$" maxLength={7} /></div></div>)}
         </div>
         <div className="flex items-center justify-between gap-4 rounded-xl border p-4"><div><div className="font-medium">{isAr ? "إظهار Powered by ZMedico" : "Show Powered by ZMedico"}</div><p className="mt-1 text-xs text-muted-foreground">{isAr ? "أوقفه لإخفاء اسم وشعار ZMedico من تجربة العميل." : "Turn this off to hide ZMedico name and logo from the tenant experience."}</p></div><Switch checked={form.show_powered_by} onCheckedChange={(checked) => setForm((current) => ({ ...current, show_powered_by: checked }))} /></div>

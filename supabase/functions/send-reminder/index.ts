@@ -50,7 +50,15 @@ type Reminder = {
   scheduled_time: string;
   status: string;
   payload?: Record<string, unknown> | null;
+  attempt_count?: number;
 };
+
+function normalizeWhatsAppRecipient(raw: string): string {
+  let digits = (raw || "").replace(/\D/g, "");
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  if (digits.startsWith("0")) digits = `20${digits.slice(1)}`;
+  return digits;
+}
 
 type NotifySettings = {
   whatsapp_api_key: string | null;
@@ -128,7 +136,7 @@ async function sendOne(
   patientPhone: string | null,
   patientEmail: string | null,
   cfg: NotifySettings | null,
-): Promise<{ ok: boolean; error?: string; provider_response?: Record<string, string> }> {
+): Promise<{ ok: boolean; error?: string; provider_message_id?: string; provider_response?: Record<string, string> }> {
   const message = reminder.message_en || reminder.message_ar;
 
   if (reminder.reminder_type === "whatsapp" || reminder.reminder_type === "sms") {
@@ -157,40 +165,80 @@ async function sendOne(
           },
           body: new URLSearchParams({ To: to, From: fromAddr, Body: message }).toString(),
         });
+        const rawBody = await res.text().catch(() => "");
         if (!res.ok) {
-          const body = await res.text().catch(() => "");
-          return { ok: false, error: `Twilio ${res.status}: ${sanitizeProviderError(body)}` };
+          return { ok: false, error: `Twilio ${res.status}: ${sanitizeProviderError(rawBody)}` };
         }
-        return { ok: true };
+        let parsed: any = null;
+        try { parsed = JSON.parse(rawBody); } catch { /* provider may return empty body */ }
+        const providerMessageId = String(parsed?.sid ?? "");
+        return {
+          ok: true,
+          provider_message_id: providerMessageId || undefined,
+          provider_response: { provider: "twilio", message_id: providerMessageId, status: String(parsed?.status ?? "accepted") },
+        };
       } catch {
         return { ok: false, error: "Twilio request failed" };
       }
     }
 
-    // Meta WhatsApp Cloud API
+    // Meta WhatsApp Cloud API. Automated business-initiated messages must use
+    // an approved template; free-form text is allowed only for manual sends
+    // inside Meta's customer-service window.
     if (isWa && provider === "meta") {
       const phoneId = cfg?.meta_phone_number_id;
       const token = cfg?.whatsapp_api_key;
       if (!phoneId || !token) return { ok: false, error: "Meta WhatsApp not configured" };
+      const recipient = normalizeWhatsAppRecipient(patientPhone);
+      if (!recipient) return { ok: false, error: "Invalid WhatsApp recipient" };
+      const metaTemplateName = String(reminder.payload?.meta_template_name ?? "").trim();
+      const metaLanguage = String(reminder.payload?.meta_template_language ?? "ar").trim() || "ar";
+      const rawParams = reminder.payload?.meta_template_params;
+      const metaParams = Array.isArray(rawParams) ? rawParams.map((v) => ({ type: "text", text: String(v ?? "") })) : [];
+      const isAutomated = reminder.event_type !== "manual";
+      if (isAutomated && !metaTemplateName) {
+        return { ok: false, error: "Approved Meta template is required for automated WhatsApp" };
+      }
+      const requestBody: Record<string, unknown> = {
+        messaging_product: "whatsapp",
+        to: recipient,
+      };
+      if (metaTemplateName) {
+        requestBody.type = "template";
+        requestBody.template = {
+          name: metaTemplateName,
+          language: { code: metaLanguage },
+          ...(metaParams.length ? { components: [{ type: "body", parameters: metaParams }] } : {}),
+        };
+      } else {
+        requestBody.type = "text";
+        requestBody.text = { body: message };
+      }
       try {
-        const res = await fetch(`https://graph.facebook.com/v20.0/${encodeURIComponent(phoneId)}/messages`, {
+        const res = await fetch(`https://graph.facebook.com/v23.0/${encodeURIComponent(phoneId)}/messages`, {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            messaging_product: "whatsapp",
-            to: patientPhone.replace(/^\+/, ""),
-            type: "text",
-            text: { body: message },
-          }),
+          body: JSON.stringify(requestBody),
         });
+        const rawBody = await res.text().catch(() => "");
         if (!res.ok) {
-          const body = await res.text().catch(() => "");
-          return { ok: false, error: `Meta ${res.status}: ${sanitizeProviderError(body)}` };
+          return { ok: false, error: `Meta ${res.status}: ${sanitizeProviderError(rawBody)}` };
         }
-        return { ok: true };
+        let parsed: any = null;
+        try { parsed = JSON.parse(rawBody); } catch { /* provider may return empty body */ }
+        const providerMessageId = String(parsed?.messages?.[0]?.id ?? "");
+        return {
+          ok: true,
+          provider_message_id: providerMessageId || undefined,
+          provider_response: {
+            provider: "meta",
+            message_id: providerMessageId,
+            messaging_product: String(parsed?.messaging_product ?? "whatsapp"),
+          },
+        };
       } catch {
         return { ok: false, error: "Meta request failed" };
       }
@@ -368,7 +416,7 @@ Deno.serve(async (req) => {
   // Build query
   let q = supabase
     .from("reminders")
-    .select("id,branch_id,patient_id,reminder_type,message_en,message_ar,scheduled_time,status,payload");
+    .select("id,branch_id,patient_id,reminder_type,message_en,message_ar,scheduled_time,status,payload,attempt_count");
 
   if (body.reminder_id) {
     q = q.eq("id", body.reminder_id);
@@ -399,7 +447,7 @@ Deno.serve(async (req) => {
   }
   let sent = 0;
   let failed = 0;
-  const results: Array<{ id: string; ok: boolean; error?: string; provider_response?: Record<string, string> }> = [];
+  const results: Array<{ id: string; ok: boolean; error?: string; provider_message_id?: string; provider_response?: Record<string, string> }> = [];
 
   // Cache config & patient lookups
   const cfgCache = new Map<string, NotifySettings | null>();
@@ -440,7 +488,7 @@ Deno.serve(async (req) => {
     }
 
     const res = await sendOne(r, phone, email, cfg);
-    results.push({ id: r.id, ok: res.ok, error: res.error, provider_response: res.provider_response });
+    results.push({ id: r.id, ok: res.ok, error: res.error, provider_message_id: res.provider_message_id, provider_response: res.provider_response });
 
     if (res.ok) {
       sent++;
@@ -451,6 +499,11 @@ Deno.serve(async (req) => {
           sent_at: new Date().toISOString(),
           error_message: null,
           destination_phone: phone,
+          provider_status: "accepted",
+          provider_message_id: res.provider_message_id ?? null,
+          attempt_count: (r as any).attempt_count ? (r as any).attempt_count + 1 : 1,
+          last_attempt_at: new Date().toISOString(),
+          provider_response: res.provider_response ?? {},
           payload: res.provider_response
             ? { ...(r.payload ?? {}), provider_response: res.provider_response }
             : r.payload,
@@ -464,6 +517,9 @@ Deno.serve(async (req) => {
           status: "failed",
           error_message: res.error ?? "unknown",
           destination_phone: phone,
+          provider_status: "failed",
+          attempt_count: (r as any).attempt_count ? (r as any).attempt_count + 1 : 1,
+          last_attempt_at: new Date().toISOString(),
         })
         .eq("id", r.id);
     }

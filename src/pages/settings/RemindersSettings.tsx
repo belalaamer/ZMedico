@@ -95,8 +95,10 @@ export default function RemindersSettings() {
       if (f.twilio_auth_token) payload.twilio_auth_token = f.twilio_auth_token;
       if (f.sms_api_key) payload.sms_api_key = f.sms_api_key;
 
-      const { error } = await supabase.from("notification_settings")
-        .upsert(payload, { onConflict: "branch_id" });
+      const { error } = await (supabase as any).rpc("upsert_notification_settings", {
+        p_branch_id: branchId,
+        p_settings: payload,
+      });
       if (error) throw error;
 
       const hours = (f.reminder_hours_before ?? []).filter(n => Number.isFinite(n) && n > 0);
@@ -115,7 +117,7 @@ export default function RemindersSettings() {
     setTesting(true);
     try {
       const { data, error } = await supabase.functions.invoke("send-reminder", {
-        body: { branch_id: branchId, due_only: false },
+        body: { branch_id: branchId, due_only: true },
       });
       if (error) throw error;
       toast.success(`${data?.sent ?? 0} sent / ${data?.failed ?? 0} failed`);
@@ -137,6 +139,16 @@ export default function RemindersSettings() {
 
         <Card className="p-5 space-y-5">
           <h2 className="font-semibold">WhatsApp</h2>
+          <p className="text-xs text-muted-foreground">
+            {lang === "ar"
+              ? "لرسائل العيادة التلقائية عبر Meta: أدخل Phone Number ID وPermanent Access Token، واربط Webhook، واستخدم قالبًا معتمدًا من Meta مع موافقة المريض."
+              : "For automated Meta messages: enter the Phone Number ID and permanent access token, configure the webhook, and use a Meta-approved template with patient opt-in."}
+          </p>
+          <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
+            <div className="font-medium text-foreground">Webhook URL</div>
+            <code className="mt-1 block break-all">https://rqcmnfzfytyyicelvifk.supabase.co/functions/v1/whatsapp-webhook</code>
+            <div className="mt-1">{lang === "ar" ? "ضع هذا الرابط في Meta Developers، واضبط WHATSAPP_VERIFY_TOKEN وWHATSAPP_APP_SECRET في Supabase Secrets." : "Use this URL in Meta Developers, and set WHATSAPP_VERIFY_TOKEN and WHATSAPP_APP_SECRET in Supabase Secrets."}</div>
+          </div>
           <div className="flex items-center justify-between rounded-lg border p-3">
             <Label>{lang === "ar" ? "تفعيل WhatsApp" : "Enable WhatsApp"}</Label>
             <Switch checked={f.whatsapp_enabled} onCheckedChange={v => setF({ ...f, whatsapp_enabled: v })} />
@@ -264,7 +276,7 @@ export default function RemindersSettings() {
         </Card>
 
         <div className="flex justify-end gap-3">
-          <Button variant="outline" onClick={sendTest} disabled={testing}>{testing ? "..." : (lang === "ar" ? "إرسال التذكيرات المستحقة الآن" : "Send due reminders now")}</Button>
+          <Button variant="outline" onClick={sendTest} disabled={testing}>{testing ? "..." : (lang === "ar" ? "إرسال المستحق الآن" : "Send due reminders now")}</Button>
           <Button className="gradient-primary text-primary-foreground" onClick={save} disabled={saving}>{saving ? "..." : t("save")}</Button>
         </div>
       </div>

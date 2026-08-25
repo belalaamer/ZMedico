@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,7 +21,7 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
   const [form, setForm] = useState({
     first_name_en: "", last_name_en: "", first_name_ar: "", last_name_ar: "",
     phone: "", phone2: "", email: "", dob: "",
-    gender: "" as "" | "male" | "female",
+    gender: "" as "" | "male" | "female", whatsapp_opt_in: false,
     blood_type: "", address: "", city: "", nationality: "", notes: "",
     assigned_doctor_id: "",
     referred_by_patient_id: null as string | null,
@@ -55,6 +56,7 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
       phone2: patient.phone2 ?? "",
       email: patient.email ?? "",
       dob: patient.dob ?? "",
+      whatsapp_opt_in: !!patient.whatsapp_opt_in,
       gender: (patient.gender as any) ?? "",
       blood_type: patient.blood_type ?? "",
       address: patient.address ?? "",
@@ -107,6 +109,9 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
       notes: form.notes || null,
       assigned_doctor_id: form.assigned_doctor_id || null,
       referred_by_patient_id: form.referred_by_patient_id || null,
+      whatsapp_opt_in: form.whatsapp_opt_in,
+      whatsapp_opt_in_at: form.whatsapp_opt_in ? (patient.whatsapp_opt_in_at ?? new Date().toISOString()) : null,
+      whatsapp_opt_in_source: form.whatsapp_opt_in ? (patient.whatsapp_opt_in_source ?? "clinic_staff") : null,
     };
     const { error } = await supabase.from("patients").update(payload).eq("id", patient.id);
     setSaving(false);
@@ -141,6 +146,13 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
           <div className="space-y-2">
             <Label>{t("email")}</Label>
             <Input dir="ltr" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} maxLength={255} />
+          </div>
+          <div className="sm:col-span-2 flex items-center justify-between rounded-lg border p-3">
+            <div>
+              <Label>{lang === "ar" ? "موافقة رسائل WhatsApp" : "WhatsApp messaging consent"}</Label>
+              <p className="text-xs text-muted-foreground mt-1">{lang === "ar" ? "أوقفها فورًا إذا سحب المريض موافقته." : "Turn this off immediately if the patient withdraws consent."}</p>
+            </div>
+            <Switch checked={form.whatsapp_opt_in} onCheckedChange={(v) => setForm({ ...form, whatsapp_opt_in: v })} />
           </div>
           <div className="space-y-2">
             <Label>{t("dob")}</Label>

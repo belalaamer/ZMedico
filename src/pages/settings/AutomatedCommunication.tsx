@@ -13,7 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Trash2, Plus } from "lucide-react";
 
-type EventType = "booking_confirmation" | "appointment_reminder" | "win_back";
+type EventType = "booking_confirmation" | "appointment_reminder" | "appointment_rescheduled" | "appointment_cancelled" | "invoice_issued" | "payment_receipt" | "win_back";
 type Channel = "whatsapp" | "sms" | "email";
 
 type Tpl = {
@@ -25,11 +25,16 @@ type Tpl = {
   body_en: string;
   body_ar: string;
   hours_before: number | null;
+  meta_template_name?: string | null;
+  meta_template_language?: string | null;
   _isNew?: boolean;
   _delete?: boolean;
 };
 
-const EVENTS: EventType[] = ["booking_confirmation", "appointment_reminder", "win_back"];
+const EVENTS: EventType[] = [
+  "booking_confirmation", "appointment_rescheduled", "appointment_cancelled",
+  "appointment_reminder", "invoice_issued", "payment_receipt", "win_back",
+];
 
 export default function AutomatedCommunication() {
   const { t, lang } = useI18n();
@@ -57,9 +62,13 @@ export default function AutomatedCommunication() {
 
   const byEvent = useMemo(() => {
     const map: Record<EventType, Tpl[]> = {
-      booking_confirmation: [], appointment_reminder: [], win_back: [],
+      booking_confirmation: [], appointment_reminder: [], appointment_rescheduled: [],
+      appointment_cancelled: [], invoice_issued: [], payment_receipt: [], win_back: [],
     };
-    for (const t of templates) if (!t._delete) map[t.event_type].push(t);
+    for (const t of templates) {
+      if (!t._delete && map[t.event_type]) map[t.event_type].push(t);
+    }
+
     return map;
   }, [templates]);
 
@@ -115,16 +124,18 @@ export default function AutomatedCommunication() {
         body_en: r.body_en,
         body_ar: r.body_ar,
         hours_before: r.event_type === "appointment_reminder" ? r.hours_before : null,
+        meta_template_name: r.meta_template_name || null,
+        meta_template_language: r.meta_template_language || "ar",
       }));
       if (toUpsert.length) {
         const { error } = await supabase.from("communication_templates").upsert(toUpsert as any);
         if (error) throw error;
       }
 
-      const { error: nsErr } = await supabase.from("notification_settings").upsert(
-        { branch_id: branchId, winback_enabled: winbackEnabled, winback_inactive_days: winbackDays } as any,
-        { onConflict: "branch_id" }
-      );
+      const { error: nsErr } = await (supabase as any).rpc("upsert_notification_settings", {
+        p_branch_id: branchId,
+        p_settings: { winback_enabled: winbackEnabled, winback_inactive_days: winbackDays },
+      });
       if (nsErr) throw nsErr;
 
       toast.success(t("templateSavedToast"));
@@ -140,12 +151,21 @@ export default function AutomatedCommunication() {
 
   const eventLabel = (ev: EventType) =>
     ev === "booking_confirmation" ? t("eventBookingConfirmation")
+    : ev === "appointment_rescheduled" ? (lang === "ar" ? "إعادة جدولة الموعد" : "Appointment rescheduled")
+    : ev === "appointment_cancelled" ? (lang === "ar" ? "إلغاء الموعد" : "Appointment cancelled")
     : ev === "appointment_reminder" ? t("eventAppointmentReminder")
+    : ev === "invoice_issued" ? (lang === "ar" ? "إصدار الفاتورة" : "Invoice issued")
+    : ev === "payment_receipt" ? (lang === "ar" ? "إيصال الدفع" : "Payment receipt")
     : t("eventWinBack");
 
   return (
     <SettingsLayout>
       <div className="space-y-6">
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-muted-foreground">
+          {lang === "ar"
+            ? "رسائل WhatsApp التلقائية تستخدم قوالب معتمدة من Meta. لا يتم إرسال رسالة تلقائية إذا لم توجد موافقة WhatsApp للمريض أو اسم قالب Meta معتمد."
+            : "Automated WhatsApp messages use Meta-approved templates. Nothing is sent automatically without patient WhatsApp opt-in and an approved Meta template name."}
+        </div>
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold">{t("automatedComm")}</h1>
@@ -210,6 +230,18 @@ export default function AutomatedCommunication() {
                         <Input type="number" min={1} value={row.hours_before ?? ""}
                           onChange={e => updateRow(row, { hours_before: +e.target.value || 0 })} />
                       </div>
+                    )}
+                    {row.channel === "whatsapp" && (
+                      <>
+                        <div className="min-w-[190px]">
+                          <Label className="text-xs">{lang === "ar" ? "اسم قالب Meta المعتمد" : "Approved Meta template name"}</Label>
+                          <Input value={row.meta_template_name ?? ""} onChange={e => updateRow(row, { meta_template_name: e.target.value })} placeholder="appointment_confirmation" />
+                        </div>
+                        <div className="min-w-[120px]">
+                          <Label className="text-xs">{lang === "ar" ? "لغة القالب" : "Template language"}</Label>
+                          <Input value={row.meta_template_language ?? "ar"} onChange={e => updateRow(row, { meta_template_language: e.target.value })} placeholder="ar" />
+                        </div>
+                      </>
                     )}
                     <div className="flex items-center gap-2 ml-auto">
                       <Label className="text-xs">{t("enabled")}</Label>

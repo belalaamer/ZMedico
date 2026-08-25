@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Phone, Mail, MapPin, MoreHorizontal, Calendar as CalendarIcon, FileText, Eye, Trash2, UserRound } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -49,6 +50,7 @@ type Patient = {
   branch_id: string | null;
   created_at: string;
   name_language: "ar" | "en" | null;
+  whatsapp_opt_in: boolean;
 };
 
 const schema = z.object({
@@ -86,7 +88,7 @@ export default function PatientsPage() {
 
   const [form, setForm] = useState({
     name_en: "", name_ar: "", phone: "", phone2: "", email: "",
-    dob: "", gender: "" as "" | "male" | "female",
+    dob: "", gender: "" as "" | "male" | "female", whatsapp_opt_in: false,
     blood_type: "", address: "", notes: "",
     referred_by_patient_id: null as string | null,
   });
@@ -105,7 +107,7 @@ export default function PatientsPage() {
     // the same "most recently registered first" ordering intent while
     // guaranteeing the visible numbers are always in consistent order.
     let query = supabase.from("patients")
-      .select("id,patient_code,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,phone,phone2,email,gender,city,address,dob,blood_type,notes,branch_id,created_at", { count: "exact" })
+      .select("id,patient_code,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,phone,phone2,email,gender,city,address,dob,blood_type,notes,branch_id,created_at,whatsapp_opt_in", { count: "exact" })
       .is("deleted_at", null).order("patient_code", { ascending: false }).range(from, to);
     if (currentBranchId) query = query.eq("branch_id", currentBranchId);
     const { data, error, count } = await query;
@@ -164,12 +166,15 @@ export default function PatientsPage() {
       notes: d.notes || null,
       branch_id: currentBranchId,
       referred_by_patient_id: form.referred_by_patient_id || null,
+      whatsapp_opt_in: form.whatsapp_opt_in,
+      whatsapp_opt_in_at: form.whatsapp_opt_in ? new Date().toISOString() : null,
+      whatsapp_opt_in_source: form.whatsapp_opt_in ? "clinic_staff" : null,
     };
     const { error } = await supabase.from("patients").insert(payload);
     if (error) { toast.error(error.message); return; }
     toast.success(lang === "ar" ? "تمت إضافة المريض" : "Patient added");
     setOpen(false);
-    setForm({ name_en: "", name_ar: "", phone: "", phone2: "", email: "", dob: "", gender: "", blood_type: "", address: "", notes: "", referred_by_patient_id: null });
+    setForm({ name_en: "", name_ar: "", phone: "", phone2: "", email: "", dob: "", gender: "", whatsapp_opt_in: false, blood_type: "", address: "", notes: "", referred_by_patient_id: null });
     load();
   };
 
@@ -235,6 +240,13 @@ export default function PatientsPage() {
                 <div className="space-y-2">
                   <Label>{t("email")}</Label>
                   <Input dir="ltr" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} maxLength={255} />
+                </div>
+                <div className="sm:col-span-2 flex items-center justify-between rounded-lg border p-3">
+                  <div>
+                    <Label>{lang === "ar" ? "موافقة رسائل WhatsApp" : "WhatsApp messaging consent"}</Label>
+                    <p className="text-xs text-muted-foreground mt-1">{lang === "ar" ? "لا تُرسل الرسائل التلقائية إلا بعد موافقة المريض." : "Automated messages are sent only after the patient opts in."}</p>
+                  </div>
+                  <Switch checked={form.whatsapp_opt_in} onCheckedChange={(v) => setForm({ ...form, whatsapp_opt_in: v })} />
                 </div>
                 <div className="space-y-2">
                   <Label>{t("dob")}</Label>

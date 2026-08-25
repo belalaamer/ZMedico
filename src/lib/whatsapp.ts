@@ -21,6 +21,19 @@ export function openWhatsApp(phone: string, message: string): boolean {
   return true;
 }
 
+export function appointmentWhatsAppMessage(opts: {
+  patientName: string;
+  appointmentDate: string;
+  branchName: string;
+  lang: "ar" | "en";
+}): string {
+  const { patientName, appointmentDate, branchName, lang } = opts;
+  if (lang === "ar") {
+    return `مرحبًا ${patientName}،\nتأكيد موعدك في ${branchName}\nالتاريخ والوقت: ${appointmentDate}`;
+  }
+  return `Hello ${patientName},\nYour appointment at ${branchName} is confirmed.\nDate and time: ${appointmentDate}`;
+}
+
 export function invoiceWhatsAppMessage(opts: {
   patientName: string;
   invoiceNumber: string;

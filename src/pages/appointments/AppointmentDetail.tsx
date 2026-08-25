@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ListSkeleton } from "@/components/ListSkeleton";
-import { Activity, ArrowLeft, ExternalLink, Stethoscope, User as UserIcon, MapPin, Clock, ScrollText, Receipt, CheckCircle2 } from "lucide-react";
+import { Activity, ArrowLeft, ExternalLink, Stethoscope, User as UserIcon, MapPin, Clock, ScrollText, Receipt, CheckCircle2, MessageCircle } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { CreateInvoiceDialog } from "@/pages/invoices/CreateInvoiceDialog";
 import { Can } from "@/components/Can";
 import { doctorDisplayName } from "@/lib/doctorName";
+import { appointmentWhatsAppMessage, openWhatsApp } from "@/lib/whatsapp";
 
 const SAFE_KEYS = ["status", "doctor_id", "room", "priority", "is_walk_in", "checked_in_at", "started_at"];
 const QUEUE_ACTIONS = [
@@ -131,6 +132,23 @@ export default function AppointmentDetailPage() {
           <Button asChild variant="outline" size="sm" className="h-9">
             <Link to={`/patients/${appt.patient_id}`}><UserIcon className="size-4 me-1" />{t("openChart")}</Link>
           </Button>
+          {appt.patients?.phone && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 border-emerald-500/30 text-emerald-700 dark:text-emerald-300"
+              onClick={() => {
+                const ok = openWhatsApp(
+                  appt.patients.phone,
+                  appointmentWhatsAppMessage({ patientName, appointmentDate: fmt(appt.scheduled_at), branchName, lang }),
+                );
+                if (!ok) toast.error(lang === "ar" ? "رقم الهاتف غير صالح" : "Invalid phone number");
+              }}
+            >
+              <MessageCircle className="size-4 me-1" />
+              {lang === "ar" ? "رسالة WhatsApp" : "WhatsApp message"}
+            </Button>
+          )}
           {record && (
             <Button asChild size="sm" className="h-9">
               <Link to={`/medical/consultation/${record.id}`}><Stethoscope className="size-4 me-1" />{t("openConsultation")}</Link>

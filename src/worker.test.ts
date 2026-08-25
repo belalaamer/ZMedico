@@ -38,20 +38,16 @@ describe("custom domain gateway", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("rewrites the active provider subdomain root to the login asset", async () => {
+  it("redirects the active provider subdomain root to /auth", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify([{ tenant_id: "tenant-1", default_branch_id: "branch-1" }]), { status: 200, headers: { "Content-Type": "application/json" } }));
     vi.stubGlobal("fetch", fetchMock);
-    let assetUrl = "";
-    const assetsFetch = vi.fn((request: Request) => {
-      assetUrl = request.url;
-      return Promise.resolve(new Response("login-asset", { status: 200, headers: { "Content-Type": "text/html" } }));
-    });
+    const assetsFetch = vi.fn();
 
-    const response = await worker.fetch(new Request("https://blitz-physio.belalaamer.com/", { method: "GET" }), { ASSETS: { fetch: assetsFetch } as unknown as Fetcher });
+    const response = await worker.fetch(new Request("https://blitz-physio.belalaamer.com/?utm_source=marketing", { method: "GET" }), { ASSETS: { fetch: assetsFetch } as unknown as Fetcher });
 
-    expect(response.status).toBe(200);
-    expect(new URL(assetUrl).pathname).toBe("/auth");
-    expect(await response.text()).toBe("login-asset");
+    expect(response.status).toBe(302);
+    expect(response.headers.get("Location")).toBe("https://blitz-physio.belalaamer.com/auth");
+    expect(assetsFetch).not.toHaveBeenCalled();
   });
 
   it("forwards the authenticated request to the Supabase function", async () => {

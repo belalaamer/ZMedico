@@ -93,8 +93,13 @@ export default {
       const active = await hasActiveTenantDomain(hostname);
       if (!active) return new Response("Tenant subdomain is not active", { status: 404, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
       // A tenant-owned hostname is an application portal, not the public
-      // marketing site. Keep deep links intact but make the root open login.
-      if (pathname === "/" || pathname === "/index.html") url.pathname = "/auth";
+      // marketing site. Redirect the browser so React Router also sees /auth.
+      if (pathname === "/" || pathname === "/index.html") {
+        const loginUrl = new URL(request.url);
+        loginUrl.pathname = "/auth";
+        loginUrl.search = "";
+        return Response.redirect(loginUrl.toString(), 302);
+      }
     }
     if (isHtmlRequest) {
       url.searchParams.set("__zmedico_build", "whitelabel-20260825");

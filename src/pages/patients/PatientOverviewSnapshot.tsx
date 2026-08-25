@@ -71,7 +71,7 @@ export default function PatientOverviewSnapshot({
         .eq("patient_id", patientId)
         .order("visit_date", { ascending: false }).limit(4),
       supabase.from("appointments")
-        .select("id,scheduled_at,status,procedure,branches(name_en,name_ar),profiles!appointments_doctor_id_fkey(full_name,full_name_en,full_name_ar)")
+        .select("id,scheduled_at,status,procedure,service_id,services(name_en,name_ar),branches(name_en,name_ar),profiles!appointments_doctor_id_fkey(full_name,full_name_en,full_name_ar)")
         .eq("patient_id", patientId).is("deleted_at", null)
         .gte("scheduled_at", nowIso)
         .in("status", ["scheduled", "confirmed", "in_progress"])
@@ -89,7 +89,7 @@ export default function PatientOverviewSnapshot({
       // Fallback: appointments query may fail if FK alias differs — retry without alias
       if (ap.error) {
         supabase.from("appointments")
-          .select("id,scheduled_at,status,procedure,branches(name_en,name_ar)")
+          .select("id,scheduled_at,status,procedure,service_id,services(name_en,name_ar),branches(name_en,name_ar)")
           .eq("patient_id", patientId).is("deleted_at", null)
           .gte("scheduled_at", nowIso)
           .in("status", ["scheduled", "confirmed", "in_progress"])
@@ -108,6 +108,9 @@ export default function PatientOverviewSnapshot({
     ? (lang === "ar" ? (history.allergies_ar || history.allergies_en) : (history.allergies_en || history.allergies_ar))
     : null;
   const chronics: string[] = [];
+  const appointmentLabel = (appointment: any) => appointment.services
+    ? (lang === "ar" ? (appointment.services.name_ar || appointment.services.name_en) : (appointment.services.name_en || appointment.services.name_ar))
+    : appointment.procedure;
   if (history?.has_diabetes) chronics.push(lang === "ar" ? "السكري" : "Diabetes");
   if (history?.has_hypertension) chronics.push(lang === "ar" ? "ضغط الدم" : "Hypertension");
   if (history?.has_heart_disease) chronics.push(lang === "ar" ? "أمراض القلب" : "Heart disease");
@@ -326,7 +329,7 @@ export default function PatientOverviewSnapshot({
                             {formatDateTime(a.scheduled_at, lang)}
                           </div>
                           <div className="text-xs text-muted-foreground mt-0.5 truncate">
-                            {[a.procedure, branch, a.profiles ? doctorDisplayName(a.profiles, lang) : null].filter(Boolean).join(" · ") || "—"}
+                            {[appointmentLabel(a), branch, a.profiles ? doctorDisplayName(a.profiles, lang) : null].filter(Boolean).join(" · ") || "—"}
                           </div>
                         </div>
                         <Badge variant="outline" className={statusTone[a.status] ?? ""}>{t(a.status as any) ?? a.status}</Badge>

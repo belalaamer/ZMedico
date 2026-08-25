@@ -49,9 +49,11 @@ type Appt = {
   scheduled_at: string;
   duration_minutes: number;
   status: "scheduled" | "confirmed" | "in_progress" | "completed" | "cancelled" | "no_show" | "departed";
+  service_id: string | null;
   procedure: string | null;
   room: string | null;
   notes: string | null;
+  services?: { name_en: string | null; name_ar: string | null } | null;
   patients?: { first_name_en: string; last_name_en: string | null; first_name_ar: string | null; last_name_ar: string | null; patient_code: number };
 };
 
@@ -150,12 +152,12 @@ export default function CalendarPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [monthDots, setMonthDots] = useState<Record<string, number>>({});
   const [patients, setPatients] = useState<{ id: string; label: string }[]>([]);
-  const [procedures, setProcedures] = useState<{ id: string; name: string; duration: number | null }[]>([]);
+  const [services, setServices] = useState<{ id: string; name_en: string; name_ar: string; duration: number }[]>([]);
   const [rooms, setRooms] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({
-    patient_id: "", doctor_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "",
+    patient_id: "", doctor_id: "", scheduled_at: "", duration_minutes: 30, service_id: "", procedure: "", room: "", notes: "",
     status: "scheduled" as Appt["status"],
   });
   const [patientCtx, setPatientCtx] = useState<{ wallet: number; outstanding: number; lastVisit: string | null } | null>(null);
@@ -268,7 +270,7 @@ export default function CalendarPage() {
     const start = rangeStart.toISOString();
     const end = rangeEnd.toISOString();
     let q = supabase.from("appointments")
-      .select("*, patients!inner(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code,deleted_at)")
+      .select("*, patients!inner(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code,deleted_at), services(name_en,name_ar)")
       .gte("scheduled_at", start).lt("scheduled_at", end)
       .is("deleted_at", null)
       .is("patients.deleted_at", null)
@@ -371,17 +373,19 @@ export default function CalendarPage() {
   useEffect(() => { loadPatientOptions(); }, [lang]);
   useDataSync(["patients"], () => loadPatientOptions());
 
-  // Load procedures + distinct rooms
-  const loadProcedures = () => {
-    supabase.from("procedures")
-      .select("id,name_en,name_ar,default_duration")
-      .eq("is_active", true).is("deleted_at", null)
-      .order("name_en")
+  // Booking uses tenant-scoped services/visit types. Clinical procedures remain
+  // part of the medical record rather than the receptionist-facing booking list.
+  const loadServices = () => {
+    supabase.from("services")
+      .select("id,name_en,name_ar,default_duration_minutes")
+      .eq("is_active", true).eq("requires_appointment", true).is("deleted_at", null)
+      .order("display_order").order("name_en")
       .then(({ data }) => {
-        setProcedures((data ?? []).map((p: any) => ({
-          id: p.id,
-          name: lang === "ar" ? (p.name_ar || p.name_en) : (p.name_en || p.name_ar),
-          duration: p.default_duration,
+        setServices((data ?? []).map((s: any) => ({
+          id: s.id,
+          name_en: s.name_en || s.name_ar || "",
+          name_ar: s.name_ar || s.name_en || "",
+          duration: Number(s.default_duration_minutes) || 30,
         })));
       });
   };
@@ -394,7 +398,7 @@ export default function CalendarPage() {
       setRooms(Array.from(set).sort());
     });
   };
-  useEffect(() => { loadProcedures(); }, [lang]);
+  useEffect(() => { loadServices(); }, [lang, currentBranchId]);
   useEffect(() => { loadRooms(); }, [currentBranchId]);
   useDataSync(["appointments"], () => loadRooms());
 
@@ -414,14 +418,14 @@ export default function CalendarPage() {
     if (remainder !== 0 || base.getSeconds() > 0) base.setMinutes(base.getMinutes() + (30 - remainder), 0, 0);
     const tz = base.getTimezoneOffset();
     const local = new Date(base.getTime() - tz * 60000).toISOString().slice(0, 16);
-    setForm({ patient_id: "", doctor_id: "", scheduled_at: local, duration_minutes: 30, procedure: "", room: "", notes: "", status: "scheduled" });
+    setForm({ patient_id: "", doctor_id: "", scheduled_at: local, duration_minutes: 30, service_id: "", procedure: "", room: "", notes: "", status: "scheduled" });
     setOpen(true);
   };
   const openNewAt = (slot: Date) => {
     setEditId(null);
     const tz = slot.getTimezoneOffset();
     const local = new Date(slot.getTime() - tz * 60000).toISOString().slice(0, 16);
-    setForm({ patient_id: "", doctor_id: "", scheduled_at: local, duration_minutes: 30, procedure: "", room: "", notes: "", status: "scheduled" });
+    setForm({ patient_id: "", doctor_id: "", scheduled_at: local, duration_minutes: 30, service_id: "", procedure: "", room: "", notes: "", status: "scheduled" });
     setOpen(true);
   };
   const openEdit = (a: Appt) => {
@@ -434,6 +438,7 @@ export default function CalendarPage() {
       doctor_id: a.doctor_id ?? "",
       scheduled_at: local,
       duration_minutes: a.duration_minutes,
+      service_id: a.service_id ?? "",
       procedure: a.procedure ?? "",
       room: a.room ?? "",
       notes: a.notes ?? "",
@@ -539,6 +544,7 @@ export default function CalendarPage() {
       doctor_id: form.doctor_id || null,
       scheduled_at: new Date(form.scheduled_at).toISOString(),
       duration_minutes: Number(form.duration_minutes) || 30,
+      service_id: form.service_id || null,
       procedure: form.procedure || null,
       room: form.room || null,
       notes: form.notes || null,
@@ -550,7 +556,7 @@ export default function CalendarPage() {
     if (error) { toast.error(error.message); return; }
     toast.success(lang === "ar" ? "تم حفظ الموعد" : "Appointment saved");
     setOpen(false); setEditId(null);
-    setForm({ patient_id: "", doctor_id: "", scheduled_at: "", duration_minutes: 30, procedure: "", room: "", notes: "", status: "scheduled" });
+    setForm({ patient_id: "", doctor_id: "", scheduled_at: "", duration_minutes: 30, service_id: "", procedure: "", room: "", notes: "", status: "scheduled" });
     load();
   };
 
@@ -671,6 +677,10 @@ export default function CalendarPage() {
   const timeStr = (d: Date) => d.toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US",
     { hour: "2-digit", minute: "2-digit", hour12: true });
   const fullName = (p: NonNullable<Appt["patients"]>) => patientDisplayName(p, lang);
+  const appointmentServiceLabel = (a: Appt) => {
+    if (a.services) return lang === "ar" ? (a.services.name_ar || a.services.name_en) : (a.services.name_en || a.services.name_ar);
+    return a.procedure;
+  };
 
   const renderApptBlock = (a: Appt, lane = 0, lanes = 1) => {
     const { style, isOutOfHours } = blockStyle(a, lane, lanes);
@@ -703,9 +713,9 @@ export default function CalendarPage() {
         {timeStr(new Date(a.scheduled_at))}
         {isOutOfHours && <span className="ms-1" aria-hidden>⚠</span>}
       </div>
-      {(a.procedure || a.room) && (
+      {(appointmentServiceLabel(a) || a.room) && (
         <div className="text-[10px] leading-tight truncate text-muted-foreground/90">
-          {a.procedure || "—"}{a.room ? ` · ${a.room}` : ""}
+          {appointmentServiceLabel(a) || "—"}{a.room ? ` · ${a.room}` : ""}
         </div>
       )}
     </button>
@@ -946,26 +956,43 @@ export default function CalendarPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label>{t("procedure")}</Label>
+                    <Label>{lang === "ar" ? "الخدمة / نوع الزيارة" : "Service / appointment type"}</Label>
                     <Select
-                      value={procedures.find((p) => p.name === form.procedure) ? form.procedure : (form.procedure ? "__custom__" : "__none__")}
+                      value={form.service_id || "__none__"}
                       onValueChange={(v) => {
-                        if (v === "__none__") { setForm({ ...form, procedure: "" }); return; }
-                        if (v === "__custom__") return;
-                        const sel = procedures.find((p) => p.name === v);
+                        if (v === "__none__") {
+                          setForm({ ...form, service_id: "", procedure: "" });
+                          return;
+                        }
+                        const selected = services.find((s) => s.id === v);
                         setForm({
                           ...form,
-                          procedure: v,
-                          duration_minutes: sel?.duration ? sel.duration : form.duration_minutes,
+                          service_id: v,
+                          // Keep a snapshot for legacy reports and old rows while
+                          // service_id remains the canonical booking relationship.
+                          procedure: selected?.name_en || selected?.name_ar || "",
+                          duration_minutes: selected?.duration || form.duration_minutes,
                         });
                       }}
                     >
-                      <SelectTrigger><SelectValue placeholder={t("selectProcedure")} /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={lang === "ar" ? "اختر الخدمة" : "Choose service"} /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="__none__">— {t("none")} —</SelectItem>
-                        {procedures.map((p) => <SelectItem key={p.id} value={p.name}>{p.name}{p.duration ? ` · ${p.duration}m` : ""}</SelectItem>)}
+                        <SelectItem value="__none__">— {lang === "ar" ? "بدون خدمة" : "No service"} —</SelectItem>
+                        {services.map((service) => (
+                          <SelectItem key={service.id} value={service.id}>
+                            {lang === "ar" ? service.name_ar : service.name_en} · {service.duration}m
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
+                    <p className="text-[11px] leading-4 text-muted-foreground">
+                      {lang === "ar" ? "الإجراءات الطبية التي تم تنفيذها تُسجل داخل السجل الطبي بعد حضور المريض." : "Clinical procedures performed are documented in the medical record after the patient visit."}
+                    </p>
+                    {form.procedure && !form.service_id ? (
+                      <p className="text-[11px] leading-4 text-amber-600">
+                        {lang === "ar" ? "هذا موعد قديم يحتوي على إجراء محفوظ؛ اختر خدمة جديدة لتحديثه." : "This legacy appointment has a saved procedure; choose a service to update it."}
+                      </p>
+                    ) : null}
                   </div>
                   <div className="space-y-2">
                     <Label>{t("room")}</Label>

@@ -120,6 +120,7 @@ export type Database = {
           public_booking_metadata: Json | null
           public_booking_reference: string | null
           room: string | null
+          service_id: string | null
           scheduled_at: string
           self_checked_in_at: string | null
           started_at: string | null
@@ -145,6 +146,7 @@ export type Database = {
           public_booking_metadata?: Json | null
           public_booking_reference?: string | null
           room?: string | null
+          service_id?: string | null
           scheduled_at: string
           self_checked_in_at?: string | null
           started_at?: string | null
@@ -170,6 +172,7 @@ export type Database = {
           public_booking_metadata?: Json | null
           public_booking_reference?: string | null
           room?: string | null
+          service_id?: string | null
           scheduled_at?: string
           self_checked_in_at?: string | null
           started_at?: string | null
@@ -189,6 +192,13 @@ export type Database = {
             columns: ["patient_id"]
             isOneToOne: false
             referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
             referencedColumns: ["id"]
           },
         ]

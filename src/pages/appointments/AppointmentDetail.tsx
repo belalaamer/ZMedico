@@ -56,7 +56,7 @@ export default function AppointmentDetailPage() {
       const [{ data: a, error: aErr }, { data: l }] = await Promise.all([
         supabase
           .from("appointments")
-          .select("id,patient_id,doctor_id,branch_id,room,scheduled_at,status,procedure,priority,checked_in_at,started_at,is_walk_in,duration_minutes,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code,phone),branches(name_en,name_ar)")
+          .select("id,patient_id,doctor_id,branch_id,room,scheduled_at,status,procedure,service_id,priority,checked_in_at,started_at,is_walk_in,duration_minutes,services(name_en,name_ar),patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code,phone),branches(name_en,name_ar)")
           .eq("id", appointmentId)
           .maybeSingle(),
         supabase
@@ -233,8 +233,12 @@ export default function AppointmentDetailPage() {
             <div className="flex items-center gap-2"><Clock className="size-4 text-muted-foreground" /><span>{t("checkedInAt")}: {fmt(appt.checked_in_at)}</span></div>
             <div className="flex items-center gap-2"><Clock className="size-4 text-muted-foreground" /><span>{t("inSessionTime")}: {fmt(appt.started_at)}</span></div>
           </div>
-          {appt.procedure && (
-            <div className="pt-2 text-sm text-muted-foreground">{appt.procedure}</div>
+          {(appt.services || appt.procedure) && (
+            <div className="pt-2 text-sm text-muted-foreground">
+              {appt.services
+                ? (lang === "ar" ? (appt.services.name_ar || appt.services.name_en) : (appt.services.name_en || appt.services.name_ar))
+                : appt.procedure}
+            </div>
           )}
         </Card>
 

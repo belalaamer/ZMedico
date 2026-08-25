@@ -56,7 +56,7 @@ export default function TenantBrandingDialog({ tenant, open, onOpenChange, onSav
     if (!open || !tenant) return;
     let active = true;
     setLoading(true);
-    void supabase.from("tenant_branding").select("display_name,logo_url,favicon_url,primary_color,secondary_color,accent_color,show_powered_by").eq("tenant_id", tenant.id).maybeSingle()
+    void supabase.from("tenant_branding").select("display_name,logo_url,favicon_url,primary_color,secondary_color,accent_color,show_powered_by,display_name_source,logo_source,favicon_source,colors_source").eq("tenant_id", tenant.id).maybeSingle()
       .then(({ data, error }) => {
         if (!active) return;
         if (error) {
@@ -139,9 +139,40 @@ export default function TenantBrandingDialog({ tenant, open, onOpenChange, onSav
     if (!tenant) return;
     setSaving(true);
     const displayName = form.display_name.trim() || tenant.name;
-    const { error } = await supabase.from("tenant_branding").upsert({ tenant_id: tenant.id, display_name: displayName, logo_url: form.logo_url.trim() || null, favicon_url: form.favicon_url.trim() || null, primary_color: form.primary_color, secondary_color: form.secondary_color, accent_color: form.accent_color, show_powered_by: form.show_powered_by, display_name_source: form.display_name_source, logo_source: form.logo_source, favicon_source: form.favicon_source, colors_source: form.colors_source }, { onConflict: "tenant_id" });
+    const payload = {
+      display_name: displayName,
+      logo_url: form.logo_url.trim() || null,
+      favicon_url: form.favicon_url.trim() || null,
+      primary_color: form.primary_color,
+      secondary_color: form.secondary_color,
+      accent_color: form.accent_color,
+      show_powered_by: form.show_powered_by,
+      display_name_source: form.display_name_source,
+      logo_source: form.logo_source,
+      favicon_source: form.favicon_source,
+      colors_source: form.colors_source,
+    };
+    const { data: updated, error: updateError } = await supabase
+      .from("tenant_branding")
+      .update(payload)
+      .eq("tenant_id", tenant.id)
+      .select("tenant_id,show_powered_by")
+      .maybeSingle();
+    let error = updateError;
+    let saved = updated;
+    if (!error && !saved) {
+      const inserted = await supabase
+        .from("tenant_branding")
+        .insert({ tenant_id: tenant.id, ...payload })
+        .select("tenant_id,show_powered_by")
+        .single();
+      error = inserted.error;
+      saved = inserted.data;
+    }
     if (error) {
       toast({ title: error.message, variant: "destructive" });
+    } else if (!saved || saved.show_powered_by !== form.show_powered_by) {
+      toast({ title: isAr ? "لم يتم تأكيد حفظ إعداد Powered by" : "Powered by setting could not be confirmed", variant: "destructive" });
     } else {
       toast({ title: isAr ? "تم حفظ هوية العميل" : "Tenant branding saved" });
       onSaved?.();

@@ -182,9 +182,7 @@ export default function AuthPage() {
     <div className="min-h-dvh grid lg:grid-cols-2 bg-background">
       <div className="hidden lg:flex flex-col justify-between p-10 gradient-primary text-primary-foreground relative overflow-hidden">
         <div className="flex items-center gap-3">
-          <div className="size-11 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center">
-            <Stethoscope className="size-6" />
-          </div>
+          {branding?.logo_url ? <img src={branding.logo_url} alt={brandName} className="size-11 rounded-2xl bg-white/15 object-contain p-1" /> : branding && !branding.show_powered_by ? <div className="size-11 rounded-2xl border border-white/10 bg-white/5" aria-hidden="true" /> : <div className="size-11 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center"><Stethoscope className="size-6" /></div>}
           <div>
             <div className="text-xl font-bold">{brandName}</div>
             {!isBrandedTenantHost ? <div className="text-sm text-white/70">{t("tagline")}</div> : null}

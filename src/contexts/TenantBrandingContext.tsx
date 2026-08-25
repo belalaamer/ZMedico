@@ -1,6 +1,17 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+export type BrandingSource = "zmedico" | "tenant";
+
+const ZMEDICO_DEFAULTS = {
+  display_name: "ZMedico",
+  logo_url: null,
+  favicon_url: null,
+  primary_color: "#3a1a5e",
+  secondary_color: "#6d3bb3",
+  accent_color: "#d7b86e",
+} as const;
+
 export type TenantBranding = {
   tenant_id: string;
   display_name: string;
@@ -10,6 +21,10 @@ export type TenantBranding = {
   secondary_color: string;
   accent_color: string;
   show_powered_by: boolean;
+  display_name_source: BrandingSource;
+  logo_source: BrandingSource;
+  favicon_source: BrandingSource;
+  colors_source: BrandingSource;
 };
 
 type BrandingContextValue = {
@@ -57,31 +72,44 @@ export function TenantBrandingProvider({ children }: { children: ReactNode }) {
     return () => { active = false; };
   }, []);
 
-  useEffect(() => {
-    document.title = branding?.display_name || "ZMedico";
-    return () => { document.title = "ZMedico"; };
+  const effectiveBranding = useMemo(() => {
+    if (!branding) return null;
+    return {
+      ...branding,
+      display_name: branding.display_name_source === "zmedico" ? ZMEDICO_DEFAULTS.display_name : branding.display_name,
+      logo_url: branding.logo_source === "zmedico" ? ZMEDICO_DEFAULTS.logo_url : branding.logo_url,
+      favicon_url: branding.favicon_source === "zmedico" ? ZMEDICO_DEFAULTS.favicon_url : branding.favicon_url,
+      primary_color: branding.colors_source === "zmedico" ? ZMEDICO_DEFAULTS.primary_color : branding.primary_color,
+      secondary_color: branding.colors_source === "zmedico" ? ZMEDICO_DEFAULTS.secondary_color : branding.secondary_color,
+      accent_color: branding.colors_source === "zmedico" ? ZMEDICO_DEFAULTS.accent_color : branding.accent_color,
+    };
   }, [branding]);
+
+  useEffect(() => {
+    document.title = effectiveBranding?.display_name || "ZMedico";
+    return () => { document.title = "ZMedico"; };
+  }, [effectiveBranding]);
 
   useEffect(() => {
     const existing = document.head.querySelector<HTMLLinkElement>('link[data-tenant-favicon="true"]');
     const link = existing ?? document.head.appendChild(document.createElement("link"));
     link.setAttribute("data-tenant-favicon", "true");
     link.rel = "icon";
-    const faviconUrl = branding?.favicon_url?.toLowerCase() || "";
+    const faviconUrl = effectiveBranding?.favicon_url?.toLowerCase() || "";
     link.type = faviconUrl.includes(".ico") ? "image/x-icon" : faviconUrl.includes(".svg") ? "image/svg+xml" : faviconUrl.includes(".webp") ? "image/webp" : "image/png";
-    if (branding?.favicon_url) {
-      link.href = branding.favicon_url;
+    if (effectiveBranding?.favicon_url) {
+      link.href = effectiveBranding.favicon_url;
     } else {
       link.removeAttribute("href");
     }
     return () => {
       link.remove();
     };
-  }, [branding?.favicon_url]);
+  }, [effectiveBranding?.favicon_url]);
 
   useEffect(() => {
     const root = document.documentElement;
-    if (!branding) {
+    if (!effectiveBranding) {
       root.removeAttribute("data-tenant-branded");
       root.style.removeProperty("--tenant-brand-primary");
       root.style.removeProperty("--tenant-brand-secondary");
@@ -89,18 +117,18 @@ export function TenantBrandingProvider({ children }: { children: ReactNode }) {
       return;
     }
     root.setAttribute("data-tenant-branded", "true");
-    root.style.setProperty("--tenant-brand-primary", branding.primary_color);
-    root.style.setProperty("--tenant-brand-secondary", branding.secondary_color);
-    root.style.setProperty("--tenant-brand-accent", branding.accent_color);
+    root.style.setProperty("--tenant-brand-primary", effectiveBranding.primary_color);
+    root.style.setProperty("--tenant-brand-secondary", effectiveBranding.secondary_color);
+    root.style.setProperty("--tenant-brand-accent", effectiveBranding.accent_color);
     return () => {
       root.removeAttribute("data-tenant-branded");
       root.style.removeProperty("--tenant-brand-primary");
       root.style.removeProperty("--tenant-brand-secondary");
       root.style.removeProperty("--tenant-brand-accent");
     };
-  }, [branding]);
+  }, [effectiveBranding]);
 
-  const value = useMemo(() => ({ branding, loading, isBrandedTenantHost }), [branding, loading, isBrandedTenantHost]);
+  const value = useMemo(() => ({ branding: effectiveBranding, loading, isBrandedTenantHost }), [effectiveBranding, loading, isBrandedTenantHost]);
   return <BrandingContext.Provider value={value}>{children}</BrandingContext.Provider>;
 }
 

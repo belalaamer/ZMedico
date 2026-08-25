@@ -6718,6 +6718,10 @@ export type Database = {
           display_name: string | null
           logo_url: string | null
           favicon_url: string | null
+          display_name_source: string
+          logo_source: string
+          favicon_source: string
+          colors_source: string
           primary_color: string
           secondary_color: string
           show_powered_by: boolean
@@ -6730,6 +6734,10 @@ export type Database = {
           display_name?: string | null
           logo_url?: string | null
           favicon_url?: string | null
+          display_name_source?: string
+          logo_source?: string
+          favicon_source?: string
+          colors_source?: string
           primary_color?: string
           secondary_color?: string
           show_powered_by?: boolean
@@ -6742,6 +6750,10 @@ export type Database = {
           display_name?: string | null
           logo_url?: string | null
           favicon_url?: string | null
+          display_name_source?: string
+          logo_source?: string
+          favicon_source?: string
+          colors_source?: string
           primary_color?: string
           secondary_color?: string
           show_powered_by?: boolean

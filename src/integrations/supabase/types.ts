@@ -8145,6 +8145,22 @@ export type Database = {
       }
       _get_cron_secret: { Args: never; Returns: string }
       _set_cron_secret: { Args: { p_secret: string }; Returns: undefined }
+      platform_save_tenant_branding: {
+        Args: {
+          p_accent_color: string
+          p_display_name: string
+          p_display_name_source: string
+          p_favicon_source: string
+          p_favicon_url: string | null
+          p_logo_source: string
+          p_logo_url: string | null
+          p_primary_color: string
+          p_secondary_color: string
+          p_show_powered_by: boolean
+          p_tenant_id: string
+        }
+        Returns: Database["public"]["Tables"]["tenant_branding"]["Row"]
+      }
       _treasury_assert_open_period: {
         Args: {
           _branch_id: string

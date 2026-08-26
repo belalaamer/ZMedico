@@ -1,5 +1,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
-import { corsHeaders, corsPreflight, jsonResponse } from "../_shared/cors.ts";
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+function corsPreflight() { return new Response("ok", { headers: corsHeaders }); }
 
 // Generates a cryptographically strong temporary password. It is only returned
 // once in the admin response so the admin can hand it to the new staff member.
@@ -48,6 +56,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const email = String(body.email ?? "").trim().toLowerCase();
+    const username = body.username ? String(body.username).trim().toLowerCase() : null;
     const full_name = body.full_name ? String(body.full_name).trim() : null;
     const full_name_en = body.full_name_en ? String(body.full_name_en).trim() : null;
     const full_name_ar = body.full_name_ar ? String(body.full_name_ar).trim() : null;
@@ -62,6 +71,13 @@ Deno.serve(async (req) => {
 
     if (!email || !email.includes("@")) {
       return jsonResponse({ error: "Invalid email" }, 400);
+    }
+    if (username && !/^[A-Za-z0-9][A-Za-z0-9._-]{2,31}$/.test(username)) {
+      return jsonResponse({ error: "Username must be 3-32 characters and use letters, numbers, dot, underscore, or hyphen" }, 400);
+    }
+    if (username) {
+      const { data: taken } = await admin.from("profiles").select("id").ilike("username", username).limit(1);
+      if (taken?.length) return jsonResponse({ error: "Username is already in use" }, 409);
     }
     const allowedRoles = [
       "admin", "manager", "doctor", "nurse",
@@ -127,6 +143,7 @@ Deno.serve(async (req) => {
         id: created.user.id,
         email,
         full_name: full_name ?? full_name_en ?? full_name_ar,
+        username,
         full_name_en,
         full_name_ar,
       },

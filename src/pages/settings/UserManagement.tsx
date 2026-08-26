@@ -110,6 +110,7 @@ export default function UserManagement() {
   // Create-user dialog state
   const [createOpen, setCreateOpen] = useState(false);
   const [cEmail, setCEmail] = useState("");
+  const [cUsername, setCUsername] = useState("");
   const [cName, setCName] = useState("");
   const [cNameEn, setCNameEn] = useState("");
   const [cNameAr, setCNameAr] = useState("");
@@ -277,7 +278,7 @@ export default function UserManagement() {
       scopedUserIds = Array.from(new Set((memberships ?? []).map((m: any) => m.user_id).filter(Boolean)));
     }
 
-    let psQuery: any = supabase.from("profiles").select("id,full_name,email");
+    let psQuery: any = supabase.from("profiles").select("id,full_name,email,username");
     let rsQuery: any = (supabase as any).from("user_roles").select("user_id,role");
     let invQuery: any = (supabase as any)
       .from("allowed_signup_emails")
@@ -412,7 +413,7 @@ export default function UserManagement() {
       if (r.error) { setCreating(false); toast.error(r.error.message); return; }
       setCreating(false);
       toast.success(lang === "ar" ? "تم ربط المستخدم بالموظف" : "User linked to employee");
-      setCEmail(""); setCName(""); setCNameEn(""); setCNameAr(""); setCRole("receptionist"); setCPassword(""); setCBranch(""); setCLinkedStaffId("");
+      setCEmail(""); setCUsername(""); setCName(""); setCNameEn(""); setCNameAr(""); setCRole("receptionist"); setCPassword(""); setCBranch(""); setCLinkedStaffId("");
       setCreateOpen(false);
       load();
       return;
@@ -431,6 +432,7 @@ export default function UserManagement() {
     const { data, error } = await supabase.functions.invoke("admin-create-user", {
       body: {
         email,
+        username: cUsername.trim().toLowerCase() || undefined,
         full_name: cName.trim() || cNameEn.trim() || cNameAr.trim() || null,
         full_name_en: cNameEn.trim() || null,
         full_name_ar: cNameAr.trim() || null,
@@ -644,6 +646,7 @@ export default function UserManagement() {
                             <div className="min-w-0">
                               <div className="font-semibold truncate text-foreground">{u.full_name ?? "—"}</div>
                               <div className="text-xs text-muted-foreground truncate">{u.email}</div>
+                              {u.username ? <div className="text-xs text-primary/80 truncate">@{u.username}</div> : null}
                             </div>
                           </div>
                         </TableCell>
@@ -892,6 +895,11 @@ export default function UserManagement() {
               <div className="space-y-2">
                 <Label htmlFor="cEmail">{lang === "ar" ? "البريد الإلكتروني" : "Email"}</Label>
                 <Input id="cEmail" type="email" required value={cEmail} onChange={(e) => setCEmail(e.target.value)} readOnly={!!cLinkedStaffId && cLinkedStaffId !== "none"} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cUsername">{lang === "ar" ? "اسم المستخدم (اختياري)" : "Username (optional)"}</Label>
+                <Input id="cUsername" value={cUsername} onChange={(e) => setCUsername(e.target.value.replace(/\s/g, "").toLowerCase())} placeholder="ahmed.clinic" pattern="[A-Za-z0-9][A-Za-z0-9._-]{2,31}" />
+                <p className="text-xs text-muted-foreground">{lang === "ar" ? "3–32 حرفًا: الإنجليزية والأرقام والنقطة والشرطة السفلية أو الواصلة. البريد يظل قناة الاسترجاع." : "3–32 chars: letters, numbers, dot, underscore, or hyphen. Email remains the recovery channel."}</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="cName">{lang === "ar" ? "الاسم الأساسي (احتياطي)" : "Primary name (fallback)"}</Label>

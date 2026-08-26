@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { hasPersistedAuthSession, persistAuthSessionForPreview } from "@/lib/authSessionPersistence";
 import { resolvePostAuthRedirect } from "@/lib/authRedirect";
 import { useTenantBranding } from "@/contexts/TenantBrandingContext";
+import { signInWithIdentifier } from "@/lib/signInWithIdentifier";
 
 function authDebug(message: string, details?: Record<string, unknown>) {
   if (import.meta.env.DEV) console.info("[auth-debug]", message, details ?? {});
@@ -69,7 +70,7 @@ export default function AuthPage() {
   }, [location.search, location.state]);
 
   const [loading, setLoading] = useState(false);
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [resetOpen, setResetOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
@@ -104,19 +105,21 @@ export default function AuthPage() {
 
     const form = e.currentTarget;
     const formData = new FormData(form);
-    const submittedEmail = String(formData.get("email") ?? "");
+    const submittedIdentifier = String(formData.get("identifier") ?? "").trim();
     const submittedPassword = String(formData.get("password") ?? "");
 
-    setEmail(submittedEmail);
+    setIdentifier(submittedIdentifier);
     setPassword(submittedPassword);
 
-    if (!isValidEmailAddress(submittedEmail) || submittedPassword.length < 6 || submittedPassword.length > 128) {
+    const validEmail = isValidEmailAddress(submittedIdentifier);
+    const validUsername = /^[A-Za-z0-9][A-Za-z0-9._-]{2,31}$/.test(submittedIdentifier);
+    if ((!validEmail && !validUsername) || submittedPassword.length < 6 || submittedPassword.length > 128) {
       toast.error("Invalid email or password");
       return;
     }
 
     const credentials = {
-      email: submittedEmail,
+      identifier: submittedIdentifier,
       password: submittedPassword,
     };
 
@@ -129,12 +132,12 @@ export default function AuthPage() {
         environment: import.meta.env.PROD ? "production" : "development",
       },
       payload: {
-        email: credentials.email,
+        identifierType: credentials.identifier.includes("@") ? "email" : "username",
         passwordLength: credentials.password.length,
       },
     });
 
-    const { data, error } = await supabase.auth.signInWithPassword(credentials);
+    const { data, error } = await signInWithIdentifier(credentials.identifier, credentials.password);
 
     setLoading(false);
     authDebug( "password sign-in completed", {
@@ -225,8 +228,8 @@ export default function AuthPage() {
               </div>
               <form onSubmit={handleSignIn} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="email">{t("email")}</Label>
-                    <Input id="email" name="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
+                    <Label htmlFor="identifier">{lang === "ar" ? "البريد الإلكتروني أو اسم المستخدم" : "Email or username"}</Label>
+                    <Input id="identifier" name="identifier" type="text" value={identifier} onChange={(e) => setIdentifier(e.target.value)} autoComplete="username" required />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="password">{t("password")}</Label>

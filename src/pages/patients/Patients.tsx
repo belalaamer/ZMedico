@@ -53,6 +53,21 @@ type Patient = {
   whatsapp_opt_in: boolean;
 };
 
+type PortalCredentials = {
+  email: string;
+  username: string;
+  password: string;
+  patientName: string;
+  patientNameAr: string;
+};
+
+type PortalTemplate = {
+  body_en: string;
+  body_ar: string;
+  subject_en?: string;
+  subject_ar?: string;
+};
+
 const schema = z.object({
   name_en: z.string().trim().max(160).optional(),
   name_ar: z.string().trim().max(160).optional(),
@@ -86,7 +101,9 @@ export default function PatientsPage() {
   const [total, setTotal] = useState(0);
   const [invoiceForPatient, setInvoiceForPatient] = useState<string | null>(null);
   const [autoCreatePortalCredentials, setAutoCreatePortalCredentials] = useState(false);
-  const [portalCredentials, setPortalCredentials] = useState<{ email: string; username: string; password: string } | null>(null);
+  const [portalCredentials, setPortalCredentials] = useState<PortalCredentials | null>(null);
+  const [portalTemplates, setPortalTemplates] = useState<Record<"email" | "sms" | "whatsapp", PortalTemplate | null>>({ email: null, sms: null, whatsapp: null });
+  const [portalSupportContact, setPortalSupportContact] = useState("");
 
   const [form, setForm] = useState({
     name_en: "", name_ar: "", phone: "", phone2: "", email: "",
@@ -147,6 +164,55 @@ export default function PatientsPage() {
     return () => { active = false; };
   }, [items]);
 
+  useEffect(() => {
+    if (!portalCredentials || !currentBranchId) {
+      setPortalTemplates({ email: null, sms: null, whatsapp: null });
+      setPortalSupportContact("");
+      return;
+    }
+    let active = true;
+    void (async () => {
+      const [emailResult, smsResult, whatsappResult, settingsResult] = await Promise.all([
+        (supabase as any).from("email_templates").select("body_en,body_ar,subject_en,subject_ar").eq("template_key", "patient_portal_credentials").eq("is_active", true).maybeSingle(),
+        (supabase as any).from("sms_templates").select("body_en,body_ar").eq("template_key", "patient_portal_credentials").eq("is_active", true).maybeSingle(),
+        (supabase as any).from("whatsapp_templates").select("body_en,body_ar").eq("template_key", "patient_portal_credentials").eq("is_active", true).maybeSingle(),
+        supabase.from("patient_portal_settings").select("support_email,support_phone").eq("branch_id", currentBranchId).maybeSingle(),
+      ]);
+      if (!active) return;
+      const settings = settingsResult.data as { support_email?: string | null; support_phone?: string | null } | null;
+      setPortalTemplates({
+        email: (emailResult.data as PortalTemplate | null) ?? null,
+        sms: (smsResult.data as PortalTemplate | null) ?? null,
+        whatsapp: (whatsappResult.data as PortalTemplate | null) ?? null,
+      });
+      setPortalSupportContact([settings?.support_email, settings?.support_phone].filter(Boolean).join(" / "));
+    })();
+    return () => { active = false; };
+  }, [portalCredentials, currentBranchId]);
+
+  const portalTemplateValues = portalCredentials ? {
+    patient_name: portalCredentials.patientName || portalCredentials.patientNameAr,
+    patient_name_ar: portalCredentials.patientNameAr || portalCredentials.patientName,
+    patient_portal_username: portalCredentials.username,
+    patient_portal_password: portalCredentials.password,
+    patient_portal_url: `${window.location.origin}/patient-portal/login`,
+    support_contact: portalSupportContact || (lang === "ar" ? "تواصل مع العيادة" : "Contact the clinic"),
+  } : null;
+
+  const renderPortalTemplate = (body: string) => body.replace(/{{\s*([a-z0-9_]+)\s*}}/gi, (_, key: string) => String(portalTemplateValues?.[key as keyof NonNullable<typeof portalTemplateValues>] ?? ""));
+
+  const copyPortalMessage = async (kind: "email" | "sms" | "whatsapp") => {
+    const template = portalTemplates[kind];
+    if (!template || !portalTemplateValues) {
+      toast.error(lang === "ar" ? "القالب غير متاح؛ طبّق migration القوالب أولًا." : "Template is unavailable; apply the template migration first.");
+      return;
+    }
+    const subject = kind === "email" ? `${lang === "ar" ? "الموضوع: " : "Subject: "}${renderPortalTemplate(lang === "ar" ? (template.subject_ar ?? "") : (template.subject_en ?? ""))}` : "";
+    const body = renderPortalTemplate(lang === "ar" ? template.body_ar : template.body_en);
+    await navigator.clipboard.writeText([subject, body].filter(Boolean).join("\n\n"));
+    toast.success(lang === "ar" ? `تم نسخ رسالة ${kind === "email" ? "البريد" : kind === "sms" ? "SMS" : "WhatsApp"}` : `${kind.toUpperCase()} message copied`);
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = schema.safeParse(form);
@@ -184,7 +250,11 @@ export default function PatientsPage() {
       if (portalError || portalResult?.error) {
         toast.warning(lang === "ar" ? "تم إنشاء المريض، لكن تعذر إرسال دعوة البوابة. يمكنك إعادة المحاولة من ملف المريض." : "Patient created, but the portal invitation could not be sent. You can retry from the patient profile.");
       } else if (portalResult?.credentials) {
-        setPortalCredentials(portalResult.credentials);
+        setPortalCredentials({
+          ...portalResult.credentials,
+          patientName: d.name_en?.trim() || d.name_ar?.trim() || "",
+          patientNameAr: d.name_ar?.trim() || d.name_en?.trim() || "",
+        });
         toast.success(lang === "ar" ? "تم إنشاء بيانات الدخول المؤقتة" : "Temporary portal credentials created");
       } else {
         toast.success(lang === "ar" ? "تم إرسال دعوة بوابة المريض إلى البريد الإلكتروني" : "Patient portal invitation sent by email");
@@ -444,6 +514,22 @@ export default function PatientsPage() {
             <div className="rounded-md border bg-muted/30 p-3"><div className="text-xs text-muted-foreground">Username</div><div className="font-medium">{portalCredentials?.username}</div></div>
             <div className="rounded-md border bg-muted/30 p-3"><div className="text-xs text-muted-foreground">Temporary password</div><div className="font-mono font-medium break-all">{portalCredentials?.password}</div></div>
             <Button type="button" variant="outline" className="w-full" onClick={() => portalCredentials && navigator.clipboard.writeText(`Username: ${portalCredentials.username}\nPassword: ${portalCredentials.password}`)}><Copy className="me-2 size-4" />{lang === "ar" ? "نسخ بيانات الدخول" : "Copy credentials"}</Button>
+            <div className="border-t pt-3 space-y-3">
+              <div>
+                <div className="font-medium">{lang === "ar" ? "قوالب الرسائل الجاهزة" : "Ready-to-copy message templates"}</div>
+                <p className="text-xs text-muted-foreground mt-1">{lang === "ar" ? "تتم تعبئة المتغيرات محليًا داخل هذه النافذة فقط. لا يتم الإرسال تلقائيًا ولا تُحفظ كلمة المرور في القالب أو سجل الرسائل." : "Variables are rendered locally in this dialog only. Nothing is sent automatically, and the password is not saved in the template or message log."}</p>
+              </div>
+              {(["sms", "email", "whatsapp"] as const).map((kind) => {
+                const template = portalTemplates[kind];
+                const body = template && portalTemplateValues ? renderPortalTemplate(lang === "ar" ? template.body_ar : template.body_en) : "";
+                const subject = kind === "email" && template && portalTemplateValues ? renderPortalTemplate(lang === "ar" ? (template.subject_ar ?? "") : (template.subject_en ?? "")) : "";
+                return <div key={kind} className="space-y-2 rounded-md border bg-muted/20 p-3">
+                  <div className="flex items-center justify-between gap-2"><Label>{kind === "sms" ? "SMS" : kind === "email" ? (lang === "ar" ? "البريد الإلكتروني" : "Email") : "WhatsApp"}</Label><Button type="button" size="sm" variant="outline" onClick={() => copyPortalMessage(kind)} disabled={!template}><Copy className="me-2 size-3.5" />{lang === "ar" ? "نسخ" : "Copy"}</Button></div>
+                  {kind === "email" && subject && <div className="text-xs font-medium">{lang === "ar" ? "الموضوع: " : "Subject: "}{subject}</div>}
+                  <Textarea readOnly value={body || (lang === "ar" ? "القالب غير متاح حاليًا" : "Template unavailable")} dir={lang === "ar" ? "rtl" : "ltr"} rows={kind === "sms" ? 3 : 6} className="text-xs" />
+                </div>;
+              })}
+            </div>
           </div>
         </DialogContent>
       </Dialog>

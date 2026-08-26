@@ -36,20 +36,38 @@ export default function PatientPortal() {
   const [loading, setLoading] = useState(true);
   const [newPassword, setNewPassword] = useState("");
   const [passwordSaving, setPasswordSaving] = useState(false);
+  const [username, setUsername] = useState("");
+  const [usernameSaving, setUsernameSaving] = useState(false);
 
   useEffect(() => {
     let active = true;
     (async () => {
-      const { data: snapshot, error } = await supabase.rpc("patient_portal_snapshot");
+      const [{ data: snapshot, error }, { data: profile }] = await Promise.all([
+        supabase.rpc("patient_portal_snapshot"),
+        user?.id ? supabase.from("profiles").select("username").eq("id", user.id).maybeSingle() : Promise.resolve({ data: null }),
+      ]);
       if (!active) return;
       if (error) { toast.error(lang === "ar" ? "لا يمكن الوصول إلى بوابة المريض بهذا الحساب" : "This account cannot access the patient portal"); setLoading(false); return; }
       setData(snapshot as unknown as PortalData);
+      setUsername(profile?.username ?? "");
       setLoading(false);
     })();
     return () => { active = false; };
   }, [lang]);
 
   const logout = async () => { await signOut(); window.location.assign("/auth"); };
+  const saveUsername = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const value = username.trim().toLowerCase();
+    if (!/^[a-z0-9][a-z0-9._-]{2,31}$/.test(value)) { toast.error(lang === "ar" ? "استخدم 3–32 حرفًا إنجليزيًا أو أرقامًا أو نقطة أو شرطة" : "Use 3–32 letters, numbers, dot, underscore, or hyphen"); return; }
+    setUsernameSaving(true);
+    const { data: result, error } = await supabase.rpc("patient_portal_set_username", { p_username: value });
+    setUsernameSaving(false);
+    if (error || !(result as any)?.username) { toast.error(lang === "ar" ? "اسم المستخدم مستخدم بالفعل أو غير صالح" : "Username is already in use or invalid"); return; }
+    setUsername(value);
+    toast.success(lang === "ar" ? "تم حفظ اسم المستخدم" : "Username saved");
+  };
+
   const savePassword = async (event: React.FormEvent) => {
     event.preventDefault();
     if (newPassword.length < 8) { toast.error(lang === "ar" ? "كلمة المرور يجب ألا تقل عن 8 أحرف" : "Password must be at least 8 characters"); return; }
@@ -96,6 +114,11 @@ export default function PatientPortal() {
           <Card className="border-primary/20 bg-primary/5 p-5"><h2 className="font-bold">{lang === "ar" ? "الشكاوى والتواصل" : "Complaints & contact"}</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">{complaintText || (lang === "ar" ? "للاستفسارات أو الشكاوى تواصل مع العيادة عبر إحدى القنوات التالية." : "For questions or complaints, contact the clinic through one of the channels below.")}</p><div className="mt-4 flex flex-wrap gap-2">{supportEmail ? <Button asChild variant="outline" size="sm"><a href={`mailto:${supportEmail}`}><Mail className="me-2 size-4" />{supportEmail}</a></Button> : null}{supportPhone ? <Button asChild variant="outline" size="sm"><a href={`tel:${supportPhone}`}><Phone className="me-2 size-4" />{supportPhone}</a></Button> : null}{!supportEmail && !supportPhone ? <p className="text-xs text-muted-foreground">{lang === "ar" ? "لم تضبط العيادة قنوات التواصل بعد." : "The clinic has not configured contact channels yet."}</p> : null}</div></Card>
         </div>
       </div>
+      <Card className="border-primary/20 bg-background p-5">
+        <h2 className="font-bold">{lang === "ar" ? "اسم المستخدم" : "Username"}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{lang === "ar" ? "اختياري. يمكنك استخدامه بدل البريد الإلكتروني عند الدخول." : "Optional. You can use it instead of your email when signing in."}</p>
+        <form onSubmit={saveUsername} className="mt-3 flex flex-col gap-3 sm:flex-row"><input type="text" value={username} onChange={(event) => setUsername(event.target.value.replace(/\s/g, "").toLowerCase())} minLength={3} maxLength={32} pattern="[a-z0-9][a-z0-9._-]{2,31}" placeholder="patient.name" className="h-10 flex-1 rounded-md border bg-background px-3 text-sm" autoComplete="username" /><Button type="submit" disabled={usernameSaving}>{usernameSaving ? "…" : (lang === "ar" ? "حفظ الاسم" : "Save username")}</Button></form>
+      </Card>
       <Card className="border-primary/20 bg-background p-5">
         <h2 className="font-bold">{lang === "ar" ? "تأمين الحساب" : "Secure your account"}</h2>
         <p className="mt-1 text-sm text-muted-foreground">{lang === "ar" ? "بعد فتح رابط الدعوة، يمكنك تعيين كلمة مرور خاصة بك لاستخدام البريد الإلكتروني في الدخول لاحقًا." : "After opening your invitation link, set a personal password to sign in with your email next time."}</p>

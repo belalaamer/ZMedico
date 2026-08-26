@@ -54,6 +54,7 @@ type Patient = {
 };
 
 type PortalCredentials = {
+  patientId: string;
   email: string;
   username: string;
   password: string;
@@ -66,6 +67,8 @@ type PortalTemplate = {
   body_ar: string;
   subject_en?: string;
   subject_ar?: string;
+  meta_template_name?: string | null;
+  meta_template_language?: string | null;
 };
 
 const schema = z.object({
@@ -104,6 +107,7 @@ export default function PatientsPage() {
   const [portalCredentials, setPortalCredentials] = useState<PortalCredentials | null>(null);
   const [portalTemplates, setPortalTemplates] = useState<Record<"email" | "sms" | "whatsapp", PortalTemplate | null>>({ email: null, sms: null, whatsapp: null });
   const [portalSupportContact, setPortalSupportContact] = useState("");
+  const [sendingPortalChannel, setSendingPortalChannel] = useState<"email" | "whatsapp" | null>(null);
 
   const [form, setForm] = useState({
     name_en: "", name_ar: "", phone: "", phone2: "", email: "",
@@ -175,7 +179,7 @@ export default function PatientsPage() {
       const [emailResult, smsResult, whatsappResult, settingsResult] = await Promise.all([
         (supabase as any).from("email_templates").select("body_en,body_ar,subject_en,subject_ar").eq("template_key", "patient_portal_credentials").eq("is_active", true).maybeSingle(),
         (supabase as any).from("sms_templates").select("body_en,body_ar").eq("template_key", "patient_portal_credentials").eq("is_active", true).maybeSingle(),
-        (supabase as any).from("whatsapp_templates").select("body_en,body_ar").eq("template_key", "patient_portal_credentials").eq("is_active", true).maybeSingle(),
+        (supabase as any).from("whatsapp_templates").select("body_en,body_ar,meta_template_name,meta_template_language").eq("template_key", "patient_portal_credentials").eq("is_active", true).maybeSingle(),
         supabase.from("patient_portal_settings").select("support_email,support_phone").eq("branch_id", currentBranchId).maybeSingle(),
       ]);
       if (!active) return;
@@ -211,6 +215,32 @@ export default function PatientsPage() {
     const body = renderPortalTemplate(lang === "ar" ? template.body_ar : template.body_en);
     await navigator.clipboard.writeText([subject, body].filter(Boolean).join("\n\n"));
     toast.success(lang === "ar" ? `تم نسخ رسالة ${kind === "email" ? "البريد" : kind === "sms" ? "SMS" : "WhatsApp"}` : `${kind.toUpperCase()} message copied`);
+  };
+
+  const sendPortalMessage = async (channel: "email" | "whatsapp") => {
+    if (!portalCredentials) return;
+    const warning = channel === "whatsapp"
+      ? (lang === "ar" ? "سيتم إرسال كلمة المرور المؤقتة عبر قالب WhatsApp معتمد. تأكد من موافقة المريض قبل المتابعة." : "The temporary password will be sent through an approved WhatsApp template. Confirm patient consent before continuing.")
+      : (lang === "ar" ? "سيتم إرسال كلمة المرور المؤقتة إلى البريد الإلكتروني المسجل للمريض." : "The temporary password will be sent to the patient’s registered email.");
+    if (!window.confirm(warning)) return;
+    setSendingPortalChannel(channel);
+    const template = portalTemplates.whatsapp;
+    const { data: result, error } = await supabase.functions.invoke("send-patient-portal-message", {
+      body: {
+        patient_id: portalCredentials.patientId,
+        channel,
+        username: portalCredentials.username,
+        temporary_password: portalCredentials.password,
+        language: lang,
+        ...(channel === "whatsapp" ? { template_name: template?.meta_template_name ?? "", template_language: template?.meta_template_language ?? (lang === "ar" ? "ar" : "en_US") } : {}),
+      },
+    });
+    setSendingPortalChannel(null);
+    if (error || result?.error) {
+      toast.error(result?.error ?? error?.message ?? (lang === "ar" ? "تعذر إرسال الرسالة" : "Message could not be sent"));
+      return;
+    }
+    toast.success(lang === "ar" ? "تم قبول الرسالة للإرسال" : "Message accepted for delivery");
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -252,6 +282,7 @@ export default function PatientsPage() {
       } else if (portalResult?.credentials) {
         setPortalCredentials({
           ...portalResult.credentials,
+          patientId: createdPatient.id,
           patientName: d.name_en?.trim() || d.name_ar?.trim() || "",
           patientNameAr: d.name_ar?.trim() || d.name_en?.trim() || "",
         });
@@ -514,6 +545,10 @@ export default function PatientsPage() {
             <div className="rounded-md border bg-muted/30 p-3"><div className="text-xs text-muted-foreground">Username</div><div className="font-medium">{portalCredentials?.username}</div></div>
             <div className="rounded-md border bg-muted/30 p-3"><div className="text-xs text-muted-foreground">Temporary password</div><div className="font-mono font-medium break-all">{portalCredentials?.password}</div></div>
             <Button type="button" variant="outline" className="w-full" onClick={() => portalCredentials && navigator.clipboard.writeText(`Username: ${portalCredentials.username}\nPassword: ${portalCredentials.password}`)}><Copy className="me-2 size-4" />{lang === "ar" ? "نسخ بيانات الدخول" : "Copy credentials"}</Button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Button type="button" variant="secondary" onClick={() => sendPortalMessage("email")} disabled={sendingPortalChannel !== null}><Mail className="me-2 size-4" />{sendingPortalChannel === "email" ? "…" : (lang === "ar" ? "إرسال بالبريد" : "Send by email")}</Button>
+              <Button type="button" variant="secondary" onClick={() => sendPortalMessage("whatsapp")} disabled={sendingPortalChannel !== null}><Phone className="me-2 size-4" />{sendingPortalChannel === "whatsapp" ? "…" : (lang === "ar" ? "إرسال WhatsApp" : "Send WhatsApp")}</Button>
+            </div>
             <div className="border-t pt-3 space-y-3">
               <div>
                 <div className="font-medium">{lang === "ar" ? "قوالب الرسائل الجاهزة" : "Ready-to-copy message templates"}</div>

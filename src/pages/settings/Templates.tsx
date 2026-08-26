@@ -27,6 +27,7 @@ export default function Templates({ kind }: { kind: "email" | "sms" | "whatsapp"
     if (!sel) return;
     const payload: any = { name_en: sel.name_en, name_ar: sel.name_ar, body_en: sel.body_en, body_ar: sel.body_ar, is_active: sel.is_active };
     if (kind === "email") { payload.subject_en = sel.subject_en; payload.subject_ar = sel.subject_ar; }
+    if (kind === "whatsapp") { payload.meta_template_name = sel.meta_template_name || null; payload.meta_template_language = sel.meta_template_language || "ar"; }
     const { error } = await (supabase as any).from(table).update(payload).eq("id", sel.id);
     if (error) return toast.error(error.message);
     toast.success(t("saved")); load();
@@ -59,6 +60,10 @@ export default function Templates({ kind }: { kind: "email" | "sms" | "whatsapp"
                   {kind === "email" && (<>
                     <div><Label>{t("subject")} (EN)</Label><Input value={sel.subject_en ?? ""} onChange={e => setSel({ ...sel, subject_en: e.target.value })} /></div>
                     <div><Label>{t("subject")} (AR)</Label><Input dir="rtl" value={sel.subject_ar ?? ""} onChange={e => setSel({ ...sel, subject_ar: e.target.value })} /></div>
+                  </>)}
+                  {kind === "whatsapp" && (<>
+                    <div><Label>Approved Meta template name</Label><Input value={sel.meta_template_name ?? ""} onChange={e => setSel({ ...sel, meta_template_name: e.target.value })} placeholder="patient_portal_credentials" /></div>
+                    <div><Label>Meta template language</Label><Input value={sel.meta_template_language ?? "ar"} onChange={e => setSel({ ...sel, meta_template_language: e.target.value })} placeholder="ar" /></div>
                   </>)}
                   <div className="col-span-2"><Label>{t("body")} (EN)</Label><Textarea rows={5} value={sel.body_en ?? ""} onChange={e => setSel({ ...sel, body_en: e.target.value })} /></div>
                   <div className="col-span-2"><Label>{t("body")} (AR)</Label><Textarea dir="rtl" rows={5} value={sel.body_ar ?? ""} onChange={e => setSel({ ...sel, body_ar: e.target.value })} /></div>

@@ -100,6 +100,7 @@ Deno.serve(async (req) => {
       tenant_id: branch.tenant_id,
       portal_enabled: true,
       status: "active",
+      must_change_password: autoCredentials,
       invited_at: new Date().toISOString(),
     }, { onConflict: "patient_id" });
     if (accountError) {

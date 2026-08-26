@@ -26,6 +26,12 @@ compatibility_date = "2026-07-31"
 compatibility_flags = ["nodejs_compat"]
 main = "src/worker.ts"
 
+[[send_email]]
+name = "EMAIL"
+
+[vars]
+EMAIL_FROM = "noreply@belalaamer.com"
+
 [assets]
 directory = "./dist"
 binding = "ASSETS"

@@ -1,5 +1,7 @@
 export interface Env {
   ASSETS: Fetcher;
+  EMAIL: SendEmail;
+  EMAIL_FROM: string;
 }
 
 const DOMAIN_FUNCTION_URL = "https://rqcmnfzfytyyicelvifk.supabase.co/functions/v1/manage-custom-domain";
@@ -7,9 +9,36 @@ const SUPABASE_REST_URL = "https://rqcmnfzfytyyicelvifk.supabase.co/rest/v1/rpc/
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_Vu3oi0N4hmxPzTsScwrwFA_Wt3-CUyU";
 const PROVIDER_SUBDOMAIN_SUFFIX = "belalaamer.com";
 const DOMAIN_GATEWAY_PATH = "/api/domains";
+const PATIENT_PORTAL_EMAIL_PATH = "/api/patient-portal-email";
+const SUPABASE_AUTH_USER_URL = "https://rqcmnfzfytyyicelvifk.supabase.co/auth/v1/user";
+const SUPABASE_PATIENT_CONTEXT_URL = "https://rqcmnfzfytyyicelvifk.supabase.co/rest/v1/rpc/patient_portal_send_context";
+const SUPABASE_EMAIL_TEMPLATE_URL = "https://rqcmnfzfytyyicelvifk.supabase.co/rest/v1/email_templates";
 const PROVIDER_SUBDOMAIN_HEALTH_PATH = "/_zmedico/provisioning-check";
 const MAX_GATEWAY_BODY_BYTES = 32 * 1024;
 const DEFAULT_ORIGIN = "https://zmedico2.belalaamer.workers.dev";
+
+type PortalEmailInput = {
+  patient_id?: unknown;
+  temporary_password?: unknown;
+  username?: unknown;
+  language?: unknown;
+};
+
+type PortalSendContext = {
+  allowed?: boolean;
+  email?: string | null;
+  patient_name?: string | null;
+  patient_name_ar?: string | null;
+  support_email?: string | null;
+  support_phone?: string | null;
+};
+
+type PortalEmailTemplate = {
+  subject_en?: string | null;
+  subject_ar?: string | null;
+  body_en?: string | null;
+  body_ar?: string | null;
+};
 
 function gatewayHeaders(request: Request): Headers {
   const origin = request.headers.get("Origin");
@@ -51,6 +80,78 @@ async function hasActiveTenantDomain(hostname: string): Promise<boolean> {
   }
 }
 
+function jsonResponse(body: unknown, status: number, request: Request): Response {
+  return new Response(JSON.stringify(body), { status, headers: { ...Object.fromEntries(gatewayHeaders(request)), "Content-Type": "application/json" } });
+}
+
+function renderTemplate(template: string, values: Record<string, string>): string {
+  return template.replace(/{{\s*([a-z0-9_]+)\s*}}/gi, (_, key: string) => values[key] ?? "");
+}
+
+async function fetchJson<T>(url: string, token: string, init?: RequestInit): Promise<{ response: Response; data: T | null }> {
+  const response = await fetch(url, {
+    ...init,
+    headers: {
+      apikey: SUPABASE_PUBLISHABLE_KEY,
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {}),
+    },
+  });
+  const data = await response.json().catch(() => null) as T | null;
+  return { response, data };
+}
+
+async function sendPatientPortalEmail(request: Request, env: Env): Promise<Response> {
+  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: gatewayHeaders(request) });
+  if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405, request);
+  const authorization = request.headers.get("Authorization") ?? "";
+  if (!authorization.startsWith("Bearer ")) return jsonResponse({ error: "Unauthorized" }, 401, request);
+  const token = authorization.slice("Bearer ".length).trim();
+  if (!token) return jsonResponse({ error: "Unauthorized" }, 401, request);
+
+  let body: PortalEmailInput;
+  try { body = await request.json() as PortalEmailInput; } catch { return jsonResponse({ error: "Invalid JSON" }, 400, request); }
+  const patientId = typeof body.patient_id === "string" ? body.patient_id : "";
+  const temporaryPassword = typeof body.temporary_password === "string" ? body.temporary_password : "";
+  const username = typeof body.username === "string" ? body.username : "";
+  const language = body.language === "en" ? "en" : "ar";
+  if (!/^[0-9a-f-]{36}$/i.test(patientId) || !username || temporaryPassword.length < 8 || temporaryPassword.length > 256) {
+    return jsonResponse({ error: "Invalid portal email request" }, 400, request);
+  }
+
+  const userResult = await fetchJson<{ id?: string }>(SUPABASE_AUTH_USER_URL, token);
+  if (!userResult.response.ok || !userResult.data?.id) return jsonResponse({ error: "Unauthorized" }, 401, request);
+  const contextResult = await fetchJson<PortalSendContext>(SUPABASE_PATIENT_CONTEXT_URL, token, { method: "POST", body: JSON.stringify({ p_patient_id: patientId }) });
+  if (!contextResult.response.ok || !contextResult.data?.allowed || !contextResult.data.email) return jsonResponse({ error: "Forbidden" }, 403, request);
+
+  const templateUrl = `${SUPABASE_EMAIL_TEMPLATE_URL}?template_key=eq.patient_portal_credentials&is_active=eq.true&select=subject_en,subject_ar,body_en,body_ar&limit=1`;
+  const templateResult = await fetchJson<PortalEmailTemplate[]>(templateUrl, token);
+  const template = templateResult.data?.[0];
+  if (!template) return jsonResponse({ error: "Patient portal email template is not configured" }, 503, request);
+
+  const origin = new URL(request.url).origin;
+  const supportContact = [contextResult.data.support_email, contextResult.data.support_phone].filter(Boolean).join(" / ") || (language === "ar" ? "تواصل مع العيادة" : "Contact the clinic");
+  const values = {
+    patient_name: contextResult.data.patient_name ?? "Patient",
+    patient_name_ar: contextResult.data.patient_name_ar ?? contextResult.data.patient_name ?? "المريض",
+    patient_portal_username: username,
+    patient_portal_password: temporaryPassword,
+    patient_portal_url: `${origin}/patient-portal/login`,
+    support_contact: supportContact,
+  };
+  const subject = renderTemplate((language === "ar" ? template.subject_ar : template.subject_en) ?? "Patient Portal access", values);
+  const text = renderTemplate((language === "ar" ? template.body_ar : template.body_en) ?? "", values);
+  const html = `<div dir="${language === "ar" ? "rtl" : "ltr"}" style="font-family:Arial,sans-serif;white-space:pre-line">${text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`;
+
+  try {
+    await env.EMAIL.send({ to: contextResult.data.email, from: env.EMAIL_FROM, subject, text, html });
+    return jsonResponse({ success: true, accepted: true }, 200, request);
+  } catch {
+    return jsonResponse({ error: "Email provider rejected the message" }, 502, request);
+  }
+}
+
 async function proxyDomainRequest(request: Request): Promise<Response> {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: gatewayHeaders(request) });
   if (request.method !== "POST") return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers: { ...Object.fromEntries(gatewayHeaders(request)), "Content-Type": "application/json" } });
@@ -81,6 +182,7 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname === DOMAIN_GATEWAY_PATH) return proxyDomainRequest(request);
+    if (url.pathname === PATIENT_PORTAL_EMAIL_PATH) return sendPatientPortalEmail(request, env);
 
     const pathname = url.pathname;
     const hostname = url.hostname.toLowerCase();

@@ -98,7 +98,22 @@ Deno.serve(async (req: Request) => {
           .from("reminders")
           .update(patch)
           .eq("provider_message_id", providerMessageId);
-        if (!error) updated++;
+        const portalStatus = providerStatus === "failed"
+          ? "failed"
+          : providerStatus === "read"
+            ? "read"
+            : providerStatus === "delivered"
+              ? "delivered"
+              : providerStatus === "sent"
+                ? "sent"
+                : null;
+        const { error: portalError } = portalStatus
+          ? await supabase
+            .from("patient_portal_delivery_events")
+            .update({ status: portalStatus, error_message: portalStatus === "failed" ? patch.error_message : null })
+            .eq("provider_message_id", providerMessageId)
+          : { error: null };
+        if (!error || !portalError) updated++;
       }
     }
   }

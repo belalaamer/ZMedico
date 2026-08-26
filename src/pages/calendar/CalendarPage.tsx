@@ -141,6 +141,7 @@ export default function CalendarPage() {
   const [items, setItems] = useState<Appt[]>([]);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [doctors, setDoctors] = useState<{ id: string; full_name: string | null; full_name_en?: string | null; full_name_ar?: string | null }[]>([]);
+  const [serviceDoctors, setServiceDoctors] = useState<{ id: string; full_name: string | null; full_name_en?: string | null; full_name_ar?: string | null }[] | null>(null);
   const [doctorFilter, setDoctorFilter] = useState<string>("all");
   // Doctor-centric default (FINAL-03 UX audit): mirrors the existing,
   // already-shipped Queue.tsx pattern (see doctorDefaultApplied there) so a
@@ -317,6 +318,33 @@ export default function CalendarPage() {
   }, [user?.id, doctors, doctorDefaultApplied]);
 
   const isDoctorUser = !!user?.id && doctors.some((d) => d.id === user.id);
+  const bookingDoctors = form.service_id ? (serviceDoctors ?? []) : doctors;
+
+  useEffect(() => {
+    if (!form.service_id || !currentBranchId) {
+      setServiceDoctors(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await (supabase as any).rpc("list_doctors_for_service", {
+        p_branch_id: currentBranchId,
+        p_service_id: form.service_id,
+        p_service_kind: "service",
+      });
+      if (cancelled) return;
+      if (error) {
+        toast.error(error.message);
+        setServiceDoctors([]);
+        return;
+      }
+      setServiceDoctors((data ?? []) as typeof doctors);
+      if (form.doctor_id && !(data ?? []).some((doctor: { id: string }) => doctor.id === form.doctor_id)) {
+        setForm((current) => ({ ...current, doctor_id: "" }));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [form.service_id, currentBranchId]);
 
   // Read ?date=YYYY-MM-DD and ?appt=<id> from URL
   useEffect(() => {
@@ -952,10 +980,10 @@ export default function CalendarPage() {
                   <Combobox
                     value={form.doctor_id}
                     onChange={(v) => setForm({ ...form, doctor_id: v })}
-                    options={doctors.map((d) => ({ value: d.id, label: doctorDisplayName(d, lang) }))}
+                    options={bookingDoctors.map((d) => ({ value: d.id, label: doctorDisplayName(d, lang) }))}
                     placeholder={lang === "ar" ? "— بدون —" : "— None —"}
                     searchPlaceholder={lang === "ar" ? "ابحث عن طبيب..." : "Search doctor..."}
-                    emptyText={lang === "ar" ? "لا يوجد أطباء" : "No doctors found"}
+                    emptyText={form.service_id && serviceDoctors?.length === 0 ? (lang === "ar" ? "لا يوجد طبيب مؤهل لهذه الخدمة" : "No doctor is assigned to this service") : (lang === "ar" ? "لا يوجد أطباء" : "No doctors found")}
                     allowClear
                   />
                 </div>

@@ -218,6 +218,28 @@ export default function PublicBooking() {
   }, [branch]);
 
   useEffect(() => {
+    if (!branchId || !serviceId) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await publicRpc<Doctor[]>("list_doctors_for_service", {
+        p_branch_id: branchId,
+        p_service_id: serviceId,
+        p_service_kind: service?.source ?? "service",
+      });
+      if (cancelled) return;
+      if (error) {
+        setDoctors([]);
+        toast.error(error.message || (isArabic ? "تعذر تحميل الأطباء المؤهلين" : "Unable to load eligible doctors"));
+        return;
+      }
+      const eligible = (data ?? []) as Doctor[];
+      setDoctors(eligible);
+      if (doctorId && !eligible.some((doctor) => doctor.id === doctorId)) setDoctorId("");
+    })();
+    return () => { cancelled = true; };
+  }, [branchId, serviceId, service?.source]);
+
+  useEffect(() => {
     let cancelled = false;
     const loadSlots = async () => {
       if (!branchId || !serviceId || !date) {

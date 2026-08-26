@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatMoney, formatDate } from "@/lib/format";
 import { statusLabel } from "./Staff";
 import StaffBranchesTab from "./StaffBranchesTab";
+import DoctorServicesTab from "./DoctorServicesTab";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -258,6 +259,7 @@ export default function StaffDetail() {
           <TabsTrigger value="leaves">{t("leaves")}</TabsTrigger>
           <TabsTrigger value="payroll">{t("payroll")}</TabsTrigger>
           <TabsTrigger value="branches">{lang === "ar" ? "الفروع" : "Branches"}</TabsTrigger>
+          {userRoles.includes("doctor") && <TabsTrigger value="services">{lang === "ar" ? "الخدمات" : "Services"}</TabsTrigger>}
         </TabsList>
         <TabsContent value="info">
           <Card className="p-5 shadow-card grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
@@ -345,6 +347,11 @@ export default function StaffDetail() {
         <TabsContent value="branches">
           {id && <StaffBranchesTab userId={id} />}
         </TabsContent>
+        {userRoles.includes("doctor") && linkedProfile?.id ? (
+          <TabsContent value="services">
+            <DoctorServicesTab doctorId={linkedProfile.id} />
+          </TabsContent>
+        ) : null}
       </Tabs>
 
       <AlertDialog open={confirmUnlink} onOpenChange={(o) => !o && !busy && setConfirmUnlink(false)}>

@@ -468,7 +468,7 @@ export default function PublicBooking() {
                           <Label htmlFor="booking-service">{isArabic ? "الخدمة" : "Service"}</Label>
                           <select id="booking-service" value={serviceId} onChange={(event) => setServiceId(event.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-ring">
                             <option value="">{isArabic ? "اختر الخدمة" : "Choose service"}</option>
-                            {services.map((item) => <option key={`${item.source}-${item.id}`} value={item.id}>{displayName(item, lang)} · {item.duration_minutes} {isArabic ? "دقيقة" : "min"}</option>)}
+                            {services.map((item) => <option key={`${item.source}-${item.id}`} value={item.id}>{displayName(item, lang)}</option>)}
                           </select>
                           {!services.length ? <p className="text-xs text-amber-600">{isArabic ? "لم تُضف خدمات للحجز الإلكتروني بعد." : "No online services are configured yet."}</p> : null}
                         </div>

@@ -95,6 +95,13 @@ export default defineConfig({
     viewport: { width: 1280, height: 800 },
   },
   projects: [
+    // Read-only cross-tenant RLS checks. The tests skip safely until two
+    // dedicated QA identities and fixture marker IDs are configured.
+    {
+      name: "rls-tenant-isolation",
+      testMatch: /rls\.tenant-isolation\.spec\.ts/,
+      use: { baseURL: BASE_URL },
+    },
     {
       name: "setup:admin",
       testMatch: /auth\.setup\.ts/,

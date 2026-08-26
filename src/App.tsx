@@ -262,6 +262,7 @@ function AppContent() {
               <Route path="/settings/insurance-contracts" element={<PermissionRoute adminOnly><InsuranceContracts /></PermissionRoute>} />
               <Route path="/settings/communication" element={<PermissionRoute adminOnly><Communication /></PermissionRoute>} />
               {/* Backward-compatible redirects from the legacy 6 routes */}
+              <Route path="/settings/notification-settings" element={<Navigate to="/settings/communication?tab=notifications" replace />} />
               <Route path="/settings/notifications" element={<Navigate to="/settings/communication?tab=notifications" replace />} />
               <Route path="/settings/reminders" element={<Navigate to="/settings/communication?tab=reminders" replace />} />
               <Route path="/settings/automated-comm" element={<Navigate to="/settings/communication?tab=automated" replace />} />

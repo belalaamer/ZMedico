@@ -5,7 +5,7 @@
 
 begin;
 create extension if not exists pgtap;
-select plan(14);
+select plan(18);
 
 select ok(
   (select relrowsecurity from pg_class where oid = 'public.tenant_domains'::regclass),
@@ -59,6 +59,69 @@ select ok(
 select ok(
   exists (select 1 from pg_proc where oid = 'public.resolve_active_tenant_domain(text)'::regprocedure and prosecdef),
   'public resolver is SECURITY DEFINER and returns only routing identifiers'
+);
+
+-- Runtime-facing isolation contract: every direct-branch and child table
+-- must retain RLS plus a restrictive branch_isolation policy. This catches
+-- regressions when a new table is added to the clinic data surface.
+select is(
+  (select count(*) from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public'
+     and c.relname = any (array[
+       'patients','appointments','invoices','payments','expenses',
+       'treasury_daily_closes','medical_records','treatment_plans',
+       'reminders','patient_wallet_transactions','doctor_commissions',
+       'inventory','inventory_transactions','stock_alerts',
+       'invoice_items','patient_wallets','patient_documents','medical_history',
+       'dental_chart','vital_signs','record_diagnoses','record_procedures',
+       'prescriptions','prescription_items','treatment_sessions',
+       'treasury_transactions','treasury'
+     ]::name[])
+     and c.relrowsecurity),
+  27::bigint,
+  'all clinic data tables have RLS enabled'
+);
+select is(
+  (select count(*) from pg_policies
+   where schemaname = 'public'
+     and policyname = any (array['branch_isolation','rls_hardening_branch_scope'])
+     and permissive = 'RESTRICTIVE'
+     and tablename = any (array[
+       'patients','appointments','invoices','payments','expenses',
+       'treasury_daily_closes','medical_records','treatment_plans',
+       'reminders','patient_wallet_transactions','doctor_commissions',
+       'inventory','inventory_transactions','stock_alerts',
+       'invoice_items','patient_wallets','patient_documents','medical_history',
+       'dental_chart','vital_signs','record_diagnoses','record_procedures',
+       'prescriptions','prescription_items','treatment_sessions',
+       'treasury_transactions','treasury'
+     ])),
+  27::bigint,
+  'all clinic data tables have restrictive branch isolation policy'
+);
+select is(
+  (select count(*) from pg_policies
+   where schemaname = 'public'
+     and policyname = any (array['branch_isolation','rls_hardening_branch_scope'])
+     and (qual::text like '%user_has_branch_access%'
+       or with_check::text like '%user_has_branch_access%')
+     and tablename = any (array[
+       'patients','appointments','invoices','payments','expenses',
+       'treasury_daily_closes','medical_records','treatment_plans',
+       'reminders','patient_wallet_transactions','doctor_commissions',
+       'inventory','inventory_transactions','stock_alerts',
+       'invoice_items','patient_wallets','patient_documents','medical_history',
+       'dental_chart','vital_signs','record_diagnoses','record_procedures',
+       'prescriptions','prescription_items','treatment_sessions',
+       'treasury_transactions','treasury'
+     ])),
+  27::bigint,
+  'branch isolation policies call the branch-access guard'
+);
+select ok(
+  exists (select 1 from pg_proc where oid = 'public.user_has_branch_access(uuid)'::regprocedure and prosecdef),
+  'branch-access guard is SECURITY DEFINER with controlled search_path'
 );
 
 select * from finish();

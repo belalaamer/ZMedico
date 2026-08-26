@@ -81,6 +81,9 @@ export default function Pricing() {
   const formatNum = (n: number) =>
     n >= 999 ? (isAr ? "غير محدود" : "Unlimited") : n.toLocaleString();
 
+  const formatEnglishCount = (n: number, singular: string, plural: string) =>
+    n >= 999 ? "Unlimited" : `${n.toLocaleString()} ${n === 1 ? singular : plural}`;
+
   return (
     <div dir={dir} className="min-h-dvh bg-background">
       {/* Header */}
@@ -178,15 +181,15 @@ export default function Pricing() {
                     <ul className="space-y-2 text-sm mb-6">
                       <li className="flex items-center gap-2">
                         <Check className="h-4 w-4 text-primary" />
-                        {isAr ? `${formatNum(p.max_branches)} فرع` : `${formatNum(p.max_branches)} branches`}
+                        {isAr ? `${formatNum(p.max_branches)} فرع` : formatEnglishCount(p.max_branches, "branch", "branches")}
                       </li>
                       <li className="flex items-center gap-2">
                         <Check className="h-4 w-4 text-primary" />
-                        {isAr ? `${formatNum(p.max_staff)} موظف` : `${formatNum(p.max_staff)} staff`}
+                        {isAr ? `${formatNum(p.max_staff)} موظف` : formatEnglishCount(p.max_staff, "staff member", "staff members")}
                       </li>
                       <li className="flex items-center gap-2">
                         <Check className="h-4 w-4 text-primary" />
-                        {isAr ? `${formatNum(p.max_patients)} مريض` : `${formatNum(p.max_patients)} patients`}
+                        {isAr ? `${formatNum(p.max_patients)} مريض` : formatEnglishCount(p.max_patients, "patient", "patients")}
                       </li>
                       <li className="flex items-center gap-2">
                         <Check className="h-4 w-4 text-primary" />
@@ -273,7 +276,7 @@ export default function Pricing() {
           {[
             {
               q: isAr ? "هل أحتاج بطاقة ائتمان للتجربة؟" : "Do I need a credit card for the trial?",
-              a: isAr ? "لا، تبدأ التجربة فوراً بدون أي بيانات دفع." : "No. Start your trial instantly without any payment details.",
+              a: isAr ? "لا، يمكنك طلب التجربة بدون إدخال أي بيانات دفع. يبدأ التفعيل بعد مراجعة الطلب والتواصل معك." : "No. You can request a trial without payment details. Activation starts after we review your request and contact you.",
             },
             {
               q: isAr ? "هل يمكنني تغيير خطتي لاحقاً؟" : "Can I change plans later?",

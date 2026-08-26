@@ -150,6 +150,7 @@ export default function CalendarPage() {
   // does not change the underlying query, filters, or any authorization.
   const [doctorDefaultApplied, setDoctorDefaultApplied] = useState(false);
   const [roomFilter, setRoomFilter] = useState<string>("all");
+  const [roomBoard, setRoomBoard] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [monthDots, setMonthDots] = useState<Record<string, number>>({});
   const [patients, setPatients] = useState<{ id: string; label: string }[]>([]);
@@ -593,6 +594,16 @@ export default function CalendarPage() {
     [itemsByDay]
   );
 
+  const roomBoardColumns = useMemo(() => {
+    if (!resources.length) return [];
+    const dayItems = itemsByDay[date.toDateString()] ?? [];
+    const hasUnassigned = dayItems.some((item) => !resources.some((resource) => resource.id === item.resource_id || (!item.resource_id && (item.room === resource.name_en || item.room === resource.name_ar))));
+    return hasUnassigned ? [...resources, { id: "__unassigned__", name_en: "Unassigned", name_ar: "بدون غرفة", capacity: 0, is_active: true }] : resources;
+  }, [resources, itemsByDay, date]);
+
+  const roomBoardMatches = (item: Appt, resource: { id: string; name_en: string; name_ar: string }) =>
+    item.resource_id === resource.id || (!item.resource_id && (item.room === resource.name_en || item.room === resource.name_ar));
+
   // Stats for current visible range
   const stats = useMemo(() => {
     const s = { total: filteredItems.length, scheduled: 0, completed: 0, cancelled: 0 };
@@ -833,6 +844,11 @@ export default function CalendarPage() {
               <CalendarRange className="size-4" /> {lang === "ar" ? "شهر" : "Month"}
             </button>
           </div>
+          {view === "day" && resources.length ? (
+            <Button variant={roomBoard ? "default" : "outline"} size="sm" onClick={() => setRoomBoard((value) => !value)} className="gap-1">
+              <LayoutGrid className="size-4" />{lang === "ar" ? "جدول الغرف" : "Room board"}
+            </Button>
+          ) : null}
           <Button variant="outline" size="icon" onClick={() => {
             if (view === "month") setDate(new Date(date.getFullYear(), date.getMonth() - 1, 1));
             else setDate(addDays(date, view === "week" ? -7 : -1));
@@ -1133,6 +1149,38 @@ export default function CalendarPage() {
       </Card>
 
       <div className="grid grid-cols-1 gap-4">
+        {view === "day" && roomBoard && roomBoardColumns.length ? (
+          <Card className="shadow-card overflow-hidden">
+            <div className="flex items-center justify-between gap-3 border-b p-4">
+              <div><h2 className="font-bold">{lang === "ar" ? "جدول الغرف اليومي" : "Daily room board"}</h2><p className="text-xs text-muted-foreground">{lang === "ar" ? "كل عمود يمثل غرفة، والإلغاء يحرر السعة تلقائيًا." : "Each column is a room; cancelled appointments release capacity automatically."}</p></div>
+              <Badge variant="outline">{roomBoardColumns.length} {lang === "ar" ? "موارد" : "resources"}</Badge>
+            </div>
+            <div className="overflow-x-auto">
+              <div className="min-w-[760px]">
+                <div className="grid border-b bg-muted/30" style={{ gridTemplateColumns: `76px repeat(${roomBoardColumns.length}, minmax(180px, 1fr))` }}>
+                  <div className="border-e p-3 text-xs font-semibold text-muted-foreground">{lang === "ar" ? "الوقت" : "Time"}</div>
+                  {roomBoardColumns.map((resource) => <div key={resource.id} className="border-e p-3 text-sm font-semibold last:border-e-0">{lang === "ar" ? resource.name_ar : resource.name_en}<span className="ms-2 text-xs font-normal text-muted-foreground">{resource.capacity ? `${resource.capacity} ${lang === "ar" ? "سعة" : "capacity"}` : ""}</span></div>)}
+                </div>
+                {hours.map((hour) => {
+                  const hourStart = hour * 60;
+                  const hourEnd = hourStart + 60;
+                  return <div key={hour} className="grid min-h-[84px] border-b last:border-b-0" style={{ gridTemplateColumns: `76px repeat(${roomBoardColumns.length}, minmax(180px, 1fr))` }}>
+                    <div className="border-e p-2 text-end text-xs text-muted-foreground">{new Date(2000, 0, 1, hour).toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US", { hour: "numeric", minute: "2-digit", hour12: true })}</div>
+                    {roomBoardColumns.map((resource) => {
+                      const roomItems = (itemsByDay[date.toDateString()] ?? []).filter((item) => {
+                        const start = new Date(item.scheduled_at);
+                        const minute = start.getHours() * 60 + start.getMinutes();
+                        const isRoom = resource.id === "__unassigned__" ? !resources.some((candidate) => roomBoardMatches(item, candidate)) : roomBoardMatches(item, resource);
+                        return isRoom && minute >= hourStart && minute < hourEnd;
+                      });
+                      return <div key={resource.id} className="border-e p-2 last:border-e-0"><div className="space-y-1">{roomItems.map((item) => <button key={item.id} type="button" onClick={() => openEdit(item)} className={cn("w-full rounded-md border p-2 text-start text-xs", statusBlock[item.status])}><div className="font-semibold">{timeStr(new Date(item.scheduled_at))} · {fullName(item.patients!)}</div><div className="mt-1 truncate text-muted-foreground">{item.services?.[lang === "ar" ? "name_ar" : "name_en"] || item.procedure || (lang === "ar" ? "موعد" : "Appointment")}</div></button>)}</div></div>;
+                    })}
+                  </div>;
+                })}
+              </div>
+            </div>
+          </Card>
+        ) : null}
         {view === "month" ? (
           <Card className="shadow-card p-3">
             <div className="grid grid-cols-7 gap-1 text-center text-[11px] text-muted-foreground mb-2">

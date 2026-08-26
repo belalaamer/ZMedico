@@ -57,7 +57,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
 
   const dashboardItem: NavItem = isPlatformSurface
     ? { to: "/platform", icon: Building2, label: lang === "ar" ? "إدارة المنصة" : "Platform Console", end: true }
-    : { to: "/", icon: LayoutDashboard, label: t("dashboard"), end: true };
+    : { to: "/workspace", icon: LayoutDashboard, label: t("dashboard"), end: true };
   const reportItems = useMemo(() => {
     const labels: Record<ReportNavigationKey, string> = {
       financial: t("financialReports"),

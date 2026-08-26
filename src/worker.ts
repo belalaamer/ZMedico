@@ -2,6 +2,7 @@ export interface Env {
   ASSETS: Fetcher;
   EMAIL: SendEmail;
   EMAIL_FROM: string;
+  RESEND_API_KEY?: string;
 }
 
 const DOMAIN_FUNCTION_URL = "https://rqcmnfzfytyyicelvifk.supabase.co/functions/v1/manage-custom-domain";
@@ -31,6 +32,13 @@ type PortalSendContext = {
   patient_name_ar?: string | null;
   support_email?: string | null;
   support_phone?: string | null;
+  clinic_name?: string | null;
+  clinic_name_ar?: string | null;
+  email_enabled?: boolean;
+  email_provider?: string | null;
+  email_sender_name?: string | null;
+  email_sender_address?: string | null;
+  email_reply_to?: string | null;
 };
 
 type PortalEmailTemplate = {
@@ -87,6 +95,16 @@ function jsonResponse(body: unknown, status: number, request: Request): Response
 function renderTemplate(template: string, values: Record<string, string>): string {
   return template.replace(/{{\s*([a-z0-9_]+)\s*}}/gi, (_, key: string) => values[key] ?? "");
 }
+function cleanHeader(value: string, fallback: string, max = 120): string {
+  const cleaned = value.replace(/[\r\n]+/g, " ").trim().slice(0, max);
+  return cleaned || fallback;
+}
+function validEmail(value: string | null | undefined): value is string {
+  return !!value && /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(value) && !/[\r\n]/.test(value);
+}
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;");
+}
 
 async function fetchJson<T>(url: string, token: string, init?: RequestInit): Promise<{ response: Response; data: T | null }> {
   const response = await fetch(url, {
@@ -124,6 +142,7 @@ async function sendPatientPortalEmail(request: Request, env: Env): Promise<Respo
   if (!userResult.response.ok || !userResult.data?.id) return jsonResponse({ error: "Unauthorized" }, 401, request);
   const contextResult = await fetchJson<PortalSendContext>(SUPABASE_PATIENT_CONTEXT_URL, token, { method: "POST", body: JSON.stringify({ p_patient_id: patientId }) });
   if (!contextResult.response.ok || !contextResult.data?.allowed || !contextResult.data.email) return jsonResponse({ error: "Forbidden" }, 403, request);
+  if (contextResult.data.email_enabled !== true) return jsonResponse({ error: "Email delivery is disabled for this workspace" }, 400, request);
 
   const templateUrl = `${SUPABASE_EMAIL_TEMPLATE_URL}?template_key=eq.patient_portal_credentials&is_active=eq.true&select=subject_en,subject_ar,body_en,body_ar&limit=1`;
   const templateResult = await fetchJson<PortalEmailTemplate[]>(templateUrl, token);
@@ -140,12 +159,28 @@ async function sendPatientPortalEmail(request: Request, env: Env): Promise<Respo
     patient_portal_url: `${origin}/patient-portal/login`,
     support_contact: supportContact,
   };
-  const subject = renderTemplate((language === "ar" ? template.subject_ar : template.subject_en) ?? "Patient Portal access", values);
+  const subject = cleanHeader(renderTemplate((language === "ar" ? template.subject_ar : template.subject_en) ?? "Patient Portal access", values), "Patient Portal access");
   const text = renderTemplate((language === "ar" ? template.body_ar : template.body_en) ?? "", values);
-  const html = `<div dir="${language === "ar" ? "rtl" : "ltr"}" style="font-family:Arial,sans-serif;white-space:pre-line">${text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`;
+  const html = `<div dir="${language === "ar" ? "rtl" : "ltr"}" style="font-family:Arial,sans-serif;white-space:pre-line">${escapeHtml(text)}</div>`;
+  const senderAddress = validEmail(contextResult.data.email_sender_address) ? contextResult.data.email_sender_address : env.EMAIL_FROM;
+  const displayName = cleanHeader(contextResult.data.email_sender_name || (language === "ar" ? contextResult.data.clinic_name_ar : contextResult.data.clinic_name) || "ZMedico", "ZMedico");
+  const from = `${displayName} <${senderAddress}>`;
+  const replyTo = validEmail(contextResult.data.email_reply_to) ? contextResult.data.email_reply_to : undefined;
+  const provider = contextResult.data.email_provider === "resend" ? "resend" : "cloudflare";
 
   try {
-    await env.EMAIL.send({ to: contextResult.data.email, from: env.EMAIL_FROM, subject, text, html });
+    if (provider === "resend") {
+      if (!env.RESEND_API_KEY) return jsonResponse({ error: "Resend is not configured on the Worker" }, 503, request);
+      const resendResponse = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from, to: [contextResult.data.email], subject, text, html, ...(replyTo ? { reply_to: replyTo } : {}) }),
+      });
+      const resendBody = await resendResponse.json().catch(() => null) as { id?: string } | null;
+      if (!resendResponse.ok || !resendBody?.id) return jsonResponse({ error: "Resend rejected the email" }, resendResponse.status >= 500 ? 502 : 400, request);
+      return jsonResponse({ success: true, accepted: true, provider_message_id: resendBody.id }, 200, request);
+    }
+    await env.EMAIL.send({ to: contextResult.data.email, from, ...(replyTo ? { replyTo } : {}), subject, text, html });
     return jsonResponse({ success: true, accepted: true }, 200, request);
   } catch {
     return jsonResponse({ error: "Email provider rejected the message" }, 502, request);

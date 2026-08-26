@@ -22,7 +22,7 @@ export default function NotificationSettings() {
     send_invoice_notification: true, send_payment_receipt: true,
     send_birthday_greeting: false, birthday_discount_percentage: 0,
     send_follow_up_reminder: true, follow_up_days_after: 7,
-    email_sender_name: "", email_sender_address: "", sms_sender_id: "", whatsapp_business_number: "",
+    email_enabled: false, email_provider: "cloudflare", email_sender_name: "", email_sender_address: "", email_reply_to: "", sms_sender_id: "", whatsapp_business_number: "",
     whatsapp_api_key: "", whatsapp_api_url: "", sms_api_key: "", sms_api_url: "",
     sms_enabled: false, whatsapp_enabled: false,
     sms_provider: "custom", smsmisr_username: "", smsmisr_password: "", smsmisr_sender_token: "",
@@ -79,15 +79,17 @@ export default function NotificationSettings() {
   });
   const channelReady = channel === "push"
     ? true
-    : channel === "sms"
+    : channel === "email"
+      ? f.email_enabled === true && !!f.email_sender_address
+      : channel === "sms"
       ? f.sms_enabled === true && (!!f.sms_provider || !!f.sms_api_url)
       : channel === "whatsapp"
         ? f.whatsapp_enabled === true && (!!f.whatsapp_provider || !!f.whatsapp_api_url)
         : false;
   const readinessText = channelReady
-    ? (lang === "ar" ? "القناة المختارة جاهزة للجدولة، بشرط وجود رصيد/حساب فعال لدى مزود الخدمة." : "The selected channel is ready to queue messages, provided the provider account has balance and is active.")
+    ? (lang === "ar" ? "القناة المختارة جاهزة للإرسال، بشرط اكتمال تحقق النطاق ووجود حساب مزود فعال." : "The selected channel is ready to send, provided the sender domain is verified and the provider is active.")
     : channel === "email"
-      ? (lang === "ar" ? "البريد الإلكتروني غير موصل بمزود إرسال فعلي في النسخة الحالية؛ لن تصل الرسالة بمجرد اختيار Email." : "Email is not connected to a real delivery provider in the current build; selecting Email alone will not deliver messages.")
+      ? (lang === "ar" ? "فعّل البريد وحدد عنوان From موثقًا لدى Cloudflare أو Resend. اسم العيادة سيظهر كاسم المرسل." : "Enable email and set a From address verified with Cloudflare or Resend. The clinic name will appear as the display name.")
       : (lang === "ar" ? "القناة غير جاهزة: فعّلها وأدخل Provider URL/المفاتيح ثم احفظ الإعدادات." : "The channel is not ready: enable it, enter the provider URL/credentials, then save the settings.");
   return (
     <SettingsLayout>
@@ -125,8 +127,17 @@ export default function NotificationSettings() {
           <div><Label>{t("birthdayDiscountPercentage")}</Label><Input type="number" step="0.01" value={f.birthday_discount_percentage} onChange={e => setF({ ...f, birthday_discount_percentage: +e.target.value })} /></div>
           <Toggle k="send_follow_up_reminder" label={t("sendFollowUpReminder")} />
           <div><Label>{t("followUpDaysAfter")}</Label><Input type="number" value={f.follow_up_days_after} onChange={e => setF({ ...f, follow_up_days_after: +e.target.value })} /></div>
-          <div><Label>{t("emailSenderName")}</Label><Input value={f.email_sender_name ?? ""} onChange={e => setF({ ...f, email_sender_name: e.target.value })} /></div>
-          <div><Label>{t("emailSenderAddress")}</Label><Input value={f.email_sender_address ?? ""} onChange={e => setF({ ...f, email_sender_address: e.target.value })} /></div>
+          <div className="sm:col-span-2 rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-4">
+            <div><div className="font-semibold">{lang === "ar" ? "إعدادات البريد الإلكتروني للـWorkspace" : "Workspace email delivery"}</div><p className="mt-1 text-xs text-muted-foreground">{lang === "ar" ? "هذه الإعدادات مستقلة حسب الفرع/Workspace. لا تُدخل كلمة مرور البريد هنا؛ مفاتيح المزود تحفظ كـSecrets." : "These settings are isolated per branch/Workspace. Do not enter a mailbox password here; provider keys are stored as secrets."}</p></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Toggle k="email_enabled" label={lang === "ar" ? "تفعيل البريد الإلكتروني" : "Enable email delivery"} />
+              <div><Label>{lang === "ar" ? "مزود الإرسال" : "Email provider"}</Label><Select value={f.email_provider ?? "cloudflare"} onValueChange={v => setF({ ...f, email_provider: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="cloudflare">Cloudflare Email Service</SelectItem><SelectItem value="resend">Resend HTTP API</SelectItem></SelectContent></Select></div>
+              <div><Label>{lang === "ar" ? "اسم المرسل الظاهر" : "Display name"}</Label><Input value={f.email_sender_name ?? ""} onChange={e => setF({ ...f, email_sender_name: e.target.value })} placeholder={lang === "ar" ? "يُستخدم اسم العيادة تلقائيًا إذا تُرك فارغًا" : "Clinic name is used automatically if blank"} /></div>
+              <div><Label>{t("emailSenderAddress")}</Label><Input type="email" value={f.email_sender_address ?? ""} onChange={e => setF({ ...f, email_sender_address: e.target.value })} placeholder="noreply@belalaamer.com" /></div>
+              <div><Label>{lang === "ar" ? "Reply-To" : "Reply-To"}</Label><Input type="email" value={f.email_reply_to ?? ""} onChange={e => setF({ ...f, email_reply_to: e.target.value })} placeholder="support@clinic-domain.com" /></div>
+            </div>
+            <p className="text-xs text-muted-foreground">{lang === "ar" ? "يجب أن يكون عنوان From تابعًا لنطاق موثق. يمكن تغيير اسم العرض حسب العيادة، لكن لا يمكن انتحال عنوان بريد غير مملوك أو غير موثق." : "The From address must belong to a verified domain. The display name can vary per clinic, but an unowned or unverified address cannot be impersonated."}</p>
+          </div>
           <div><Label>{t("smsSenderId")}</Label><Input value={f.sms_sender_id ?? ""} onChange={e => setF({ ...f, sms_sender_id: e.target.value })} /></div>
           <div>
             <Label>{lang === "ar" ? "مزود SMS" : "SMS Provider"}</Label>

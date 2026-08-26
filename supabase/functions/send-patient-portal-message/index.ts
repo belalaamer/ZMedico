@@ -63,10 +63,10 @@ async function sendEmail(params: { token: string; patientId: string; username: s
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ patient_id: patientId, username, temporary_password: temporaryPassword, language }),
   });
-  const workerBody = await workerResponse.json().catch(() => ({})) as { error?: string; accepted?: boolean };
+  const workerBody = await workerResponse.json().catch(() => ({})) as { error?: string; accepted?: boolean; provider_message_id?: string };
   if (!workerResponse.ok || !workerBody.accepted) return jsonResponse({ error: workerBody.error ?? "Email provider rejected the message" }, workerResponse.status >= 500 ? 502 : workerResponse.status);
 
-  const { error: eventError } = await service.from("patient_portal_delivery_events").insert({ patient_id: patientId, branch_id: context.branch_id, channel: "email", status: "accepted" });
+  const { error: eventError } = await service.from("patient_portal_delivery_events").insert({ patient_id: patientId, branch_id: context.branch_id, channel: "email", provider_message_id: workerBody.provider_message_id ?? null, status: "accepted" });
   if (eventError) return jsonResponse({ error: "Email accepted but delivery status could not be recorded" }, 500);
   // Keep subject/text in memory only; they are deliberately not persisted or logged.
   void subject; void text;

@@ -106,9 +106,24 @@ export default {
     }
     const assetRequest = isHtmlRequest ? new Request(url, request) : request;
     const response = await env.ASSETS.fetch(assetRequest);
-    const contentType = response.headers.get("content-type");
+    const contentType = response.headers.get("content-type") ?? "";
+    const isJavaScriptRequest = /\.(?:m?js)$/.test(pathname);
 
-    if (isHtmlRequest || (/\.(?:m?js)$/.test(pathname) && !contentType)) {
+    // Never serve the SPA shell for a missing JavaScript module. A stale HTML
+    // document must fail with a clear 404 instead of trying to evaluate
+    // index.html as JavaScript and producing a misleading dynamic-import error.
+    if (isJavaScriptRequest && (response.status === 404 || contentType.includes("text/html"))) {
+      return new Response("JavaScript asset not found", {
+        status: 404,
+        headers: {
+          "Cache-Control": "no-store",
+          "Content-Type": "text/plain; charset=UTF-8",
+          "X-Content-Type-Options": "nosniff",
+        },
+      });
+    }
+
+    if (isHtmlRequest || (isJavaScriptRequest && !contentType)) {
       const headers = new Headers(response.headers);
       if (isHtmlRequest) {
         headers.set("cache-control", "no-store, max-age=0");

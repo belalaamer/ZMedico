@@ -52,6 +52,7 @@ type Appt = {
   service_id: string | null;
   procedure: string | null;
   room: string | null;
+  resource_id: string | null;
   notes: string | null;
   services?: { name_en: string | null; name_ar: string | null } | null;
   patients?: { first_name_en: string; last_name_en: string | null; first_name_ar: string | null; last_name_ar: string | null; patient_code: number };
@@ -154,10 +155,11 @@ export default function CalendarPage() {
   const [patients, setPatients] = useState<{ id: string; label: string }[]>([]);
   const [services, setServices] = useState<{ id: string; name_en: string; name_ar: string; duration: number }[]>([]);
   const [rooms, setRooms] = useState<string[]>([]);
+  const [resources, setResources] = useState<{ id: string; name_en: string; name_ar: string; capacity: number; is_active: boolean }[]>([]);
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({
-    patient_id: "", doctor_id: "", scheduled_at: "", duration_minutes: 30, service_id: "", procedure: "", room: "", notes: "",
+    patient_id: "", doctor_id: "", scheduled_at: "", duration_minutes: 30, service_id: "", procedure: "", room: "", resource_id: "", notes: "",
     status: "scheduled" as Appt["status"],
   });
   const [patientCtx, setPatientCtx] = useState<{ wallet: number; outstanding: number; lastVisit: string | null } | null>(null);
@@ -389,14 +391,22 @@ export default function CalendarPage() {
         })));
       });
   };
-  const loadRooms = () => {
-    let q = supabase.from("appointments").select("room").not("room", "is", null).is("deleted_at", null).limit(1000);
-    if (currentBranchId) q = q.eq("branch_id", currentBranchId);
-    q.then(({ data }) => {
-      const set = new Set<string>();
-      (data ?? []).forEach((r: any) => { if (r.room) set.add(String(r.room).trim()); });
-      setRooms(Array.from(set).sort());
-    });
+  const loadRooms = async () => {
+    const resourceQuery = (supabase as any).from("booking_resources")
+      .select("id,name_en,name_ar,capacity,is_active")
+      .eq("is_active", true)
+      .order("display_order", { ascending: true });
+    const appointmentQuery = supabase.from("appointments").select("room").not("room", "is", null).is("deleted_at", null).limit(1000);
+    if (currentBranchId) {
+      resourceQuery.eq("branch_id", currentBranchId);
+      appointmentQuery.eq("branch_id", currentBranchId);
+    }
+    const [{ data: resourceData }, { data: appointmentData }] = await Promise.all([resourceQuery, appointmentQuery]);
+    const nextResources = (resourceData ?? []) as { id: string; name_en: string; name_ar: string; capacity: number; is_active: boolean }[];
+    setResources(nextResources);
+    const set = new Set<string>(nextResources.map((r) => r.name_en).filter(Boolean));
+    (appointmentData ?? []).forEach((r: any) => { if (r.room) set.add(String(r.room).trim()); });
+    setRooms(Array.from(set).sort());
   };
   useEffect(() => { loadServices(); }, [lang, currentBranchId]);
   useEffect(() => { loadRooms(); }, [currentBranchId]);
@@ -418,14 +428,14 @@ export default function CalendarPage() {
     if (remainder !== 0 || base.getSeconds() > 0) base.setMinutes(base.getMinutes() + (30 - remainder), 0, 0);
     const tz = base.getTimezoneOffset();
     const local = new Date(base.getTime() - tz * 60000).toISOString().slice(0, 16);
-    setForm({ patient_id: "", doctor_id: "", scheduled_at: local, duration_minutes: 30, service_id: "", procedure: "", room: "", notes: "", status: "scheduled" });
+    setForm({ patient_id: "", doctor_id: "", scheduled_at: local, duration_minutes: 30, service_id: "", procedure: "", room: "", resource_id: "", notes: "", status: "scheduled" });
     setOpen(true);
   };
   const openNewAt = (slot: Date) => {
     setEditId(null);
     const tz = slot.getTimezoneOffset();
     const local = new Date(slot.getTime() - tz * 60000).toISOString().slice(0, 16);
-    setForm({ patient_id: "", doctor_id: "", scheduled_at: local, duration_minutes: 30, service_id: "", procedure: "", room: "", notes: "", status: "scheduled" });
+    setForm({ patient_id: "", doctor_id: "", scheduled_at: local, duration_minutes: 30, service_id: "", procedure: "", room: "", resource_id: "", notes: "", status: "scheduled" });
     setOpen(true);
   };
   const openEdit = (a: Appt) => {
@@ -441,6 +451,7 @@ export default function CalendarPage() {
       service_id: a.service_id ?? "",
       procedure: a.procedure ?? "",
       room: a.room ?? "",
+      resource_id: a.resource_id ?? resources.find((resource) => resource.name_en === a.room)?.id ?? "",
       notes: a.notes ?? "",
       status: a.status,
     });
@@ -546,7 +557,8 @@ export default function CalendarPage() {
       duration_minutes: Number(form.duration_minutes) || 30,
       service_id: form.service_id || null,
       procedure: form.procedure || null,
-      room: form.room || null,
+      resource_id: form.resource_id || null,
+      room: form.resource_id ? (resources.find((resource) => resource.id === form.resource_id)?.name_en || form.room || null) : (form.room || null),
       notes: form.notes || null,
     };
     if (editId) payload.status = form.status;
@@ -996,16 +1008,24 @@ export default function CalendarPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>{t("room")}</Label>
-                    <Input
-                      list="calendar-rooms-list"
-                      value={form.room}
-                      onChange={(e) => setForm({ ...form, room: e.target.value })}
-                      maxLength={40}
-                      placeholder={t("selectRoom")}
-                    />
-                    <datalist id="calendar-rooms-list">
-                      {rooms.map((r) => <option key={r} value={r} />)}
-                    </datalist>
+                    {resources.length ? (
+                      <Select value={form.resource_id || "__none__"} onValueChange={(value) => {
+                        const selected = resources.find((resource) => resource.id === value);
+                        setForm({ ...form, resource_id: value === "__none__" ? "" : value, room: selected?.name_en || "" });
+                      }}>
+                        <SelectTrigger><SelectValue placeholder={lang === "ar" ? "اختر الغرفة" : "Choose room"} /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">— {lang === "ar" ? "بدون غرفة محددة" : "No specific room"} —</SelectItem>
+                          {resources.map((resource) => <SelectItem key={resource.id} value={resource.id}>{lang === "ar" ? resource.name_ar : resource.name_en} · {resource.capacity} {lang === "ar" ? "سعة" : "capacity"}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <>
+                        <Input list="calendar-rooms-list" value={form.room} onChange={(e) => setForm({ ...form, room: e.target.value, resource_id: "" })} maxLength={40} placeholder={t("selectRoom")} />
+                        <datalist id="calendar-rooms-list">{rooms.map((r) => <option key={r} value={r} />)}</datalist>
+                      </>
+                    )}
+                    <p className="text-[11px] leading-4 text-muted-foreground">{resources.length ? (lang === "ar" ? "اختيار الغرفة يثبت المورد الذي سيستهلكه الموعد." : "Selecting a room assigns the resource consumed by this appointment.") : (lang === "ar" ? "أضف الغرف من إعدادات المواعيد لتفعيل حساب السعة." : "Add rooms in Appointment Settings to enable capacity-aware booking.")}</p>
                   </div>
                 </div>
                 <div className="space-y-2">

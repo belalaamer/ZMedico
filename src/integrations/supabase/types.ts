@@ -10,12 +10,13 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
       allowed_signup_emails: {
         Row: {
+          branch_id: string | null
           created_at: string
           created_by: string | null
           email: string
@@ -24,6 +25,7 @@ export type Database = {
           role: Database["public"]["Enums"]["app_role"] | null
         }
         Insert: {
+          branch_id?: string | null
           created_at?: string
           created_by?: string | null
           email: string
@@ -32,6 +34,7 @@ export type Database = {
           role?: Database["public"]["Enums"]["app_role"] | null
         }
         Update: {
+          branch_id?: string | null
           created_at?: string
           created_by?: string | null
           email?: string
@@ -39,7 +42,15 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"] | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "allowed_signup_emails_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       appointment_settings: {
         Row: {
@@ -119,10 +130,11 @@ export type Database = {
           public_booking_created_at: string | null
           public_booking_metadata: Json | null
           public_booking_reference: string | null
+          resource_id: string | null
           room: string | null
-          service_id: string | null
           scheduled_at: string
           self_checked_in_at: string | null
+          service_id: string | null
           started_at: string | null
           status: Database["public"]["Enums"]["appointment_status"]
           updated_at: string
@@ -145,10 +157,11 @@ export type Database = {
           public_booking_created_at?: string | null
           public_booking_metadata?: Json | null
           public_booking_reference?: string | null
+          resource_id?: string | null
           room?: string | null
-          service_id?: string | null
           scheduled_at: string
           self_checked_in_at?: string | null
+          service_id?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["appointment_status"]
           updated_at?: string
@@ -171,10 +184,11 @@ export type Database = {
           public_booking_created_at?: string | null
           public_booking_metadata?: Json | null
           public_booking_reference?: string | null
+          resource_id?: string | null
           room?: string | null
-          service_id?: string | null
           scheduled_at?: string
           self_checked_in_at?: string | null
+          service_id?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["appointment_status"]
           updated_at?: string
@@ -192,6 +206,13 @@ export type Database = {
             columns: ["patient_id"]
             isOneToOne: false
             referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "booking_resources"
             referencedColumns: ["id"]
           },
           {
@@ -753,6 +774,82 @@ export type Database = {
         }
         Relationships: []
       }
+      booking_resource_services: {
+        Row: {
+          created_at: string
+          resource_id: string
+          service_id: string
+          service_kind: string
+        }
+        Insert: {
+          created_at?: string
+          resource_id: string
+          service_id: string
+          service_kind?: string
+        }
+        Update: {
+          created_at?: string
+          resource_id?: string
+          service_id?: string
+          service_kind?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_resource_services_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "booking_resources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      booking_resources: {
+        Row: {
+          branch_id: string
+          capacity: number
+          created_at: string
+          display_order: number
+          id: string
+          is_active: boolean
+          name_ar: string
+          name_en: string
+          resource_type: string
+          updated_at: string
+        }
+        Insert: {
+          branch_id: string
+          capacity?: number
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          name_ar: string
+          name_en: string
+          resource_type?: string
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string
+          capacity?: number
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          name_ar?: string
+          name_en?: string
+          resource_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_resources_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       branches: {
         Row: {
           address: string | null
@@ -1046,6 +1143,8 @@ export type Database = {
           event_type: string
           hours_before: number | null
           id: string
+          meta_template_language: string
+          meta_template_name: string | null
           updated_at: string
         }
         Insert: {
@@ -1058,6 +1157,8 @@ export type Database = {
           event_type: string
           hours_before?: number | null
           id?: string
+          meta_template_language?: string
+          meta_template_name?: string | null
           updated_at?: string
         }
         Update: {
@@ -1070,6 +1171,8 @@ export type Database = {
           event_type?: string
           hours_before?: number | null
           id?: string
+          meta_template_language?: string
+          meta_template_name?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -3710,6 +3813,9 @@ export type Database = {
           referral_source: string | null
           referred_by_patient_id: string | null
           updated_at: string
+          whatsapp_opt_in: boolean
+          whatsapp_opt_in_at: string | null
+          whatsapp_opt_in_source: string | null
         }
         Insert: {
           address?: string | null
@@ -3741,6 +3847,9 @@ export type Database = {
           referral_source?: string | null
           referred_by_patient_id?: string | null
           updated_at?: string
+          whatsapp_opt_in?: boolean
+          whatsapp_opt_in_at?: string | null
+          whatsapp_opt_in_source?: string | null
         }
         Update: {
           address?: string | null
@@ -3772,6 +3881,9 @@ export type Database = {
           referral_source?: string | null
           referred_by_patient_id?: string | null
           updated_at?: string
+          whatsapp_opt_in?: boolean
+          whatsapp_opt_in_at?: string | null
+          whatsapp_opt_in_source?: string | null
         }
         Relationships: [
           {
@@ -5257,18 +5369,26 @@ export type Database = {
       reminders: {
         Row: {
           appointment_id: string | null
+          attempt_count: number
           branch_id: string | null
           created_at: string
           created_by: string | null
+          dedupe_key: string | null
           destination_channel: string | null
           destination_phone: string | null
           error_message: string | null
           event_type: string
           id: string
+          invoice_id: string | null
+          last_attempt_at: string | null
           message_ar: string
           message_en: string
           patient_id: string | null
           payload: Json
+          payment_id: string | null
+          provider_message_id: string | null
+          provider_response: Json
+          provider_status: string | null
           reminder_type: Database["public"]["Enums"]["reminder_channel"]
           scheduled_time: string
           sent_at: string | null
@@ -5278,18 +5398,26 @@ export type Database = {
         }
         Insert: {
           appointment_id?: string | null
+          attempt_count?: number
           branch_id?: string | null
           created_at?: string
           created_by?: string | null
+          dedupe_key?: string | null
           destination_channel?: string | null
           destination_phone?: string | null
           error_message?: string | null
           event_type?: string
           id?: string
+          invoice_id?: string | null
+          last_attempt_at?: string | null
           message_ar?: string
           message_en?: string
           patient_id?: string | null
           payload?: Json
+          payment_id?: string | null
+          provider_message_id?: string | null
+          provider_response?: Json
+          provider_status?: string | null
           reminder_type?: Database["public"]["Enums"]["reminder_channel"]
           scheduled_time: string
           sent_at?: string | null
@@ -5299,18 +5427,26 @@ export type Database = {
         }
         Update: {
           appointment_id?: string | null
+          attempt_count?: number
           branch_id?: string | null
           created_at?: string
           created_by?: string | null
+          dedupe_key?: string | null
           destination_channel?: string | null
           destination_phone?: string | null
           error_message?: string | null
           event_type?: string
           id?: string
+          invoice_id?: string | null
+          last_attempt_at?: string | null
           message_ar?: string
           message_en?: string
           patient_id?: string | null
           payload?: Json
+          payment_id?: string | null
+          provider_message_id?: string | null
+          provider_response?: Json
+          provider_status?: string | null
           reminder_type?: Database["public"]["Enums"]["reminder_channel"]
           scheduled_time?: string
           sent_at?: string | null
@@ -5318,7 +5454,22 @@ export type Database = {
           template_key?: string | null
           winback_month?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "reminders_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reminders_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       report_schedules: {
         Row: {
@@ -6367,6 +6518,51 @@ export type Database = {
           },
         ]
       }
+      subscription_plan_change_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          after_values: Json
+          before_values: Json
+          created_at: string
+          id: string
+          plan_id: string
+        }
+        Insert: {
+          action?: string
+          actor_id?: string | null
+          after_values: Json
+          before_values: Json
+          created_at?: string
+          id?: string
+          plan_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          after_values?: Json
+          before_values?: Json
+          created_at?: string
+          id?: string
+          plan_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_plan_change_log_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_plan_change_log_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscription_plans: {
         Row: {
           created_at: string
@@ -6714,14 +6910,14 @@ export type Database = {
       tenant_branding: {
         Row: {
           accent_color: string
+          colors_source: string
           created_at: string
           display_name: string | null
-          logo_url: string | null
-          favicon_url: string | null
           display_name_source: string
-          logo_source: string
           favicon_source: string
-          colors_source: string
+          favicon_url: string | null
+          logo_source: string
+          logo_url: string | null
           primary_color: string
           secondary_color: string
           show_powered_by: boolean
@@ -6730,14 +6926,14 @@ export type Database = {
         }
         Insert: {
           accent_color?: string
+          colors_source?: string
           created_at?: string
           display_name?: string | null
-          logo_url?: string | null
-          favicon_url?: string | null
           display_name_source?: string
-          logo_source?: string
           favicon_source?: string
-          colors_source?: string
+          favicon_url?: string | null
+          logo_source?: string
+          logo_url?: string | null
           primary_color?: string
           secondary_color?: string
           show_powered_by?: boolean
@@ -6746,14 +6942,14 @@ export type Database = {
         }
         Update: {
           accent_color?: string
+          colors_source?: string
           created_at?: string
           display_name?: string | null
-          logo_url?: string | null
-          favicon_url?: string | null
           display_name_source?: string
-          logo_source?: string
           favicon_source?: string
-          colors_source?: string
+          favicon_url?: string | null
+          logo_source?: string
+          logo_url?: string | null
           primary_color?: string
           secondary_color?: string
           show_powered_by?: boolean
@@ -8145,22 +8341,6 @@ export type Database = {
       }
       _get_cron_secret: { Args: never; Returns: string }
       _set_cron_secret: { Args: { p_secret: string }; Returns: undefined }
-      platform_save_tenant_branding: {
-        Args: {
-          p_accent_color: string
-          p_display_name: string
-          p_display_name_source: string
-          p_favicon_source: string
-          p_favicon_url: string | null
-          p_logo_source: string
-          p_logo_url: string | null
-          p_primary_color: string
-          p_secondary_color: string
-          p_show_powered_by: boolean
-          p_tenant_id: string
-        }
-        Returns: Database["public"]["Tables"]["tenant_branding"]["Row"]
-      }
       _treasury_assert_open_period: {
         Args: {
           _branch_id: string
@@ -8299,8 +8479,20 @@ export type Database = {
             }
             Returns: undefined
           }
+      booking_resource_is_eligible: {
+        Args: {
+          p_resource_id: string
+          p_service_id: string
+          p_service_kind: string
+        }
+        Returns: boolean
+      }
       branch_invoice_code: { Args: { _branch: string }; Returns: string }
       check_expiry_alerts: { Args: never; Returns: number }
+      communication_event_enabled: {
+        Args: { p_branch_id: string; p_event_type: string }
+        Returns: boolean
+      }
       consume_custom_domain_rate_limit: {
         Args: { _action: string; _actor_id: string; _limit?: number }
         Returns: boolean
@@ -8318,8 +8510,24 @@ export type Database = {
         Args: { _branch_id: string }
         Returns: string
       }
+      enqueue_appointment_event: {
+        Args: {
+          p_appointment_id: string
+          p_event_key?: string
+          p_event_type: string
+        }
+        Returns: undefined
+      }
       enqueue_appointment_reminders: {
         Args: { p_appointment_id: string }
+        Returns: undefined
+      }
+      enqueue_invoice_event: {
+        Args: { p_event_type: string; p_invoice_id: string }
+        Returns: undefined
+      }
+      enqueue_payment_receipt: {
+        Args: { p_payment_id: string }
         Returns: undefined
       }
       expense_treasury_self_audit: {
@@ -8368,6 +8576,10 @@ export type Database = {
       generate_product_sku: { Args: never; Returns: string }
       generate_saas_invoice_number: { Args: never; Returns: string }
       get_clinic_logo: { Args: { _branch_id: string }; Returns: string }
+      get_lead_analytics: {
+        Args: { p_branch_id?: string; p_end_at?: string; p_start_at?: string }
+        Returns: Json
+      }
       get_meta_ads_connection_status: {
         Args: { _branch_id: string }
         Returns: {
@@ -8386,6 +8598,23 @@ export type Database = {
           status: string
           timezone: string
           token_configured: boolean
+        }[]
+      }
+      get_public_tenant_branding: {
+        Args: { _hostname: string }
+        Returns: {
+          accent_color: string
+          colors_source: string
+          display_name: string
+          display_name_source: string
+          favicon_source: string
+          favicon_url: string
+          logo_source: string
+          logo_url: string
+          primary_color: string
+          secondary_color: string
+          show_powered_by: boolean
+          tenant_id: string
         }[]
       }
       has_permission: {
@@ -8461,6 +8690,44 @@ export type Database = {
         }[]
       }
       platform_log_change: { Args: { payload: Json }; Returns: string }
+      platform_save_tenant_branding: {
+        Args: {
+          p_accent_color: string
+          p_colors_source: string
+          p_display_name: string
+          p_display_name_source: string
+          p_favicon_source: string
+          p_favicon_url: string
+          p_logo_source: string
+          p_logo_url: string
+          p_primary_color: string
+          p_secondary_color: string
+          p_show_powered_by: boolean
+          p_tenant_id: string
+        }
+        Returns: {
+          accent_color: string
+          colors_source: string
+          created_at: string
+          display_name: string | null
+          display_name_source: string
+          favicon_source: string
+          favicon_url: string | null
+          logo_source: string
+          logo_url: string | null
+          primary_color: string
+          secondary_color: string
+          show_powered_by: boolean
+          tenant_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tenant_branding"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       platform_update_subscription_plan: {
         Args: { p_payload: Json; p_plan_id: string }
         Returns: Json

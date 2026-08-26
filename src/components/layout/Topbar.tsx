@@ -118,7 +118,7 @@ export function Topbar() {
   const linkFor = (n: NotificationRow): string => {
     if (!n.related_entity_type || !n.related_entity_id) return "#";
     switch (n.related_entity_type) {
-      case "appointment": return "/calendar";
+      case "appointment": return n.related_entity_id ? `/appointments/${n.related_entity_id}` : "/calendar";
       case "patient": return `/patients/${n.related_entity_id}`;
       case "invoice": return `/invoices/${n.related_entity_id}`;
       case "payment": return "/payments";

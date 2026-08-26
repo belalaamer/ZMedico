@@ -49,6 +49,9 @@ type Appt = {
   scheduled_at: string;
   duration_minutes: number;
   status: "scheduled" | "confirmed" | "in_progress" | "completed" | "cancelled" | "no_show" | "departed";
+  booking_request_status?: "not_applicable" | "pending" | "confirmed" | "rejected" | "expired";
+  booking_request_expires_at?: string | null;
+  booking_rejection_reason?: string | null;
   service_id: string | null;
   procedure: string | null;
   room: string | null;
@@ -166,6 +169,10 @@ export default function CalendarPage() {
   });
   const [patientCtx, setPatientCtx] = useState<{ wallet: number; outstanding: number; lastVisit: string | null } | null>(null);
   const [patientCtxLoading, setPatientCtxLoading] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectingAppointment, setRejectingAppointment] = useState<Appt | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
 
   // Per-branch working hours window (source of truth: branches.working_hours_start/end).
   const [dayStartHour, setDayStartHour] = useState<number>(DEFAULT_DAY_START_HOUR);
@@ -271,6 +278,12 @@ export default function CalendarPage() {
   const endHourLabel = dayEndHour;
 
   const load = async () => {
+    if (currentBranchId) {
+      const { error: expiryError } = await supabase.rpc("expire_public_booking_requests", { p_branch_id: currentBranchId });
+      if (expiryError && !String(expiryError.message).includes("booking_request_expiry_forbidden")) {
+        console.warn("Could not expire booking requests", expiryError.message);
+      }
+    }
     const start = rangeStart.toISOString();
     const end = rangeEnd.toISOString();
     let q = supabase.from("appointments")
@@ -512,6 +525,58 @@ export default function CalendarPage() {
     if (error) { toast.error(error.message); return; }
     toast.success(t("saved"));
     load();
+  };
+
+  const editingAppointment = editId ? items.find((item) => item.id === editId) ?? null : null;
+
+  const confirmBookingRequest = async (appointment: Appt) => {
+    if (actionBusy) return;
+    setActionBusy(true);
+    const { error } = await supabase.rpc("confirm_public_booking", { p_appointment_id: appointment.id });
+    setActionBusy(false);
+    if (error) {
+      const message = String(error.message || "");
+      toast.error(message.includes("booking_request_expired")
+        ? (lang === "ar" ? "انتهت مهلة طلب الحجز وتحررت السعة." : "The booking request expired and its capacity was released.")
+        : message.includes("slot_unavailable")
+          ? (lang === "ar" ? "لم تعد السعة متاحة لهذا الموعد." : "The capacity is no longer available for this appointment.")
+          : (lang === "ar" ? "تعذر تأكيد طلب الحجز." : "Could not confirm the booking request."));
+      await load();
+      return;
+    }
+    toast.success(lang === "ar" ? "تم تأكيد طلب الحجز" : "Booking request confirmed");
+    setOpen(false);
+    await load();
+  };
+
+  const openRejectDialog = (appointment: Appt) => {
+    setRejectingAppointment(appointment);
+    setRejectReason("");
+    setRejectOpen(true);
+  };
+
+  const rejectBookingRequest = async () => {
+    if (!rejectingAppointment || actionBusy) return;
+    const reason = rejectReason.trim();
+    if (!reason) {
+      toast.error(lang === "ar" ? "اكتب سبب رفض طلب الحجز" : "Enter a reason for rejecting the booking request");
+      return;
+    }
+    setActionBusy(true);
+    const { error } = await supabase.rpc("reject_public_booking", {
+      p_appointment_id: rejectingAppointment.id,
+      p_reason: reason,
+    });
+    setActionBusy(false);
+    if (error) {
+      toast.error(lang === "ar" ? "تعذر رفض طلب الحجز" : "Could not reject the booking request");
+      return;
+    }
+    toast.success(lang === "ar" ? "تم رفض طلب الحجز وتحرير السعة" : "Booking request rejected and capacity released");
+    setRejectOpen(false);
+    setRejectingAppointment(null);
+    setOpen(false);
+    await load();
   };
 
   // Forward-only progression along the standard reception flow.
@@ -1079,7 +1144,8 @@ export default function CalendarPage() {
                 {editId && (
                   <div className="space-y-2">
                     <Label>{t("status")}</Label>
-                    <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as Appt["status"] })}>
+                                            <Select disabled={editingAppointment?.booking_request_status === "pending"} value={form.status} onValueChange={(v) => setForm({ ...form, status: v as Appt["status"] })}>
+
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="scheduled">{t("statusScheduled")}</SelectItem>
@@ -1091,8 +1157,29 @@ export default function CalendarPage() {
                         <SelectItem value="departed">{t("statusDeparted")}</SelectItem>
                       </SelectContent>
                     </Select>
+                    {editingAppointment?.booking_request_status === "pending" ? (
+                      <p className="text-xs text-amber-600">
+                        {lang === "ar" ? "استخدم زر التأكيد أو الرفض لمعالجة طلب الحجز. لا يمكن تغيير الحالة يدويًا قبل المعالجة." : "Use Confirm or Reject to process this booking request. Manual status changes are disabled until it is processed."}
+                      </p>
+                    ) : null}
                   </div>
                 )}
+                {editingAppointment?.booking_request_status === "pending" ? (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-3">
+                    <div>
+                      <div className="font-semibold text-sm">{lang === "ar" ? "طلب حجز في انتظار المراجعة" : "Booking request awaiting review"}</div>
+                      {editingAppointment.booking_request_expires_at ? <div className="text-xs text-muted-foreground mt-1">{lang === "ar" ? "تنتهي المهلة: " : "Hold expires: "}{new Date(editingAppointment.booking_request_expires_at).toLocaleString(lang === "ar" ? "ar-EG" : "en-EG")}</div> : null}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" className="bg-emerald-600 text-white hover:bg-emerald-700" disabled={actionBusy} onClick={() => confirmBookingRequest(editingAppointment)}>
+                        <Check className="size-4 me-1" />{lang === "ar" ? "تأكيد الحجز" : "Confirm booking"}
+                      </Button>
+                      <Button type="button" variant="destructive" disabled={actionBusy} onClick={() => openRejectDialog(editingAppointment)}>
+                        <X className="size-4 me-1" />{lang === "ar" ? "رفض الطلب" : "Reject request"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
                 <DialogFooter>
                   <Button type="button" variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button>
                   <Button type="submit" className="gradient-primary text-primary-foreground">{t("save")}</Button>
@@ -1394,6 +1481,20 @@ export default function CalendarPage() {
         </Card>
         )}
       </div>
+      <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
+        <DialogContent className="max-w-md w-[calc(100vw-2rem)] sm:w-full">
+          <DialogHeader><DialogTitle>{lang === "ar" ? "رفض طلب الحجز" : "Reject booking request"}</DialogTitle></DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="booking-rejection-reason">{lang === "ar" ? "سبب الرفض" : "Reason for rejection"}</Label>
+            <Textarea id="booking-rejection-reason" value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} maxLength={1000} rows={5} placeholder={lang === "ar" ? "اكتب سببًا واضحًا يمكن الرجوع إليه..." : "Write a clear reason for the record..."} />
+            <p className="text-xs text-muted-foreground">{lang === "ar" ? "سيتم حفظ السبب في سجل الموعد، ولن يتم إرسال رسالة خارجية تلقائيًا." : "The reason is saved with the appointment; no external message is sent automatically."}</p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setRejectOpen(false)}>{t("cancel")}</Button>
+            <Button type="button" variant="destructive" disabled={actionBusy || !rejectReason.trim()} onClick={rejectBookingRequest}>{lang === "ar" ? "تأكيد الرفض" : "Confirm rejection"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Fab ariaLabel={t("newAppointment")} onClick={openNew}>
         <Plus className="size-6" />
       </Fab>

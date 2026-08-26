@@ -34,7 +34,7 @@ export default function AppointmentSettings() {
   const [branchId, setBranchId] = useState(currentBranchId ?? "");
   const [f, setF] = useState<any>({
     slot_duration_minutes: 30, buffer_minutes: 0, max_appointments_per_slot: 1,
-    allow_online_booking: true, require_confirmation: false,
+    allow_online_booking: true, require_confirmation: false, booking_request_hold_minutes: 15,
     cancellation_deadline_hours: 24, reminder_hours_before: [24, 2],
     max_future_booking_days: 30, min_advance_booking_hours: 1,
   });
@@ -226,6 +226,7 @@ export default function AppointmentSettings() {
               <div><Label>{t("cancellationDeadlineHours")}</Label><Input type="number" min={0} value={f.cancellation_deadline_hours} onChange={e => setF({ ...f, cancellation_deadline_hours: +e.target.value })} /></div>
               <div><Label>{t("maxFutureBookingDays")}</Label><Input type="number" min={1} value={f.max_future_booking_days} onChange={e => setF({ ...f, max_future_booking_days: +e.target.value })} /></div>
               <div><Label>{t("minAdvanceBookingHours")}</Label><Input type="number" min={0} value={f.min_advance_booking_hours} onChange={e => setF({ ...f, min_advance_booking_hours: +e.target.value })} /></div>
+              <div><Label>{lang === "ar" ? "مدة الاحتفاظ بطلب الحجز (دقيقة)" : "Booking request hold (minutes)"}</Label><Input type="number" min={1} max={1440} value={f.booking_request_hold_minutes} onChange={e => setF({ ...f, booking_request_hold_minutes: Math.max(1, Math.min(1440, +e.target.value || 1)) })} /><p className="text-xs text-muted-foreground mt-1">{lang === "ar" ? "تتحرر السعة تلقائيًا عند انتهاء المدة دون تأكيد." : "Capacity is released when the request expires without confirmation."}</p></div>
             </div>
           </CardContent>
         </Card>
@@ -239,6 +240,7 @@ export default function AppointmentSettings() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="flex items-center justify-between rounded-lg border p-3"><Label>{t("allowOnlineBooking")}</Label><Switch checked={!!f.allow_online_booking} onCheckedChange={v => setF({ ...f, allow_online_booking: v })} /></div>
               <div className="flex items-center justify-between rounded-lg border p-3"><Label>{t("requireConfirmation")}</Label><Switch checked={!!f.require_confirmation} onCheckedChange={v => setF({ ...f, require_confirmation: v })} /></div>
+              <p className="text-xs leading-5 text-muted-foreground md:col-span-2 lg:col-span-3">{lang === "ar" ? "عند التفعيل، تظهر الحجوزات العامة كطلبات معلقة وتحتاج إلى تأكيد من فريق العيادة. عند الإيقاف، يتم تأكيدها تلقائيًا." : "When enabled, public bookings become pending requests that require staff confirmation. When disabled, they are confirmed automatically."}</p>
               <div className="rounded-lg border p-3 space-y-2"><Label>{t("reminderHoursBefore")}</Label><Input value={(f.reminder_hours_before ?? []).join(",")} onChange={e => setF({ ...f, reminder_hours_before: e.target.value.split(",").map(s => +s.trim()).filter(Boolean) })} placeholder="24, 2" /><p className="text-xs text-muted-foreground">{lang === "ar" ? "قيم مفصولة بفواصل" : "Comma-separated hours"}</p></div>
             </div>
           </CardContent>

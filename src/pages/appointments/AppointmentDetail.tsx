@@ -4,7 +4,10 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ListSkeleton } from "@/components/ListSkeleton";
-import { Activity, ArrowLeft, ExternalLink, Stethoscope, User as UserIcon, MapPin, Clock, ScrollText, Receipt, CheckCircle2, MessageCircle } from "lucide-react";
+import { Activity, ArrowLeft, ExternalLink, Stethoscope, User as UserIcon, MapPin, Clock, ScrollText, Receipt, CheckCircle2, MessageCircle, Check, X } from "lucide-react";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -48,6 +51,9 @@ export default function AppointmentDetailPage() {
   const [record, setRecord] = useState<{ id: string } | null>(null);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [bookingActionBusy, setBookingActionBusy] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
 
   useEffect(() => {
     if (!appointmentId) return;
@@ -57,7 +63,7 @@ export default function AppointmentDetailPage() {
       const [{ data: a, error: aErr }, { data: l }] = await Promise.all([
         supabase
           .from("appointments")
-          .select("id,patient_id,doctor_id,branch_id,room,scheduled_at,status,procedure,service_id,priority,checked_in_at,started_at,is_walk_in,duration_minutes,services(name_en,name_ar),patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code,phone),branches(name_en,name_ar)")
+          .select("id,patient_id,doctor_id,branch_id,room,scheduled_at,status,procedure,service_id,priority,checked_in_at,started_at,is_walk_in,duration_minutes,booking_request_status,booking_request_expires_at,booking_rejection_reason,services(name_en,name_ar),patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code,phone),branches(name_en,name_ar)")
           .eq("id", appointmentId)
           .maybeSingle(),
         supabase
@@ -106,6 +112,44 @@ export default function AppointmentDetailPage() {
     const b = appt?.branches; if (!b) return "—";
     return lang === "ar" ? (b.name_ar ?? b.name_en) : b.name_en;
   }, [appt, lang]);
+
+  const confirmBookingRequest = async () => {
+    if (!appt || bookingActionBusy) return;
+    setBookingActionBusy(true);
+    const { error } = await supabase.rpc("confirm_public_booking", { p_appointment_id: appt.id });
+    setBookingActionBusy(false);
+    if (error) {
+      const message = String(error.message || "");
+      toast.error(message.includes("booking_request_expired")
+        ? (lang === "ar" ? "انتهت مهلة الطلب وتحررت السعة." : "The request expired and capacity was released.")
+        : message.includes("slot_unavailable")
+          ? (lang === "ar" ? "لم تعد السعة متاحة لهذا الموعد." : "Capacity is no longer available for this appointment.")
+          : (lang === "ar" ? "تعذر تأكيد طلب الحجز." : "Could not confirm the booking request."));
+      return;
+    }
+    setAppt((current: any) => current ? { ...current, status: "confirmed", booking_request_status: "confirmed", booking_request_expires_at: null } : current);
+    toast.success(lang === "ar" ? "تم تأكيد طلب الحجز" : "Booking request confirmed");
+  };
+
+  const rejectBookingRequest = async () => {
+    if (!appt || bookingActionBusy) return;
+    const reason = rejectReason.trim();
+    if (!reason) {
+      toast.error(lang === "ar" ? "اكتب سبب الرفض" : "Enter a rejection reason");
+      return;
+    }
+    setBookingActionBusy(true);
+    const { error } = await supabase.rpc("reject_public_booking", { p_appointment_id: appt.id, p_reason: reason });
+    setBookingActionBusy(false);
+    if (error) {
+      toast.error(lang === "ar" ? "تعذر رفض طلب الحجز" : "Could not reject the booking request");
+      return;
+    }
+    setAppt((current: any) => current ? { ...current, status: "cancelled", booking_request_status: "rejected", booking_request_expires_at: null, booking_rejection_reason: reason } : current);
+    setRejectOpen(false);
+    setRejectReason("");
+    toast.success(lang === "ar" ? "تم رفض الطلب وتحرير السعة" : "Request rejected and capacity released");
+  };
 
   if (loading) {
     return <div className="p-4 sm:p-6 space-y-4"><Card className="p-0 overflow-hidden"><ListSkeleton rows={6} /></Card></div>;
@@ -242,7 +286,25 @@ export default function AppointmentDetailPage() {
         <Card className="p-4 space-y-3 lg:col-span-1">
           <div className="text-xs text-muted-foreground">{t("status")}</div>
           <Badge variant="outline" className="capitalize">{String(appt.status).replace(/_/g, " ")}</Badge>
+          {appt.booking_request_status === "pending" && <Badge variant="secondary" className="ms-1">{lang === "ar" ? "طلب يحتاج تأكيدًا" : "Awaiting confirmation"}</Badge>}
+          {appt.booking_request_status === "rejected" && <Badge variant="destructive" className="ms-1">{lang === "ar" ? "مرفوض" : "Rejected"}</Badge>}
+          {appt.booking_request_status === "pending" ? (
+            <div className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
+              <div className="text-xs text-muted-foreground">{appt.booking_request_expires_at ? (lang === "ar" ? `تنتهي المهلة: ${fmt(appt.booking_request_expires_at)}` : `Hold expires: ${fmt(appt.booking_request_expires_at)}`) : (lang === "ar" ? "في انتظار المراجعة" : "Awaiting review")}</div>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" disabled={bookingActionBusy} onClick={confirmBookingRequest}><Check className="size-4 me-1" />{lang === "ar" ? "تأكيد الحجز" : "Confirm booking"}</Button>
+                <Button size="sm" variant="destructive" disabled={bookingActionBusy} onClick={() => setRejectOpen(true)}><X className="size-4 me-1" />{lang === "ar" ? "رفض الطلب" : "Reject request"}</Button>
+              </div>
+            </div>
+          ) : null}
+          {appt.booking_request_status === "expired" && <Badge variant="secondary" className="ms-1">{lang === "ar" ? "منتهي" : "Expired"}</Badge>}
           {appt.is_walk_in && <Badge variant="secondary" className="ms-1">{t("walkIn")}</Badge>}
+          {appt.booking_request_status === "rejected" && appt.booking_rejection_reason ? (
+            <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs leading-5">
+              <div className="font-semibold text-destructive">{lang === "ar" ? "سبب الرفض" : "Rejection reason"}</div>
+              <div className="mt-1 text-muted-foreground">{appt.booking_rejection_reason}</div>
+            </div>
+          ) : null}
           {(appt.priority ?? 0) > 0 && <Badge variant="destructive" className="ms-1">{t("urgent")}</Badge>}
           <div className="pt-2 space-y-1.5 text-sm">
             <div className="flex items-center gap-2"><UserIcon className="size-4 text-muted-foreground" /><span>{t("doctor")}: {appt.doctor_id ? (profiles[appt.doctor_id] ? doctorDisplayName(profiles[appt.doctor_id], lang) : appt.doctor_id.slice(0, 8)) : "—"}</span></div>
@@ -288,6 +350,20 @@ export default function AppointmentDetailPage() {
         </Card>
       </div>
 
+      <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
+        <DialogContent className="max-w-md w-[calc(100vw-2rem)] sm:w-full">
+          <DialogHeader><DialogTitle>{lang === "ar" ? "رفض طلب الحجز" : "Reject booking request"}</DialogTitle></DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="appointment-rejection-reason">{lang === "ar" ? "سبب الرفض" : "Reason for rejection"}</Label>
+            <Textarea id="appointment-rejection-reason" value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} maxLength={1000} rows={5} placeholder={lang === "ar" ? "اكتب سببًا واضحًا..." : "Write a clear reason..."} />
+            <p className="text-xs text-muted-foreground">{lang === "ar" ? "سيتم حفظ السبب ضمن سجل الموعد." : "The reason will be saved with the appointment."}</p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setRejectOpen(false)}>{t("cancel")}</Button>
+            <Button type="button" variant="destructive" disabled={bookingActionBusy || !rejectReason.trim()} onClick={rejectBookingRequest}>{lang === "ar" ? "تأكيد الرفض" : "Confirm rejection"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <CreateInvoiceDialog
         open={invoiceOpen}
         onOpenChange={setInvoiceOpen}

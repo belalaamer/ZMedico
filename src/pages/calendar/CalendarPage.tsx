@@ -1170,14 +1170,16 @@ export default function CalendarPage() {
                       <div className="font-semibold text-sm">{lang === "ar" ? "طلب حجز في انتظار المراجعة" : "Booking request awaiting review"}</div>
                       {editingAppointment.booking_request_expires_at ? <div className="text-xs text-muted-foreground mt-1">{lang === "ar" ? "تنتهي المهلة: " : "Hold expires: "}{new Date(editingAppointment.booking_request_expires_at).toLocaleString(lang === "ar" ? "ar-EG" : "en-EG")}</div> : null}
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Button type="button" className="bg-emerald-600 text-white hover:bg-emerald-700" disabled={actionBusy} onClick={() => confirmBookingRequest(editingAppointment)}>
-                        <Check className="size-4 me-1" />{lang === "ar" ? "تأكيد الحجز" : "Confirm booking"}
-                      </Button>
-                      <Button type="button" variant="destructive" disabled={actionBusy} onClick={() => openRejectDialog(editingAppointment)}>
-                        <X className="size-4 me-1" />{lang === "ar" ? "رفض الطلب" : "Reject request"}
-                      </Button>
-                    </div>
+                    <Can permission="appointments.edit">
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" className="bg-emerald-600 text-white hover:bg-emerald-700" disabled={actionBusy} onClick={() => confirmBookingRequest(editingAppointment)}>
+                          <Check className="size-4 me-1" />{lang === "ar" ? "تأكيد الحجز" : "Confirm booking"}
+                        </Button>
+                        <Button type="button" variant="destructive" disabled={actionBusy} onClick={() => openRejectDialog(editingAppointment)}>
+                          <X className="size-4 me-1" />{lang === "ar" ? "رفض الطلب" : "Reject request"}
+                        </Button>
+                      </div>
+                    </Can>
                   </div>
                 ) : null}
                 <DialogFooter>

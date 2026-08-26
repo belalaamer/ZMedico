@@ -42,12 +42,14 @@ setup("authenticate as admin", async ({ page }) => {
 
   await page.goto("/auth", { waitUntil: "domcontentloaded" });
 
-  // App renders auth UI in Arabic by default (dir=rtl), so match by input
-  // type rather than a locale-specific label. The primary submit button
-  // reads "تسجيل الدخول" in Arabic and "Sign in" / "Log in" in English.
-  await page.locator('input[type="email"]').first().waitFor({ timeout: 30_000 });
-  await page.locator('input[type="email"]').first().fill(email);
-  await page.locator('input[type="password"]').first().fill(password);
+  // The staff sign-in field intentionally supports either email or username,
+  // so it is type="text" and must be selected by its stable name/id.
+  // The primary submit button reads "تسجيل الدخول" in Arabic and
+  // "Sign in" / "Log in" in English.
+  const identifierInput = page.locator('input[name="identifier"]');
+  await identifierInput.first().waitFor({ timeout: 30_000 });
+  await identifierInput.first().fill(email);
+  await page.locator('input[name="password"]').first().fill(password);
 
   await Promise.all([
     page.waitForURL(

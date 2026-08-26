@@ -146,6 +146,23 @@ export default defineConfig({
             : undefined,
       },
     })),
+    // Public unauthenticated mobile smoke projects. These deliberately do
+    // not depend on setup:admin so the public landing/auth flow is covered.
+    ...MOBILE_VIEWPORTS.map((vp) => ({
+      name: `public-mobile:${vp.name}`,
+      testMatch: /public-mobile\.spec\.ts/,
+      use: {
+        baseURL: BASE_URL,
+        viewport: { width: vp.width, height: vp.height },
+        deviceScaleFactor: 2,
+        isMobile: vp.width < 600,
+        hasTouch: true,
+        userAgent:
+          vp.width < 600
+            ? "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
+            : undefined,
+      },
+    })),
     // ---- Settings vertical-slice shadow QA ----------------------------
     // `setup:shadow` mints one storageState per role whose credentials
     // are present in the environment. The walk spec exercises Settings

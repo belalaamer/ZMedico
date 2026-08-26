@@ -202,7 +202,9 @@ export default function PublicBooking() {
       ];
       setBranches(nextBranches);
       setServices(nextServices);
-      setDoctors((data?.doctors ?? []) as Doctor[]);
+      // Doctors are loaded through the service-aware RPC below; do not render
+      // the unfiltered options payload while the selected service is resolving.
+      setDoctors([]);
       setBranchId((current) => current || nextBranches[0]?.id || "");
       setServiceId((current) => current || nextServices[0]?.id || "");
       setDate((current) => current || getInitialDate(nextBranches[0]));

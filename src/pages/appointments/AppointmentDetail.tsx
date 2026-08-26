@@ -291,10 +291,12 @@ export default function AppointmentDetailPage() {
           {appt.booking_request_status === "pending" ? (
             <div className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
               <div className="text-xs text-muted-foreground">{appt.booking_request_expires_at ? (lang === "ar" ? `تنتهي المهلة: ${fmt(appt.booking_request_expires_at)}` : `Hold expires: ${fmt(appt.booking_request_expires_at)}`) : (lang === "ar" ? "في انتظار المراجعة" : "Awaiting review")}</div>
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" disabled={bookingActionBusy} onClick={confirmBookingRequest}><Check className="size-4 me-1" />{lang === "ar" ? "تأكيد الحجز" : "Confirm booking"}</Button>
-                <Button size="sm" variant="destructive" disabled={bookingActionBusy} onClick={() => setRejectOpen(true)}><X className="size-4 me-1" />{lang === "ar" ? "رفض الطلب" : "Reject request"}</Button>
-              </div>
+              <Can permission="appointments.edit">
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" disabled={bookingActionBusy} onClick={confirmBookingRequest}><Check className="size-4 me-1" />{lang === "ar" ? "تأكيد الحجز" : "Confirm booking"}</Button>
+                  <Button size="sm" variant="destructive" disabled={bookingActionBusy} onClick={() => setRejectOpen(true)}><X className="size-4 me-1" />{lang === "ar" ? "رفض الطلب" : "Reject request"}</Button>
+                </div>
+              </Can>
             </div>
           ) : null}
           {appt.booking_request_status === "expired" && <Badge variant="secondary" className="ms-1">{lang === "ar" ? "منتهي" : "Expired"}</Badge>}

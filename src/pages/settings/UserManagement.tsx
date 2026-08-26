@@ -265,21 +265,52 @@ export default function UserManagement() {
   }, []);
 
   const load = async () => {
-    // Only the identity fields are rendered / edited on this screen.
-    const { data: ps } = await supabase.from("profiles").select("id,full_name,email");
-    const { data: rs } = await (supabase as any).from("user_roles").select("user_id,role");
-    const { data: inv } = await (supabase as any)
+    // In a tenant workspace, every identity query is explicitly scoped to the
+    // active branch. RLS remains authoritative, but this prevents a global
+    // admin-shaped query from painting another clinic in the UI.
+    let scopedUserIds: string[] | null = null;
+    if (currentBranchId) {
+      const { data: memberships } = await (supabase as any)
+        .from("staff_branches")
+        .select("user_id")
+        .eq("branch_id", currentBranchId);
+      scopedUserIds = Array.from(new Set((memberships ?? []).map((m: any) => m.user_id).filter(Boolean)));
+    }
+
+    let psQuery: any = supabase.from("profiles").select("id,full_name,email");
+    let rsQuery: any = (supabase as any).from("user_roles").select("user_id,role");
+    let invQuery: any = (supabase as any)
       .from("allowed_signup_emails")
-      .select("id,email,role,full_name,created_at")
+      .select("id,email,role,full_name,created_at,branch_id")
       .order("created_at", { ascending: false });
-    const { data: brs } = await (supabase as any)
+    let brQuery: any = (supabase as any)
       .from("branches")
       .select("id,name_en,name_ar")
       .eq("is_active", true)
       .order("name_en");
-    const { data: sps } = await (supabase as any)
+    let spQuery: any = (supabase as any)
       .from("staff_profiles")
       .select("id,branch_id,employee_id,deleted_at,linked_user_id");
+
+    if (currentBranchId) {
+      const ids = scopedUserIds ?? [];
+      // An empty membership set must remain empty; never omit the filter and
+      // accidentally fall back to a global profiles/user_roles query.
+      if (ids.length) {
+        psQuery = psQuery.in("id", ids);
+        rsQuery = rsQuery.in("user_id", ids);
+      } else {
+        psQuery = psQuery.eq("id", "00000000-0000-0000-0000-000000000000");
+        rsQuery = rsQuery.eq("user_id", "00000000-0000-0000-0000-000000000000");
+      }
+      invQuery = invQuery.eq("branch_id", currentBranchId);
+      brQuery = brQuery.eq("id", currentBranchId);
+      spQuery = spQuery.eq("branch_id", currentBranchId);
+    }
+
+    const [{ data: ps }, { data: rs }, { data: inv }, { data: brs }, { data: sps }] = await Promise.all([
+      psQuery, rsQuery, invQuery, brQuery, spQuery,
+    ]);
     setUsers(ps ?? []);
     const m: Record<string, string[]> = {};
     (rs ?? []).forEach((r: any) => { (m[r.user_id] = m[r.user_id] || []).push(r.role); });
@@ -297,7 +328,7 @@ export default function UserManagement() {
     setStaffLinks(sb);
     setIsLoading(false);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [currentBranchId]);
 
   // Load employees in the current branch that don't yet have any user role assigned.
   // Loaded on branch/data change so the picker (and the "link" flow from any surface)
@@ -348,6 +379,7 @@ export default function UserManagement() {
       email,
       role: invRole,
       full_name: invName.trim() || null,
+      branch_id: invBranch || null,
       created_by: u.user?.id ?? null,
     });
     setSaving(false);

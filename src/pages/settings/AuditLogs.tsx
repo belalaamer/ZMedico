@@ -15,6 +15,7 @@ import { ListSkeleton } from "@/components/ListSkeleton";
 import { TablePager } from "@/components/TablePager";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useBranch } from "@/contexts/BranchContext";
 import { formatMoney } from "@/lib/format";
 import { patientDisplayName } from "@/lib/patientName";
 import { Info, AlertTriangle, ExternalLink } from "lucide-react";
@@ -261,6 +262,7 @@ function formatDateCell(iso: string, lang: "ar" | "en" | string) {
 
 export default function AuditLogs() {
   const { t, lang } = useI18n();
+  const { currentBranchId } = useBranch();
   const [items, setItems] = useState<AuditRow[]>([]);
   const [maps, setMaps] = useState<RecordMaps>(EMPTY_MAPS);
   const [isLoading, setIsLoading] = useState(true);
@@ -302,11 +304,13 @@ export default function AuditLogs() {
       setIsLoading(true);
       setLoadError(null);
 
-      const { data, error } = await (supabase as any)
+      let auditQuery = (supabase as any)
         .from("audit_logs")
-        .select("id,action,entity_type,entity_id,created_at,user_id,old_values,new_values")
+        .select("id,branch_id,action,entity_type,entity_id,created_at,user_id,old_values,new_values")
         .order("created_at", { ascending: false })
         .limit(100);
+      if (currentBranchId) auditQuery = auditQuery.eq("branch_id", currentBranchId);
+      const { data, error } = await auditQuery;
 
       if (!active) return;
 
@@ -441,7 +445,7 @@ export default function AuditLogs() {
     });
 
     return () => { active = false; };
-  }, [lang]);
+  }, [lang, currentBranchId]);
 
   const entityTypes = useMemo(() => {
     const s = new Set<string>();

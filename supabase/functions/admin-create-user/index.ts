@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
     // Pre-authorize email so handle_new_user trigger accepts the signup
     // and assigns the chosen role + name automatically.
     await admin.from("allowed_signup_emails").upsert(
-      { email, role, full_name, created_by: userData.user.id },
+      { email, role, full_name, branch_id, created_by: userData.user.id },
       { onConflict: "email" },
     );
 

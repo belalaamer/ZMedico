@@ -170,9 +170,17 @@ export default function PatientsPage() {
       whatsapp_opt_in_at: form.whatsapp_opt_in ? new Date().toISOString() : null,
       whatsapp_opt_in_source: form.whatsapp_opt_in ? "clinic_staff" : null,
     };
-    const { error } = await supabase.from("patients").insert(payload);
+    const { data: createdPatient, error } = await supabase.from("patients").insert(payload).select("id").single();
     if (error) { toast.error(error.message); return; }
     toast.success(lang === "ar" ? "تمت إضافة المريض" : "Patient added");
+    if (createdPatient?.id && d.email) {
+      const { data: portalResult, error: portalError } = await supabase.functions.invoke("patient-portal-invite", { body: { patient_id: createdPatient.id } });
+      if (portalError || portalResult?.error) {
+        toast.warning(lang === "ar" ? "تم إنشاء المريض، لكن تعذر إرسال دعوة البوابة. يمكنك إعادة المحاولة من ملف المريض." : "Patient created, but the portal invitation could not be sent. You can retry from the patient profile.");
+      } else {
+        toast.success(lang === "ar" ? "تم إرسال دعوة بوابة المريض إلى البريد الإلكتروني" : "Patient portal invitation sent by email");
+      }
+    }
     setOpen(false);
     setForm({ name_en: "", name_ar: "", phone: "", phone2: "", email: "", dob: "", gender: "", whatsapp_opt_in: false, blood_type: "", address: "", notes: "", referred_by_patient_id: null });
     load();

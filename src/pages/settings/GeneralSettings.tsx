@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Upload, ImageIcon } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
@@ -17,6 +18,7 @@ export default function GeneralSettings() {
   const { branches, currentBranchId } = useBranch();
   const [branchId, setBranchId] = useState<string>(currentBranchId ?? "");
   const [uploading, setUploading] = useState(false);
+  const [portalSettings, setPortalSettings] = useState({ portal_enabled: true, support_email: "", support_phone: "", complaint_instructions_ar: "", complaint_instructions_en: "" });
   const [form, setForm] = useState<any>({
     clinic_name_ar: "", clinic_name_en: "", logo_url: "", favicon_url: "",
     tagline_ar: "", tagline_en: "", description_ar: "", description_en: "",
@@ -31,6 +33,8 @@ export default function GeneralSettings() {
     if (!branchId) return;
     supabase.from("clinic_profile").select("*").eq("branch_id", branchId).maybeSingle()
       .then(({ data }) => { if (data) setForm({ ...form, ...data }); });
+    (supabase as any).from("patient_portal_settings").select("portal_enabled,support_email,support_phone,complaint_instructions_ar,complaint_instructions_en").eq("branch_id", branchId).maybeSingle()
+      .then(({ data }: any) => { if (data) setPortalSettings((current) => ({ ...current, ...data })); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [branchId]);
 
@@ -39,6 +43,8 @@ export default function GeneralSettings() {
     const payload = { ...form, branch_id: branchId };
     const { error } = await supabase.from("clinic_profile").upsert(payload, { onConflict: "branch_id" });
     if (error) return toast.error(error.message);
+    const { error: portalError } = await (supabase as any).from("patient_portal_settings").upsert({ ...portalSettings, branch_id: branchId }, { onConflict: "branch_id" });
+    if (portalError) return toast.error(portalError.message);
     toast.success(t("saved"));
   };
 
@@ -148,6 +154,17 @@ export default function GeneralSettings() {
               <div><Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">{t("city")}</Label><Input value={form.city ?? ""} onChange={e => setForm({ ...form, city: e.target.value })} /></div>
               <div><Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">Country</Label><Input value={form.country ?? ""} onChange={e => setForm({ ...form, country: e.target.value })} /></div>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm border-border/50">
+          <CardHeader>
+            <CardTitle>{lang === "ar" ? "بوابة المريض والشكاوى" : "Patient portal & complaints"}</CardTitle>
+            <CardDescription>{lang === "ar" ? "حدد قنوات التواصل التي تظهر للمريض بعد تسجيل الدخول إلى بوابته." : "Configure the contact channels patients see after signing in to their portal."}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="flex items-center justify-between gap-4 rounded-lg border p-4"><div><Label>{lang === "ar" ? "تفعيل بوابة المريض" : "Enable patient portal"}</Label><p className="mt-1 text-xs text-muted-foreground">{lang === "ar" ? "يمكن إيقاف الدخول لجميع مرضى هذا الفرع دون حذف بياناتهم." : "Disable portal access for this branch without deleting patient data."}</p></div><Switch checked={portalSettings.portal_enabled} onCheckedChange={(value) => setPortalSettings({ ...portalSettings, portal_enabled: value })} /></div>
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2"><div><Label>{lang === "ar" ? "بريد الشكاوى" : "Complaints email"}</Label><Input type="email" value={portalSettings.support_email} onChange={(e) => setPortalSettings({ ...portalSettings, support_email: e.target.value })} placeholder="support@clinic.com" /></div><div><Label>{lang === "ar" ? "هاتف الشكاوى" : "Complaints phone"}</Label><Input value={portalSettings.support_phone} onChange={(e) => setPortalSettings({ ...portalSettings, support_phone: e.target.value })} placeholder="+20..." /></div><div><Label>{lang === "ar" ? "تعليمات التواصل بالعربية" : "Arabic contact instructions"}</Label><Textarea dir="rtl" value={portalSettings.complaint_instructions_ar} onChange={(e) => setPortalSettings({ ...portalSettings, complaint_instructions_ar: e.target.value })} /></div><div><Label>{lang === "ar" ? "تعليمات التواصل بالإنجليزية" : "English contact instructions"}</Label><Textarea value={portalSettings.complaint_instructions_en} onChange={(e) => setPortalSettings({ ...portalSettings, complaint_instructions_en: e.target.value })} /></div></div>
           </CardContent>
         </Card>
 

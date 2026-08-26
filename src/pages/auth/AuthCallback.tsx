@@ -38,6 +38,8 @@ export default function AuthCallback() {
       const params = new URLSearchParams(location.search);
       const hashParams = new URLSearchParams(location.hash.replace(/^#/, ""));
       const code = params.get("code");
+      const tokenHash = params.get("token_hash");
+      const tokenType = params.get("type") || "invite";
       const providerError = params.get("error_description") || hashParams.get("error_description") || params.get("error") || hashParams.get("error");
       const next = safeRedirectPath(params.get("next") || hashParams.get("next") || "/");
 
@@ -69,9 +71,23 @@ export default function AuthCallback() {
         }
       }
 
+      if (!code && tokenHash) {
+        const { data, error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: tokenType as "invite" | "recovery" | "email" | "magiclink" });
+        persistAuthSessionForPreview(data.session, "callback-token-hash-verification");
+        console.info(AUTH_DEBUG_PREFIX, "callback invite token verification completed", {
+          hasSession: Boolean(data.session),
+          hasUser: Boolean(data.user),
+          error: error?.message ?? null,
+        });
+        if (error) {
+          if (!cancelled) setError(error.message);
+          return;
+        }
+      }
+
       const hashAccessToken = hashParams.get("access_token");
       const hashRefreshToken = hashParams.get("refresh_token");
-      if (!code && hashAccessToken && hashRefreshToken) {
+      if (!code && !tokenHash && hashAccessToken && hashRefreshToken) {
         const { data, error } = await supabase.auth.setSession({
           access_token: hashAccessToken,
           refresh_token: hashRefreshToken,

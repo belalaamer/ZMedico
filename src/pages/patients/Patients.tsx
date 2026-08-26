@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Phone, Mail, MapPin, MoreHorizontal, Calendar as CalendarIcon, FileText, Eye, Trash2, UserRound } from "lucide-react";
+import { Plus, Search, Phone, Mail, MapPin, MoreHorizontal, Calendar as CalendarIcon, FileText, Eye, Trash2, UserRound, Copy } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -85,6 +85,8 @@ export default function PatientsPage() {
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
   const [invoiceForPatient, setInvoiceForPatient] = useState<string | null>(null);
+  const [autoCreatePortalCredentials, setAutoCreatePortalCredentials] = useState(false);
+  const [portalCredentials, setPortalCredentials] = useState<{ email: string; username: string; password: string } | null>(null);
 
   const [form, setForm] = useState({
     name_en: "", name_ar: "", phone: "", phone2: "", email: "",
@@ -150,6 +152,10 @@ export default function PatientsPage() {
     const parsed = schema.safeParse(form);
     if (!parsed.success) { toast.error(parsed.error.issues[0]?.message ?? "Please check the form"); return; }
     const d = parsed.data;
+    if (autoCreatePortalCredentials && !d.email) {
+      toast.error(lang === "ar" ? "أدخل البريد الإلكتروني لتوليد بيانات دخول المريض" : "Enter an email to generate patient portal credentials");
+      return;
+    }
     const payload = {
       first_name_en: d.name_en?.trim() || d.name_ar?.trim() || "",
       last_name_en: null,
@@ -174,14 +180,18 @@ export default function PatientsPage() {
     if (error) { toast.error(error.message); return; }
     toast.success(lang === "ar" ? "تمت إضافة المريض" : "Patient added");
     if (createdPatient?.id && d.email) {
-      const { data: portalResult, error: portalError } = await supabase.functions.invoke("patient-portal-invite", { body: { patient_id: createdPatient.id } });
+      const { data: portalResult, error: portalError } = await supabase.functions.invoke("patient-portal-invite", { body: { patient_id: createdPatient.id, auto_credentials: autoCreatePortalCredentials } });
       if (portalError || portalResult?.error) {
         toast.warning(lang === "ar" ? "تم إنشاء المريض، لكن تعذر إرسال دعوة البوابة. يمكنك إعادة المحاولة من ملف المريض." : "Patient created, but the portal invitation could not be sent. You can retry from the patient profile.");
+      } else if (portalResult?.credentials) {
+        setPortalCredentials(portalResult.credentials);
+        toast.success(lang === "ar" ? "تم إنشاء بيانات الدخول المؤقتة" : "Temporary portal credentials created");
       } else {
         toast.success(lang === "ar" ? "تم إرسال دعوة بوابة المريض إلى البريد الإلكتروني" : "Patient portal invitation sent by email");
       }
     }
     setOpen(false);
+    setAutoCreatePortalCredentials(false);
     setForm({ name_en: "", name_ar: "", phone: "", phone2: "", email: "", dob: "", gender: "", whatsapp_opt_in: false, blood_type: "", address: "", notes: "", referred_by_patient_id: null });
     load();
   };
@@ -248,6 +258,13 @@ export default function PatientsPage() {
                 <div className="space-y-2">
                   <Label>{t("email")}</Label>
                   <Input dir="ltr" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} maxLength={255} />
+                </div>
+                <div className="sm:col-span-2 flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 p-3">
+                  <div>
+                    <Label>{lang === "ar" ? "إنشاء دخول بوابة المريض تلقائيًا" : "Create patient portal login automatically"}</Label>
+                    <p className="text-xs text-muted-foreground mt-1">{lang === "ar" ? "يتطلب بريدًا إلكترونيًا. سيتم توليد Username وكلمة مرور مؤقتة تظهر مرة واحدة بعد الحفظ." : "Requires an email. A username and temporary password will be generated and shown once after saving."}</p>
+                  </div>
+                  <Switch checked={autoCreatePortalCredentials} onCheckedChange={setAutoCreatePortalCredentials} disabled={!form.email.trim()} />
                 </div>
                 <div className="sm:col-span-2 flex items-center justify-between rounded-lg border p-3">
                   <div>
@@ -415,6 +432,21 @@ export default function PatientsPage() {
           <Plus className="size-6" />
         </Fab>
       </Can>
+
+      <Dialog open={!!portalCredentials} onOpenChange={(o) => !o && setPortalCredentials(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{lang === "ar" ? "بيانات دخول بوابة المريض" : "Patient portal credentials"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p className="text-muted-foreground">{lang === "ar" ? "هذه البيانات مؤقتة. سلّمها للمريض بطريقة آمنة، واطلب منه تغيير كلمة المرور بعد أول دخول. لن تظهر كلمة المرور مرة أخرى بعد إغلاق هذه النافذة." : "These credentials are temporary. Share them securely and ask the patient to change the password after the first sign-in. The password will not be shown again after closing this dialog."}</p>
+            <div className="rounded-md border bg-muted/30 p-3"><div className="text-xs text-muted-foreground">Email</div><div className="font-medium break-all">{portalCredentials?.email}</div></div>
+            <div className="rounded-md border bg-muted/30 p-3"><div className="text-xs text-muted-foreground">Username</div><div className="font-medium">{portalCredentials?.username}</div></div>
+            <div className="rounded-md border bg-muted/30 p-3"><div className="text-xs text-muted-foreground">Temporary password</div><div className="font-mono font-medium break-all">{portalCredentials?.password}</div></div>
+            <Button type="button" variant="outline" className="w-full" onClick={() => portalCredentials && navigator.clipboard.writeText(`Username: ${portalCredentials.username}\nPassword: ${portalCredentials.password}`)}><Copy className="me-2 size-4" />{lang === "ar" ? "نسخ بيانات الدخول" : "Copy credentials"}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!confirmDel} onOpenChange={(o) => !o && setConfirmDel(null)}>
         <AlertDialogContent>

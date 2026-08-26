@@ -11,6 +11,15 @@ function jsonResponse(body: unknown, status = 200) {
 function corsPreflight() { return new Response("ok", { headers: corsHeaders }); }
 
 const allowedRoles = new Set(["system_owner", "admin", "manager", "receptionist", "doctor", "nurse"]);
+function randomTemporaryPassword() {
+  const bytes = crypto.getRandomValues(new Uint8Array(18));
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
+  return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("");
+}
+function usernameBase(value: string) {
+  const normalized = value.normalize("NFKD").replace(/[^A-Za-z0-9]+/g, ".").replace(/^\.+|\.+$/g, "").toLowerCase();
+  return normalized.slice(0, 24) || "patient";
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return corsPreflight();
@@ -31,10 +40,11 @@ Deno.serve(async (req) => {
     const admin = createClient(supabaseUrl, serviceKey);
     const body = await req.json().catch(() => ({}));
     const patientId = typeof body.patient_id === "string" ? body.patient_id : "";
+    const autoCredentials = body.auto_credentials === true;
     if (!patientId) return jsonResponse({ error: "patient_id is required" }, 400);
 
     const [{ data: patient, error: patientError }, { data: roles }] = await Promise.all([
-      admin.from("patients").select("id,branch_id,email,first_name_en,last_name_en,first_name_ar,last_name_ar").eq("id", patientId).is("deleted_at", null).maybeSingle(),
+      admin.from("patients").select("id,patient_code,branch_id,email,first_name_en,last_name_en,first_name_ar,last_name_ar").eq("id", patientId).is("deleted_at", null).maybeSingle(),
       admin.from("user_roles").select("role").eq("user_id", callerData.user.id),
     ]);
     if (patientError || !patient) return jsonResponse({ error: "Patient not found" }, 404);
@@ -56,16 +66,30 @@ Deno.serve(async (req) => {
     }
 
     const fullName = [patient.first_name_en || patient.first_name_ar, patient.last_name_en || patient.last_name_ar].filter(Boolean).join(" ") || "Patient";
-    const redirectTo = `${Deno.env.get("PATIENT_PORTAL_ORIGIN") ?? "https://belalaamer.com"}/auth/callback?next=/patient-portal`;
-    const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(String(patient.email).trim().toLowerCase(), {
-      redirectTo,
-      data: { full_name: fullName, patient_portal: true, patient_id: patient.id },
-    });
+    let portalUsername: string | null = null;
+    let temporaryPassword: string | null = null;
+    if (autoCredentials) {
+      const base = usernameBase([patient.first_name_en, patient.last_name_en].filter(Boolean).join(" ") || `patient-${patient.patient_code}`);
+      for (let i = 0; i < 20; i++) {
+        const suffix = i === 0 ? "" : `.${i + 1}`;
+        const candidate = `${base.slice(0, 32 - suffix.length)}${suffix}`;
+        const { data: taken } = await admin.from("profiles").select("id").ilike("username", candidate).limit(1);
+        if (!taken?.length) { portalUsername = candidate; break; }
+      }
+      if (!portalUsername) return jsonResponse({ error: "Could not allocate a unique username" }, 409);
+      temporaryPassword = randomTemporaryPassword();
+    }
+    const email = String(patient.email).trim().toLowerCase();
+    const metadata = { full_name: fullName, patient_portal: true, patient_id: patient.id, portal_username: portalUsername, force_password_change: autoCredentials };
+    const { data: invited, error: inviteError } = autoCredentials
+      ? await admin.auth.admin.createUser({ email, password: temporaryPassword!, email_confirm: true, user_metadata: metadata })
+      : await admin.auth.admin.inviteUserByEmail(email, { redirectTo: `${Deno.env.get("PATIENT_PORTAL_ORIGIN") ?? "https://belalaamer.com"}/auth/callback?next=/patient-portal`, data: metadata });
     if (inviteError || !invited.user) return jsonResponse({ error: inviteError?.message ?? "Portal invitation failed" }, 400);
 
     // The generic signup trigger may provision a default staff role. A portal
     // identity is not staff and must never receive clinic operational access.
     await admin.from("user_roles").delete().eq("user_id", invited.user.id);
+    await admin.from("profiles").upsert({ id: invited.user.id, email, full_name: fullName, username: portalUsername }, { onConflict: "id" });
     const { data: branch } = await admin.from("branches").select("tenant_id").eq("id", patient.branch_id).maybeSingle();
     if (!branch?.tenant_id) return jsonResponse({ error: "Branch not found" }, 400);
 
@@ -83,7 +107,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: `Portal account provisioning failed: ${accountError.message}` }, 500);
     }
 
-    return new Response(JSON.stringify({ success: true, already_enabled: false, invitation_sent: true }), {
+    return new Response(JSON.stringify({ success: true, already_enabled: false, invitation_sent: !autoCredentials, credentials: autoCredentials && portalUsername && temporaryPassword ? { username: portalUsername, password: temporaryPassword, email } : null }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

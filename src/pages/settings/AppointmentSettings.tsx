@@ -11,6 +11,8 @@ import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+type CatalogService = { id: string; name_en: string; name_ar: string };
+
 type BookingResource = {
   id?: string;
   branch_id?: string;
@@ -37,6 +39,8 @@ export default function AppointmentSettings() {
     max_future_booking_days: 30, min_advance_booking_hours: 1,
   });
   const [resources, setResources] = useState<BookingResource[]>([]);
+  const [catalogServices, setCatalogServices] = useState<CatalogService[]>([]);
+  const [resourceServices, setResourceServices] = useState<Record<string, string[]>>({});
   const [newResource, setNewResource] = useState<BookingResource>({
     name_en: "", name_ar: "", resource_type: "room", capacity: 1, is_active: true, display_order: 0,
   });
@@ -47,10 +51,17 @@ export default function AppointmentSettings() {
     supabase.from("appointment_settings").select("*").eq("branch_id", branchId).maybeSingle()
       .then(({ data }) => { if (data) setF((current: any) => ({ ...current, ...data })); });
     void loadResources(branchId);
+    void loadCatalogServices();
   }, [branchId]);
 
+  const loadCatalogServices = async () => {
+    const { data, error } = await supabase.from("services").select("id,name_en,name_ar").eq("is_active", true).is("deleted_at", null).order("name_en").limit(200);
+    if (error) { toast.error(error.message); return; }
+    setCatalogServices((data ?? []) as CatalogService[]);
+  };
+
   const loadResources = async (selectedBranchId = branchId) => {
-    if (!selectedBranchId) { setResources([]); return; }
+    if (!selectedBranchId) { setResources([]); setResourceServices({}); return; }
     setResourcesLoading(true);
     const { data, error } = await resourceTable.from("booking_resources")
       .select("id,branch_id,name_en,name_ar,resource_type,capacity,is_active,display_order")
@@ -59,7 +70,15 @@ export default function AppointmentSettings() {
       .order("name_en", { ascending: true });
     setResourcesLoading(false);
     if (error) { toast.error(error.message); return; }
-    setResources((data ?? []) as BookingResource[]);
+    const nextResources = (data ?? []) as BookingResource[];
+    setResources(nextResources);
+    const { data: mappingData, error: mappingError } = await resourceTable.from("booking_resource_services").select("resource_id,service_id").in("resource_id", nextResources.map((resource) => resource.id));
+    if (mappingError && !String(mappingError.message).toLowerCase().includes("does not exist")) { toast.error(mappingError.message); return; }
+    const nextMapping: Record<string, string[]> = {};
+    (mappingData ?? []).forEach((row: { resource_id: string; service_id: string }) => {
+      nextMapping[row.resource_id] = [...(nextMapping[row.resource_id] ?? []), row.service_id];
+    });
+    setResourceServices(nextMapping);
   };
 
   const save = async () => {
@@ -75,10 +94,20 @@ export default function AppointmentSettings() {
     const nameAr = resource.name_ar.trim();
     if (!nameEn || !nameAr) return toast.error(lang === "ar" ? "اكتب اسم الغرفة بالعربية والإنجليزية" : "Enter the room name in Arabic and English");
     const capacity = Math.max(1, Math.min(100, Number(resource.capacity) || 1));
-    const { error } = await resourceTable.from("booking_resources").upsert({
+    const { data: saved, error } = await resourceTable.from("booking_resources").upsert({
       ...resource, id: resource.id, branch_id: branchId, name_en: nameEn, name_ar: nameAr, capacity,
-    });
+    }).select("id").single();
     if (error) { toast.error(error.message); return; }
+    const resourceId = saved?.id ?? resource.id;
+    if (resourceId) {
+      const { error: deleteMappingError } = await resourceTable.from("booking_resource_services").delete().eq("resource_id", resourceId);
+      if (deleteMappingError) { toast.error(deleteMappingError.message); return; }
+      const selectedServiceIds = resourceServices[resourceId] ?? [];
+      if (selectedServiceIds.length) {
+        const { error: insertMappingError } = await resourceTable.from("booking_resource_services").insert(selectedServiceIds.map((serviceId) => ({ resource_id: resourceId, service_id: serviceId, service_kind: "service" })));
+        if (insertMappingError) { toast.error(insertMappingError.message); return; }
+      }
+    }
     toast.success(lang === "ar" ? "تم حفظ المورد" : "Resource saved");
     await loadResources();
   };
@@ -86,6 +115,14 @@ export default function AppointmentSettings() {
   const addResource = async () => {
     await saveResource({ ...newResource, display_order: resources.length });
     setNewResource({ name_en: "", name_ar: "", resource_type: "room", capacity: 1, is_active: true, display_order: resources.length + 1 });
+  };
+
+  const toggleResourceService = (resourceId: string, serviceId: string, checked: boolean) => {
+    setResourceServices((current) => {
+      const selected = new Set(current[resourceId] ?? []);
+      if (checked) selected.add(serviceId); else selected.delete(serviceId);
+      return { ...current, [resourceId]: Array.from(selected) };
+    });
   };
 
   const deleteResource = async (resource: BookingResource) => {
@@ -143,6 +180,16 @@ export default function AppointmentSettings() {
                   <div><Label>{lang === "ar" ? "نشطة" : "Active"}</Label><div className="flex h-10 items-center"><Switch checked={resource.is_active} onCheckedChange={(value) => updateResource(resource.id!, { is_active: value })} /></div></div>
                   <Button variant="outline" onClick={() => saveResource(resource)}>{t("save")}</Button>
                   <Button variant="ghost" className="text-destructive" onClick={() => deleteResource(resource)}>{lang === "ar" ? "حذف" : "Remove"}</Button>
+                  <div className="md:col-span-6">
+                    <Label>{lang === "ar" ? "الخدمات المسموح بها (اختياري)" : "Allowed services (optional)"}</Label>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {catalogServices.length ? catalogServices.map((service) => {
+                        const checked = (resourceServices[resource.id!] ?? []).includes(service.id);
+                        return <label key={service.id} className="flex items-center gap-2 rounded-md border px-2 py-1 text-xs"><input type="checkbox" checked={checked} onChange={(event) => toggleResourceService(resource.id!, service.id, event.target.checked)} />{lang === "ar" ? service.name_ar : service.name_en}</label>;
+                      }) : <span className="text-xs text-muted-foreground">{lang === "ar" ? "لا توجد خدمات نشطة" : "No active services"}</span>}
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">{lang === "ar" ? "إذا لم تختر خدمات، تظل الغرفة متاحة لكل الخدمات. عند اختيار خدمة، ستستخدم هذه الخدمة الغرف المحددة لها فقط." : "With no selection, the room remains available for all services. Once a service is selected, it uses only rooms mapped to it."}</p>
+                  </div>
                 </div>
               ))}
             </div>

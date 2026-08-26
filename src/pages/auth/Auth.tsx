@@ -196,7 +196,7 @@ export default function AuthPage() {
           </h1>
             <p className="text-white/80">
             {isBrandedTenantHost
-              ? (lang === "ar" ? "مساحة تشغيل آمنة ومخصصة لفريق العيادة." : "A secure operational workspace for your clinic team.")
+              ? (lang === "ar" ? `إدارة ${brandName} ومتابعة أعمال فريقك من مكان واحد.` : `Manage ${brandName} and keep your team in sync from one place.`)
               : (lang === "ar" ? "إدارة المرضى، المواعيد، الفواتير، والفروع في مكان واحد." : "Patients, appointments, billing, and multi-branch — all in one place.")}
           </p>
         </div>

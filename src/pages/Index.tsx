@@ -37,15 +37,36 @@ export default function Index() {
 
   useEffect(() => {
     let cancelled = false;
-    void supabase
-      .from("subscription_plans")
-      .select("id,name_ar,name_en,price_monthly,currency,is_popular")
-      .eq("is_active", true)
-      .order("display_order")
-      .then(({ data }) => {
-        if (!cancelled) setPlans((data ?? []) as PublicPlan[]);
-      });
-    return () => { cancelled = true; };
+    const loadPlans = () => {
+      void supabase
+        .from("subscription_plans")
+        .select("id,name_ar,name_en,price_monthly,currency,is_popular")
+        .eq("is_active", true)
+        .order("display_order")
+        .then(({ data }) => {
+          if (!cancelled) setPlans((data ?? []) as PublicPlan[]);
+        });
+    };
+
+    // Pricing cards are below the fold and are not needed for the first paint.
+    // Defer this optional query so slow mobile connections can render the hero
+    // and primary actions without competing with the initial page load.
+    const idleWindow = window as Window & {
+      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    if (idleWindow.requestIdleCallback) {
+      const idleId = idleWindow.requestIdleCallback(loadPlans, { timeout: 2000 });
+      return () => {
+        cancelled = true;
+        idleWindow.cancelIdleCallback?.(idleId);
+      };
+    }
+    const timeoutId = window.setTimeout(loadPlans, 900);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
   }, []);
 
   const navItems = [

@@ -260,6 +260,19 @@ export default {
       });
     }
 
+    // Vite assets are content-hashed, so they can be cached immutably. This
+    // prevents repeat visits on mobile networks from revalidating and
+    // downloading the shared JavaScript/CSS bundle on every navigation.
+    if (request.method === "GET" && response.ok && pathname.startsWith("/assets/")) {
+      const headers = new Headers(response.headers);
+      if (isJavaScriptRequest && !contentType) {
+        headers.set("content-type", "text/javascript; charset=UTF-8");
+      }
+      headers.set("cache-control", "public, max-age=31536000, immutable");
+      headers.set("x-content-type-options", "nosniff");
+      return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+    }
+
     if (isHtmlRequest || (isJavaScriptRequest && !contentType)) {
       const headers = new Headers(response.headers);
       if (isHtmlRequest) {

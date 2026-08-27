@@ -30,7 +30,7 @@ export const CLINIC_MODULES: ClinicModuleDefinition[] = [
   { key: "appointments", nameAr: "المواعيد", nameEn: "Appointments", descriptionAr: "الحجز والتقويم والطابور", descriptionEn: "Booking, calendar and queue", group: "core", alwaysOn: true },
   { key: "medical", nameAr: "الملفات الطبية", nameEn: "Medical records", descriptionAr: "السجلات والاستشارات والوصفات", descriptionEn: "Records, consultations and prescriptions", group: "core", alwaysOn: true },
   { key: "invoices", nameAr: "الفوترة", nameEn: "Billing", descriptionAr: "الفواتير والمدفوعات والخزينة", descriptionEn: "Invoices, payments and treasury", group: "core", alwaysOn: true },
-  { key: "reports", nameAr: "التقارير", nameEn: "Reports", descriptionAr: "تقارير التشغيل والماليات", descriptionEn: "Operational and financial reports", group: "core", alwaysOn: true },
+  { key: "reports", nameAr: "التقارير المتقدمة", nameEn: "Advanced reports", descriptionAr: "تقارير التشغيل والماليات المتقدمة", descriptionEn: "Advanced operational and financial reports", group: "core" },
   { key: "communication", nameAr: "التواصل", nameEn: "Communication", descriptionAr: "التذكيرات وقنوات الرسائل", descriptionEn: "Reminders and messaging channels", group: "core", alwaysOn: true },
   { key: "physio", nameAr: "العلاج الطبيعي", nameEn: "Physiotherapy", descriptionAr: "الحالات والجلسات والمتابعات", descriptionEn: "Cases, sessions and follow-ups", group: "specialty" },
   { key: "dermatology", nameAr: "الجلدية", nameEn: "Dermatology", descriptionAr: "إجراءات الجلدية والزيارات", descriptionEn: "Dermatology visits and procedures", group: "specialty" },

@@ -10,8 +10,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CLINIC_MODULES, type ClinicModuleKey } from "@/lib/clinicModules";
 import { normalizeTenantSlug } from "@/lib/saasOnboarding";
+import { defaultModulesForPlan, planAllowsModule } from "@/lib/subscriptionEntitlements";
 
-type Plan = { id: string; name_ar: string; name_en: string; max_branches: number; max_staff: number; max_patients?: number; max_invoices_monthly?: number; price_monthly?: number; price_yearly?: number };
+type Plan = { id: string; name_ar: string; name_en: string; max_branches: number; max_staff: number; max_patients?: number; max_invoices_monthly?: number; price_monthly?: number; price_yearly?: number; features?: Record<string, boolean> };
 type Props = { open: boolean; onOpenChange: (open: boolean) => void; plans: Plan[]; onCreated: () => Promise<void> | void };
 
 type FormState = {
@@ -30,6 +31,10 @@ type FormState = {
 
 const coreKeys = new Set<ClinicModuleKey>(CLINIC_MODULES.filter((module) => module.alwaysOn).map((module) => module.key));
 
+function initialModules(plan: Plan | undefined) {
+  return new Set<ClinicModuleKey>(defaultModulesForPlan(plan?.features ?? {}));
+}
+
 export default function OnboardingWizard({ open, onOpenChange, plans, onCreated }: Props) {
   const { lang } = useI18n();
   const { toast } = useToast();
@@ -47,7 +52,7 @@ export default function OnboardingWizard({ open, onOpenChange, plans, onCreated 
   const reset = () => {
     setForm({ tenantName: "", slug: "", billingEmail: "", planId: "", branchNameEn: "", branchNameAr: "", phone: "", city: "", address: "", durationDays: "14", billingCycle: "monthly" });
     setSlugEdited(false);
-    setSelected(new Set(coreKeys));
+    setSelected(initialModules(undefined));
   };
 
   const close = (value: boolean) => {
@@ -111,7 +116,7 @@ export default function OnboardingWizard({ open, onOpenChange, plans, onCreated 
             <div className="space-y-1.5"><Label>{isAr ? "اسم العميل / العيادة" : "Tenant / clinic name"}</Label><Input value={form.tenantName} onChange={(e) => { update("tenantName", e.target.value); if (!slugEdited) update("slug", normalizeTenantSlug(e.target.value)); }} placeholder={isAr ? "عيادة النور" : "Al Noor Clinic"} /></div>
             <div className="space-y-1.5"><Label>Slug</Label><Input dir="ltr" value={form.slug} onChange={(e) => { setSlugEdited(true); update("slug", normalizeTenantSlug(e.target.value)); }} placeholder="al-noor-clinic" /><p className="text-xs text-muted-foreground">{isAr ? "حروف إنجليزية صغيرة وأرقام وشرطات فقط." : "Lowercase letters, numbers and hyphens only."}</p></div>
             <div className="space-y-1.5"><Label>{isAr ? "بريد الفوترة (اختياري)" : "Billing email (optional)"}</Label><Input type="email" value={form.billingEmail} onChange={(e) => update("billingEmail", e.target.value)} /></div>
-            <div className="space-y-1.5"><Label>{isAr ? "خطة الاشتراك" : "Subscription plan"}</Label><Select value={form.planId || "none"} onValueChange={(value) => update("planId", value === "none" ? "" : value)}><SelectTrigger><SelectValue placeholder={isAr ? "اختر الخطة" : "Choose a plan"} /></SelectTrigger><SelectContent><SelectItem value="none">{isAr ? "اختر الخطة" : "Choose a plan"}</SelectItem>{plans.map((plan) => <SelectItem key={plan.id} value={plan.id}>{isAr ? plan.name_ar : plan.name_en}</SelectItem>)}</SelectContent></Select>{form.planId ? <p className="text-xs text-muted-foreground">{(() => { const plan = plans.find((item) => item.id === form.planId); return plan ? `${plan.max_branches} ${isAr ? "فروع" : "branches"} · ${plan.max_staff} ${isAr ? "موظفين" : "staff"}` : ""; })()}</p> : null}</div>
+            <div className="space-y-1.5"><Label>{isAr ? "خطة الاشتراك" : "Subscription plan"}</Label><Select value={form.planId || "none"} onValueChange={(value) => { const planId = value === "none" ? "" : value; update("planId", planId); setSelected(initialModules(plans.find((plan) => plan.id === planId))); }}><SelectTrigger><SelectValue placeholder={isAr ? "اختر الخطة" : "Choose a plan"} /></SelectTrigger><SelectContent><SelectItem value="none">{isAr ? "اختر الخطة" : "Choose a plan"}</SelectItem>{plans.map((plan) => <SelectItem key={plan.id} value={plan.id}>{isAr ? plan.name_ar : plan.name_en}</SelectItem>)}</SelectContent></Select>{form.planId ? <p className="text-xs text-muted-foreground">{(() => { const plan = plans.find((item) => item.id === form.planId); return plan ? `${plan.max_branches} ${isAr ? "فروع" : "branches"} · ${plan.max_staff} ${isAr ? "موظفين" : "staff"}` : ""; })()}</p> : null}</div>
             <div className="space-y-1.5"><Label>{isAr ? "مدة التجربة / الاشتراك بالأيام" : "Trial / subscription duration (days)"}</Label><Input type="number" min={1} max={3650} value={form.durationDays} onChange={(e) => update("durationDays", e.target.value)} /></div>
             <div className="space-y-1.5"><Label>{isAr ? "دورة الفوترة" : "Billing cycle"}</Label><Select value={form.billingCycle} onValueChange={(value) => update("billingCycle", value as FormState["billingCycle"])}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="monthly">{isAr ? "شهري" : "Monthly"}</SelectItem><SelectItem value="yearly">{isAr ? "سنوي" : "Yearly"}</SelectItem></SelectContent></Select></div>
           </div>
@@ -129,9 +134,9 @@ export default function OnboardingWizard({ open, onOpenChange, plans, onCreated 
         </section>
 
         <section className="space-y-3 border-t pt-4">
-          <div><div className="font-semibold">{isAr ? "الوحدات المفعلة" : "Enabled modules"}</div><p className="text-xs text-muted-foreground">{isAr ? "الوحدات الأساسية مطلوبة. الوحدات التخصصية والتجارية اختيارية ويمكن تغييرها لاحقًا." : "Core modules are required. Specialty and business modules are optional and can be changed later."}</p></div>
+          <div><div className="font-semibold">{isAr ? "الوحدات المفعلة" : "Enabled modules"}</div><p className="text-xs text-muted-foreground">{isAr ? "الوحدات الأساسية مفعلة دائمًا. الوحدات التي لا تشملها الخطة تظهر معطلة ولا يمكن إرسالها إلى قاعدة البيانات." : "Core modules are always enabled. Modules not included in the selected plan are disabled and cannot be sent to the database."}</p></div>
           <div className="grid gap-4 sm:grid-cols-2">
-            {groups.map((group) => <div key={group.key} className="space-y-2"><div className="text-sm font-medium text-muted-foreground">{group.title}</div>{CLINIC_MODULES.filter((module) => module.group === group.key).map((module) => { const enabled = selected.has(module.key); return <label key={module.key} className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border p-3 has-[:disabled]:cursor-default has-[:disabled]:bg-muted/40"><span><span className="block text-sm font-medium">{isAr ? module.nameAr : module.nameEn}</span><span className="block text-xs text-muted-foreground">{isAr ? module.descriptionAr : module.descriptionEn}</span></span><input type="checkbox" checked={enabled} onChange={() => setSelected((current) => { const next = new Set(current); if (next.has(module.key)) next.delete(module.key); else next.add(module.key); return next; })} className="size-4 accent-primary" /></label>; })}</div>)}
+            {groups.map((group) => <div key={group.key} className="space-y-2"><div className="text-sm font-medium text-muted-foreground">{group.title}</div>{CLINIC_MODULES.filter((module) => module.group === group.key && !module.alwaysOn).map((module) => { const enabled = selected.has(module.key); const planAllowed = planAllowsModule(module.key, plans.find((plan) => plan.id === form.planId)?.features ?? {}); return <label key={module.key} className={`flex items-center justify-between gap-3 rounded-lg border p-3 ${planAllowed ? "cursor-pointer" : "cursor-not-allowed bg-muted/40 opacity-70"}`}><span><span className="block text-sm font-medium">{isAr ? module.nameAr : module.nameEn}</span><span className="block text-xs text-muted-foreground">{isAr ? module.descriptionAr : module.descriptionEn}</span>{!planAllowed ? <span className="mt-1 block text-[11px] font-medium text-amber-700 dark:text-amber-300">{isAr ? "غير متاحة في الخطة الحالية" : "Not included in selected plan"}</span> : null}</span><input type="checkbox" checked={enabled} disabled={!planAllowed} onChange={() => setSelected((current) => { const next = new Set(current); if (next.has(module.key)) next.delete(module.key); else next.add(module.key); return next; })} className="size-4 accent-primary" /></label>; })}</div>)}
           </div>
           <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">{CLINIC_MODULES.filter((module) => module.alwaysOn).map((module) => <span key={module.key} className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1"><Check className="size-3" />{isAr ? module.nameAr : module.nameEn}</span>)}</div>
         </section>

@@ -17,6 +17,7 @@ const FEATURE_KEYS = [
   { key: "invoices", en: "Invoicing & payments", ar: "الفواتير والمدفوعات" },
   { key: "inventory", en: "Inventory & purchase orders", ar: "المخزون وأوامر الشراء" },
   { key: "hr", en: "HR & attendance", ar: "الموارد البشرية والحضور" },
+  { key: "marketing", en: "Marketing & CRM", ar: "التسويق وCRM" },
   { key: "reports", en: "Advanced reports", ar: "التقارير المتقدمة" },
   { key: "whatsapp", en: "WhatsApp / SMS reminders", ar: "تذكيرات واتساب / SMS" },
   { key: "api", en: "API access", ar: "الوصول إلى API" },

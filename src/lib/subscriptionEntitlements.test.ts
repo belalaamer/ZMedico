@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_ENABLED_MODULES, moduleKeyForPath, type ClinicModuleKey } from "@/lib/clinicModules";
 import {
+  defaultModulesForPlan,
   filterModulesByPlan,
   isModuleEnabledForEntitlement,
   planAllowsModule,
@@ -46,6 +47,27 @@ describe("subscription entitlements", () => {
   it("does not treat unrelated feature names as module grants", () => {
     expect(planAllowsModule("physio", { max_cases: true })).toBe(true);
     expect(planAllowsModule("physio", { physio: false, another_feature: true })).toBe(false);
+  });
+
+  it("keeps the core enabled and maps plan-gated modules consistently", () => {
+    const basic = defaultModulesForPlan({ reports: false, inventory: false, hr: false });
+    const professional = defaultModulesForPlan({ reports: true, inventory: true, hr: true, marketing: false });
+    const enterprise = defaultModulesForPlan({ reports: true, inventory: true, hr: true, marketing: true });
+
+    expect(basic).toEqual(expect.arrayContaining(["dashboard", "patients", "appointments", "medical", "invoices", "communication"]));
+    expect(basic).not.toContain("reports");
+    expect(basic).not.toContain("inventory");
+    expect(basic).not.toContain("hr");
+    expect(professional).toEqual(expect.arrayContaining(["reports", "inventory", "hr"]));
+    expect(professional).not.toContain("marketing");
+    expect(enterprise).toContain("marketing");
+    expect(enterprise).not.toContain("physio");
+  });
+
+  it("does not allow a disabled plan-gated module even when a tenant payload requests it", () => {
+    expect(planAllowsModule("reports", { reports: false })).toBe(false);
+    expect(planAllowsModule("inventory", { inventory: false })).toBe(false);
+    expect(planAllowsModule("reports", { reports: true })).toBe(true);
   });
 });
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, Clock3, Loader2, Mail, Phone, Rocket, UserRound, X } from "lucide-react";
+import { Check, Clock3, Loader2, Mail, Phone, Rocket, Trash2, UserRound, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CLINIC_MODULES, type ClinicModuleKey } from "@/lib/clinicModules";
 import { normalizeTenantSlug } from "@/lib/saasOnboarding";
+import { defaultModulesForPlan, planAllowsModule } from "@/lib/subscriptionEntitlements";
 
 type RequestRow = {
   id: string;
@@ -69,11 +70,7 @@ function statusLabel(status: string, isAr: boolean) {
 }
 
 function initialModules(plan: Plan | undefined) {
-  const selected = new Set<ClinicModuleKey>(coreKeys);
-  for (const module of CLINIC_MODULES) {
-    if (!module.alwaysOn && plan?.features?.[module.key]) selected.add(module.key);
-  }
-  return selected;
+  return new Set<ClinicModuleKey>(defaultModulesForPlan(plan?.features ?? {}));
 }
 
 export default function SubscriptionRequestsPanel({ onChanged }: Props) {
@@ -87,6 +84,8 @@ export default function SubscriptionRequestsPanel({ onChanged }: Props) {
   const [updating, setUpdating] = useState<string | null>(null);
   const [provisioning, setProvisioning] = useState(false);
   const [provisionRequest, setProvisionRequest] = useState<RequestRow | null>(null);
+  const [deleteRequest, setDeleteRequest] = useState<RequestRow | null>(null);
+  const [deletingRequest, setDeletingRequest] = useState(false);
   const [slugEdited, setSlugEdited] = useState(false);
   const [form, setForm] = useState<ProvisionForm>({
     tenantName: "",
@@ -217,7 +216,36 @@ export default function SubscriptionRequestsPanel({ onChanged }: Props) {
     await load();
   };
 
+  const deleteSelectedRequest = async () => {
+    if (!deleteRequest) return;
+    setDeletingRequest(true);
+    const { error } = await supabase.rpc("platform_delete_subscription_request" as never, { p_request_id: deleteRequest.id } as never);
+    setDeletingRequest(false);
+    if (error) {
+      toast({ title: isAr ? "تعذر حذف الطلب" : "Unable to delete the request", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: isAr ? "تم حذف طلب الاشتراك" : "Subscription request deleted" });
+    setDeleteRequest(null);
+    await onChanged?.();
+    await load();
+  };
+
+  const closeSelectedRequest = async (row: RequestRow) => {
+    setUpdating(row.id);
+    const { error } = await supabase.rpc("platform_close_subscription_request" as never, { p_request_id: row.id } as never);
+    setUpdating(null);
+    if (error) {
+      toast({ title: isAr ? "تعذر إغلاق الطلب" : "Unable to close the request", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: isAr ? "تم إغلاق سجل الطلب" : "Request record closed" });
+    await onChanged?.();
+    await load();
+  };
+
   const groups = useMemo(() => [
+    { key: "core", title: isAr ? "الوحدات المدفوعة" : "Plan-gated modules" },
     { key: "specialty", title: isAr ? "الوحدات التخصصية" : "Specialty modules" },
     { key: "business", title: isAr ? "وحدات الأعمال" : "Business modules" },
   ], [isAr]);
@@ -249,6 +277,7 @@ export default function SubscriptionRequestsPanel({ onChanged }: Props) {
                 {row.status === "pending" || row.status === "contacted" ? <Button size="sm" onClick={() => void updateRequest(row.id, "approved")} disabled={updating === row.id}>{updating === row.id ? <Loader2 className="me-1 size-3.5 animate-spin" /> : <Check className="me-1 size-3.5" />}{isAr ? "موافقة فقط" : "Approve only"}</Button> : null}
                 {row.status === "approved" && !row.provisioned_tenant_id ? <Button size="sm" onClick={() => openProvisioning(row)}><Rocket className="me-1 size-3.5" />{isAr ? "مراجعة وإنشاء النظام" : "Review & create workspace"}</Button> : null}
                 {row.status === "pending" || row.status === "contacted" ? <Button size="sm" variant="ghost" className="text-destructive" onClick={() => void updateRequest(row.id, "rejected")} disabled={updating === row.id}><X className="me-1 size-3.5" />{isAr ? "رفض" : "Reject"}</Button> : null}
+                {!row.provisioned_tenant_id ? <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setDeleteRequest(row)} disabled={updating === row.id}><Trash2 className="me-1 size-3.5" />{isAr ? "حذف الطلب" : "Delete request"}</Button> : row.status !== "closed" ? <Button size="sm" variant="ghost" onClick={() => void closeSelectedRequest(row)} disabled={updating === row.id}>{updating === row.id ? <Loader2 className="me-1 size-3.5 animate-spin" /> : null}{isAr ? "إغلاق السجل" : "Close record"}</Button> : null}
               </div>
             </div>
           </div>)}
@@ -269,7 +298,7 @@ export default function SubscriptionRequestsPanel({ onChanged }: Props) {
               <div className="space-y-1.5"><Label>{isAr ? "اسم العميل / العيادة" : "Tenant / clinic name"}</Label><Input value={form.tenantName} onChange={(e) => { const value = e.target.value; setForm((current) => ({ ...current, tenantName: value, slug: slugEdited ? current.slug : normalizeTenantSlug(value) })); }} /></div>
               <div className="space-y-1.5"><Label>Slug</Label><Input dir="ltr" value={form.slug} onChange={(e) => { setSlugEdited(true); setForm((current) => ({ ...current, slug: normalizeTenantSlug(e.target.value) })); }} /><p className="text-xs text-muted-foreground">{isAr ? "حروف إنجليزية صغيرة وأرقام وشرطات فقط." : "Lowercase letters, numbers and hyphens only."}</p></div>
               <div className="space-y-1.5"><Label>{isAr ? "بريد الفوترة" : "Billing email"}</Label><Input type="email" value={form.billingEmail} onChange={(e) => setForm((current) => ({ ...current, billingEmail: e.target.value }))} /></div>
-              <div className="space-y-1.5"><Label>{isAr ? "الخطة" : "Plan"}</Label><Select value={form.planId || "none"} onValueChange={(value) => { const planId = value === "none" ? "" : value; setForm((current) => ({ ...current, planId })); setSelectedModules(initialModules(plans.find((plan) => plan.id === planId))); }}><SelectTrigger><SelectValue placeholder={isAr ? "اختر الخطة" : "Choose a plan"} /></SelectTrigger><SelectContent><SelectItem value="none">{isAr ? "اختر الخطة" : "Choose a plan"}</SelectItem>{plans.map((plan) => <SelectItem key={plan.id} value={plan.id}>{isAr ? plan.name_ar : plan.name_en}</SelectItem>)}</SelectContent></Select></div>
+              <div className="space-y-1.5"><Label>{isAr ? "الخطة" : "Plan"}</Label><Select value={form.planId || "none"} onValueChange={(value) => { const planId = value === "none" ? "" : value; setForm((current) => ({ ...current, planId })); setSelectedModules(initialModules(plans.find((plan) => plan.id === planId))); }}><SelectTrigger><SelectValue placeholder={isAr ? "اختر الخطة" : "Choose a plan"} /></SelectTrigger><SelectContent><SelectItem value="none">{isAr ? "اختر الخطة" : "Choose a plan"}</SelectItem>{plans.map((plan) => <SelectItem key={plan.id} value={plan.id}>{isAr ? plan.name_ar : plan.name_en}</SelectItem>)}</SelectContent></Select>{form.planId ? <div className="mt-2 rounded-lg bg-muted/50 p-2 text-xs"><span className="font-medium">{isAr ? "مميزات الخطة:" : "Plan features:"}</span> {Object.entries(plans.find((plan) => plan.id === form.planId)?.features ?? {}).filter(([, enabled]) => enabled).map(([key]) => ({ dashboard: isAr ? "لوحة التحكم" : "Dashboard", patients: isAr ? "المرضى" : "Patients", appointments: isAr ? "المواعيد" : "Appointments", invoices: isAr ? "الفوترة" : "Billing", reports: isAr ? "التقارير المتقدمة" : "Advanced reports", inventory: isAr ? "المخزون" : "Inventory", hr: isAr ? "الموارد البشرية" : "HR", marketing: isAr ? "التسويق" : "Marketing", whatsapp: isAr ? "واتساب وSMS" : "WhatsApp/SMS", api: "API", priority_support: isAr ? "دعم أولوية" : "Priority support" } as Record<string, string>)[key] ?? key).join(isAr ? "، " : ", ")}</div> : null}</div>
               <div className="space-y-1.5"><Label>{isAr ? "المدة بالأيام" : "Term length (days)"}</Label><Input type="number" min={1} max={3650} value={form.durationDays} onChange={(e) => setForm((current) => ({ ...current, durationDays: e.target.value }))} /></div>
               <div className="space-y-1.5"><Label>{isAr ? "دورة الفوترة" : "Billing cycle"}</Label><Select value={form.billingCycle} onValueChange={(value) => setForm((current) => ({ ...current, billingCycle: value as ProvisionForm["billingCycle"] }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="monthly">{isAr ? "شهري" : "Monthly"}</SelectItem><SelectItem value="yearly">{isAr ? "سنوي" : "Yearly"}</SelectItem></SelectContent></Select></div>
             </div>
@@ -285,11 +314,19 @@ export default function SubscriptionRequestsPanel({ onChanged }: Props) {
             </div>
           </section>
           <section className="space-y-3 border-t pt-4">
-            <div><div className="font-semibold">{isAr ? "الوحدات المفعلة" : "Enabled modules"}</div><p className="text-xs text-muted-foreground">{isAr ? "الوحدات الأساسية مفعلة دائمًا، ويمكنك مراجعة الوحدات الاختيارية قبل الإنشاء." : "Core modules are always enabled; review optional modules before creation."}</p></div>
-            <div className="grid gap-4 sm:grid-cols-2">{groups.map((group) => <div key={group.key} className="space-y-2"><div className="text-sm font-medium text-muted-foreground">{group.title}</div>{CLINIC_MODULES.filter((module) => module.group === group.key).map((module) => { const enabled = selectedModules.has(module.key); return <label key={module.key} className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border p-3"><span><span className="block text-sm font-medium">{isAr ? module.nameAr : module.nameEn}</span><span className="block text-xs text-muted-foreground">{isAr ? module.descriptionAr : module.descriptionEn}</span></span><input type="checkbox" checked={enabled} onChange={() => setSelectedModules((current) => { const next = new Set(current); if (next.has(module.key)) next.delete(module.key); else next.add(module.key); return next; })} className="size-4 accent-primary" /></label>; })}</div>)}</div>
+            <div><div className="font-semibold">{isAr ? "الوحدات المفعلة" : "Enabled modules"}</div><p className="text-xs text-muted-foreground">{isAr ? "لوحة التحكم والمرضى والمواعيد والملفات الطبية والفوترة والتواصل أساسية دائمًا. أما التقارير والمخزون والموارد البشرية والتسويق فتتبع الخطة." : "Dashboard, patients, appointments, medical records, billing and communication are always included. Reports, inventory, HR and marketing follow the selected plan."}</p><div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">{CLINIC_MODULES.filter((module) => module.alwaysOn).map((module) => <span key={module.key} className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1"><Check className="size-3" />{isAr ? module.nameAr : module.nameEn}</span>)}</div></div>
+            <div className="grid gap-4 sm:grid-cols-2">{groups.map((group) => <div key={group.key} className="space-y-2"><div className="text-sm font-medium text-muted-foreground">{group.title}</div>{CLINIC_MODULES.filter((module) => module.group === group.key && !module.alwaysOn).map((module) => { const enabled = selectedModules.has(module.key); const planAllowed = planAllowsModule(module.key, plans.find((plan) => plan.id === form.planId)?.features ?? {}); return <label key={module.key} className={`flex items-center justify-between gap-3 rounded-lg border p-3 ${planAllowed ? "cursor-pointer" : "cursor-not-allowed bg-muted/40 opacity-70"}`}><span><span className="block text-sm font-medium">{isAr ? module.nameAr : module.nameEn}</span><span className="block text-xs text-muted-foreground">{isAr ? module.descriptionAr : module.descriptionEn}</span>{!planAllowed ? <span className="mt-1 block text-[11px] font-medium text-amber-700 dark:text-amber-300">{isAr ? "غير متاحة في الخطة الحالية" : "Not included in selected plan"}</span> : null}</span><input type="checkbox" checked={enabled} disabled={!planAllowed} onChange={() => setSelectedModules((current) => { const next = new Set(current); if (next.has(module.key)) next.delete(module.key); else next.add(module.key); return next; })} className="size-4 accent-primary" /></label>; })}</div>)}</div>
           </section>
         </div>
         <DialogFooter><Button variant="outline" onClick={() => closeProvisioning(false)} disabled={provisioning}>{isAr ? "إلغاء" : "Cancel"}</Button><Button onClick={() => void submitProvisioning()} disabled={provisioning}>{provisioning ? <Loader2 className="me-2 size-4 animate-spin" /> : <Rocket className="me-2 size-4" />}{isAr ? "تأكيد وإنشاء Workspace" : "Confirm & create workspace"}</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog open={!!deleteRequest} onOpenChange={(open) => { if (!open && !deletingRequest) setDeleteRequest(null); }}>
+      <DialogContent dir={isAr ? "rtl" : "ltr"} className="max-w-md">
+        <DialogHeader><DialogTitle className="flex items-center gap-2 text-destructive"><Trash2 className="size-5" />{isAr ? "حذف طلب الاشتراك" : "Delete subscription request"}</DialogTitle></DialogHeader>
+        <div className="space-y-3 text-sm"><p>{isAr ? `سيتم حذف طلب ${deleteRequest?.clinic_name ?? ""} نهائيًا من قائمة الطلبات فقط.` : `This will permanently remove the request for ${deleteRequest?.clinic_name ?? ""} from the request list only.`}</p><p className="text-muted-foreground">{isAr ? "لا يمكن استخدام هذا الإجراء بعد إنشاء Workspace؛ عندها استخدم إغلاق السجل أو أرشف مساحة العمل." : "This action is unavailable after a Workspace is provisioned; close the record or archive the workspace instead."}</p></div>
+        <DialogFooter><Button variant="outline" onClick={() => setDeleteRequest(null)} disabled={deletingRequest}>{isAr ? "إلغاء" : "Cancel"}</Button><Button variant="destructive" onClick={() => void deleteSelectedRequest()} disabled={deletingRequest}>{deletingRequest ? <Loader2 className="me-2 size-4 animate-spin" /> : <Trash2 className="me-2 size-4" />}{isAr ? "تأكيد الحذف" : "Confirm delete"}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   </>;

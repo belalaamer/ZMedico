@@ -31,6 +31,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
   const brandName = branding?.display_name ?? t("appName");
   const { currentBranchId, branchSelectionReady, isModuleEnabled } = useBranch();
   const { pathname, search } = useLocation();
+  const branchAwarePath = (to: string) => currentBranchId ? `${to}?branch=${encodeURIComponent(currentBranchId)}` : to;
   const [alertCount, setAlertCount] = useState(0);
   const { authz, loading: authzLoading } = useAuthorization("sidebar");
   const isSystemOwner = authz.holdsAnyRole("system_owner");
@@ -60,7 +61,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
 
   const dashboardItem: NavItem = isPlatformSurface
     ? { to: "/platform", icon: Building2, label: lang === "ar" ? "إدارة المنصة" : "Platform Console", end: true }
-    : { to: "/workspace", icon: LayoutDashboard, label: t("dashboard"), end: true };
+    : { to: branchAwarePath("/workspace"), icon: LayoutDashboard, label: t("dashboard"), end: true };
   const reportItems = useMemo(() => {
     const labels: Record<ReportNavigationKey, string> = {
       financial: t("financialReports"),
@@ -279,7 +280,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
                 <div className="overflow-hidden min-h-0">
                   <div className="space-y-1 pt-1">
                     {g.items.map((it) => (
-                      <NavLink key={it.to} to={it.to} onClick={onNavigate} tabIndex={isOpen ? 0 : -1}
+                      <NavLink key={it.to} to={branchAwarePath(it.to)} onClick={onNavigate} tabIndex={isOpen ? 0 : -1}
                         className={({ isActive }) => cn(
                           "flex min-h-11 items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors duration-150 touch-manipulation",
                           isActive

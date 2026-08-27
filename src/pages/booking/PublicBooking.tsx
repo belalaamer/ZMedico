@@ -220,6 +220,11 @@ export default function PublicBooking() {
   }, [branch]);
 
   useEffect(() => {
+    // A doctor selection belongs to the current branch + catalog item. Clear it
+    // immediately so a previous service cannot leak into the next request while
+    // the service-aware doctor list is loading.
+    setDoctorId("");
+    setDoctors([]);
     if (!branchId || !serviceId) return;
     let cancelled = false;
     (async () => {
@@ -236,7 +241,6 @@ export default function PublicBooking() {
       }
       const eligible = (data ?? []) as Doctor[];
       setDoctors(eligible);
-      if (doctorId && !eligible.some((doctor) => doctor.id === doctorId)) setDoctorId("");
     })();
     return () => { cancelled = true; };
   }, [branchId, serviceId, service?.source]);

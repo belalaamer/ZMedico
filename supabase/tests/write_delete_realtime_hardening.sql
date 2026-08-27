@@ -1,7 +1,7 @@
 -- Structural contract for write/delete and private Realtime hardening.
 -- This test is not applied to Production and does not create business rows.
 begin;
-select plan(14);
+select plan(17);
 
 select ok(
   exists (
@@ -95,6 +95,46 @@ select ok(
   exists (select 1 from pg_policies where schemaname='realtime' and tablename='messages' and policyname='zmedico_private_topic_read' and qual::text like '%can_access_realtime_topic%')
     and exists (select 1 from pg_policies where schemaname='realtime' and tablename='messages' and policyname='zmedico_private_topic_send' and with_check::text like '%can_access_realtime_topic%'),
   'private Realtime policies delegate access to the topic guard'
+);
+
+select is(
+  (select count(*) from pg_proc p
+   join pg_namespace n on n.oid=p.pronamespace
+   where n.nspname='public'
+     and p.proname in (
+       'enforce_doctor_service_eligibility','ensure_appointment_reminders',
+       'set_doctor_service_assignment_tenant','set_patient_portal_settings_tenant',
+       'sync_patient_portal_branch_enabled','tg_public_booking_request_defaults',
+       'trg_invoice_enqueue_communication','trg_payment_enqueue_communication'
+     )
+     and NOT has_function_privilege('anon', p.oid, 'EXECUTE')),
+  8::bigint,
+  'internal trigger and setter functions are not executable by anon'
+);
+select is(
+  (select count(*) from pg_proc p
+   join pg_namespace n on n.oid=p.pronamespace
+   where n.nspname='public'
+     and p.proname in (
+       'enforce_doctor_service_eligibility','ensure_appointment_reminders',
+       'set_doctor_service_assignment_tenant','set_patient_portal_settings_tenant',
+       'sync_patient_portal_branch_enabled','tg_public_booking_request_defaults',
+       'trg_invoice_enqueue_communication','trg_payment_enqueue_communication'
+     )
+     and NOT has_function_privilege('authenticated', p.oid, 'EXECUTE')),
+  8::bigint,
+  'internal trigger and setter functions are not executable by authenticated'
+);
+
+select ok(
+  exists (
+    select 1 from pg_class c
+    join pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='public'
+      and c.relname='safe_notification_settings'
+      and c.reloptions @> array['security_invoker=true']
+  ),
+  'safe notification settings view uses security_invoker'
 );
 
 select * from finish();

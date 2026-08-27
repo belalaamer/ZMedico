@@ -140,7 +140,7 @@ export default function AppointmentSettings() {
   return (
     <SettingsLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between flex-wrap gap-3 sticky top-0 z-20 bg-background/80 backdrop-blur-md py-3 -mx-1 px-1 border-b">
+        <div className="flex items-center justify-between flex-wrap gap-3 bg-background border-b border-border/60 py-3 -mx-1 px-1">
           <h1 className="text-2xl font-bold">{t("appointmentSettings")}</h1>
           <div className="flex items-center gap-2 flex-wrap">
             <Select value={branchId} onValueChange={setBranchId}>

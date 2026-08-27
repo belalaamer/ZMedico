@@ -74,7 +74,7 @@ export default function GeneralSettings() {
   return (
     <SettingsLayout>
       <div className="pb-24">
-        <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-xl border-b border-border/60 py-4 px-6 -mx-1 flex justify-between items-center flex-wrap gap-3 shadow-sm mb-6">
+        <div className="bg-background border-b border-border/60 py-4 px-1 flex justify-between items-center flex-wrap gap-3 mb-6">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{t("clinicProfile")}</h1>
             <p className="text-sm text-muted-foreground mt-0.5">

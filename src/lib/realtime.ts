@@ -52,6 +52,8 @@ export interface SubscribeResilientOptions {
   onReconnect?: () => void;
   /** Cap on backoff between reconnect attempts. Defaults to 30s. */
   maxBackoffMs?: number;
+  /** Use a private Realtime channel. Defaults to true for tenant-scoped data. */
+  private?: boolean;
 }
 
 /** Remove a channel off the current call stack, never throwing or rejecting. */
@@ -86,7 +88,9 @@ export function subscribeResilient(opts: SubscribeResilientOptions): () => void 
   const connect = () => {
     if (stopped) return;
     const topic = `${opts.name}-${Math.random().toString(36).slice(2, 8)}`;
-    const ch = opts.bind(supabase.channel(topic));
+    const ch = opts.bind(supabase.channel(topic, {
+      config: { private: opts.private ?? true },
+    }));
     current = ch;
     ch.subscribe((status: string) => {
       if (stopped) return;

@@ -54,15 +54,16 @@ export default function StockOverview() {
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, [branchSelectionReady, currentBranchId, subscription?.tenant_id]);
 
   useEffect(() => {
+    if (!branchSelectionReady || !currentBranchId) return () => {};
     const onFocus = () => load();
     const onVisible = () => { if (document.visibilityState === "visible") load(); };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisible);
     const stop = subscribeResilient({
-      name: "stock-overview-sync",
+      name: `stock-overview-sync:${currentBranchId}`,
       bind: (ch) => ch
         .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => load())
-        .on("postgres_changes", { event: "*", schema: "public", table: "inventory" }, () => load()),
+        .on("postgres_changes", { event: "*", schema: "public", table: "inventory", filter: `branch_id=eq.${currentBranchId}` }, () => load()),
       onReconnect: () => load(),
     });
     return () => {

@@ -273,7 +273,7 @@ async function probeRealtime(branchId: string): Promise<{ ok: boolean; elapsedMs
       resolve(val);
     };
     const channel = (supabase as any)
-      .channel(`audit_probe:${branchId}:${Date.now()}:${Math.random().toString(36).slice(2, 6)}`)
+      .channel(`audit_probe:${branchId}:${Date.now()}:${Math.random().toString(36).slice(2, 6)}`, { config: { private: true } })
       .on("postgres_changes", { event: "*", schema: "public", table: "queue_alerts", filter: `branch_id=eq.${branchId}` }, () => {})
       .subscribe((status: string) => {
         lastStatus = status;

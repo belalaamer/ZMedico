@@ -14,6 +14,8 @@ export type Branch = { id: string; name_en: string; name_ar: string };
 export type TenantSubscriptionSnapshot = {
   tenant_id: string;
   tenant_name: string;
+  tenant_name_en: string | null;
+  tenant_name_ar: string | null;
   tenant_slug: string;
   plan_id: string | null;
   plan_name_ar: string | null;

@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { getPublicBookingLocator } from "@/lib/publicBookingTenant";
 import { toast } from "sonner";
+import { localizedTenantName } from "@/lib/tenantName";
 
  type Lang = "ar" | "en";
 
@@ -63,6 +64,8 @@ type BookingResult = {
 type PublicBookingOptions = {
   tenant_id: string;
   tenant_name: string;
+  tenant_name_en?: string | null;
+  tenant_name_ar?: string | null;
   tenant_slug: string;
   branches: Branch[];
   services: BookingOption[];
@@ -138,6 +141,7 @@ export default function PublicBooking() {
   useEffect(() => { isArabicRef.current = isArabic; }, [isArabic]);
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [tenantName, setTenantName] = useState("ZMedico");
+  const [tenantNames, setTenantNames] = useState({ en: "", ar: "" });
   const [branches, setBranches] = useState<Branch[]>([]);
   const [services, setServices] = useState<BookingOption[]>([]);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -194,7 +198,8 @@ export default function PublicBooking() {
         return;
       }
       setTenantId(data.tenant_id ?? resolvedTenantId);
-      setTenantName(data.tenant_name || "ZMedico");
+      setTenantNames({ en: data.tenant_name_en?.trim() || data.tenant_name || "", ar: data.tenant_name_ar?.trim() || data.tenant_name || "" });
+      setTenantName(localizedTenantName({ name: data.tenant_name, name_en: data.tenant_name_en, name_ar: data.tenant_name_ar }, isArabic ? "ar" : "en"));
       const nextBranches = (data.branches ?? []) as Branch[];
       const nextServices = [
         ...((data?.services ?? []) as BookingOption[]),
@@ -213,6 +218,10 @@ export default function PublicBooking() {
     void load();
     return () => { cancelled = true; };
   }, [isArabic]);
+
+  useEffect(() => {
+    setTenantName(localizedTenantName({ name_en: tenantNames.en, name_ar: tenantNames.ar }, isArabic ? "ar" : "en"));
+  }, [isArabic, tenantNames]);
 
   useEffect(() => {
     if (!branch) return;

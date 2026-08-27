@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useI18n } from "./I18nContext";
+import { localizedTenantName } from "@/lib/tenantName";
 
 export type BrandingSource = "zmedico" | "tenant";
 
@@ -15,6 +17,8 @@ const ZMEDICO_DEFAULTS = {
 export type TenantBranding = {
   tenant_id: string;
   display_name: string;
+  tenant_name_en: string | null;
+  tenant_name_ar: string | null;
   logo_url: string | null;
   favicon_url: string | null;
   primary_color: string;
@@ -40,6 +44,7 @@ function isPlatformHost(hostname: string) {
 }
 
 export function TenantBrandingProvider({ children }: { children: ReactNode }) {
+  const { lang } = useI18n();
   const [branding, setBranding] = useState<TenantBranding | null>(null);
   const [loading, setLoading] = useState(false);
   const [isBrandedTenantHost, setIsBrandedTenantHost] = useState(false);
@@ -76,14 +81,16 @@ export function TenantBrandingProvider({ children }: { children: ReactNode }) {
     if (!branding) return null;
     return {
       ...branding,
-      display_name: branding.display_name_source === "zmedico" ? ZMEDICO_DEFAULTS.display_name : branding.display_name,
+      display_name: branding.display_name_source === "zmedico"
+        ? ZMEDICO_DEFAULTS.display_name
+        : localizedTenantName(branding, lang === "ar" ? "ar" : "en"),
       logo_url: branding.logo_source === "zmedico" ? ZMEDICO_DEFAULTS.logo_url : branding.logo_url,
       favicon_url: branding.favicon_source === "zmedico" ? ZMEDICO_DEFAULTS.favicon_url : branding.favicon_url,
       primary_color: branding.colors_source === "zmedico" ? ZMEDICO_DEFAULTS.primary_color : branding.primary_color,
       secondary_color: branding.colors_source === "zmedico" ? ZMEDICO_DEFAULTS.secondary_color : branding.secondary_color,
       accent_color: branding.colors_source === "zmedico" ? ZMEDICO_DEFAULTS.accent_color : branding.accent_color,
     };
-  }, [branding]);
+  }, [branding, lang]);
 
   useEffect(() => {
     document.title = effectiveBranding?.display_name || "ZMedico";

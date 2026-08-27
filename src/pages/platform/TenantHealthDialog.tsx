@@ -8,10 +8,13 @@ import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { CLINIC_MODULES, type ClinicModuleKey } from "@/lib/clinicModules";
 import { filterModulesByPlan, planAllowsModule } from "@/lib/subscriptionEntitlements";
+import { localizedTenantName } from "@/lib/tenantName";
 
 type Tenant = {
   id: string;
   name: string;
+  name_en?: string | null;
+  name_ar?: string | null;
   subscription_status: string;
   is_active: boolean;
   plan_id: string | null;
@@ -105,7 +108,7 @@ export default function TenantHealthDialog({ tenant, branches, plans, open, onOp
 
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto" dir={isAr ? "rtl" : "ltr"}>
-      <DialogHeader><DialogTitle className="flex items-center gap-2"><ShieldAlert className="size-5 text-primary" />{isAr ? "صحة العميل" : "Tenant health"} · {tenant?.name}</DialogTitle></DialogHeader>
+      <DialogHeader><DialogTitle className="flex items-center gap-2"><ShieldAlert className="size-5 text-primary" />{isAr ? "صحة العميل" : "Tenant health"} · {localizedTenantName(tenant, isAr ? "ar" : "en")}</DialogTitle></DialogHeader>
       {loading ? <div className="flex min-h-40 items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" />{isAr ? "جارٍ تحميل المؤشرات…" : "Loading health indicators…"}</div> : <div className="space-y-4">
         {error ? <div className="flex gap-2 rounded-lg border border-amber-300/60 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/20 dark:text-amber-200"><AlertTriangle className="mt-0.5 size-4 shrink-0" />{error}</div> : null}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

@@ -11,6 +11,7 @@ import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { isSystemOwnerWorkspaceHandoff } from "@/lib/platformWorkspace";
 import { visibleReportNavigation, type ReportNavigationKey } from "@/lib/reportNavigation";
 import { useTenantBranding } from "@/contexts/TenantBrandingContext";
+import { localizedTenantName } from "@/lib/tenantName";
 
 type NavItem = { to: string; icon: LucideIcon; label: string; end?: boolean; badge?: number };
 
@@ -28,8 +29,8 @@ const REPORT_ICONS: Record<ReportNavigationKey, LucideIcon> = {
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {}) {
   const { t, lang } = useI18n();
   const { branding } = useTenantBranding();
-  const brandName = branding?.display_name ?? t("appName");
-  const { currentBranchId, branchSelectionReady, isModuleEnabled } = useBranch();
+  const { currentBranchId, branchSelectionReady, isModuleEnabled, subscription } = useBranch();
+  const brandName = branding?.display_name ?? localizedTenantName(subscription ? { name: subscription.tenant_name, name_en: subscription.tenant_name_en, name_ar: subscription.tenant_name_ar } : null, lang === "ar" ? "ar" : "en", t("appName"));
   const { pathname, search } = useLocation();
   const branchAwarePath = (to: string) => currentBranchId ? `${to}?branch=${encodeURIComponent(currentBranchId)}` : to;
   const [alertCount, setAlertCount] = useState(0);

@@ -9,8 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { localizedTenantName } from "@/lib/tenantName";
 
-type Tenant = { id: string; name: string };
+type Tenant = { id: string; name: string; name_en?: string | null; name_ar?: string | null };
 type Branch = { id: string; name_en: string; name_ar: string; tenant_id?: string | null; is_active: boolean };
 type RecordItem = { type?: string; name?: string; value?: string; url?: string; purpose?: string; txt_name?: string; txt_value?: string };
 type ProvisioningMode = "custom_hostname" | "provider_subdomain";
@@ -94,8 +95,8 @@ export default function TenantDomains({ tenant, branches, open, onOpenChange }: 
     const selectedBranch = tenantBranches.find((branch) => branch.id === branchId);
     const finalHostname = provisioningMode === "provider_subdomain" ? `${value}.${ZMEDICO_SUBDOMAIN_SUFFIX}` : value;
     const confirmation = isAr
-      ? `سيتم تسجيل ${finalHostname} للعميل ${tenant.name} وربطه بالفرع ${selectedBranch?.name_ar || selectedBranch?.name_en || "المحدد"}. هل تريد المتابعة؟`
-      : `Register ${finalHostname} for ${tenant.name} and map it to ${selectedBranch?.name_en || selectedBranch?.name_ar || "the selected branch"}?`;
+      ? `سيتم تسجيل ${finalHostname} للعميل ${localizedTenantName(tenant, isAr ? "ar" : "en")} وربطه بالفرع ${selectedBranch?.name_ar || selectedBranch?.name_en || "المحدد"}. هل تريد المتابعة؟`
+      : `Register ${finalHostname} for ${localizedTenantName(tenant, isAr ? "ar" : "en")} and map it to ${selectedBranch?.name_en || selectedBranch?.name_ar || "the selected branch"}?`;
     if (!window.confirm(confirmation)) return;
     setAdding(true);
     createKeyRef.current = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;

@@ -11,11 +11,13 @@ import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
-export type BrandingTenant = { id: string; name: string };
+export type BrandingTenant = { id: string; name: string; name_en?: string | null; name_ar?: string | null };
 
 type BrandingSource = "zmedico" | "tenant";
 
 type BrandingForm = {
+  tenant_name_en: string;
+  tenant_name_ar: string;
   display_name: string;
   logo_url: string;
   favicon_url: string;
@@ -30,6 +32,8 @@ type BrandingForm = {
 };
 
 const DEFAULT_FORM: BrandingForm = {
+  tenant_name_en: "",
+  tenant_name_ar: "",
   display_name: "",
   logo_url: "",
   favicon_url: "",
@@ -65,7 +69,9 @@ export default function TenantBrandingDialog({ tenant, open, onOpenChange, onSav
         } else {
           const row = data as Partial<BrandingForm> | null;
           setForm({
-            display_name: row?.display_name ?? tenant.name,
+            tenant_name_en: tenant.name_en ?? tenant.name,
+            tenant_name_ar: tenant.name_ar ?? tenant.name,
+            display_name: row?.display_name ?? "",
             logo_url: row?.logo_url ?? "",
             favicon_url: row?.favicon_url ?? "",
             primary_color: row?.primary_color ?? DEFAULT_FORM.primary_color,
@@ -138,7 +144,24 @@ export default function TenantBrandingDialog({ tenant, open, onOpenChange, onSav
   const save = async () => {
     if (!tenant) return;
     setSaving(true);
-    const displayName = form.display_name.trim() || tenant.name;
+    const tenantNameEn = form.tenant_name_en.trim();
+    const tenantNameAr = form.tenant_name_ar.trim();
+    if (!tenantNameEn && !tenantNameAr) {
+      toast({ title: isAr ? "أدخل اسم العيادة بالعربية أو الإنجليزية" : "Enter an English or Arabic clinic name", variant: "destructive" });
+      setSaving(false);
+      return;
+    }
+    const { error: nameError } = await supabase.rpc("platform_update_tenant_names" as never, {
+      p_tenant_id: tenant.id,
+      p_name_en: tenantNameEn || null,
+      p_name_ar: tenantNameAr || null,
+    } as never);
+    if (nameError) {
+      toast({ title: nameError.message, variant: "destructive" });
+      setSaving(false);
+      return;
+    }
+    const displayName = form.display_name.trim() || null;
     const { data: saved, error } = await supabase.rpc("platform_save_tenant_branding", {
       p_tenant_id: tenant.id,
       p_display_name: displayName,
@@ -165,7 +188,9 @@ export default function TenantBrandingDialog({ tenant, open, onOpenChange, onSav
     setSaving(false);
   };
 
-  const previewName = form.display_name_source === "zmedico" ? "ZMedico" : (form.display_name || tenant?.name);
+  const previewName = form.display_name_source === "zmedico"
+    ? "ZMedico"
+    : (form.display_name || (isAr ? form.tenant_name_ar || form.tenant_name_en : form.tenant_name_en || form.tenant_name_ar) || tenant?.name);
   const previewLogo = form.logo_source === "zmedico" ? "" : form.logo_url;
   const previewColors = form.colors_source === "zmedico"
     ? { primary: "#3a1a5e", secondary: "#6d3bb3" }
@@ -176,7 +201,9 @@ export default function TenantBrandingDialog({ tenant, open, onOpenChange, onSav
       <DialogHeader><DialogTitle className="flex items-center gap-2"><Palette className="size-5 text-primary" />{isAr ? "هوية العميل White‑Label" : "Tenant White‑Label branding"} · {tenant?.name}</DialogTitle></DialogHeader>
       {loading ? <div className="py-10 text-center text-sm text-muted-foreground"><Loader2 className="me-2 inline size-4 animate-spin" />{isAr ? "جارٍ تحميل الهوية…" : "Loading branding…"}</div> : <div className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5 sm:col-span-2"><Label>{isAr ? "اسم العرض داخل النظام" : "Display name"}</Label><Input value={form.display_name} onChange={(event) => setForm((current) => ({ ...current, display_name: event.target.value }))} placeholder={tenant?.name} maxLength={160} disabled={form.display_name_source === "zmedico"} /></div>
+          <div className="space-y-1.5"><Label>{isAr ? "اسم العيادة بالإنجليزية" : "Clinic name (English)"}</Label><Input dir="ltr" value={form.tenant_name_en} onChange={(event) => setForm((current) => ({ ...current, tenant_name_en: event.target.value }))} placeholder="Clinic name" maxLength={160} /></div>
+          <div className="space-y-1.5"><Label>{isAr ? "اسم العيادة بالعربية" : "Clinic name (Arabic)"}</Label><Input value={form.tenant_name_ar} onChange={(event) => setForm((current) => ({ ...current, tenant_name_ar: event.target.value }))} placeholder="اسم العيادة" maxLength={160} /></div>
+          <div className="space-y-1.5 sm:col-span-2"><Label>{isAr ? "اسم عرض مخصص داخل النظام (اختياري)" : "Custom display name (optional)"}</Label><Input value={form.display_name} onChange={(event) => setForm((current) => ({ ...current, display_name: event.target.value }))} placeholder={tenant?.name} maxLength={160} disabled={form.display_name_source === "zmedico"} /></div>
           <div className="space-y-1.5"><Label>{isAr ? "مصدر الاسم" : "Name source"}</Label><Select value={form.display_name_source} onValueChange={(value: BrandingSource) => setForm((current) => ({ ...current, display_name_source: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="tenant">{isAr ? "هوية العيادة" : "Clinic brand"}</SelectItem><SelectItem value="zmedico">ZMedico</SelectItem></SelectContent></Select></div>
           <div className="space-y-1.5 sm:col-span-2"><Label>{isAr ? "الشعار الرئيسي" : "Main logo"}</Label><div className="flex flex-wrap items-center gap-3"><Input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(event) => { void uploadLogo(event.target.files?.[0]); event.currentTarget.value = ""; }} disabled={uploading || form.logo_source === "zmedico"} className="max-w-sm" /><span className="text-xs text-muted-foreground">{isAr ? "PNG أو JPG أو WEBP أو SVG حتى 2MB" : "PNG, JPG, WEBP, or SVG up to 2MB"}</span></div><Input dir="ltr" value={form.logo_url} onChange={(event) => setForm((current) => ({ ...current, logo_url: event.target.value }))} placeholder="https://…/logo.png" disabled={form.logo_source === "zmedico"} /></div>
           <div className="space-y-1.5"><Label>{isAr ? "مصدر الشعار" : "Logo source"}</Label><Select value={form.logo_source} onValueChange={(value: BrandingSource) => setForm((current) => ({ ...current, logo_source: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="tenant">{isAr ? "شعار العيادة" : "Clinic logo"}</SelectItem><SelectItem value="zmedico">{isAr ? "شعار ZMedico" : "ZMedico logo"}</SelectItem></SelectContent></Select></div>

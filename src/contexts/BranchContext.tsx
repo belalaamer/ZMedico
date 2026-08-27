@@ -91,11 +91,30 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     return () => { active = false; };
   }, [user?.id]);
 
-  const loadBranches = () => {
+  const loadBranches = async () => {
     if (!user) { setBranches([]); setBranchSelectionReady(false); return; }
     setBranchSelectionReady(false);
+    let tenantScopeId = domainTenantId;
+    // System Owner is global only on /platform. During a workspace handoff,
+    // resolve the selected branch first and restrict the context to its tenant
+    // before fetching the branch list; never fetch every tenant's branches and
+    // filter them only in React.
+    if (isSystemOwner && !platformRoute) {
+      const handoffBranchId = requestedBranchId ?? getPlatformWorkspaceBranch();
+      if (!handoffBranchId) {
+        setBranches([]);
+        setBranchSelectionReady(false);
+        return;
+      }
+      const { data: handoffBranch } = await supabase
+        .from("branches")
+        .select("tenant_id")
+        .eq("id", handoffBranchId)
+        .maybeSingle();
+      tenantScopeId = (handoffBranch as { tenant_id?: string | null } | null)?.tenant_id ?? "__no_workspace__";
+    }
     let branchQuery = supabase.from("branches").select("id,name_en,name_ar").order("name_en");
-    if (domainTenantId && !isSystemOwner) branchQuery = branchQuery.eq("tenant_id", domainTenantId);
+    if (tenantScopeId) branchQuery = branchQuery.eq("tenant_id", tenantScopeId);
     withTimeout(
       branchQuery,
       {
@@ -152,7 +171,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    loadBranches();
+    void loadBranches();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, isSystemOwner, roleLoading, domainTenantId, location.search]);
 

@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatMoney, formatDateTime, formatDate } from "@/lib/format";
+import { useBranch } from "@/contexts/BranchContext";
 
 const txClass: Record<string, string> = {
   purchase: "status-completed", sale: "status-departed", adjustment: "status-progress",
@@ -17,6 +18,7 @@ const txClass: Record<string, string> = {
 export default function ProductDetail() {
   const { id } = useParams();
   const { t, lang } = useI18n();
+  const { subscription } = useBranch();
   const [p, setP] = useState<any>(null);
   const [cat, setCat] = useState<any>(null);
   const [sup, setSup] = useState<any>(null);
@@ -26,10 +28,10 @@ export default function ProductDetail() {
   const [pos, setPos] = useState<any[]>([]);
 
   const load = async () => {
-    if (!id) return;
+    if (!id || !subscription?.tenant_id) return;
     const [{ data: prod }, { data: brs }, { data: invs }, { data: ts }, { data: poItems }] = await Promise.all([
-      supabase.from("products").select("*").eq("id", id).maybeSingle(),
-      supabase.from("branches").select("*").order("name_en"),
+      supabase.from("products").select("*").eq("id", id).eq("tenant_id", subscription.tenant_id).maybeSingle(),
+      supabase.from("branches").select("*").eq("tenant_id", subscription.tenant_id).order("name_en"),
       supabase.from("inventory").select("*").eq("product_id", id),
       supabase.from("inventory_transactions").select("*").eq("product_id", id).order("created_at", { ascending: false }).limit(100),
       supabase.from("purchase_order_items").select("*, purchase_orders(*, suppliers(name_en,name_ar))").eq("product_id", id).order("created_at", { ascending: false }),
@@ -44,7 +46,7 @@ export default function ProductDetail() {
       setSup(s);
     }
   };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [id, subscription?.tenant_id]);
 
   if (!p) return <div className="text-center text-muted-foreground py-10">…</div>;
 

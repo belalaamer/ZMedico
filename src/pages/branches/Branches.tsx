@@ -50,7 +50,9 @@ export default function Branches() {
   const { user } = useAuth();
   const { isSystemOwner } = useUserRole();
   const { toast } = useToast();
-  const { currentBranchId } = useBranch();
+  const { currentBranchId, subscription, subscriptionLoading } = useBranch();
+  const workspaceTenantId = currentBranchId ? subscription?.tenant_id ?? null : null;
+  const isWorkspaceScoped = Boolean(currentBranchId);
   const [items, setItems] = useState<Branch[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [tenants, setTenants] = useState<TenantOption[]>([]);
@@ -77,6 +79,11 @@ export default function Branches() {
     () => items.find((b) => b.id === currentBranchId) ?? null,
     [items, currentBranchId]
   );
+  useEffect(() => {
+    setItems([]);
+    setStaff([]);
+    setTenants([]);
+  }, [currentBranchId]);
   useEffect(() => {
     let cancelled = false;
     if (!currentBranchId) { setSummary(null); return; }
@@ -107,19 +114,41 @@ export default function Branches() {
   };
 
   const load = useCallback(async () => {
-    const [{ data }, { data: s }] = await Promise.all([
-      supabase.from("branches").select("*").order("created_at"),
-      supabase.from("profiles").select("id, full_name, email").order("full_name"),
-    ]);
-    setItems((data ?? []) as Branch[]);
-    setStaff((s ?? []) as Staff[]);
+    // A System Owner is global on the platform surface, but once a workspace
+    // branch is selected this page must fail closed to that tenant only.
+    if (isWorkspaceScoped && (!workspaceTenantId || subscriptionLoading)) {
+      if (!subscriptionLoading) { setItems([]); setStaff([]); setTenants([]); }
+      return;
+    }
+    let branchQuery = supabase.from("branches").select("*").order("created_at");
+    if (isWorkspaceScoped && workspaceTenantId) branchQuery = branchQuery.eq("tenant_id", workspaceTenantId);
+    const { data } = await branchQuery;
+    const scopedBranches = (data ?? []) as Branch[];
+    let staffQuery = supabase.from("profiles").select("id, full_name, email").order("full_name");
+    if (isWorkspaceScoped) {
+      const branchIds = scopedBranches.map((branch) => branch.id);
+      if (branchIds.length === 0) {
+        setItems([]); setStaff([]); setTenants([]); return;
+      }
+      const { data: assignments } = await supabase.from("staff_branches").select("user_id").in("branch_id", branchIds);
+      const staffIds = Array.from(new Set((assignments ?? []).map((row) => String((row as { user_id: string }).user_id))));
+      if (staffIds.length === 0) {
+        setItems(scopedBranches); setStaff([]); setTenants([]); return;
+      }
+      staffQuery = staffQuery.in("id", staffIds);
+    }
+    const { data: staffData } = await staffQuery;
+    setItems(scopedBranches);
+    setStaff((staffData ?? []) as Staff[]);
     if (isSystemOwner) {
-      const { data: tenantData } = await supabase.from("tenants").select("id,name,slug").order("name");
+      let tenantQuery = supabase.from("tenants").select("id,name,slug").order("name");
+      if (isWorkspaceScoped && workspaceTenantId) tenantQuery = tenantQuery.eq("id", workspaceTenantId);
+      const { data: tenantData } = await tenantQuery;
       setTenants((tenantData ?? []) as TenantOption[]);
     } else {
       setTenants([]);
     }
-  }, [isSystemOwner]);
+  }, [isSystemOwner, isWorkspaceScoped, subscriptionLoading, workspaceTenantId]);
   useEffect(() => { void load(); }, [load]);
   useDataSync(["branches"], () => { load(); });
 
@@ -159,6 +188,10 @@ export default function Branches() {
 
   const save = async () => {
     if (!form.name.trim()) { toast({ title: t("name"), variant: "destructive" }); return; }
+    if (isWorkspaceScoped && form.tenant_id !== workspaceTenantId) {
+      toast({ title: lang === "ar" ? "لا يمكن نقل فرع خارج مساحة العمل الحالية" : "A branch cannot be moved outside the current workspace", variant: "destructive" });
+      return;
+    }
     if (!form.tenant_id) {
       toast({ title: lang === "ar" ? "اختر العميل المرتبط بالفرع" : "Choose the tenant for this branch", variant: "destructive" });
       return;

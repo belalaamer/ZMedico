@@ -14,7 +14,8 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 
 export default function OperationalReports() {
   const { t, lang } = useI18n();
-  const { currentBranchId } = useBranch();
+  const { currentBranchId, subscription } = useBranch();
+  const tenantId = subscription?.tenant_id ?? null;
   const dr = defaultDateRange(30);
   const [start, setStart] = useState(dr.start);
   const [end, setEnd] = useState(dr.end);
@@ -29,8 +30,8 @@ export default function OperationalReports() {
           <TabsTrigger value="branch">{t("branchPerformance")}</TabsTrigger>
         </TabsList>
         <TabsContent value="appts"><ApptsTab start={start} end={end} setStart={setStart} setEnd={setEnd} branchId={currentBranchId} lang={lang} t={t} /></TabsContent>
-        <TabsContent value="doctor"><DoctorTab start={start} end={end} setStart={setStart} setEnd={setEnd} branchId={currentBranchId} lang={lang} t={t} /></TabsContent>
-        <TabsContent value="branch"><BranchTab start={start} end={end} setStart={setStart} setEnd={setEnd} lang={lang} t={t} /></TabsContent>
+        <TabsContent value="doctor"><DoctorTab start={start} end={end} setStart={setStart} setEnd={setEnd} branchId={currentBranchId} tenantId={tenantId} lang={lang} t={t} /></TabsContent>
+        <TabsContent value="branch"><BranchTab start={start} end={end} setStart={setStart} setEnd={setEnd} tenantId={tenantId} lang={lang} t={t} /></TabsContent>
       </Tabs>
     </div>
   );
@@ -97,15 +98,31 @@ function ApptsTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
   );
 }
 
-function DoctorTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
+function DoctorTab({ start, end, setStart, setEnd, branchId, tenantId, lang, t }: any) {
   const [data, setData] = useState<any[]>([]);
   useEffect(() => {
     (async () => {
-      // Strict role verification: fetch only users with the "doctor" role.
+      // Resolve eligible doctors through branch membership before reading roles.
+      // This prevents the System Owner role from widening a workspace report.
+      let membershipQuery = supabase.from("staff_branches").select("user_id");
+      if (branchId) {
+        membershipQuery = membershipQuery.eq("branch_id", branchId);
+      } else if (tenantId) {
+        const { data: tenantBranches } = await supabase.from("branches").select("id").eq("tenant_id", tenantId);
+        const branchIds = (tenantBranches ?? []).map((row) => row.id);
+        if (!branchIds.length) { setData([]); return; }
+        membershipQuery = membershipQuery.in("branch_id", branchIds);
+      } else {
+        setData([]); return;
+      }
+      const { data: memberships } = await membershipQuery;
+      const doctorIds = Array.from(new Set((memberships ?? []).map((row) => row.user_id).filter(Boolean)));
+      if (!doctorIds.length) { setData([]); return; }
       const { data: doctorRoleRows } = await supabase
         .from("user_roles")
         .select("user_id, profiles!user_roles_user_id_fkey(id, full_name, full_name_en, full_name_ar)")
-        .eq("role", "doctor");
+        .eq("role", "doctor")
+        .in("user_id", doctorIds);
       const counts = new Map<string, { name: string; count: number; revenue: number }>();
       (doctorRoleRows ?? []).forEach((r: any) => {
         const id = r.user_id;
@@ -168,11 +185,12 @@ function DoctorTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
   );
 }
 
-function BranchTab({ start, end, setStart, setEnd, lang, t }: any) {
+function BranchTab({ start, end, setStart, setEnd, tenantId, lang, t }: any) {
   const [data, setData] = useState<any[]>([]);
   useEffect(() => {
     (async () => {
-      const { data: branches } = await supabase.from("branches").select("id, name_en, name_ar");
+      if (!tenantId) { setData([]); return; }
+      const { data: branches } = await supabase.from("branches").select("id, name_en, name_ar").eq("tenant_id", tenantId);
       const out: any[] = [];
       for (const b of branches ?? []) {
         const [{ count: patients }, { data: revs }, { data: exps }] = await Promise.all([
@@ -186,7 +204,7 @@ function BranchTab({ start, end, setStart, setEnd, lang, t }: any) {
       }
       setData(out);
     })();
-  }, [start, end, lang]);
+  }, [start, end, lang, tenantId]);
 
   const cols = [{ header: t("branch"), key: "name" }, { header: t("patients"), key: "patients" }, { header: t("revenue"), key: "revenue" }, { header: t("totalExpenses"), key: "expense" }, { header: t("profitAmount"), key: "profit" }];
   const expRows = data.map((d) => ({ name: d.name, patients: d.patients, revenue: d.revenue.toFixed(2), expense: d.expense.toFixed(2), profit: d.profit.toFixed(2) }));

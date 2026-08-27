@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { toast } from "@/hooks/use-toast";
+import { useBranch } from "@/contexts/BranchContext";
 
 type Branch = { id: string; name_en: string; name_ar: string };
 
@@ -22,6 +23,7 @@ export default function StaffBranchesTab({ userId }: { userId: string }) {
   // R2: manage-branches gate routed through AuthorizationService.
   const { authz } = useAuthorization("StaffBranchesTab");
   const canManage = authz.hasRoleAny("hr");
+  const { subscription } = useBranch();
 
   const [branches, setBranches] = useState<Branch[]>([]);
   const [assigned, setAssigned] = useState<string[]>([]);
@@ -50,8 +52,10 @@ export default function StaffBranchesTab({ userId }: { userId: string }) {
 
   async function load() {
     setLoading(true);
+    const tenantId = subscription?.tenant_id;
+    if (!tenantId) { setBranches([]); setAssigned([]); setLoading(false); return; }
     const [{ data: br }, { data: sb }] = await Promise.all([
-      supabase.from("branches").select("id,name_en,name_ar").order("name_en"),
+      supabase.from("branches").select("id,name_en,name_ar").eq("tenant_id", tenantId).order("name_en"),
       supabase.from("staff_branches").select("branch_id").eq("user_id", userId),
     ]);
     setBranches((br ?? []) as Branch[]);
@@ -59,7 +63,7 @@ export default function StaffBranchesTab({ userId }: { userId: string }) {
     setLoading(false);
   }
 
-  useEffect(() => { if (userId) load(); /* eslint-disable-next-line */ }, [userId]);
+  useEffect(() => { if (userId) load(); /* eslint-disable-next-line */ }, [userId, subscription?.tenant_id]);
 
   const available = branches.filter((b) => !assigned.includes(b.id));
 

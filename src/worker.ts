@@ -17,6 +17,7 @@ const SUPABASE_EMAIL_TEMPLATE_URL = "https://rqcmnfzfytyyicelvifk.supabase.co/re
 const PROVIDER_SUBDOMAIN_HEALTH_PATH = "/_zmedico/provisioning-check";
 const MAX_GATEWAY_BODY_BYTES = 32 * 1024;
 const DEFAULT_ORIGIN = "https://zmedico2.belalaamer.workers.dev";
+const PLATFORM_HOSTNAMES = new Set(["belalaamer.com", "www.belalaamer.com", "zmedico2.belalaamer.workers.dev"]);
 
 type PortalEmailInput = {
   patient_id?: unknown;
@@ -226,9 +227,10 @@ export default {
     }
     const isHtmlRequest = request.method === "GET" && (pathname === "/" || pathname === "/index.html" || !pathname.includes("."));
     const providerSubdomain = isProviderSubdomainHost(hostname);
-    if (isHtmlRequest && providerSubdomain) {
+    const customTenantHostname = !PLATFORM_HOSTNAMES.has(hostname) && !hostname.endsWith(".workers.dev");
+    if (isHtmlRequest && (providerSubdomain || customTenantHostname)) {
       const active = await hasActiveTenantDomain(hostname);
-      if (!active) return new Response("Tenant subdomain is not active", { status: 404, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+      if (!active) return new Response(providerSubdomain ? "Tenant subdomain is not active" : "Tenant domain is not active", { status: 404, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
       // A tenant-owned hostname is an application portal, not the public
       // marketing site. Redirect the browser so React Router also sees /auth.
       if (pathname === "/" || pathname === "/index.html") {

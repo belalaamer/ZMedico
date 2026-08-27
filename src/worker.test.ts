@@ -50,6 +50,31 @@ describe("custom domain gateway", () => {
     expect(assetsFetch).not.toHaveBeenCalled();
   });
 
+  it("redirects an active custom hostname root to its tenant login", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify([{ tenant_id: "tenant-1", default_branch_id: "branch-1" }]), { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const assetsFetch = vi.fn();
+
+    const response = await worker.fetch(new Request("https://www.psipump.com/", { method: "GET" }), { ASSETS: { fetch: assetsFetch } as unknown as Fetcher });
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("Location")).toBe("https://www.psipump.com/auth");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(assetsFetch).not.toHaveBeenCalled();
+  });
+
+  it("keeps the platform hostname on the public shell", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const assetsFetch = vi.fn().mockResolvedValue(new Response("app shell", { status: 200, headers: { "Content-Type": "text/html" } }));
+
+    const response = await worker.fetch(new Request("https://belalaamer.com/", { method: "GET" }), { ASSETS: { fetch: assetsFetch } as unknown as Fetcher });
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(assetsFetch).toHaveBeenCalledTimes(1);
+  });
+
   it("forwards the authenticated request to the Supabase function", async () => {
     const upstream = new Response(JSON.stringify({ domains: [] }), { status: 200, headers: { "Content-Type": "application/json" } });
     const fetchMock = vi.fn().mockResolvedValue(upstream);

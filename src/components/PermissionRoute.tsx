@@ -71,6 +71,7 @@ function InvoicesShadowProbeMount({ path }: { path: string }) {
  */
 export function PermissionRoute({ children, module, adminOnly, systemOwnerOnly }: { children: ReactNode; module?: string; adminOnly?: boolean; systemOwnerOnly?: boolean }) {
   const { pathname } = useLocation();
+  const isPlatformPath = pathname.startsWith("/platform");
   const { authz, loading } = useAuthorization();
   const { t } = useI18n();
   const { currentBranchId, branchSelectionReady, modulesLoading, isModuleEnabled } = useBranch();
@@ -89,7 +90,7 @@ export function PermissionRoute({ children, module, adminOnly, systemOwnerOnly }
   const isHrPath = pathname.startsWith("/hr");
   const isInvoicesPath = pathname.startsWith("/invoices") || pathname.startsWith("/payments");
 
-  if (loading || !branchSelectionReady || (currentBranchId && modulesLoading)) {
+  if (loading || (!isPlatformPath && !branchSelectionReady) || (!isPlatformPath && currentBranchId && modulesLoading)) {
     return (
       <div className="min-h-[40vh] flex items-center justify-center" role="status" aria-live="polite">
         <div className="flex flex-col items-center gap-3 text-muted-foreground">
@@ -100,7 +101,7 @@ export function PermissionRoute({ children, module, adminOnly, systemOwnerOnly }
     );
   }
 
-  if (!pathname.startsWith("/platform") && !currentBranchId) {
+  if (!isPlatformPath && !currentBranchId) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center p-6">
         <div className="max-w-md text-center space-y-3">

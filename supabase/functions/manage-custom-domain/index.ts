@@ -85,7 +85,7 @@ type CloudflareHostname = {
   id?: string;
   hostname?: string;
   status?: string;
-  ssl?: { status?: string; method?: string; type?: string; validation_records?: unknown[] };
+  ssl?: { status?: string; method?: string; type?: string; validation_records?: unknown[]; dcv_delegation_records?: Array<{ cname?: string; cname_target?: string }> };
   ownership_verification?: { type?: string; name?: string; value?: string };
   ownership_verification_http?: { http_url?: string; http_body?: string };
   errors?: Array<{ code?: number; message?: string }>;
@@ -149,8 +149,13 @@ function validationRecords(body: CloudflareHostname): unknown[] {
       purpose: "ownership",
     });
   }
+  for (const record of body.ssl?.dcv_delegation_records ?? []) {
+    if (record?.cname && record.cname_target) {
+      records.push({ type: "cname", name: record.cname, value: record.cname_target, purpose: "ssl_dcv" });
+    }
+  }
   for (const record of body.ssl?.validation_records ?? []) {
-    if (record && typeof record === "object") records.push(record);
+    if (record && typeof record === "object") records.push({ ...record, purpose: "ssl" });
   }
   return records;
 }

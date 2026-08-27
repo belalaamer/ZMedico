@@ -27,7 +27,7 @@ type Coupon = {
 
 export default function CouponsPage() {
   const { lang } = useI18n();
-  const { currentBranchId } = useBranch();
+  const { currentBranchId, branchSelectionReady } = useBranch();
   // RBAC-04 hardening: this page previously had zero permission gating on
   // its create/edit(toggle)/delete controls — a receptionist (coupons: view
   // only per the live role_permissions table) could see and click "New
@@ -57,18 +57,19 @@ export default function CouponsPage() {
   const [form, setForm] = useState(empty);
 
   const load = async () => {
+    if (!branchSelectionReady || !currentBranchId) { setItems([]); setLoading(false); return; }
     setLoading(true);
-    let qy = supabase.from("coupons").select("*").order("created_at", { ascending: false }).limit(200);
-    if (currentBranchId) qy = qy.or(`branch_id.eq.${currentBranchId},branch_id.is.null`);
+    const qy = supabase.from("coupons").select("*").or(`branch_id.eq.${currentBranchId},branch_id.is.null`).order("created_at", { ascending: false }).limit(200);
     const { data, error } = await qy;
     setLoading(false);
     if (error) { toast.error(error.message); return; }
     setItems((data ?? []) as Coupon[]);
   };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId]);
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [branchSelectionReady, currentBranchId]);
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!branchSelectionReady || !currentBranchId) { toast.error(lang === "ar" ? "اختر فرعًا أولًا" : "Select a branch first"); return; }
     if (!canCreate) { toast.error(lang === "ar" ? "غير مسموح" : "Not allowed"); return; }
     if (!form.code.trim() || !form.discount_value) {
       toast.error(lang === "ar" ? "أكمل الحقول المطلوبة" : "Fill required fields"); return;
@@ -94,7 +95,8 @@ export default function CouponsPage() {
 
   const remove = async (c: Coupon) => {
     if (!canDelete) { toast.error(lang === "ar" ? "غير مسموح" : "Not allowed"); return; }
-    const { error } = await supabase.from("coupons").delete().eq("id", c.id);
+    if (!branchSelectionReady || !currentBranchId || (c.branch_id && c.branch_id !== currentBranchId)) { toast.error(lang === "ar" ? "اختر الفرع الصحيح" : "Select the correct branch"); return; }
+    const { error } = await supabase.from("coupons").delete().eq("id", c.id).eq("branch_id", currentBranchId);
     if (error) { toast.error(error.message); return; }
     toast.success(lang === "ar" ? "تم الحذف" : "Deleted");
     setDel(null); load();

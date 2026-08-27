@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -36,6 +37,7 @@ export type TenantSubscriptionSnapshot = {
 type Ctx = {
   branches: Branch[];
   currentBranchId: string | null;
+  branchSelectionReady: boolean;
   setCurrentBranchId: (id: string) => void;
   enabledModules: ClinicModuleKey[];
   modulesLoading: boolean;
@@ -47,9 +49,11 @@ type Ctx = {
 const BranchContext = createContext<Ctx | null>(null);
 
 export function BranchProvider({ children }: { children: ReactNode }) {
+  const location = useLocation();
   const { user } = useAuth();
   const { isSystemOwner, loading: roleLoading } = useUserRole();
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [branchSelectionReady, setBranchSelectionReady] = useState(false);
   const [currentBranchId, setCurrentBranchIdState] = useState<string | null>(
     () => localStorage.getItem("zmedico.branch")
   );
@@ -58,6 +62,12 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   const [subscription, setSubscription] = useState<TenantSubscriptionSnapshot | null>(null);
   const [subscriptionLoading, setSubscriptionLoading] = useState(() => Boolean(currentBranchId));
   const [domainTenantId, setDomainTenantId] = useState<string | null>(null);
+  const requestedBranchId = new URLSearchParams(location.search).get("branch");
+  const requestedBranchKnown = !requestedBranchId || branches.length === 0 || branches.some((branch) => branch.id === requestedBranchId);
+  const routeBranchPending = requestedBranchKnown && Boolean(requestedBranchId) && requestedBranchId !== currentBranchId;
+  const platformRoute = location.pathname === "/platform" || location.pathname.startsWith("/platform/");
+  const activeBranchId = platformRoute && isSystemOwner ? null : (routeBranchPending ? null : currentBranchId);
+  const activeBranchSelectionReady = !platformRoute && !routeBranchPending && branchSelectionReady;
 
   useEffect(() => {
     let active = true;
@@ -80,7 +90,8 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   }, [user?.id]);
 
   const loadBranches = () => {
-    if (!user) { setBranches([]); return; }
+    if (!user) { setBranches([]); setBranchSelectionReady(false); return; }
+    setBranchSelectionReady(false);
     let branchQuery = supabase.from("branches").select("id,name_en,name_ar").order("name_en");
     if (domainTenantId && !isSystemOwner) branchQuery = branchQuery.eq("tenant_id", domainTenantId);
     withTimeout(
@@ -93,19 +104,27 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     ).then(({ data }) => {
       const list = (data ?? []) as Branch[];
       setBranches(list);
+      if (roleLoading) {
+        setBranchSelectionReady(false);
+        return;
+      }
       setCurrentBranchIdState((prev) => {
         // System Owner starts in the platform console, not inside the first
-        // clinic. A clinic is selected only after an explicit user action.
-        if (roleLoading) return prev;
+        // clinic. An explicit URL branch always wins over stale local handoff
+        // state so a previous clinic cannot bleed into the requested one.
         if (isSystemOwner) {
-          const queryBranchId = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("branch") : null;
-          const handoffBranchId = getPlatformWorkspaceBranch() ?? queryBranchId;
+          const handoffBranchId = requestedBranchId ?? getPlatformWorkspaceBranch();
           if (handoffBranchId && list.some((branch) => branch.id === handoffBranchId)) {
             setPlatformWorkspaceBranch(handoffBranchId);
             return handoffBranchId;
           }
           localStorage.removeItem("zmedico.branch");
           return null;
+        }
+        // An explicit route branch is authoritative for every role.
+        if (requestedBranchId && list.some((branch) => branch.id === requestedBranchId)) {
+          localStorage.setItem("zmedico.branch", requestedBranchId);
+          return requestedBranchId;
         }
         // If no selection yet, pick the first.
         if (!prev) {
@@ -123,39 +142,42 @@ export function BranchProvider({ children }: { children: ReactNode }) {
         }
         return prev;
       });
+      setBranchSelectionReady(true);
     }).catch(() => {
       setBranches([]);
+      setBranchSelectionReady(false);
     });
   };
 
   useEffect(() => {
     loadBranches();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, isSystemOwner, roleLoading, domainTenantId]);
+  }, [user, isSystemOwner, roleLoading, domainTenantId, location.search]);
 
   useEffect(() => {
     let active = true;
     const loadSubscription = async () => {
-      if (!currentBranchId) {
+      if (!activeBranchSelectionReady || !activeBranchId) {
         setSubscription(null);
         setSubscriptionLoading(false);
         return;
       }
       setSubscriptionLoading(true);
-      const { data, error } = await supabase.rpc("tenant_subscription_for_branch", { _branch_id: currentBranchId });
+      const { data, error } = await supabase.rpc("tenant_subscription_for_branch", { _branch_id: activeBranchId });
       if (!active) return;
       setSubscription(error ? null : (data as TenantSubscriptionSnapshot | null));
       setSubscriptionLoading(false);
     };
     void loadSubscription();
     return () => { active = false; };
-  }, [currentBranchId]);
+  }, [activeBranchSelectionReady, activeBranchId]);
 
   useEffect(() => {
     let active = true;
     const loadModules = async () => {
-      if (!currentBranchId) {
+      if (!activeBranchSelectionReady || !activeBranchId) {
         setEnabledModules(DEFAULT_ENABLED_MODULES);
+        setModulesLoading(false);
         return;
       }
       setModulesLoading(true);
@@ -163,7 +185,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
         const { data: branch } = await supabase
           .from("branches")
           .select("tenant_id")
-          .eq("id", currentBranchId)
+          .eq("id", activeBranchId)
           .maybeSingle();
         const tenantId = (branch as { tenant_id?: string | null } | null)?.tenant_id;
         if (!tenantId) {
@@ -194,7 +216,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     };
     void loadModules();
     return () => { active = false; };
-  }, [currentBranchId, subscription]);
+  }, [activeBranchSelectionReady, activeBranchId, subscription]);
 
   // Refetch whenever any branches mutation happens elsewhere in the app
   // (create / update / delete) so sidebar, switcher and branch-scoped UI
@@ -212,7 +234,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
 
   const isModuleEnabled = (key: ClinicModuleKey) =>
     isModuleEnabledForEntitlement(key, enabledModules, subscription?.plan_features ?? {});
-  return <BranchContext.Provider value={{ branches, currentBranchId, setCurrentBranchId, enabledModules, modulesLoading, isModuleEnabled, subscription, subscriptionLoading }}>{children}</BranchContext.Provider>;
+  return <BranchContext.Provider value={{ branches, currentBranchId: activeBranchId, branchSelectionReady: activeBranchSelectionReady, setCurrentBranchId, enabledModules, modulesLoading, isModuleEnabled, subscription, subscriptionLoading }}>{children}</BranchContext.Provider>;
 }
 
 export function useBranch() {

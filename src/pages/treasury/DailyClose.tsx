@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,7 @@ type Summary = {
 
 export default function DailyClose() {
   const { t, lang } = useI18n();
-  const { currentBranchId } = useBranch();
+  const { currentBranchId, branchSelectionReady } = useBranch();
   const { user } = useAuth();
   // R2: route role-identity check through the canonical AuthorizationService.
   // Semantics unchanged: admin OR manager may close the day.
@@ -46,18 +46,28 @@ export default function DailyClose() {
   const [counted, setCounted] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
+  const loadRequestRef = useRef(0);
 
   // Load treasuries for current branch
   useEffect(() => {
+    const branchId = currentBranchId;
+    if (!branchSelectionReady || !branchId) {
+      setTreasuries([]);
+      setTreasuryId("");
+      setSummary(null);
+      setExisting(null);
+      return;
+    }
+    let active = true;
     (async () => {
-      let q = supabase.from("treasury").select("*").is("deleted_at", null).order("created_at");
-      if (currentBranchId) q = q.eq("branch_id", currentBranchId);
-      const { data } = await q;
-      setTreasuries(data ?? []);
-      if (data && data.length && !treasuryId) setTreasuryId(data[0].id);
+      const { data } = await supabase.from("treasury").select("*").eq("branch_id", branchId).is("deleted_at", null).order("created_at");
+      if (!active) return;
+      const next = data ?? [];
+      setTreasuries(next);
+      setTreasuryId((previous) => next.some((tr) => tr.id === previous) ? previous : (next[0]?.id ?? ""));
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentBranchId]);
+    return () => { active = false; };
+  }, [branchSelectionReady, currentBranchId]);
 
   const selectedTreasury = useMemo(
     () => treasuries.find((tr) => tr.id === treasuryId),
@@ -66,7 +76,12 @@ export default function DailyClose() {
 
   // Load summary + existing close
   const load = async () => {
-    if (!treasuryId || !businessDate) { setSummary(null); setExisting(null); return; }
+    const requestId = ++loadRequestRef.current;
+    if (!branchSelectionReady || !currentBranchId || !treasuryId || !businessDate || selectedTreasury?.branch_id !== currentBranchId) {
+      setSummary(null);
+      setExisting(null);
+      return;
+    }
     setLoading(true);
     try {
       const [{ data: sum, error: sumErr }, { data: ex }] = await Promise.all([
@@ -78,9 +93,11 @@ export default function DailyClose() {
           .from("treasury_daily_closes")
           .select("*")
           .eq("treasury_id", treasuryId)
+          .eq("branch_id", currentBranchId)
           .eq("business_date", businessDate)
           .maybeSingle(),
       ]);
+      if (requestId !== loadRequestRef.current) return;
       if (sumErr) toast.error(sumErr.message);
       const row = Array.isArray(sum) ? sum[0] : sum;
       setSummary(
@@ -100,7 +117,7 @@ export default function DailyClose() {
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [treasuryId, businessDate]);
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [branchSelectionReady, currentBranchId, treasuryId, businessDate, selectedTreasury?.branch_id]);
 
   const openConfirm = () => {
     if (!summary) return;
@@ -110,7 +127,7 @@ export default function DailyClose() {
   };
 
   const submitClose = async () => {
-    if (!treasuryId || !selectedTreasury || !summary || submitting) return;
+    if (!branchSelectionReady || !currentBranchId || !treasuryId || !selectedTreasury || selectedTreasury.branch_id !== currentBranchId || !summary || submitting) return;
     const countedNum = Number(counted);
     if (!isFinite(countedNum) || countedNum < 0) {
       toast.error(lang === "ar" ? "أدخل قيمة صحيحة" : "Enter a valid amount");
@@ -120,7 +137,7 @@ export default function DailyClose() {
     try {
       const { error } = await supabase.from("treasury_daily_closes").insert({
         treasury_id: treasuryId,
-        branch_id: selectedTreasury.branch_id,
+        branch_id: currentBranchId,
         business_date: businessDate,
         opening_cash: summary.opening_cash,
         expected_cash: summary.expected_cash,

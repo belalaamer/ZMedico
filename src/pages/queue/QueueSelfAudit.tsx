@@ -37,14 +37,14 @@ function StatusBadge({ status }: { status: AuditCheck["status"] }) {
 }
 
 export default function QueueSelfAudit() {
-  const { currentBranchId } = useBranch();
+  const { currentBranchId, branchSelectionReady } = useBranch();
   const { t } = useI18n();
   const [report, setReport] = useState<AuditReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [auto, setAuto] = useState(false);
 
   async function run() {
-    if (!currentBranchId) return;
+    if (!branchSelectionReady || !currentBranchId) { setReport(null); return; }
     setLoading(true);
     try {
       const r = await runQueueSelfAudit(currentBranchId);
@@ -55,16 +55,17 @@ export default function QueueSelfAudit() {
   }
 
   useEffect(() => {
-    if (currentBranchId) run();
+    if (branchSelectionReady && currentBranchId) void run();
+    else setReport(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentBranchId]);
+  }, [branchSelectionReady, currentBranchId]);
 
   useEffect(() => {
     if (!auto) return;
-    const id = setInterval(() => { run(); }, 5 * 60_000);
+    const id = setInterval(() => { void run(); }, 5 * 60_000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auto, currentBranchId]);
+  }, [auto, branchSelectionReady, currentBranchId]);
 
   const grouped = useMemo(() => {
     if (!report) return [] as { category: AuditCategory; items: AuditCheck[] }[];
@@ -108,14 +109,14 @@ export default function QueueSelfAudit() {
           >
             Auto refresh: {auto ? "on" : "off"}
           </Button>
-          <Button size="sm" onClick={run} disabled={loading || !currentBranchId}>
+          <Button size="sm" onClick={() => void run()} disabled={loading || !branchSelectionReady || !currentBranchId}>
             <RefreshCw className={cn("size-4 mr-2", loading && "animate-spin")} />
             Run audit
           </Button>
         </div>
       </div>
 
-      {!currentBranchId ? (
+      {!branchSelectionReady || !currentBranchId ? (
         <Card><CardContent className="py-8 text-center text-muted-foreground">Select a branch to run the audit.</CardContent></Card>
       ) : !report ? (
         <Card><CardContent className="py-8 text-center text-muted-foreground">Running first audit…</CardContent></Card>

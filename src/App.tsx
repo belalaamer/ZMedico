@@ -12,7 +12,6 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { PermissionRoute } from "@/components/PermissionRoute";
 import { attachGlobalRefreshListeners } from "@/lib/dataSync";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { useBranch } from "@/contexts/BranchContext";
 
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 const LandingPage = lazy(() => import("./pages/Index.tsx"));
@@ -149,8 +148,7 @@ function AppContent() {
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
-        <Suspense fallback={<RouteLoader />}>
+      <Suspense fallback={<RouteLoader />}>
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/auth" element={<AuthPage />} />
@@ -286,7 +284,6 @@ function AppContent() {
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
-      </BrowserRouter>
     </TooltipProvider>
   );
 }
@@ -296,11 +293,13 @@ const App = () => (
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
         <AuthProvider>
-          <TenantBrandingProvider>
-            <BranchProvider>
-              <AppContent />
-            </BranchProvider>
-          </TenantBrandingProvider>
+            <TenantBrandingProvider>
+              <BrowserRouter>
+                <BranchProvider>
+                  <AppContent />
+                </BranchProvider>
+              </BrowserRouter>
+            </TenantBrandingProvider>
         </AuthProvider>
       </I18nProvider>
     </QueryClientProvider>

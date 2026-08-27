@@ -93,7 +93,7 @@ function suggestRoleFromPosition(titleEn: string | null | undefined, groupKey: s
 
 export default function UserManagement() {
   const { t, lang } = useI18n();
-  const { currentBranchId } = useBranch();
+  const { currentBranchId, branchSelectionReady } = useBranch();
   const [users, setUsers] = useState<any[]>([]);
   const [roles, setRoles] = useState<Record<string, string[]>>({});
   const [q, setQ] = useState("");
@@ -266,17 +266,18 @@ export default function UserManagement() {
   }, []);
 
   const load = async () => {
+    if (!branchSelectionReady || !currentBranchId) {
+      setUsers([]); setRoles({}); setInvites([]); setBranches([]); setStaffLinks({}); setIsLoading(false);
+      return;
+    }
     // In a tenant workspace, every identity query is explicitly scoped to the
     // active branch. RLS remains authoritative, but this prevents a global
     // admin-shaped query from painting another clinic in the UI.
-    let scopedUserIds: string[] | null = null;
-    if (currentBranchId) {
-      const { data: memberships } = await (supabase as any)
-        .from("staff_branches")
-        .select("user_id")
-        .eq("branch_id", currentBranchId);
-      scopedUserIds = Array.from(new Set((memberships ?? []).map((m: any) => m.user_id).filter(Boolean)));
-    }
+    const { data: memberships } = await (supabase as any)
+      .from("staff_branches")
+      .select("user_id")
+      .eq("branch_id", currentBranchId);
+    const scopedUserIds = Array.from(new Set((memberships ?? []).map((m: any) => m.user_id).filter(Boolean))) as string[];
 
     let psQuery: any = supabase.from("profiles").select("id,full_name,email,username");
     let rsQuery: any = (supabase as any).from("user_roles").select("user_id,role");
@@ -293,8 +294,8 @@ export default function UserManagement() {
       .from("staff_profiles")
       .select("id,branch_id,employee_id,deleted_at,linked_user_id");
 
-    if (currentBranchId) {
-      const ids = scopedUserIds ?? [];
+    {
+      const ids = scopedUserIds;
       // An empty membership set must remain empty; never omit the filter and
       // accidentally fall back to a global profiles/user_roles query.
       if (ids.length) {
@@ -329,13 +330,13 @@ export default function UserManagement() {
     setStaffLinks(sb);
     setIsLoading(false);
   };
-  useEffect(() => { load(); }, [currentBranchId]);
+  useEffect(() => { void load(); }, [branchSelectionReady, currentBranchId]);
 
   // Load employees in the current branch that don't yet have any user role assigned.
   // Loaded on branch/data change so the picker (and the "link" flow from any surface)
   // always reflects the active branch — not only when the Create dialog opens.
   useEffect(() => {
-    if (!currentBranchId) { setLinkableStaff([]); return; }
+    if (!branchSelectionReady || !currentBranchId) { setLinkableStaff([]); return; }
     (async () => {
       const { data: sps } = await (supabase as any)
         .from("staff_profiles")
@@ -346,7 +347,7 @@ export default function UserManagement() {
       const withRoles = new Set((rs ?? []).map((r: any) => r.user_id));
       setLinkableStaff((sps ?? []).filter((s: any) => !withRoles.has(s.id)));
     })();
-  }, [currentBranchId, users.length]);
+  }, [branchSelectionReady, currentBranchId, users.length]);
 
   const onPickLinkedStaff = (id: string) => {
     setCLinkedStaffId(id);

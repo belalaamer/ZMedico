@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Plus, FileText } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -20,27 +20,34 @@ const PAGE_SIZE = 50;
 
 export default function MedicalRecords() {
   const { t, lang } = useI18n();
-  const { currentBranchId } = useBranch();
+  const { currentBranchId, branchSelectionReady } = useBranch();
   const navigate = useNavigate();
   // R2: canonical authorization entry point.
   const { authz } = useAuthorization("MedicalRecords");
   const [items, setItems] = useState<any[]>([]);
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
-  const load = () => {
+  const loadRequestRef = useRef(0);
+  const load = async () => {
+    const requestId = ++loadRequestRef.current;
+    const branchId = currentBranchId;
+    if (!branchSelectionReady || !branchId) { setItems([]); setTotal(0); return; }
     const from = page * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
     let q = supabase.from("medical_records")
       .select("*, patients(id,patient_code,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language), medical_specialties(name_en,name_ar)", { count: "exact" })
       .is("deleted_at", null).order("visit_date", { ascending: false }).range(from, to);
-    if (currentBranchId) q = q.eq("branch_id", currentBranchId);
-    q.then(({ data, count }) => { setItems(data ?? []); setTotal(count ?? 0); });
+    q = q.eq("branch_id", branchId);
+    const { data, count } = await q;
+    if (requestId !== loadRequestRef.current) return;
+    setItems(data ?? []); setTotal(count ?? 0);
   };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId, page]);
-  useEffect(() => { setPage(0); }, [currentBranchId]);
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [branchSelectionReady, currentBranchId, page]);
+  useEffect(() => { setPage(0); }, [branchSelectionReady, currentBranchId]);
 
   const softDelete = async (r: any): Promise<void> => {
-    const { error } = await supabase.from("medical_records").update({ deleted_at: new Date().toISOString() } as any).eq("id", r.id);
+    if (!branchSelectionReady || !currentBranchId || r.branch_id !== currentBranchId) { toast.error(t("selectBranch")); return; }
+    const { error } = await supabase.from("medical_records").update({ deleted_at: new Date().toISOString() } as any).eq("id", r.id).eq("branch_id", currentBranchId);
     if (error) { toast.error(error.message); return; }
     toast.success(t("delete")); load();
   };

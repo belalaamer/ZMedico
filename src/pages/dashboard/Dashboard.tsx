@@ -65,7 +65,7 @@ const localToday = localDateOnly;
 
 export default function Dashboard() {
   const { t, lang } = useI18n();
-  const { currentBranchId } = useBranch();
+  const { currentBranchId, branchSelectionReady } = useBranch();
   const { user } = useAuth();
   // Role-aware composition (FINAL-03 UX audit): the Dashboard is reachable by
   // every authenticated role (see App.tsx route comment — no single
@@ -136,6 +136,18 @@ export default function Dashboard() {
 
   const run = useCallback(async () => {
     setLoading(true);
+    // Never run global dashboard queries while the workspace branch is still
+    // being resolved. System Owner RLS intentionally permits global access, so
+    // a missing branch filter must fail closed at the UI query boundary.
+    if (!branchSelectionReady || !currentBranchId) {
+      setTodayAppts(0); setMyApptsToday(0); setApptStatusToday({}); setNewPatientsToday(0);
+      setTodayRevenue(0); setPendingInvoicesCount(0); setPendingInvoicesAmount(0); setPendingInvoiceId(null);
+      setTodayConsults(0); setDraftRecords(0); setPendingLeaveRequests(0); setLastClose(null);
+      setTodayTreasuryIn(0); setTodayTreasuryOut(0); setRevenue7d([]); setApptStatusAll([]); setAgeGroups([]); setReferralGroups([]); setDoctorPerf([]); setTopServices([]);
+      setRecentPatients([]); setRecentAppts([]); setRecentPayments([]); setDoctorNames({});
+      setLoading(false);
+      return;
+    }
 
     const start = new Date(); start.setHours(0, 0, 0, 0);
     const end = new Date(); end.setHours(23, 59, 59, 999);
@@ -143,7 +155,7 @@ export default function Dashboard() {
     const rs = new Date(rangeStart + "T00:00:00");
     const re = new Date(rangeEnd + "T23:59:59");
 
-    const branchEq = (q: any) => (currentBranchId ? q.eq("branch_id", currentBranchId) : q);
+    const branchEq = (q: any) => q.eq("branch_id", currentBranchId);
 
       const [
         apptsTodayRes,
@@ -191,6 +203,7 @@ export default function Dashboard() {
           .not("doctor_id", "is", null)),
         supabase.from("invoice_items").select("description_en,description_ar,quantity,total,invoice:invoices!inner(branch_id,invoice_date,deleted_at)")
           .is("invoice.deleted_at", null)
+          .eq("invoice.branch_id", currentBranchId)
           .gte("invoice.invoice_date", rangeStart).lte("invoice.invoice_date", rangeEnd),
         supabase.from("leave_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
       ]);
@@ -206,14 +219,14 @@ export default function Dashboard() {
       const lc = (lastCloseRes?.data ?? [])[0] as any;
       setLastClose(lc ? { business_date: lc.business_date, counted_cash: Number(lc.counted_cash || 0), variance: Number(lc.variance || 0) } : null);
 
-      let trQ = (supabase as any).from("treasury").select("id").is("deleted_at", null);
-      if (currentBranchId) trQ = trQ.eq("branch_id", currentBranchId);
+      const trQ = (supabase as any).from("treasury").select("id").eq("branch_id", currentBranchId).is("deleted_at", null);
       const { data: trRows } = await trQ;
       const trIds = ((trRows ?? []) as any[]).map((r) => r.id);
       let tIn = 0, tOut = 0;
       if (trIds.length) {
         const { data: tt } = await (supabase as any).from("treasury_transactions")
           .select("transaction_type,amount,reference_type,reference_id,created_at")
+          .eq("branch_id", currentBranchId)
           .in("treasury_id", trIds)
           .gte("created_at", start.toISOString())
           .lte("created_at", end.toISOString());
@@ -339,7 +352,7 @@ export default function Dashboard() {
       const svcMap = new Map<string, { count: number; revenue: number; ar?: string }>();
       for (const r of (topItemsRes.data ?? []) as any[]) {
         const inv = r.invoice;
-        if (currentBranchId && inv?.branch_id && inv.branch_id !== currentBranchId) continue;
+        if (inv?.branch_id !== currentBranchId) continue;
         const key = (lang === "ar" ? (r.description_ar || r.description_en) : (r.description_en || r.description_ar)) || "—";
         const cur = svcMap.get(key) ?? { count: 0, revenue: 0 };
         cur.count += Number(r.quantity || 0);
@@ -350,7 +363,7 @@ export default function Dashboard() {
         .sort((a, b) => b.count - a.count).slice(0, 8));
 
       setLoading(false);
-  }, [currentBranchId, rangeStart, rangeEnd, lang, user?.id]);
+  }, [branchSelectionReady, currentBranchId, rangeStart, rangeEnd, lang, user?.id]);
 
   // Initial load + refetch on branch change
   useEffect(() => { run(); }, [run]);

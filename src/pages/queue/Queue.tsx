@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -109,7 +109,7 @@ function uiStatusLabel(s: ApptStatus, t: (k: DictKey) => string) {
 
 export default function QueuePage() {
   const { t, lang } = useI18n();
-  const { currentBranchId } = useBranch();
+  const { currentBranchId, branchSelectionReady } = useBranch();
   const { user } = useAuth();
   const navigate = useNavigate();
   // R2: canonical authorization entry point.
@@ -130,6 +130,7 @@ export default function QueuePage() {
   // unnoticed for admin testing.
   const canMutate = authz.can("appointments.edit");
   const [rows, setRows] = useState<QueueRow[]>([]);
+  const loadRequestRef = useRef(0);
   const [doctors, setDoctors] = useState<QueueDoctor[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<"active" | "all" | ApptStatus>("active");
@@ -167,6 +168,7 @@ export default function QueuePage() {
   // On branch change: paint from local cache instantly, then hydrate from server.
   useEffect(() => {
     setSettings(getQueueSettings(currentBranchId));
+    setPatientOptions([]);
     let active = true;
     void fetchQueueSettings(currentBranchId).then((s) => { if (active) setSettings(s); });
     return () => { active = false; };
@@ -206,7 +208,16 @@ export default function QueuePage() {
   }, []);
 
   const load = async () => {
+    const requestId = ++loadRequestRef.current;
+    const branchId = currentBranchId;
     setLoading(true);
+    // System Owner can read globally at the database layer; the workspace UI
+    // must therefore fail closed until a valid branch is selected.
+    if (!branchSelectionReady || !branchId) {
+      setRows([]);
+      setLoading(false);
+      return;
+    }
     const from = startOfDay(new Date()).toISOString();
     const to = endOfDay(new Date()).toISOString();
     let q = supabase
@@ -215,9 +226,10 @@ export default function QueuePage() {
       .is("deleted_at", null)
       .is("patients.deleted_at", null)
       .gte("scheduled_at", from)
-      .lte("scheduled_at", to);
-    if (currentBranchId) q = q.eq("branch_id", currentBranchId);
+      .lte("scheduled_at", to)
+      .eq("branch_id", branchId);
     const { data, error } = await q;
+    if (requestId !== loadRequestRef.current) return;
     if (error) {
       toast.error(error.message);
       setRows([]);
@@ -228,26 +240,34 @@ export default function QueuePage() {
   };
 
   useEffect(() => {
-    load();
-    // realtime live sync — scoped to current branch when possible to avoid
-    // clinic-wide refetches from unrelated appointment changes.
-    const filter = currentBranchId ? `branch_id=eq.${currentBranchId}` : undefined;
+    if (!branchSelectionReady || !currentBranchId) {
+      setRows([]);
+      setLoading(false);
+      return;
+    }
+    void load();
+    // Realtime is also scoped strictly to the selected branch.
+    const filter = `branch_id=eq.${currentBranchId}`;
     return subscribeResilient({
-      name: `queue-appts:${currentBranchId ?? "all"}`,
+      name: `queue-appts:${currentBranchId}`,
       bind: (ch) => ch.on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "appointments", ...(filter ? { filter } : {}) } as never,
-        () => { load(); }
+        { event: "*", schema: "public", table: "appointments", filter } as never,
+        () => { void load(); }
       ),
-      onReconnect: () => { load(); },
+      onReconnect: () => { void load(); },
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentBranchId]);
+  }, [branchSelectionReady, currentBranchId]);
 
   // Doctors are loaded through the branch-scoped SECURITY DEFINER RPC so the
   // filter cannot reveal doctors outside the caller's permitted branches.
   useEffect(() => {
-    supabase.rpc("list_doctors").then(({ data }) => {
+    if (!branchSelectionReady || !currentBranchId) {
+      setDoctors([]);
+      return;
+    }
+    supabase.rpc("list_doctors_for_branch", { _branch_id: currentBranchId }).then(({ data }) => {
       const list = ((data ?? []) as QueueDoctor[]).map((d) => ({
         id: d.id,
         full_name: d.full_name ?? null,
@@ -256,7 +276,7 @@ export default function QueuePage() {
       }));
       setDoctors(list);
     });
-  }, []);
+  }, [branchSelectionReady, currentBranchId]);
 
   // If the signed-in user IS one of the doctors, default the view to "My queue"
   // on first load. They can switch to All freely afterwards (we don't re-apply).
@@ -280,15 +300,16 @@ export default function QueuePage() {
 
   // lightweight patient list for walk-in picker (loaded on dialog open)
   useEffect(() => {
-    if (!walkInOpen || patientOptions.length > 0) return;
+    if (!walkInOpen || patientOptions.length > 0 || !branchSelectionReady || !currentBranchId) return;
     supabase
       .from("patients")
       .select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code,phone")
       .is("deleted_at", null)
+      .eq("branch_id", currentBranchId)
       .order("created_at", { ascending: false })
       .limit(500)
       .then(({ data }) => setPatientOptions((data ?? []) as PatientOption[]));
-  }, [walkInOpen, patientOptions.length]);
+  }, [walkInOpen, patientOptions.length, branchSelectionReady, currentBranchId]);
 
   const patientName = (r: QueueRow) => patientDisplayName(r.patients, lang);
 

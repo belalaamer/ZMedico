@@ -8643,6 +8643,15 @@ export type Database = {
           id: string
         }[]
       }
+      list_doctors_for_branch: {
+        Args: { _branch_id: string }
+        Returns: {
+          full_name: string
+          full_name_ar: string
+          full_name_en: string
+          id: string
+        }[]
+      }
       list_therapists: {
         Args: { _branch_id: string }
         Returns: {

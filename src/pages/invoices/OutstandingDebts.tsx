@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,13 +34,17 @@ type Row = {
 
 export default function OutstandingDebts() {
   const { t, lang } = useI18n();
-  const { currentBranchId } = useBranch();
+  const { currentBranchId, branchSelectionReady } = useBranch();
   const navigate = useNavigate();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "pending" | "partial">("all");
+  const loadRequestRef = useRef(0);
 
   const load = async () => {
+    const requestId = ++loadRequestRef.current;
+    const branchId = currentBranchId;
+    if (!branchSelectionReady || !branchId) { setRows([]); setLoading(false); return; }
     setLoading(true);
     let q = supabase.from("invoices")
       .select("id,invoice_number,invoice_date,total,paid_amount,status,patient_id,patients!inner(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code,phone)")
@@ -48,17 +52,18 @@ export default function OutstandingDebts() {
       .in("status", ["pending", "partial"])
       .order("invoice_date", { ascending: false })
       .limit(500);
-    if (currentBranchId) q = q.eq("branch_id", currentBranchId);
+    q = q.eq("branch_id", branchId);
     if (filter !== "all") q = q.eq("status", filter);
     const { data, error } = await q;
+    if (requestId !== loadRequestRef.current) return;
     setLoading(false);
     if (error) { toast.error(error.message); return; }
     const filtered = (data ?? []).filter((i: any) => Number(i.total) - Number(i.paid_amount) > 0.009);
     setRows(filtered as any);
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId, filter]);
-  useDataSync(["invoices", "payments"], () => { load(); });
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [branchSelectionReady, currentBranchId, filter]);
+  useDataSync(["invoices", "payments"], () => { void load(); });
 
   const totalOutstanding = rows.reduce((s, r) => s + (Number(r.total) - Number(r.paid_amount)), 0);
 

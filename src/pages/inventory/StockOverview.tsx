@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Package, AlertTriangle, XCircle, Wallet, Plus, ArrowLeftRight, ArrowRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ const REASONS = ["restock", "damage", "theft", "count", "expired", "other"] as c
 
 export default function StockOverview() {
   const { t, lang } = useI18n();
-  const { currentBranchId } = useBranch();
+  const { currentBranchId, branchSelectionReady, subscription } = useBranch();
   const { user } = useAuth();
   const [products, setProducts] = useState<any[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
@@ -33,19 +33,25 @@ export default function StockOverview() {
   const [trOpen, setTrOpen] = useState(false);
   const [adj, setAdj] = useState({ product_id: "", branch_id: "", type: "add", qty: 0, reason: "restock", notes: "" });
   const [tr, setTr] = useState({ product_id: "", from_branch: "", to_branch: "", qty: 0, notes: "" });
+  const loadRequestRef = useRef(0);
 
   const load = async () => {
+    const requestId = ++loadRequestRef.current;
+    const branchId = currentBranchId;
+    const tenantId = subscription?.tenant_id;
+    if (!branchSelectionReady || !branchId || !tenantId) {
+      setProducts([]); setBranches([]); setInv([]);
+      return;
+    }
     const [{ data: ps }, { data: bs }] = await Promise.all([
       supabase.from("products").select("*").eq("is_active", true).is("deleted_at", null),
-      supabase.from("branches").select("*").order("name_en"),
+      supabase.from("branches").select("*").eq("tenant_id", tenantId).order("name_en"),
     ]);
-    setProducts(ps ?? []); setBranches(bs ?? []);
-    let iq = supabase.from("inventory").select("*");
-    if (currentBranchId) iq = iq.eq("branch_id", currentBranchId);
-    const { data: invs } = await iq;
-    setInv(invs ?? []);
+    const { data: invs } = await supabase.from("inventory").select("*").eq("branch_id", branchId);
+    if (requestId !== loadRequestRef.current) return;
+    setProducts(ps ?? []); setBranches(bs ?? []); setInv(invs ?? []);
   };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId]);
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [branchSelectionReady, currentBranchId, subscription?.tenant_id]);
 
   useEffect(() => {
     const onFocus = () => load();
@@ -65,7 +71,7 @@ export default function StockOverview() {
       stop();
     };
     // eslint-disable-next-line
-  }, [currentBranchId]);
+  }, [branchSelectionReady, currentBranchId, subscription?.tenant_id]);
 
   const productById = useMemo(() => {
     const m: Record<string, any> = {}; products.forEach((p) => { m[p.id] = p; }); return m;
@@ -99,6 +105,8 @@ export default function StockOverview() {
     // the user to pick a product even when they'd already picked one and
     // just forgot the branch (or left qty at 0). Now checks and reports each
     // field independently.
+    if (!branchSelectionReady || !currentBranchId) { toast.error(t("selectBranch")); return; }
+    if (adj.branch_id !== currentBranchId) { toast.error(t("selectBranch")); return; }
     if (!adj.product_id) { toast.error(t("selectProduct")); return; }
     if (!adj.branch_id) { toast.error(t("selectBranch")); return; }
     if (!adj.qty) { toast.error(t("amount")); return; }
@@ -131,9 +139,11 @@ export default function StockOverview() {
     // Bug fix: same copy-paste mismatch as submitAdj above -- always said
     // "select product" no matter which of the three required fields was
     // actually missing.
+    if (!branchSelectionReady || !currentBranchId) { toast.error(t("selectBranch")); return; }
     if (!tr.product_id) { toast.error(t("selectProduct")); return; }
     if (!tr.from_branch || !tr.to_branch) { toast.error(t("selectBranch")); return; }
     if (tr.from_branch === tr.to_branch) { toast.error(t("transferSameBranchError")); return; }
+    if (!branches.some((branch) => branch.id === tr.from_branch) || !branches.some((branch) => branch.id === tr.to_branch)) { toast.error(t("selectBranch")); return; }
     if (!tr.qty || tr.qty <= 0) { toast.error(t("amount")); return; }
     const refId = crypto.randomUUID();
     const fromName = branchName(tr.from_branch); const toName = branchName(tr.to_branch);

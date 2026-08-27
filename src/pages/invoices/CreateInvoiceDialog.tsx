@@ -35,7 +35,7 @@ export function CreateInvoiceDialog({
   open, onOpenChange, onSaved, presetPatientId,
 }: { open: boolean; onOpenChange: (v: boolean) => void; onSaved: (id?: string) => void; presetPatientId?: string }) {
   const { t, lang } = useI18n();
-  const { currentBranchId } = useBranch();
+  const { currentBranchId, branchSelectionReady, subscription } = useBranch();
   const { user } = useAuth();
   const [products, setProducts] = useState<any[]>([]);
   const [procedures, setProcedures] = useState<any[]>([]);
@@ -72,12 +72,14 @@ export function CreateInvoiceDialog({
   useEffect(() => { setPatientId(presetPatientId ?? ""); setDoctorId(""); }, [presetPatientId, open]);
 
   const { data: patientRows = [], refetch: refetchPatients } = useQuery({
-    queryKey: ["patients-for-invoice"],
+    queryKey: ["patients-for-invoice", currentBranchId],
     queryFn: async () => {
+      if (!branchSelectionReady || !currentBranchId) return [];
       const { data, error } = await supabase
         .from("patients")
         .select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code,phone,deleted_at")
         .is("deleted_at", null)
+        .eq("branch_id", currentBranchId)
         .order("first_name_en", { ascending: true })
         .order("last_name_en", { ascending: true })
         .limit(500);
@@ -92,6 +94,7 @@ export function CreateInvoiceDialog({
     },
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
+    enabled: open && branchSelectionReady && Boolean(currentBranchId),
     staleTime: 0,
   });
 
@@ -109,36 +112,40 @@ export function CreateInvoiceDialog({
 
   useEffect(() => {
     if (!open) return;
+    if (!branchSelectionReady || !currentBranchId || !subscription?.tenant_id) {
+      setProducts([]); setProcedures([]); setDoctors([]); setStocks({});
+      return;
+    }
     void refetchPatients();
     supabase.from("products").select("id,sku,name_en,name_ar,selling_price,min_stock_level").eq("is_active", true).is("deleted_at", null).order("name_en").limit(1000)
       .then(({ data }) => setProducts(data ?? []));
-    supabase.from("procedures").select("id,name_en,name_ar,default_price,is_active,deleted_at").eq("is_active", true).is("deleted_at", null).order("name_en").limit(1000)
+    supabase.from("procedures").select("id,name_en,name_ar,default_price,is_active,deleted_at").eq("is_active", true).is("deleted_at", null).eq("tenant_id", subscription.tenant_id).order("name_en").limit(1000)
       .then(({ data }) => setProcedures((data ?? []).filter((p: any) => p.deleted_at == null && p.is_active !== false)));
     supabase.from("insurance_companies").select("id,name_en,name_ar,default_coverage_ratio,is_active").eq("is_active", true).order("name_en")
       .then(({ data }) => setInsuranceCompanies(data ?? []));
     // Strict doctor list via SECURITY DEFINER RPC so non-admin staff (e.g. Front Desk)
     // can see doctors without needing SELECT on other users' user_roles rows.
-    supabase.rpc("list_doctors").then(({ data }) => setDoctors((data ?? []) as any));
-  }, [open, refetchPatients]);
+    supabase.rpc("list_doctors_for_branch", { _branch_id: currentBranchId }).then(({ data }) => setDoctors((data ?? []) as any));
+  }, [open, refetchPatients, branchSelectionReady, currentBranchId, subscription?.tenant_id]);
 
   useDataSync(["patients"], () => {
     void refetchPatients();
   });
 
   useEffect(() => {
-    if (!open) return;
-    const q = supabase.from("inventory").select("product_id, quantity");
-    (currentBranchId ? q.eq("branch_id", currentBranchId) : q).then(({ data }) => {
+    if (!open || !branchSelectionReady || !currentBranchId) return;
+    const q = supabase.from("inventory").select("product_id, quantity").eq("branch_id", currentBranchId);
+    q.then(({ data }) => {
       const map: Record<string, number> = {};
       (data ?? []).forEach((x: any) => { map[x.product_id] = (map[x.product_id] ?? 0) + Number(x.quantity); });
       setStocks(map);
     });
-  }, [open, currentBranchId]);
+  }, [open, branchSelectionReady, currentBranchId]);
 
   // Auto-fill insurance from patient
   useEffect(() => {
-    if (!patientId) { setInsuranceCompanyId(""); setCoverageRatio(0); return; }
-    supabase.from("patients").select("insurance_company_id,insurance_coverage_ratio").eq("id", patientId).maybeSingle()
+    if (!patientId || !branchSelectionReady || !currentBranchId) { setInsuranceCompanyId(""); setCoverageRatio(0); return; }
+    supabase.from("patients").select("insurance_company_id,insurance_coverage_ratio").eq("id", patientId).eq("branch_id", currentBranchId).maybeSingle()
       .then(({ data }) => {
         if (!data) return;
         if (data.insurance_company_id) {
@@ -148,7 +155,7 @@ export function CreateInvoiceDialog({
           setInsuranceCompanyId(""); setCoverageRatio(0);
         }
       });
-  }, [patientId]);
+  }, [patientId, branchSelectionReady, currentBranchId]);
 
   // When the insurance company changes, fetch its currently-active contract.
   // Null means "no contract" — the flat coverage path is used as a safe fallback.
@@ -160,12 +167,13 @@ export function CreateInvoiceDialog({
 
   // Load patient's recorded procedures (from medical records) for quick add
   useEffect(() => {
-    if (!open || !patientId) { setPatientProcedures([]); setSelectedProcIds({}); return; }
+    if (!open || !patientId || !branchSelectionReady || !currentBranchId) { setPatientProcedures([]); setSelectedProcIds({}); return; }
     (async () => {
       const { data: rps, error } = await supabase
         .from("record_procedures")
         .select("id, medical_record_id, procedure_id, quantity, tooth_number, created_at, medical_records!inner(patient_id,visit_date), procedures!inner(id,name_en,name_ar,default_price,deleted_at,is_active)")
         .eq("medical_records.patient_id", patientId)
+        .eq("medical_records.branch_id", currentBranchId)
         .is("procedures.deleted_at", null)
         .eq("procedures.is_active", true)
         .order("created_at", { ascending: false })
@@ -183,7 +191,7 @@ export function CreateInvoiceDialog({
       );
       setSelectedProcIds({});
     })();
-  }, [open, patientId]);
+  }, [open, patientId, branchSelectionReady, currentBranchId]);
 
   const addSelectedProcedures = () => {
     const picks = patientProcedures.filter((r) => selectedProcIds[r.id]);
@@ -292,6 +300,9 @@ export function CreateInvoiceDialog({
   const save = async (status: "draft" | "pending") => {
     if (submittingRef.current) return;
     submittingRef.current = true;
+    if (!branchSelectionReady || !currentBranchId) { toast.error(t("selectBranch")); submittingRef.current = false; return; }
+    const { data: patientInBranch } = await supabase.from("patients").select("id").eq("id", patientId).eq("branch_id", currentBranchId).maybeSingle();
+    if (!patientInBranch) { toast.error(t("selectPatient")); submittingRef.current = false; return; }
     if (!patientId) { toast.error(t("selectPatient")); submittingRef.current = false; return; }
     if (items.length === 0 || items.every((it) => !it.description_en)) { toast.error("Add at least one item"); submittingRef.current = false; return; }
     setSaving(true);
@@ -378,7 +389,7 @@ export function CreateInvoiceDialog({
     }
 
     // Auto-deduct inventory for product items (non-cancelled invoices)
-    if (currentBranchId && status !== "draft") {
+    if (status !== "draft") {
       for (const it of rows) {
         if (it.item_type === "product" && it.product_id) {
           const qty = Number(it.quantity) || 0;

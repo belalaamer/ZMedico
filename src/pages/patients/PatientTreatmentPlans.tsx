@@ -65,8 +65,12 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
 
   useEffect(() => {
     (async () => {
+      if (!currentBranchId) {
+        setDoctors([]);
+        return;
+      }
       // Use SECURITY DEFINER RPC so non-admin clinical roles can load doctors.
-      const { data } = await supabase.rpc("list_doctors");
+      const { data } = await supabase.rpc("list_doctors_for_branch", { _branch_id: currentBranchId });
       const list = ((data ?? []) as any[]).map((p: any) => ({
         id: p.id,
         full_name: p.full_name ?? p.id.slice(0, 8),
@@ -76,7 +80,7 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
       list.sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
       setDoctors(list);
     })();
-  }, []);
+  }, [currentBranchId]);
 
   const createPlan = async () => {
     if (!form.name_en && !form.name_ar) { toast.error(lang === "ar" ? "أدخل اسم الخطة" : "Enter plan name"); return; }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Plus, Activity, AlertCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -30,7 +30,7 @@ type Therapist = {
 
 export default function PhysioCases() {
   const { t, lang } = useI18n();
-  const { currentBranchId } = useBranch();
+  const { currentBranchId, branchSelectionReady } = useBranch();
   const navigate = useNavigate();
   // R2: canonical authorization entry point.
   const { authz } = useAuthorization("PhysioCases");
@@ -41,6 +41,8 @@ export default function PhysioCases() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [open, setOpen] = useState(false);
+  const loadRequestRef = useRef(0);
+  const optionsRequestRef = useRef(0);
   const [form, setForm] = useState<any>({
     patient_id: "", therapist_id: "", diagnosis: "", treatment_goal: "",
     treatment_plan: "", start_date: new Date().toISOString().slice(0, 10),
@@ -48,48 +50,52 @@ export default function PhysioCases() {
   });
 
   const load = async () => {
-    if (!currentBranchId) { setItems([]); setLoading(false); return; }
+    const requestId = ++loadRequestRef.current;
+    const branchId = currentBranchId;
+    if (!branchSelectionReady || !branchId) { setItems([]); setLoading(false); setLoadError(null); return; }
     setLoading(true); setLoadError(null);
     const { data, error } = await supabase
       .from("physio_cases" as any)
       .select("*, patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code)")
-      .eq("branch_id", currentBranchId)
+      .eq("branch_id", branchId)
       .is("deleted_at", null)
       .order("created_at", { ascending: false });
+    if (requestId !== loadRequestRef.current) return;
     if (error) setLoadError(error.message);
     setItems((data as any) ?? []);
     setLoading(false);
   };
 
   useEffect(() => {
-    load();
-    if (currentBranchId) {
-      supabase.from("patients").select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code")
-        .is("deleted_at", null).eq("branch_id", currentBranchId).order("created_at", { ascending: false }).limit(500)
-        .then(({ data }) => setPatients((data as any) ?? []));
-      // Therapists = active staff in the current branch (from HR staff
-      // directory). We surface the position title so the user can pick
-      // the right doctor/therapist. therapist_id FK -> staff_profiles.id.
-      (async () => {
-        const { data } = await supabase.from("staff_profiles")
-          .select("id,employee_id,profile:profiles!staff_profiles_id_fkey(full_name,email),position:staff_positions(title_en,title_ar)")
-          .eq("branch_id", currentBranchId)
-          .eq("status", "active")
-          .is("deleted_at", null)
-          .limit(500);
-        // Only clinical providers valid for physiotherapy: doctor / physiotherapist.
-        // Filter by position title keywords in EN/AR so the picker never exposes
-        // admin/receptionist/manager/HR/finance/inventory or other non-clinical staff.
-        const CLINICAL = /(doctor|physio|therapist|physical\s*therap|طبيب|علاج\s*طبيعي|أخصائي\s*علاج|معالج)/i;
-        const filtered = ((data as any) ?? []).filter((s: any) => {
-          const en = s.position?.title_en ?? "";
-          const ar = s.position?.title_ar ?? "";
-          return CLINICAL.test(en) || CLINICAL.test(ar);
-        });
-        setTherapists(filtered);
-      })();
+    const requestId = ++optionsRequestRef.current;
+    const branchId = currentBranchId;
+    if (!branchSelectionReady || !branchId) {
+      setPatients([]);
+      setTherapists([]);
+      return;
     }
-  }, [currentBranchId]);
+    let active = true;
+    supabase.from("patients").select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code")
+      .is("deleted_at", null).eq("branch_id", branchId).order("created_at", { ascending: false }).limit(500)
+      .then(({ data }) => { if (active && requestId === optionsRequestRef.current) setPatients((data as any) ?? []); });
+    (async () => {
+      const { data } = await supabase.from("staff_profiles")
+        .select("id,employee_id,profile:profiles!staff_profiles_id_fkey(full_name,email),position:staff_positions(title_en,title_ar)")
+        .eq("branch_id", branchId)
+        .eq("status", "active")
+        .is("deleted_at", null)
+        .limit(500);
+      if (!active || requestId !== optionsRequestRef.current) return;
+      const CLINICAL = /(doctor|physio|therapist|physical\s*therap|طبيب|علاج\s*طبيعي|أخصائي\s*علاج|معالج)/i;
+      const filtered = ((data as any) ?? []).filter((s: any) => {
+        const en = s.position?.title_en ?? "";
+        const ar = s.position?.title_ar ?? "";
+        return CLINICAL.test(en) || CLINICAL.test(ar);
+      });
+      setTherapists(filtered);
+    })();
+    return () => { active = false; };
+  }, [branchSelectionReady, currentBranchId]);
 
   // Open creation dialog pre-filled when navigated with ?patient=<id>&new=1
   useEffect(() => {
@@ -111,7 +117,7 @@ export default function PhysioCases() {
   const patientName = (p: Patient | null | undefined) => patientDisplayName(p, lang);
 
   const create = async () => {
-    if (!currentBranchId) { toast.error(lang === "ar" ? "اختر فرعًا أولًا" : "Select a branch first"); return; }
+    if (!branchSelectionReady || !currentBranchId) { toast.error(lang === "ar" ? "اختر فرعًا أولًا" : "Select a branch first"); return; }
     if (!form.patient_id) { toast.error(lang === "ar" ? "المريض مطلوب" : "Patient is required"); return; }
     const { data: u } = await supabase.auth.getUser();
     const payload: any = {

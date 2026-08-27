@@ -12,34 +12,37 @@ import { DollarSign, Users, CalendarDays, FileWarning, BarChart3, Briefcase, Ste
 
 export default function ReportsDashboard() {
   const { t, lang } = useI18n();
-  const { currentBranchId } = useBranch();
+  const { currentBranchId, branchSelectionReady } = useBranch();
   const { can } = usePermissions();
   const [stats, setStats] = useState({ revenue: 0, patients: 0, appts: 0, pending: 0 });
 
   useEffect(() => {
+    let active = true;
+    if (!branchSelectionReady || !currentBranchId) { setStats({ revenue: 0, patients: 0, appts: 0, pending: 0 }); return; }
     const today = new Date();
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
     (async () => {
       let pq = supabase.from("payments").select("amount").is("deleted_at", null).gte("payment_date", monthStart);
-      if (currentBranchId) pq = pq.eq("branch_id", currentBranchId);
+      pq = pq.eq("branch_id", currentBranchId);
       const { data: pays } = await pq;
       const revenue = (pays ?? []).reduce((s, r: any) => s + Number(r.amount || 0), 0);
 
       let ptq = supabase.from("patients").select("id", { count: "exact", head: true }).is("deleted_at", null).gte("created_at", monthStart);
-      if (currentBranchId) ptq = ptq.eq("branch_id", currentBranchId);
+      ptq = ptq.eq("branch_id", currentBranchId);
       const { count: patients } = await ptq;
 
       let aq = supabase.from("appointments").select("id", { count: "exact", head: true }).is("deleted_at", null).gte("scheduled_at", monthStart);
-      if (currentBranchId) aq = aq.eq("branch_id", currentBranchId);
+      aq = aq.eq("branch_id", currentBranchId);
       const { count: appts } = await aq;
 
       let iq = supabase.from("invoices").select("id", { count: "exact", head: true }).is("deleted_at", null).in("status", ["pending", "partial"]);
-      if (currentBranchId) iq = iq.eq("branch_id", currentBranchId);
+      iq = iq.eq("branch_id", currentBranchId);
       const { count: pending } = await iq;
 
-      setStats({ revenue, patients: patients ?? 0, appts: appts ?? 0, pending: pending ?? 0 });
+      if (active) setStats({ revenue, patients: patients ?? 0, appts: appts ?? 0, pending: pending ?? 0 });
     })();
-  }, [currentBranchId]);
+    return () => { active = false; };
+  }, [branchSelectionReady, currentBranchId]);
 
   const links = [
     { to: "/reports/financial", permission: "reports_finance.view", icon: DollarSign, label: t("financialReports"), desc: lang === "ar" ? "الإيرادات والمصروفات والتدفقات النقدية" : "Revenue, expenses, and cash flow" },

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDataSync } from "@/lib/dataSync";
 import { Plus, Receipt } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -21,34 +21,39 @@ import { useAuthorization } from "@/lib/authz/useAuthorization";
 
 export default function Expenses() {
   const { t, lang } = useI18n();
-  const { currentBranchId } = useBranch();
+  const { currentBranchId, branchSelectionReady } = useBranch();
   const { user } = useAuth();
   const { authz } = useAuthorization();
   const canDelete = authz.can("treasury.delete");
   const [items, setItems] = useState<any[]>([]);
   const [cats, setCats] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
+  const loadRequestRef = useRef(0);
   const [form, setForm] = useState({
     category_id: "", amount: 0, description_en: "", description_ar: "",
     expense_date: new Date().toISOString().slice(0,10), payment_method: "cash" as "cash"|"card"|"bank_transfer",
   });
 
   const load = async () => {
-    let q = supabase.from("expenses").select("*, expense_categories(name_en,name_ar)").is("deleted_at", null).order("expense_date", { ascending: false }).limit(200);
-    if (currentBranchId) q = q.eq("branch_id", currentBranchId);
+    const requestId = ++loadRequestRef.current;
+    const branchId = currentBranchId;
+    if (!branchSelectionReady || !branchId) { setItems([]); return; }
+    const q = supabase.from("expenses").select("*, expense_categories(name_en,name_ar)").eq("branch_id", branchId).is("deleted_at", null).order("expense_date", { ascending: false }).limit(200);
     const { data, error } = await q;
     if (error) { toast.error(error.message); return; }
+    if (requestId !== loadRequestRef.current) return;
     setItems(data ?? []);
   };
   useEffect(() => {
-    load();
+    void load();
     supabase.from("expense_categories").select("*").order("name_en").then(({ data }) => setCats(data ?? []));
     /* eslint-disable-next-line */
-  }, [currentBranchId]);
-  useDataSync(["expenses"], () => { load(); });
+  }, [branchSelectionReady, currentBranchId]);
+  useDataSync(["expenses"], () => { void load(); });
 
   const softDelete = async (x: any): Promise<void> => {
-    const { error } = await supabase.from("expenses").update({ deleted_at: new Date().toISOString() } as any).eq("id", x.id);
+    if (!branchSelectionReady || !currentBranchId || x.branch_id !== currentBranchId) { toast.error(t("selectBranch")); return; }
+    const { error } = await supabase.from("expenses").update({ deleted_at: new Date().toISOString() } as any).eq("id", x.id).eq("branch_id", currentBranchId);
     if (error) { toast.error(error.message); return; }
     toast.success(t("delete")); load();
   };

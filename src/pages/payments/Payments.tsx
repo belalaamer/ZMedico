@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useDataSync } from "@/lib/dataSync";
 import { Plus, CreditCard, Banknote, Wallet, Shield, Landmark, Smartphone, AlertCircle } from "lucide-react";
@@ -31,13 +31,14 @@ const methodStyle = (m: string): { badge: string; icon: string; Icon: any } => {
 
 export default function Payments() {
   const { t, lang } = useI18n();
-  const { currentBranchId } = useBranch();
+  const { currentBranchId, branchSelectionReady } = useBranch();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
+  const loadRequestRef = useRef(0);
   const [searchParams, setSearchParams] = useSearchParams();
   const prefillInvoice = searchParams.get("invoice") || undefined;
   const prefillPatient = searchParams.get("patient") || undefined;
@@ -57,6 +58,9 @@ export default function Payments() {
   };
 
   const load = async () => {
+    const requestId = ++loadRequestRef.current;
+    const branchId = currentBranchId;
+    if (!branchSelectionReady || !branchId) { setItems([]); setTotal(0); setLoadError(false); setLoading(false); return; }
     setLoading(true);
     setLoadError(false);
     const from = page * PAGE_SIZE;
@@ -65,19 +69,21 @@ export default function Payments() {
       .select("*, patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code), invoices(invoice_number)", { count: "exact" })
       .is("deleted_at", null)
       .order("created_at", { ascending: false }).range(from, to);
-    if (currentBranchId) q = q.eq("branch_id", currentBranchId);
+    q = q.eq("branch_id", branchId);
     const { data, error, count } = await q;
+    if (requestId !== loadRequestRef.current) return;
     setLoading(false);
     if (error) { setLoadError(true); toast.error(error.message); return; }
     setItems(data ?? []);
     setTotal(count ?? 0);
   };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId, page]);
-  useEffect(() => { setPage(0); }, [currentBranchId]);
-  useDataSync(["payments", "invoices"], () => { load(); });
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [branchSelectionReady, currentBranchId, page]);
+  useEffect(() => { setPage(0); }, [branchSelectionReady, currentBranchId]);
+  useDataSync(["payments", "invoices"], () => { void load(); });
 
   const softDelete = async (p: any): Promise<void> => {
-    const { error } = await supabase.from("payments").update({ deleted_at: new Date().toISOString() } as any).eq("id", p.id);
+    if (!branchSelectionReady || !currentBranchId || p.branch_id !== currentBranchId) { toast.error(t("selectBranch")); return; }
+    const { error } = await supabase.from("payments").update({ deleted_at: new Date().toISOString() } as any).eq("id", p.id).eq("branch_id", currentBranchId);
     if (error) { toast.error(error.message); return; }
     // Treasury reversal & invoice recalc happen automatically via DB trigger.
     toast.success(t("delete")); load();

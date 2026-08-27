@@ -73,7 +73,7 @@ export function PermissionRoute({ children, module, adminOnly, systemOwnerOnly }
   const { pathname } = useLocation();
   const { authz, loading } = useAuthorization();
   const { t } = useI18n();
-  const { currentBranchId, modulesLoading, isModuleEnabled } = useBranch();
+  const { currentBranchId, branchSelectionReady, modulesLoading, isModuleEnabled } = useBranch();
   const mod = module ?? moduleForPath(pathname);
   const entitlement = moduleKeyForPath(pathname);
   const entitlementBlocked = shouldBlockRouteForEntitlement(entitlement, currentBranchId, isModuleEnabled);
@@ -89,12 +89,24 @@ export function PermissionRoute({ children, module, adminOnly, systemOwnerOnly }
   const isHrPath = pathname.startsWith("/hr");
   const isInvoicesPath = pathname.startsWith("/invoices") || pathname.startsWith("/payments");
 
-  if (loading || (currentBranchId && modulesLoading)) {
+  if (loading || !branchSelectionReady || (currentBranchId && modulesLoading)) {
     return (
       <div className="min-h-[40vh] flex items-center justify-center" role="status" aria-live="polite">
         <div className="flex flex-col items-center gap-3 text-muted-foreground">
           <div className="size-8 rounded-full border-4 border-primary/20 border-t-primary animate-spin" aria-hidden="true" />
           <span className="text-sm">{t("loadingPermissions")}</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!pathname.startsWith("/platform") && !currentBranchId) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center p-6">
+        <div className="max-w-md text-center space-y-3">
+          <ShieldAlert className="mx-auto size-10 text-muted-foreground" />
+          <h2 className="text-xl font-bold">{t("selectBranch") || "Select a clinic workspace"}</h2>
+          <p className="text-sm text-muted-foreground">{t("selectBranchDescription") || "Choose a clinic from Platform Administration before opening operational data."}</p>
         </div>
       </div>
     );

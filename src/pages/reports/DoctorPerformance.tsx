@@ -27,23 +27,24 @@ type Row = {
 
 export default function DoctorPerformance() {
   const { t, lang } = useI18n();
-  const { currentBranchId } = useBranch();
+  const { currentBranchId, branchSelectionReady } = useBranch();
   const [start, setStart] = useState(new Date(new Date().getFullYear(), new Date().getMonth() - 2, 1).toISOString().slice(0, 10));
   const [end, setEnd] = useState(new Date().toISOString().slice(0, 10));
   const [rows, setRows] = useState<Row[]>([]);
 
   useEffect(() => {
+    let active = true;
     (async () => {
-      // All users with the doctor role (don't require staff_profiles — RLS may hide it from non-admins)
-      const { data: roles } = await supabase.from("user_roles").select("user_id").eq("role", "doctor");
-      const docIds = Array.from(new Set((roles ?? []).map((r: any) => r.user_id).filter(Boolean)));
-      if (!docIds.length) { setRows([]); return; }
-      const { data: profs } = await supabase.from("profiles").select("id, full_name, full_name_en, full_name_ar").in("id", docIds);
-      const nameMap = new Map<string, DoctorNameFields>((profs ?? []).map((p: any) => [p.id, p]));
+      if (!branchSelectionReady || !currentBranchId) { setRows([]); return; }
+      const { data: doctors } = await supabase.rpc("list_doctors_for_branch", { _branch_id: currentBranchId });
+      const doctorRows = (doctors ?? []) as Array<{ id: string; full_name?: string | null; full_name_en?: string | null; full_name_ar?: string | null }>;
+      const docIds = doctorRows.map((doctor) => doctor.id).filter(Boolean);
+      if (!docIds.length) { if (active) setRows([]); return; }
+      const nameMap = new Map<string, DoctorNameFields>(doctorRows.map((doctor) => [doctor.id, doctor]));
 
       // Assigned patient counts
       let aq = supabase.from("patients").select("id, assigned_doctor_id").is("deleted_at", null).not("assigned_doctor_id", "is", null);
-      if (currentBranchId) aq = aq.eq("branch_id", currentBranchId);
+      aq = aq.eq("branch_id", currentBranchId);
       const { data: assignedRows } = await aq;
       const assignedMap = new Map<string, number>();
       (assignedRows ?? []).forEach((p: any) => {
@@ -54,7 +55,7 @@ export default function DoctorPerformance() {
       // Medical records (visits) in date range
       let vq = supabase.from("medical_records").select("doctor_id, patient_id, visit_date")
         .gte("visit_date", start).lte("visit_date", end).is("deleted_at", null).not("doctor_id", "is", null);
-      if (currentBranchId) vq = vq.eq("branch_id", currentBranchId);
+      vq = vq.eq("branch_id", currentBranchId);
       const { data: visits } = await vq;
 
       // Appointments in date range (with fallback to patient's assigned doctor when appt.doctor_id is null)
@@ -64,7 +65,7 @@ export default function DoctorPerformance() {
         .lte("scheduled_at", end + "T23:59:59")
         .is("deleted_at", null)
         .in("status", ["completed", "in_progress"] as any);
-      if (currentBranchId) aq2 = aq2.eq("branch_id", currentBranchId);
+      aq2 = aq2.eq("branch_id", currentBranchId);
       const { data: appts } = await aq2;
 
       // Build patient → assigned doctor map for fallback
@@ -92,7 +93,7 @@ export default function DoctorPerformance() {
       // Treatment plans
       let tq = (supabase as any).from("treatment_plans").select("doctor_id, status, price")
         .gte("created_at", start).lte("created_at", end + "T23:59:59").is("deleted_at", null).not("doctor_id", "is", null);
-      if (currentBranchId) tq = tq.eq("branch_id", currentBranchId);
+      tq = tq.eq("branch_id", currentBranchId);
       const { data: plans } = await tq;
       const planMap = new Map<string, { completed: number; active: number }>();
       (plans ?? []).forEach((p: any) => {
@@ -106,7 +107,7 @@ export default function DoctorPerformance() {
       let cq = (supabase as any).from("doctor_commissions")
         .select("doctor_id, base_amount, commission_amount")
         .gte("created_at", start).lte("created_at", end + "T23:59:59");
-      if (currentBranchId) cq = cq.eq("branch_id", currentBranchId);
+      cq = cq.eq("branch_id", currentBranchId);
       const { data: comms } = await cq;
       const commMap = new Map<string, { revenue: number; commissions: number }>();
       (comms ?? []).forEach((c: any) => {
@@ -145,9 +146,10 @@ export default function DoctorPerformance() {
         (b.assigned + b.unique_visits) - (a.assigned + a.unique_visits) ||
         b.retention - a.retention
       );
-      setRows(out);
+      if (active) setRows(out);
     })();
-  }, [start, end, currentBranchId]);
+    return () => { active = false; };
+  }, [start, end, branchSelectionReady, currentBranchId]);
 
   const totals = useMemo(() => {
     const t = { assigned: 0, patients: 0, returning: 0, revenue: 0 };

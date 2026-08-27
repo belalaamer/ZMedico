@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Send, RefreshCw, Trash2, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useDataSync } from "@/lib/dataSync";
@@ -38,7 +38,7 @@ const statusColor: Record<Reminder["status"], string> = {
 
 export default function ScheduledReminders() {
   const { t, lang } = useI18n();
-  const { currentBranchId } = useBranch();
+  const { currentBranchId, branchSelectionReady } = useBranch();
   const { user } = useAuth();
   const { toast } = useToast();
   const [items, setItems] = useState<Reminder[]>([]);
@@ -47,6 +47,7 @@ export default function ScheduledReminders() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [open, setOpen] = useState(false);
+  const loadRequestRef = useRef(0);
   const [form, setForm] = useState({
     patient_id: "",
     reminder_type: "sms" as Reminder["reminder_type"],
@@ -55,16 +56,19 @@ export default function ScheduledReminders() {
   });
 
   const load = async () => {
-    let q = supabase.from("reminders").select("*").order("scheduled_time", { ascending: false }).limit(300);
-    if (currentBranchId) q = q.eq("branch_id", currentBranchId);
+    const requestId = ++loadRequestRef.current;
+    const branchId = currentBranchId;
+    if (!branchSelectionReady || !branchId) { setItems([]); setPatients([]); return; }
+    const q = supabase.from("reminders").select("*").eq("branch_id", branchId).order("scheduled_time", { ascending: false }).limit(300);
     const { data } = await q;
+    if (requestId !== loadRequestRef.current) return;
     setItems((data ?? []) as Reminder[]);
     const { data: p } = await supabase.from("patients").select("id, first_name_en, last_name_en, first_name_ar, last_name_ar, name_language, phone")
-      .is("deleted_at", null).order("created_at", { ascending: false }).limit(500);
-    setPatients((p ?? []) as Patient[]);
+      .eq("branch_id", branchId).is("deleted_at", null).order("created_at", { ascending: false }).limit(500);
+    if (requestId === loadRequestRef.current) setPatients((p ?? []) as Patient[]);
   };
-  useEffect(() => { load(); }, [currentBranchId]);
-  useDataSync(["patients", "reminders"], () => load());
+  useEffect(() => { void load(); }, [branchSelectionReady, currentBranchId]);
+  useDataSync(["patients", "reminders"], () => { void load(); });
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -89,12 +93,13 @@ export default function ScheduledReminders() {
   };
 
   const create = async () => {
+    if (!branchSelectionReady || !currentBranchId) { toast({ title: t("selectBranch"), variant: "destructive" }); return; }
     if (!form.patient_id || !form.message.trim()) {
       toast({ title: "Required", variant: "destructive" }); return;
     }
     const { error } = await supabase.from("reminders").insert({
       patient_id: form.patient_id,
-      branch_id: currentBranchId ?? null,
+      branch_id: currentBranchId,
       reminder_type: form.reminder_type,
       scheduled_time: new Date(form.scheduled_time).toISOString(),
       message_en: form.message, message_ar: form.message,
@@ -107,7 +112,8 @@ export default function ScheduledReminders() {
   };
 
   const markSent = async (id: string) => {
-    await supabase.from("reminders").update({ status: "sent", sent_at: new Date().toISOString() }).eq("id", id);
+    if (!branchSelectionReady || !currentBranchId) return;
+    await supabase.from("reminders").update({ status: "sent", sent_at: new Date().toISOString() }).eq("id", id).eq("branch_id", currentBranchId);
     load();
   };
   const sendNow = async (id: string) => {

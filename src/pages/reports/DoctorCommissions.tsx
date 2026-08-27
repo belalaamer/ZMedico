@@ -14,7 +14,7 @@ import { Wallet, TrendingUp, Award } from "lucide-react";
 
 export default function DoctorCommissions() {
   const { t, lang } = useI18n();
-  const { currentBranchId } = useBranch();
+  const { currentBranchId, branchSelectionReady } = useBranch();
   // R2: doctor-only scoping routed through AuthorizationService.
   // Semantics unchanged: user must hold `doctor` and NOT be admin/manager/hr.
   const { authz } = useAuthorization("DoctorCommissions");
@@ -29,19 +29,22 @@ export default function DoctorCommissions() {
   const [rows, setRows] = useState<any[]>([]);
 
   useEffect(() => {
+    let active = true;
     (async () => {
-      const { data: staff } = await supabase.from("staff_profiles").select("id").eq("status", "active");
-      const ids = (staff ?? []).map((s: any) => s.id);
-      if (ids.length === 0) { setDoctors([]); return; }
-      const { data: profs } = await supabase.from("profiles").select("id, full_name").in("id", ids);
-      const list = (profs ?? []).map((p: any) => ({ id: p.id, full_name: p.full_name ?? p.id.slice(0,8) }));
+      if (!branchSelectionReady || !currentBranchId) { setDoctors([]); return; }
+      const { data } = await supabase.rpc("list_doctors_for_branch", { _branch_id: currentBranchId });
+      if (!active) return;
+      const list = ((data ?? []) as any[]).map((p: any) => ({ id: p.id, full_name: p.full_name ?? p.full_name_en ?? p.full_name_ar ?? p.id.slice(0,8) }));
       list.sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
       setDoctors(list);
     })();
-  }, []);
+    return () => { active = false; };
+  }, [branchSelectionReady, currentBranchId]);
 
   useEffect(() => {
+    let active = true;
     (async () => {
+      if (!branchSelectionReady || !currentBranchId) { setRows([]); return; }
       let q = (supabase as any)
         .from("doctor_commissions")
         .select("id, doctor_id, base_amount, collected_amount, commission_amount, commission_percent, status, created_at, branch_id, procedures(name_en,name_ar), patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language)")
@@ -49,13 +52,14 @@ export default function DoctorCommissions() {
         .lte("created_at", end + "T23:59:59")
         .order("created_at", { ascending: false })
         .limit(2000);
-      if (currentBranchId) q = q.eq("branch_id", currentBranchId);
+      q = q.eq("branch_id", currentBranchId);
       if (doctorId !== "all") q = q.eq("doctor_id", doctorId);
       if (status !== "all") q = q.eq("status", status);
       const { data } = await q;
-      setRows(data ?? []);
+      if (active) setRows(data ?? []);
     })();
-  }, [start, end, doctorId, status, currentBranchId]);
+    return () => { active = false; };
+  }, [start, end, doctorId, status, branchSelectionReady, currentBranchId]);
 
   const totals = useMemo(() => {
     const t = { base: 0, collected: 0, commission: 0 };

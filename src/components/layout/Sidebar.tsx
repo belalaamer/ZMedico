@@ -29,7 +29,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
   const { t, lang } = useI18n();
   const { branding } = useTenantBranding();
   const brandName = branding?.display_name ?? t("appName");
-  const { currentBranchId, isModuleEnabled } = useBranch();
+  const { currentBranchId, branchSelectionReady, isModuleEnabled } = useBranch();
   const { pathname, search } = useLocation();
   const [alertCount, setAlertCount] = useState(0);
   const { authz, loading: authzLoading } = useAuthorization("sidebar");
@@ -38,22 +38,25 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
   const isPlatformSurface = isSystemOwner && !isWorkspaceHandoff;
 
   useEffect(() => {
+    if (!branchSelectionReady || !currentBranchId) {
+      setAlertCount(0);
+      return;
+    }
     const refresh = () => {
-      let q2 = supabase.from("stock_alerts").select("*", { count: "exact", head: true }).eq("is_resolved", false);
-      if (currentBranchId) q2 = q2.eq("branch_id", currentBranchId);
+      const q2 = supabase.from("stock_alerts").select("*", { count: "exact", head: true }).eq("is_resolved", false).eq("branch_id", currentBranchId);
       q2.then(({ count }) => setAlertCount(count ?? 0));
     };
     refresh();
     return subscribeResilient({
-      name: `inv-alerts:${currentBranchId ?? "all"}`,
+      name: `inv-alerts:${currentBranchId}`,
       bind: (ch) => ch.on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "stock_alerts" },
+        { event: "*", schema: "public", table: "stock_alerts", filter: `branch_id=eq.${currentBranchId}` },
         () => refresh()
       ),
       onReconnect: () => refresh(),
     });
-  }, [currentBranchId]);
+  }, [branchSelectionReady, currentBranchId]);
 
   const dashboardItem: NavItem = isPlatformSurface
     ? { to: "/platform", icon: Building2, label: lang === "ar" ? "إدارة المنصة" : "Platform Console", end: true }

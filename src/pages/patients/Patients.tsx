@@ -90,7 +90,7 @@ const schema = z.object({
 
 export default function PatientsPage() {
   const { t, lang } = useI18n();
-  const { currentBranchId } = useBranch();
+  const { currentBranchId, branchSelectionReady } = useBranch();
   const navigate = useNavigate();
   // R2: canonical authorization entry point.
   const { authz } = useAuthorization("Patients");
@@ -118,6 +118,13 @@ export default function PatientsPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    if (!branchSelectionReady || !currentBranchId) {
+      setItems([]);
+      setTotal(0);
+      setDuesByPatient({});
+      setLoading(false);
+      return;
+    }
     const from = page * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
     // RBAC-11 / UX fix: sort by patient_code (a guaranteed strictly-
@@ -131,14 +138,13 @@ export default function PatientsPage() {
     // guaranteeing the visible numbers are always in consistent order.
     let query = supabase.from("patients")
       .select("id,patient_code,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,phone,phone2,email,gender,city,address,dob,blood_type,notes,branch_id,created_at,whatsapp_opt_in", { count: "exact" })
-      .is("deleted_at", null).order("patient_code", { ascending: false }).range(from, to);
-    if (currentBranchId) query = query.eq("branch_id", currentBranchId);
+      .is("deleted_at", null).eq("branch_id", currentBranchId).order("patient_code", { ascending: false }).range(from, to);
     const { data, error, count } = await query;
     setLoading(false);
     if (error) { toast.error(error.message); return; }
     setItems((data ?? []) as Patient[]);
         setTotal(count ?? 0);
-  }, [currentBranchId, page]);
+  }, [branchSelectionReady, currentBranchId, page]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { setPage(0); }, [currentBranchId]);
   useDataSync(["patients"], () => { void load(); });
@@ -146,7 +152,7 @@ export default function PatientsPage() {
   // Lightweight batched outstanding-debt badge: a single query for the visible
   // patients, no per-row work, no joins.
   useEffect(() => {
-    if (!items.length) { setDuesByPatient({}); return; }
+    if (!branchSelectionReady || !currentBranchId || !items.length) { setDuesByPatient({}); return; }
     let active = true;
     const ids = items.map((p) => p.id);
     (async () => {
@@ -154,6 +160,7 @@ export default function PatientsPage() {
         .from("invoices")
         .select("patient_id,total,paid_amount,status,deleted_at")
         .in("patient_id", ids)
+        .eq("branch_id", currentBranchId)
         .is("deleted_at", null)
         .in("status", ["pending", "partial"]);
       const { data } = await q;
@@ -166,7 +173,7 @@ export default function PatientsPage() {
       setDuesByPatient(map);
     })();
     return () => { active = false; };
-  }, [items]);
+  }, [branchSelectionReady, currentBranchId, items]);
 
   useEffect(() => {
     if (!portalCredentials || !currentBranchId) {

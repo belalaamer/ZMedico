@@ -37,6 +37,7 @@ export async function searchPatients(
   branchId: string | null,
   lang: "en" | "ar",
 ): Promise<SearchHit[]> {
+  if (!branchId) return [];
   const eq = esc(q);
   const ors = [
     `first_name_en.ilike.%${eq}%`,
@@ -68,6 +69,7 @@ export async function searchPatients(
 
 /** Returns up to ASSOC_LIMIT patient ids matching q — used to scope joined searches. */
 async function patientIdsMatching(q: string, branchId: string | null): Promise<string[]> {
+  if (!branchId) return [];
   const eq = esc(q);
   const ors = [
     `first_name_en.ilike.%${eq}%`,
@@ -94,6 +96,7 @@ export async function searchInvoices(
   branchId: string | null,
   lang: "en" | "ar",
 ): Promise<SearchHit[]> {
+  if (!branchId) return [];
   const eq = esc(q);
   const patientIds = await patientIdsMatching(q, branchId);
 
@@ -146,6 +149,7 @@ export async function searchAppointments(
   branchId: string | null,
   lang: "en" | "ar",
 ): Promise<SearchHit[]> {
+  if (!branchId) return [];
   const patientIds = await patientIdsMatching(q, branchId);
   if (!patientIds.length) return [];
   // Recent window: last 7 days through 90 days ahead
@@ -180,6 +184,7 @@ export async function searchPayments(
   branchId: string | null,
   lang: "en" | "ar",
 ): Promise<SearchHit[]> {
+  if (!branchId) return [];
   const patientIds = await patientIdsMatching(q, branchId);
   if (!patientIds.length) return [];
   let query = supabase
@@ -204,6 +209,7 @@ export async function searchMedicalRecords(
   branchId: string | null,
   lang: "en" | "ar",
 ): Promise<SearchHit[]> {
+  if (!branchId) return [];
   const patientIds = await patientIdsMatching(q, branchId);
   if (!patientIds.length) return [];
   let query = supabase
@@ -227,6 +233,7 @@ export async function searchPrescriptions(
   branchId: string | null,
   lang: "en" | "ar",
 ): Promise<SearchHit[]> {
+  if (!branchId) return [];
   const patientIds = await patientIdsMatching(q, branchId);
   if (!patientIds.length) return [];
   let query = supabase
@@ -247,18 +254,26 @@ export async function searchPrescriptions(
 
 export async function searchStaff(
   q: string,
-  _branchId: string | null,
+  branchId: string | null,
   _lang: "en" | "ar",
 ): Promise<SearchHit[]> {
-  const eq = esc(q);
-  // Match by employee_id or phone in staff_profiles, plus full_name in profiles.
-  const [profilesRes, staffRes] = await Promise.all([
-    supabase.from("profiles").select("id,full_name").ilike("full_name", `%${eq}%`).limit(LIMIT),
-    (supabase as any).from("staff_profiles")
-      .select("id,user_id,employee_id,phone,profiles(full_name)")
-      .or(`employee_id.ilike.%${eq}%,phone.ilike.%${eq}%`)
-      .limit(LIMIT),
-  ]);
+  if (!branchId) return [];
+  const eq = esc(q).toLowerCase();
+  // Load only staff attached to the selected branch, then match locally so a
+  // System Owner never receives a global profiles/staff result set.
+  const { data: scopedStaff } = await (supabase as any)
+    .from("staff_profiles")
+    .select("id,user_id,employee_id,phone,profiles(full_name)")
+    .eq("branch_id", branchId)
+    .limit(300);
+  const staffRows = ((scopedStaff ?? []) as any[]).filter((s) => {
+    const name = String(s.profiles?.full_name ?? "").toLowerCase();
+    const employeeId = String(s.employee_id ?? "").toLowerCase();
+    const phone = String(s.phone ?? "").toLowerCase();
+    return name.includes(eq) || employeeId.includes(eq) || phone.includes(eq);
+  }).slice(0, LIMIT);
+  const profilesRes = { data: [] as any[] };
+  const staffRes = { data: staffRows };
   const hits: SearchHit[] = [];
   const seen = new Set<string>();
   for (const p of ((profilesRes?.data ?? []) as any[])) {

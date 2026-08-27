@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useI18n } from "@/contexts/I18nContext";
+import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ReferrerPicker } from "./ReferrerPicker";
@@ -16,6 +17,7 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
   open: boolean; onOpenChange: (v: boolean) => void; patient: any; onSaved: () => void;
 }) {
   const { t, lang } = useI18n();
+  const { currentBranchId, branchSelectionReady } = useBranch();
   const [saving, setSaving] = useState(false);
   const [doctors, setDoctors] = useState<{ id: string; full_name: string; full_name_en?: string | null; full_name_ar?: string | null }[]>([]);
   const [form, setForm] = useState({
@@ -32,8 +34,12 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
 
   useEffect(() => {
     (async () => {
+      if (!branchSelectionReady || !currentBranchId) {
+        setDoctors([]);
+        return;
+      }
       // Fetch via SECURITY DEFINER RPC so front-desk/nurse roles (no SELECT on user_roles) can load doctors.
-      const { data } = await supabase.rpc("list_doctors");
+      const { data } = await supabase.rpc("list_doctors_for_branch", { _branch_id: currentBranchId });
       const list = ((data ?? []) as any[]).map((p: any) => ({
         id: p.id,
         full_name: p.full_name ?? p.id.slice(0, 8),
@@ -43,7 +49,7 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
       list.sort((a, b) => doctorDisplayName(a, lang).localeCompare(doctorDisplayName(b, lang)));
       setDoctors(list);
     })();
-  }, [lang]);
+  }, [lang, branchSelectionReady, currentBranchId]);
 
   useEffect(() => {
     if (!patient) return;

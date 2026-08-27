@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDataSync } from "@/lib/dataSync";
 import { Banknote, ArrowDownToLine, ArrowUpFromLine, TrendingUp, ArrowLeftRight, Lock } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -21,7 +21,7 @@ import { Can } from "@/components/Can";
 
 export default function Treasury() {
   const { t, lang } = useI18n();
-  const { currentBranchId } = useBranch();
+  const { currentBranchId, branchSelectionReady } = useBranch();
   const { user } = useAuth();
   const [treasuries, setTreasuries] = useState<any[]>([]);
   const [txs, setTxs] = useState<any[]>([]);
@@ -29,17 +29,26 @@ export default function Treasury() {
   const [adjIsCash, setAdjIsCash] = useState<"cash" | "non_cash">("cash");
   const [today, setToday] = useState({ income: 0, expense: 0 });
   const [transferOpen, setTransferOpen] = useState(false);
+  const loadRequestRef = useRef(0);
 
   const load = async () => {
-    let tq = supabase.from("treasury").select("*").is("deleted_at", null).order("created_at");
-    if (currentBranchId) tq = tq.eq("branch_id", currentBranchId);
+    const requestId = ++loadRequestRef.current;
+    const branchId = currentBranchId;
+    if (!branchSelectionReady || !branchId) {
+      setTreasuries([]);
+      setTxs([]);
+      setToday({ income: 0, expense: 0 });
+      return;
+    }
+    const tq = supabase.from("treasury").select("*").eq("branch_id", branchId).is("deleted_at", null).order("created_at");
     const { data: trs, error: trsError } = await tq;
     if (trsError) { toast.error(trsError.message); return; }
+    if (requestId !== loadRequestRef.current) return;
     setTreasuries(trs ?? []);
 
     const ids = (trs ?? []).map((t: any) => t.id);
     if (ids.length) {
-      const { data: tx, error: txError } = await supabase.from("treasury_transactions").select("*").in("treasury_id", ids).order("created_at", { ascending: false }).limit(100);
+      const { data: tx, error: txError } = await supabase.from("treasury_transactions").select("*").eq("branch_id", branchId).in("treasury_id", ids).order("created_at", { ascending: false }).limit(100);
       if (txError) { toast.error(txError.message); return; }
       // Hide expense rows that have been reversed, and hide the reversal rows themselves
       const reversedIds = new Set(
@@ -52,10 +61,11 @@ export default function Treasury() {
         if (r.reference_type === "expense" && r.reference_id && reversedIds.has(r.reference_id)) return false;
         return true;
       });
+      if (requestId !== loadRequestRef.current) return;
       setTxs(visible);
 
       const startISO = new Date(new Date().setHours(0,0,0,0)).toISOString();
-      const { data: tt, error: ttError } = await supabase.from("treasury_transactions").select("transaction_type,amount,reference_type,reference_id,created_at").in("treasury_id", ids).gte("created_at", startISO);
+      const { data: tt, error: ttError } = await supabase.from("treasury_transactions").select("transaction_type,amount,reference_type,reference_id,created_at").eq("branch_id", branchId).in("treasury_id", ids).gte("created_at", startISO);
       if (ttError) { toast.error(ttError.message); return; }
       const reversedToday = new Set(
         (tt ?? [])
@@ -69,18 +79,20 @@ export default function Treasury() {
       });
       const inc = ttVisible.filter((r: any) => r.transaction_type === "income").reduce((s: number, r: any) => s + Number(r.amount), 0);
       const exp = ttVisible.filter((r: any) => r.transaction_type === "expense").reduce((s: number, r: any) => s + Number(r.amount), 0);
+      if (requestId !== loadRequestRef.current) return;
       setToday({ income: inc, expense: exp });
     } else {
       setTxs([]); setToday({ income: 0, expense: 0 });
     }
   };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId]);
-  useDataSync(["treasury_transactions", "payments", "expenses"], () => { load(); });
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [branchSelectionReady, currentBranchId]);
+  useDataSync(["treasury_transactions", "payments", "expenses"], () => { void load(); });
 
   const softDeleteTreasury = async (tr: any): Promise<void> => {
-    const { count } = await supabase.from("treasury_transactions").select("id", { count: "exact", head: true }).eq("treasury_id", tr.id);
+    if (!branchSelectionReady || !currentBranchId || tr.branch_id !== currentBranchId) { toast.error(t("chooseBranch")); return; }
+    const { count } = await supabase.from("treasury_transactions").select("id", { count: "exact", head: true }).eq("branch_id", currentBranchId).eq("treasury_id", tr.id);
     if ((count ?? 0) > 0) { toast.error(t("transactionsExist")); return; }
-    const { error } = await supabase.from("treasury").update({ deleted_at: new Date().toISOString() } as any).eq("id", tr.id);
+    const { error } = await supabase.from("treasury").update({ deleted_at: new Date().toISOString() } as any).eq("id", tr.id).eq("branch_id", currentBranchId);
     if (error) { toast.error(error.message); return; }
     toast.success(t("delete")); load();
   };
@@ -90,6 +102,7 @@ export default function Treasury() {
   const totalBalance = totalCashBalance + totalNonCashBalance;
 
   const submitAdj = async () => {
+    if (!branchSelectionReady || !currentBranchId) { toast.error(t("chooseBranch")); return; }
     if (!adj.treasury_id || !adj.amount || !adj.desc_en) { toast.error(t("fillAllFields")); return; }
     const { error } = await supabase.rpc("add_treasury_tx", {
       _treasury_id: adj.treasury_id,

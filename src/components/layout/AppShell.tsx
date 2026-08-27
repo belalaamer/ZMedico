@@ -13,7 +13,7 @@ import { isSystemOwnerWorkspaceHandoff } from "@/lib/platformWorkspace";
 export default function AppShell() {
   const { pathname, search } = useLocation();
   const { authz, loading: authzLoading } = useAuthorization("workspace-shell");
-  const { currentBranchId, subscription, subscriptionLoading } = useBranch();
+  const { currentBranchId, branchSelectionReady, subscription, subscriptionLoading } = useBranch();
   const { lang } = useI18n();
   const workspaceHandoff = isSystemOwnerWorkspaceHandoff(
     authzLoading ? false : authz.holdsAnyRole("system_owner"),
@@ -29,7 +29,7 @@ export default function AppShell() {
   // Resolve the platform/workspace boundary before mounting any workspace chrome.
   // This prevents a system owner from seeing a one-frame clinic dashboard/sidebar
   // while the role query is still loading.
-  if (authzLoading) return <SubscriptionState loading lang={lang} />;
+  if (authzLoading || !branchSelectionReady) return <SubscriptionState loading lang={lang} />;
   if (authz.holdsAnyRole("system_owner") && !workspaceHandoff) return <Navigate to="/platform" replace />;
   if (currentBranchId && subscriptionLoading) return <SubscriptionState loading lang={lang} />;
   if (!authzLoading && currentBranchId && !subscription) {

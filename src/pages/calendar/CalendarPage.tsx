@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useDataSync } from "@/lib/dataSync";
 import { Card } from "@/components/ui/card";
@@ -131,7 +131,7 @@ function parseHour(s: string | null | undefined, mode: "floor" | "ceil"): number
 
 export default function CalendarPage() {
   const { t, lang } = useI18n();
-  const { currentBranchId } = useBranch();
+  const { currentBranchId, branchSelectionReady, subscription } = useBranch();
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -142,6 +142,7 @@ export default function CalendarPage() {
   const [miniOpen, setMiniOpen] = useState(false);
   const [monthCursor, setMonthCursor] = useState<Date>(startOfMonth(new Date()));
   const [items, setItems] = useState<Appt[]>([]);
+  const loadRequestRef = useRef(0);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [doctors, setDoctors] = useState<{ id: string; full_name: string | null; full_name_en?: string | null; full_name_ar?: string | null }[]>([]);
   const [serviceDoctors, setServiceDoctors] = useState<{ id: string; full_name: string | null; full_name_en?: string | null; full_name_ar?: string | null }[] | null>(null);
@@ -220,14 +221,14 @@ export default function CalendarPage() {
 
   // Load patient financial context whenever a patient is picked in the booking dialog
   useEffect(() => {
-    if (!open || !form.patient_id) { setPatientCtx(null); return; }
+    if (!open || !form.patient_id || !branchSelectionReady || !currentBranchId) { setPatientCtx(null); return; }
     let cancelled = false;
     setPatientCtxLoading(true);
     (async () => {
       const [walletRes, invRes, lastApptRes] = await Promise.all([
         (supabase as any).from("patient_wallets").select("balance").eq("patient_id", form.patient_id).maybeSingle(),
-        supabase.from("invoices").select("total,paid_amount").eq("patient_id", form.patient_id).is("deleted_at", null).in("status", ["pending", "partial"]),
-        supabase.from("appointments").select("scheduled_at").eq("patient_id", form.patient_id).is("deleted_at", null).in("status", ["completed", "departed"]).order("scheduled_at", { ascending: false }).limit(1).maybeSingle(),
+        supabase.from("invoices").select("total,paid_amount").eq("patient_id", form.patient_id).eq("branch_id", currentBranchId).is("deleted_at", null).in("status", ["pending", "partial"]),
+        supabase.from("appointments").select("scheduled_at").eq("patient_id", form.patient_id).eq("branch_id", currentBranchId).is("deleted_at", null).in("status", ["completed", "departed"]).order("scheduled_at", { ascending: false }).limit(1).maybeSingle(),
       ]);
       if (cancelled) return;
       const wallet = Number(walletRes?.data?.balance ?? 0);
@@ -237,7 +238,7 @@ export default function CalendarPage() {
       setPatientCtxLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [form.patient_id, open]);
+  }, [form.patient_id, open, branchSelectionReady, currentBranchId]);
 
   // Force day view on mobile when user lands on week (too cramped). Month is fine.
   useEffect(() => {
@@ -278,8 +279,14 @@ export default function CalendarPage() {
   const endHourLabel = dayEndHour;
 
   const load = async () => {
-    if (currentBranchId) {
-      const { error: expiryError } = await supabase.rpc("expire_public_booking_requests", { p_branch_id: currentBranchId });
+    const requestId = ++loadRequestRef.current;
+    const branchId = currentBranchId;
+    if (!branchSelectionReady || !branchId) {
+      setItems([]);
+      return;
+    }
+    {
+      const { error: expiryError } = await supabase.rpc("expire_public_booking_requests", { p_branch_id: branchId });
       if (expiryError && !String(expiryError.message).includes("booking_request_expiry_forbidden")) {
         console.warn("Could not expire booking requests", expiryError.message);
       }
@@ -292,21 +299,26 @@ export default function CalendarPage() {
       .is("deleted_at", null)
       .is("patients.deleted_at", null)
       .order("scheduled_at", { ascending: true });
-    if (currentBranchId) q = q.eq("branch_id", currentBranchId);
+    q = q.eq("branch_id", branchId);
     const { data, error } = await q;
+    if (requestId !== loadRequestRef.current) return;
     if (error) { toast.error(error.message); return; }
     setItems((data ?? []) as any);
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [rangeStart.getTime(), rangeEnd.getTime(), currentBranchId]);
-  useDataSync(["appointments", "calendar"], () => { load(); });
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [rangeStart.getTime(), rangeEnd.getTime(), branchSelectionReady, currentBranchId]);
+  useDataSync(["appointments", "calendar"], () => { void load(); });
 
   // Load doctor options for filter
   useEffect(() => {
     (async () => {
       // Use SECURITY DEFINER RPC so non-admin roles can populate the doctor filter
       // without direct SELECT on user_roles (which restricts to own row).
-      const { data } = await supabase.rpc("list_doctors");
+      if (!currentBranchId) {
+        setDoctors([]);
+        return;
+      }
+      const { data } = await supabase.rpc("list_doctors_for_branch", { _branch_id: currentBranchId });
       const list = ((data ?? []) as any[]).map((p: any) => ({
         id: p.id,
         full_name: p.full_name ?? p.id.slice(0, 8),
@@ -316,7 +328,7 @@ export default function CalendarPage() {
       list.sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
       setDoctors(list);
     })();
-  }, []);
+  }, [currentBranchId]);
 
   // If the signed-in user IS one of the doctors, default the calendar to
   // "My schedule" on first load — mirrors the equivalent, already-approved
@@ -391,14 +403,18 @@ export default function CalendarPage() {
 
   // Month dots
   const loadMonthDots = async () => {
+    if (!branchSelectionReady || !currentBranchId) {
+      setMonthDots({});
+      return;
+    }
     const start = startOfMonth(monthCursor).toISOString();
     const endDate = new Date(monthCursor.getFullYear(), monthCursor.getMonth() + 1, 1);
     const end = endDate.toISOString();
     let q = supabase.from("appointments")
       .select("scheduled_at")
       .gte("scheduled_at", start).lt("scheduled_at", end)
-      .is("deleted_at", null);
-    if (currentBranchId) q = q.eq("branch_id", currentBranchId);
+      .is("deleted_at", null)
+      .eq("branch_id", currentBranchId);
     const { data } = await q;
     const dots: Record<string, number> = {};
     for (const r of (data ?? []) as { scheduled_at: string }[]) {
@@ -407,21 +423,30 @@ export default function CalendarPage() {
     }
     setMonthDots(dots);
   };
-  useEffect(() => { loadMonthDots(); /* eslint-disable-next-line */ }, [monthCursor.getTime(), currentBranchId]);
-  useDataSync(["appointments"], () => loadMonthDots());
+  useEffect(() => { void loadMonthDots(); /* eslint-disable-next-line */ }, [monthCursor.getTime(), branchSelectionReady, currentBranchId]);
+  useDataSync(["appointments"], () => { void loadMonthDots(); });
 
   const loadPatientOptions = () => {
-    supabase.from("patients").select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language").is("deleted_at", null).order("created_at", { ascending: false }).limit(200)
+    if (!branchSelectionReady || !currentBranchId) {
+      setPatients([]);
+      return;
+    }
+    supabase.from("patients").select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language").eq("branch_id", currentBranchId).is("deleted_at", null).order("created_at", { ascending: false }).limit(200)
       .then(({ data }) => setPatients((data ?? []).map((p: any) => ({ id: p.id, label: patientDisplayName(p, lang) }))));
   };
-  useEffect(() => { loadPatientOptions(); }, [lang]);
-  useDataSync(["patients"], () => loadPatientOptions());
+  useEffect(() => { loadPatientOptions(); }, [lang, branchSelectionReady, currentBranchId]);
+  useDataSync(["patients"], () => { loadPatientOptions(); });
 
   // Booking uses tenant-scoped services/visit types. Clinical procedures remain
   // part of the medical record rather than the receptionist-facing booking list.
   const loadServices = () => {
+    if (!branchSelectionReady || !currentBranchId || !subscription?.tenant_id) {
+      setServices([]);
+      return;
+    }
     supabase.from("services")
       .select("id,name_en,name_ar,default_duration_minutes")
+      .eq("tenant_id", subscription.tenant_id)
       .eq("is_active", true).eq("requires_appointment", true).is("deleted_at", null)
       .order("display_order").order("name_en")
       .then(({ data }) => {
@@ -434,15 +459,17 @@ export default function CalendarPage() {
       });
   };
   const loadRooms = async () => {
+    if (!branchSelectionReady || !currentBranchId) {
+      setResources([]);
+      setRooms([]);
+      return;
+    }
     const resourceQuery = (supabase as any).from("booking_resources")
       .select("id,name_en,name_ar,capacity,is_active")
+      .eq("branch_id", currentBranchId)
       .eq("is_active", true)
       .order("display_order", { ascending: true });
-    const appointmentQuery = supabase.from("appointments").select("room").not("room", "is", null).is("deleted_at", null).limit(1000);
-    if (currentBranchId) {
-      resourceQuery.eq("branch_id", currentBranchId);
-      appointmentQuery.eq("branch_id", currentBranchId);
-    }
+    const appointmentQuery = supabase.from("appointments").select("room").eq("branch_id", currentBranchId).not("room", "is", null).is("deleted_at", null).limit(1000);
     const [{ data: resourceData }, { data: appointmentData }] = await Promise.all([resourceQuery, appointmentQuery]);
     const nextResources = (resourceData ?? []) as { id: string; name_en: string; name_ar: string; capacity: number; is_active: boolean }[];
     setResources(nextResources);
@@ -450,9 +477,9 @@ export default function CalendarPage() {
     (appointmentData ?? []).forEach((r: any) => { if (r.room) set.add(String(r.room).trim()); });
     setRooms(Array.from(set).sort());
   };
-  useEffect(() => { loadServices(); }, [lang, currentBranchId]);
-  useEffect(() => { loadRooms(); }, [currentBranchId]);
-  useDataSync(["appointments"], () => loadRooms());
+  useEffect(() => { loadServices(); }, [lang, branchSelectionReady, currentBranchId, subscription?.tenant_id]);
+  useEffect(() => { void loadRooms(); }, [branchSelectionReady, currentBranchId]);
+  useDataSync(["appointments"], () => { void loadRooms(); });
 
   const openNew = () => {
     setEditId(null);

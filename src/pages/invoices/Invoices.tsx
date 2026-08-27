@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDataSync, notifyDataChange } from "@/lib/dataSync";
 import { Link } from "react-router-dom";
 import { Plus, Search, FileText, CreditCard, AlertCircle } from "lucide-react";
@@ -46,7 +46,7 @@ const statusClass: Record<Inv["status"], string> = {
 
 export default function Invoices() {
   const { t, lang } = useI18n();
-  const { currentBranchId } = useBranch();
+  const { currentBranchId, branchSelectionReady } = useBranch();
   const navigate = useNavigate();
   // R2: canonical authorization entry point. `canOverride` retains the
   // legacy "admin can delete non-draft invoices and cascade-delete
@@ -61,8 +61,15 @@ export default function Invoices() {
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
+  const loadRequestRef = useRef(0);
 
   const load = async () => {
+    const requestId = ++loadRequestRef.current;
+    const branchId = currentBranchId;
+    if (!branchSelectionReady || !branchId) {
+      setItems([]); setTotal(0); setLoadError(false); setLoading(false);
+      return;
+    }
     setLoading(true);
     setLoadError(false);
     const from = page * PAGE_SIZE;
@@ -71,18 +78,19 @@ export default function Invoices() {
       .select("id, invoice_number, invoice_date, total, paid_amount, status, patient_id, patients!inner(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code)", { count: "exact" })
       .is("deleted_at", null)
       .order("created_at", { ascending: false }).range(from, to);
-    if (currentBranchId) query = query.eq("branch_id", currentBranchId);
+    query = query.eq("branch_id", branchId);
     if (statusFilter !== "all") query = query.eq("status", statusFilter as Inv["status"]);
     const { data, error, count } = await query;
+    if (requestId !== loadRequestRef.current) return;
     setLoading(false);
     if (error) { setLoadError(true); toast.error(error.message); return; }
     setItems((data ?? []) as any);
     setTotal(count ?? 0);
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId, statusFilter, page]);
-  useEffect(() => { setPage(0); }, [currentBranchId, statusFilter]);
-  useDataSync(["invoices", "payments"], () => { load(); });
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [branchSelectionReady, currentBranchId, statusFilter, page]);
+  useEffect(() => { setPage(0); }, [branchSelectionReady, currentBranchId, statusFilter]);
+  useDataSync(["invoices", "payments"], () => { void load(); });
 
   const filtered = items.filter((i) => {
     if (!q) return true;
@@ -95,6 +103,7 @@ export default function Invoices() {
     ({ draft: t("statusDraft"), pending: t("statusPending"), paid: t("statusPaid"), partial: t("statusPartial"), cancelled: t("statusCancelled") }[s]);
 
   const softDelete = async (i: Inv): Promise<void> => {
+    if (!branchSelectionReady || !currentBranchId) { toast.error(t("selectBranch")); return; }
     if (i.status !== "draft" && !canOverride) {
       toast.error(lang === "ar" ? "يمكن حذف المسودات فقط" : "Only draft invoices can be deleted");
       return;
@@ -114,7 +123,7 @@ export default function Invoices() {
       notifyDataChange("payments");
       notifyDataChange("doctor_commissions");
     }
-    const { error } = await supabase.from("invoices").update({ deleted_at: nowIso } as any).eq("id", i.id);
+    const { error } = await supabase.from("invoices").update({ deleted_at: nowIso } as any).eq("id", i.id).eq("branch_id", currentBranchId);
     if (error) { toast.error(error.message); return; }
     toast.success(t("delete")); load();
   };

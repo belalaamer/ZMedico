@@ -262,7 +262,7 @@ function formatDateCell(iso: string, lang: "ar" | "en" | string) {
 
 export default function AuditLogs() {
   const { t, lang } = useI18n();
-  const { currentBranchId } = useBranch();
+  const { currentBranchId, branchSelectionReady } = useBranch();
   const [items, setItems] = useState<AuditRow[]>([]);
   const [maps, setMaps] = useState<RecordMaps>(EMPTY_MAPS);
   const [isLoading, setIsLoading] = useState(true);
@@ -303,13 +303,18 @@ export default function AuditLogs() {
     const load = async () => {
       setIsLoading(true);
       setLoadError(null);
+      if (!branchSelectionReady || !currentBranchId) {
+        setItems([]);
+        setIsLoading(false);
+        return;
+      }
 
       let auditQuery = (supabase as any)
         .from("audit_logs")
         .select("id,branch_id,action,entity_type,entity_id,created_at,user_id,old_values,new_values")
         .order("created_at", { ascending: false })
-        .limit(100);
-      if (currentBranchId) auditQuery = auditQuery.eq("branch_id", currentBranchId);
+        .limit(100)
+        .eq("branch_id", currentBranchId);
       const { data, error } = await auditQuery;
 
       if (!active) return;
@@ -361,21 +366,22 @@ export default function AuditLogs() {
           ? (supabase as any).from("profiles").select("id,full_name,email").in("id", Array.from(profileIds))
           : Promise.resolve(noRows),
         invoiceIds.size
-          ? supabase.from("invoices").select("id,invoice_number").in("id", Array.from(invoiceIds))
+          ? supabase.from("invoices").select("id,invoice_number").in("id", Array.from(invoiceIds)).eq("branch_id", currentBranchId)
           : Promise.resolve(noRows),
         patientIds.size
-          ? supabase.from("patients").select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code").in("id", Array.from(patientIds))
+          ? supabase.from("patients").select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code").in("id", Array.from(patientIds)).eq("branch_id", currentBranchId)
           : Promise.resolve(noRows),
         medicalRecordIds.size
           ? (supabase as any).from("medical_records")
               .select("id,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code)")
               .in("id", Array.from(medicalRecordIds))
+              .eq("branch_id", currentBranchId)
           : Promise.resolve(noRows),
         productIds.size
           ? supabase.from("products").select("id,name_en,name_ar").in("id", Array.from(productIds))
           : Promise.resolve(noRows),
         staffIds.size
-          ? (supabase as any).from("staff_profiles").select("id,employee_id").in("id", Array.from(staffIds))
+          ? (supabase as any).from("staff_profiles").select("id,employee_id").in("id", Array.from(staffIds)).eq("branch_id", currentBranchId)
           : Promise.resolve(noRows),
       ]);
 

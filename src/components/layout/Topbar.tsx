@@ -190,6 +190,19 @@ export function Topbar() {
               </Button>
             </div>
             <div className="h-[calc(100%-4rem)] overflow-y-auto py-2">
+              {showBranchSwitcher && safeBranches.length > 1 ? (
+                <div className="mx-3 mb-2 rounded-lg border border-sidebar-border bg-sidebar-accent/40 p-3">
+                  <div className="mb-2 text-xs font-semibold text-sidebar-foreground/70">{lang === "ar" ? "الفرع الحالي" : "Current branch"}</div>
+                  <Select value={branchValue} onValueChange={setCurrentBranchId}>
+                    <SelectTrigger className="h-10 w-full border-sidebar-border bg-sidebar text-sidebar-foreground">
+                      <SelectValue placeholder={t("branch")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {safeBranches.map((b) => <SelectItem key={b.id} value={b.id}>{branchLabel(b)}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
               <SidebarContent onNavigate={() => setMobileOpen(false)} />
             </div>
           </aside>
@@ -222,7 +235,7 @@ export function Topbar() {
         {time}
       </div>
 
-      {showBranchSwitcher && safeBranches.length > 0 ? (
+      {showBranchSwitcher && safeBranches.length > 1 ? (
         <Select value={branchValue} onValueChange={setCurrentBranchId}>
           <SelectTrigger className="w-[160px] hidden sm:flex">
             <SelectValue placeholder={t("branch")} />
@@ -235,6 +248,14 @@ export function Topbar() {
             ))}
           </SelectContent>
         </Select>
+      ) : showBranchSwitcher && safeBranches.length === 1 ? (
+        <div
+          className="w-[160px] hidden sm:flex items-center h-9 px-3 rounded-md border border-input bg-muted/40 text-sm text-muted-foreground truncate"
+          aria-label={lang === "ar" ? `الفرع الحالي: ${branchLabel(safeBranches[0])}` : `Current branch: ${branchLabel(safeBranches[0])}`}
+          title={branchLabel(safeBranches[0])}
+        >
+          {branchLabel(safeBranches[0])}
+        </div>
       ) : showBranchSwitcher ? (
         <div
           className="w-[160px] hidden sm:flex items-center h-9 px-3 rounded-md border border-input bg-muted/40 text-sm text-muted-foreground truncate"

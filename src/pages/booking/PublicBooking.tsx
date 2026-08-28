@@ -338,7 +338,7 @@ export default function PublicBooking() {
     }
     setSubmitting(true);
     const params = new URLSearchParams(window.location.search);
-    if (!tenantId) return;
+    if (!tenantId) { setSubmitting(false); return; }
     const { data, error } = await publicRpc<BookingResult>("public_create_booking_for_tenant", {
       p_tenant_id: tenantId,
       p_branch_id: branchId,
@@ -465,8 +465,8 @@ export default function PublicBooking() {
                   {step === 1 ? (
                     <section className="space-y-5" aria-labelledby="booking-step-one">
                       <div>
-                        <h2 id="booking-step-one" className="text-xl font-bold">{isArabic ? "ابدأ باختيار احتياجك" : "Start with your care preference"}</h2>
-                        <p className="mt-1 text-sm text-muted-foreground">{isArabic ? "الخانات المتاحة ستظهر بعد اختيار التاريخ." : "Available times will appear after you select a date."}</p>
+                        <h2 id="booking-step-one" className="text-xl font-bold">{isArabic ? "ابدأ باختيار الخدمة" : "Start with a service"}</h2>
+                        <p className="mt-1 text-sm text-muted-foreground">{isArabic ? "اختر الفرع والخدمة والتاريخ، ثم سنعرض الأطباء والمواعيد المؤهلين فقط." : "Choose a branch, service, and date. We will then show only eligible doctors and times."}</p>
                       </div>
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
@@ -479,6 +479,7 @@ export default function PublicBooking() {
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="booking-service">{isArabic ? "الخدمة" : "Service"}</Label>
+                          <p className="text-xs text-muted-foreground">{isArabic ? "اختر الخدمة التي تريد حجزها. الإجراءات الطبية تُسجل داخل الملف بعد الزيارة." : "Choose the service you want to book. Clinical procedures are recorded in the patient file after the visit."}</p>
                           <select id="booking-service" value={serviceId} onChange={(event) => setServiceId(event.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-ring">
                             <option value="">{isArabic ? "اختر الخدمة" : "Choose service"}</option>
                             {services.map((item) => <option key={`${item.source}-${item.id}`} value={item.id}>{displayName(item, lang)}</option>)}
@@ -486,19 +487,10 @@ export default function PublicBooking() {
                           {!services.length ? <p className="text-xs text-amber-600">{isArabic ? "لم تُضف خدمات للحجز الإلكتروني بعد." : "No online services are configured yet."}</p> : null}
                         </div>
                       </div>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="booking-doctor">{isArabic ? "الطبيب (اختياري)" : "Doctor (optional)"}</Label>
-                          <select id="booking-doctor" value={doctorId} onChange={(event) => setDoctorId(event.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-ring">
-                            <option value="">{isArabic ? "أي طبيب متاح" : "Any available doctor"}</option>
-                            {doctors.map((item) => <option key={item.id} value={item.id}>{doctorName(item, lang)}</option>)}
-                          </select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="booking-date">{isArabic ? "التاريخ" : "Date"}</Label>
-                          <Input id="booking-date" type="date" min={minDate} max={maxDate} value={date} onChange={(event) => setDate(event.target.value)} />
-                          <p className="text-xs text-muted-foreground">{dateHelp || (isArabic ? "اختر يومًا مناسبًا" : "Choose a suitable day")}</p>
-                        </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="booking-date">{isArabic ? "التاريخ" : "Date"}</Label>
+                        <Input id="booking-date" type="date" min={minDate} max={maxDate} value={date} onChange={(event) => setDate(event.target.value)} />
+                        <p className="text-xs text-muted-foreground">{dateHelp || (isArabic ? "اختر يومًا مناسبًا" : "Choose a suitable day")}</p>
                       </div>
                       <Button className="w-full" onClick={continueToTime} disabled={!branchId || !serviceId}>{isArabic ? "عرض المواعيد المتاحة" : "Show available times"}</Button>
                     </section>
@@ -512,6 +504,14 @@ export default function PublicBooking() {
                           <p className="mt-1 text-sm text-muted-foreground">{dateHelp} · {displayName(branch ?? {}, lang)} · {displayName(service ?? {}, lang)}</p>
                         </div>
                         <Button variant="ghost" size="sm" onClick={() => setStep(1)} className="gap-1"><ChevronLeft className="size-4 rtl:rotate-180" />{isArabic ? "تعديل" : "Edit"}</Button>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="booking-doctor">{isArabic ? "الطبيب (اختياري)" : "Doctor (optional)"}</Label>
+                        <select id="booking-doctor" value={doctorId} onChange={(event) => setDoctorId(event.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-ring">
+                          <option value="">{isArabic ? "أي طبيب متاح" : "Any available doctor"}</option>
+                          {doctors.map((item) => <option key={item.id} value={item.id}>{doctorName(item, lang)}</option>)}
+                        </select>
+                        {doctors.length > 0 ? <p className="text-xs text-muted-foreground">{isArabic ? `تم العثور على ${doctors.length} طبيب مؤهل لهذه الخدمة.` : `${doctors.length} eligible doctor${doctors.length === 1 ? "" : "s"} found for this service.`}</p> : <p className="text-xs text-muted-foreground">{isArabic ? "لا يوجد تخصيص محدد لطبيب؛ سيبحث النظام عن طبيب متاح." : "No specific doctor assignment is configured; the system will find an available doctor."}</p>}
                       </div>
                       {slotsLoading ? <div className="py-10 text-center text-sm text-muted-foreground">{isArabic ? "جارٍ البحث عن المواعيد…" : "Finding available times…"}</div> : null}
                       {!slotsLoading && !slots.length ? <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">{isArabic ? "لا توجد مواعيد متاحة لهذا اليوم. اختر تاريخًا آخر." : "No available times for this day. Please choose another date."}</div> : null}
@@ -552,6 +552,7 @@ export default function PublicBooking() {
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between gap-3"><span className="text-muted-foreground">{isArabic ? "الفرع" : "Branch"}</span><span className="text-end font-medium">{branch ? displayName(branch, lang) : "—"}</span></div>
                 <div className="flex justify-between gap-3"><span className="text-muted-foreground">{isArabic ? "الخدمة" : "Service"}</span><span className="text-end font-medium">{service ? displayName(service, lang) : "—"}</span></div>
+                <div className="flex justify-between gap-3"><span className="text-muted-foreground">{isArabic ? "الطبيب" : "Doctor"}</span><span className="text-end font-medium">{doctorId ? doctorName(doctors.find((item) => item.id === doctorId) ?? { id: doctorId, full_name: null, full_name_en: null, full_name_ar: null }, lang) : (isArabic ? "سيختاره النظام" : "Selected automatically")}</span></div>
                 <div className="flex justify-between gap-3"><span className="text-muted-foreground">{isArabic ? "التاريخ" : "Date"}</span><span className="text-end font-medium">{date ? new Date(`${date}T12:00:00`).toLocaleDateString(isArabic ? "ar-EG" : "en-EG") : "—"}</span></div>
                 <div className="flex justify-between gap-3"><span className="text-muted-foreground">{isArabic ? "الوقت" : "Time"}</span><span className="text-end font-medium">{selectedSlot ? formatSlot(selectedSlot.slot_start, lang) : "—"}</span></div>
               </div>

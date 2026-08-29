@@ -48,7 +48,8 @@ export default function Treasury() {
 
     const ids = (trs ?? []).map((t: any) => t.id);
     if (ids.length) {
-      const { data: tx, error: txError } = await supabase.from("treasury_transactions").select("*").eq("branch_id", branchId).in("treasury_id", ids).order("created_at", { ascending: false }).limit(100);
+      // treasury_transactions is scoped through its parent treasury; it has no branch_id column.
+      const { data: tx, error: txError } = await supabase.from("treasury_transactions").select("*").in("treasury_id", ids).order("created_at", { ascending: false }).limit(100);
       if (txError) { toast.error(txError.message); return; }
       // Hide expense rows that have been reversed, and hide the reversal rows themselves
       const reversedIds = new Set(
@@ -65,7 +66,7 @@ export default function Treasury() {
       setTxs(visible);
 
       const startISO = new Date(new Date().setHours(0,0,0,0)).toISOString();
-      const { data: tt, error: ttError } = await supabase.from("treasury_transactions").select("transaction_type,amount,reference_type,reference_id,created_at").eq("branch_id", branchId).in("treasury_id", ids).gte("created_at", startISO);
+      const { data: tt, error: ttError } = await supabase.from("treasury_transactions").select("transaction_type,amount,reference_type,reference_id,created_at").in("treasury_id", ids).gte("created_at", startISO);
       if (ttError) { toast.error(ttError.message); return; }
       const reversedToday = new Set(
         (tt ?? [])
@@ -90,7 +91,7 @@ export default function Treasury() {
 
   const softDeleteTreasury = async (tr: any): Promise<void> => {
     if (!branchSelectionReady || !currentBranchId || tr.branch_id !== currentBranchId) { toast.error(t("chooseBranch")); return; }
-    const { count } = await supabase.from("treasury_transactions").select("id", { count: "exact", head: true }).eq("branch_id", currentBranchId).eq("treasury_id", tr.id);
+    const { count } = await supabase.from("treasury_transactions").select("id", { count: "exact", head: true }).eq("treasury_id", tr.id);
     if ((count ?? 0) > 0) { toast.error(t("transactionsExist")); return; }
     const { error } = await supabase.from("treasury").update({ deleted_at: new Date().toISOString() } as any).eq("id", tr.id).eq("branch_id", currentBranchId);
     if (error) { toast.error(error.message); return; }

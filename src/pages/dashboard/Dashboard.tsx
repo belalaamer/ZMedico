@@ -226,7 +226,6 @@ export default function Dashboard() {
       if (trIds.length) {
         const { data: tt } = await (supabase as any).from("treasury_transactions")
           .select("transaction_type,amount,reference_type,reference_id,created_at")
-          .eq("branch_id", currentBranchId)
           .in("treasury_id", trIds)
           .gte("created_at", start.toISOString())
           .lte("created_at", end.toISOString());

@@ -163,6 +163,19 @@ export default defineConfig({
             : undefined,
       },
     })),
+    // Compact phone regression gate for the pricing comparison layout.
+    {
+      name: "public-mobile:compact-320",
+      testMatch: /public-mobile\.spec\.ts/,
+      use: {
+        baseURL: BASE_URL,
+        viewport: { width: 320, height: 568 },
+        deviceScaleFactor: 2,
+        isMobile: true,
+        hasTouch: true,
+        userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
+      },
+    },
     // ---- Settings vertical-slice shadow QA ----------------------------
     // `setup:shadow` mints one storageState per role whose credentials
     // are present in the environment. The walk spec exercises Settings

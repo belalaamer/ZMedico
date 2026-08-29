@@ -227,16 +227,42 @@ export default function Pricing() {
         )}
       </section>
 
-      {/* Comparison table */}
+      {/* Comparison */}
       <section className="container mx-auto px-4 pb-16">
         <h2 className="text-2xl font-bold text-center mb-6">
           {isAr ? "مقارنة الخطط" : "Compare plans"}
         </h2>
+
+        {/* Mobile-first comparison: avoids forcing a 640px table into a 320px viewport. */}
+        <div className="sm:hidden space-y-3" aria-label={isAr ? "مقارنة الخطط على الهاتف" : "Mobile plan comparison"}>
+          {FEATURE_KEYS.map((f) => (
+            <Card key={f.key}>
+              <CardContent className="p-4">
+                <p className="font-medium mb-3">{isAr ? f.ar : f.en}</p>
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                  {plans.map((p) => {
+                    const enabled = !!p.features?.[f.key];
+                    return (
+                      <div key={p.id} className="min-w-0 rounded-md bg-muted/40 px-1 py-2">
+                        <p className="truncate font-medium" title={isAr ? p.name_ar : p.name_en}>{isAr ? p.name_ar : p.name_en}</p>
+                        <span className="mt-1 inline-flex items-center justify-center" aria-label={enabled ? (isAr ? "متاح" : "Included") : (isAr ? "غير متاح" : "Not included")}>
+                          {enabled ? <Check className="h-4 w-4 text-primary" aria-hidden="true" /> : <X className="h-4 w-4 text-muted-foreground/40" aria-hidden="true" />}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Desktop/tablet comparison remains a real table for scanability. */}
         <div
           role="region"
           tabIndex={0}
           aria-label={isAr ? "جدول مقارنة الخطط" : "Plan comparison table"}
-          className="overflow-x-auto rounded-lg border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="hidden sm:block overflow-x-auto rounded-lg border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <table className="min-w-[640px] w-full text-sm">
             <thead className="bg-muted/50">

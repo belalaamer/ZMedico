@@ -232,6 +232,9 @@ export function BranchProvider({ children }: { children: ReactNode }) {
         const fallback = filterModulesByPlan(DEFAULT_ENABLED_MODULES, planFeatures);
         setEnabledModules(configured.length > 0 ? configured : fallback);
       } finally {
+        // Always release the loading gate, including when the branch lookup
+        // returns no tenant_id or exits early. Otherwise protected pages can
+        // remain on "Checking subscription" indefinitely.
         if (active) setModulesLoading(false);
       }
     };

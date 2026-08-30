@@ -9,7 +9,7 @@ concurrency:
 
 jobs:
   deploy:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-slim
     timeout-minutes: 20
     steps:
       - name: Checkout

@@ -71,8 +71,15 @@ export default function PrescriptionDetail() {
   };
 
   const clone = async () => {
+    // Carry the medical_record_id forward. Without it the cloned prescription
+    // is an orphan row: the branch-isolation RLS gate routes through the
+    // parent medical record, and a NULL reference used to fall outside every
+    // branch boundary (cross-tenant readable) before the policy was hardened —
+    // after the hardening, an orphan insert is rejected outright.
     const { data: nrx, error } = await supabase.from("prescriptions").insert({
-      patient_id: rx.patient_id, doctor_id: user?.id, notes_en: rx.notes_en, notes_ar: rx.notes_ar,
+      patient_id: rx.patient_id, doctor_id: user?.id,
+      medical_record_id: rx.medical_record_id,
+      notes_en: rx.notes_en, notes_ar: rx.notes_ar,
     } as any).select("id").single();
     if (error || !nrx) return toast.error(error?.message ?? "error");
     const rows = items.map((it) => ({

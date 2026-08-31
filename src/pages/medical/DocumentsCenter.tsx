@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/format";
@@ -17,6 +18,7 @@ import { useDataSync } from "@/lib/dataSync";
 export default function DocumentsCenter() {
   const { t, lang } = useI18n();
   const { user } = useAuth();
+  const { currentBranchId } = useBranch();
   const [docs, setDocs] = useState<any[]>([]);
   const [patients, setPatients] = useState<any[]>([]);
   const [filterType, setFilterType] = useState("all");
@@ -27,19 +29,26 @@ export default function DocumentsCenter() {
   const [uploading, setUploading] = useState(false);
 
   const load = async () => {
-    const { data } = await supabase.from("patient_documents")
-      .select("*, patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code)")
-      .order("created_at", { ascending: false }).limit(300);
+    // `patient_documents` has no branch_id column; branch scope is derived
+    // through the owning patient — the same indirection the RESTRICTIVE RLS
+    // policy uses via user_has_branch_access_via_patient.
+    let q = supabase.from("patient_documents")
+      .select("*, patients!inner(branch_id,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code)");
+    if (currentBranchId) q = q.eq("patients.branch_id", currentBranchId);
+    const { data } = await q.order("created_at", { ascending: false }).limit(300);
     setDocs(data ?? []);
   };
   const loadPatients = () => {
-    supabase.from("patients").select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code").is("deleted_at", null).order("created_at", { ascending: false }).limit(500)
+    let q = supabase.from("patients").select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code").is("deleted_at", null);
+    if (currentBranchId) q = q.eq("branch_id", currentBranchId);
+    q.order("created_at", { ascending: false }).limit(500)
       .then(({ data }) => setPatients(data ?? []));
   };
   useEffect(() => {
     load();
     loadPatients();
-  }, []);
+    // eslint-disable-next-line
+  }, [currentBranchId]);
   useDataSync(["patients"], () => loadPatients());
   useDataSync(["patient_documents"], () => load());
 

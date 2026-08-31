@@ -33,12 +33,17 @@ export default function QuickConsult() {
   const [ctx, setCtx] = useState<{ lastVisit: any | null; diagnoses: any[] }>({ lastVisit: null, diagnoses: [] });
 
   const loadPatients = useCallback(() => {
-    supabase.from("patients")
+    // The record created below is always saved with branch_id = currentBranchId,
+    // so the picker must offer this branch's patients only — otherwise a
+    // multi-branch user could open a record in branch A for a patient of
+    // branch B.
+    let q = supabase.from("patients")
       .select("id,first_name_en,last_name_en,patient_code")
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false }).limit(500)
+      .is("deleted_at", null);
+    if (currentBranchId) q = q.eq("branch_id", currentBranchId);
+    q.order("created_at", { ascending: false }).limit(500)
       .then(({ data }) => setPatients(data ?? []));
-  }, []);
+  }, [currentBranchId]);
 
   useEffect(() => {
     loadPatients();

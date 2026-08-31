@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useI18n } from "@/contexts/I18nContext";
+import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate } from "@/lib/format";
 import { RowActions } from "@/components/RowActions";
@@ -14,18 +15,25 @@ import { patientDisplayName, patientDisplayDirection } from "@/lib/patientName";
 
 export default function Prescriptions() {
   const { t, lang } = useI18n();
+  const { currentBranchId } = useBranch();
   const navigate = useNavigate();
   const [items, setItems] = useState<any[]>([]);
   const [search, setSearch] = useState("");
 
   const load = () => {
-    supabase.from("prescriptions")
-      .select("*, patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code)")
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false }).limit(200)
+    // `prescriptions` has no branch_id column, so branch scope is derived
+    // through the parent medical record — the same indirection the
+    // RESTRICTIVE RLS policy uses via user_has_branch_access_via_medical_record.
+    // The inner join also keeps orphan rows (medical_record_id IS NULL) out
+    // of the list, matching the hardened server-side policy.
+    let q = supabase.from("prescriptions")
+      .select("*, patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code), medical_records!inner(branch_id)")
+      .is("deleted_at", null);
+    if (currentBranchId) q = q.eq("medical_records.branch_id", currentBranchId);
+    q.order("created_at", { ascending: false }).limit(200)
       .then(({ data }) => setItems(data ?? []));
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId]);
 
   const softDelete = async (rx: any): Promise<void> => {
     const { error } = await supabase.from("prescriptions").update({ deleted_at: new Date().toISOString() } as any).eq("id", rx.id);

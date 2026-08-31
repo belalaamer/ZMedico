@@ -21,7 +21,7 @@ jobs:
           bun-version: latest
 
       - run: bun install --frozen-lockfile
-
+      - run: bun run test
       - run: bun run build
 
       - name: Verify build output

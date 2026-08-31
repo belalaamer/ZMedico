@@ -157,6 +157,17 @@ export default function Dashboard() {
 
     const branchEq = (q: any) => q.eq("branch_id", currentBranchId);
 
+    // `leave_requests` has no branch_id column of its own, so branch scope
+    // must be derived through staff_profiles -- the same indirection the
+    // treasury widgets below use via treasury_id. Without this the pending
+    // approvals badge counted every tenant's requests, not this branch's.
+    const { data: branchStaffRows } = await branchEq(
+      supabase.from("staff_profiles").select("id")
+    );
+    const branchStaffIds = ((branchStaffRows ?? []) as any[])
+      .map((r) => r.id)
+      .filter(Boolean);
+
       const [
         apptsTodayRes,
         newPtRes,
@@ -205,7 +216,9 @@ export default function Dashboard() {
           .is("invoice.deleted_at", null)
           .eq("invoice.branch_id", currentBranchId)
           .gte("invoice.invoice_date", rangeStart).lte("invoice.invoice_date", rangeEnd),
-        supabase.from("leave_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
+        supabase.from("leave_requests").select("id", { count: "exact", head: true })
+          .eq("status", "pending")
+          .in("staff_id", branchStaffIds),
       ]);
 
       // Treasury (mirrors Treasury page: filter by treasury_id for this branch,

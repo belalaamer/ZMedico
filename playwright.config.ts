@@ -79,6 +79,7 @@ export const MOBILE_VIEWPORTS = [
   { name: "iphone-se", width: 375, height: 667 },
   { name: "iphone-14", width: 390, height: 844 },
   { name: "pixel", width: 360, height: 800 },
+  { name: "iphone-15-pro-max", width: 430, height: 932 },
   { name: "ipad-mini", width: 768, height: 1024 },
 ] as const;
 

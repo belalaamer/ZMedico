@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/format";
@@ -23,6 +24,7 @@ function diffDays(a: string, b: string) {
 export default function Leaves() {
   const { t, lang } = useI18n();
   const { user } = useAuth();
+  const { currentBranchId } = useBranch();
   const [items, setItems] = useState<any[]>([]);
   const [types, setTypes] = useState<any[]>([]);
   const [staff, setStaff] = useState<any[]>([]);
@@ -32,16 +34,40 @@ export default function Leaves() {
   const [form, setForm] = useState({ staff_id: "", leave_type_id: "", start_date: "", end_date: "", reason_en: "" });
 
   const load = async () => {
-    const { data } = await supabase.from("leave_requests").select("*, leave_type:leave_types(name_en,name_ar)").order("created_at", { ascending: false });
-    setItems(data ?? []);
+    // `leave_requests` has no branch_id column, so the branch boundary has to
+    // be derived through staff_profiles.branch_id via staff_id. Filtering on a
+    // non-existent leave_requests.branch_id would reproduce exactly the
+    // treasury_transactions.branch_id regression fixed earlier.
+    let qs = supabase.from("staff_profiles").select("id,employee_id");
+    if (currentBranchId) qs = qs.eq("branch_id", currentBranchId);
+    const { data: s } = await qs;
+    const staffRows = s ?? [];
+    setStaff(staffRows);
+    const staffIds = staffRows.map((row: any) => row.id).filter(Boolean);
+
+    if (staffIds.length) {
+      const { data } = await supabase
+        .from("leave_requests")
+        .select("*, leave_type:leave_types(name_en,name_ar)")
+        .in("staff_id", staffIds)
+        .order("created_at", { ascending: false });
+      setItems(data ?? []);
+      // Only the identities rendered on this page, instead of every profile
+      // row in the database.
+      const { data: p } = await supabase
+        .from("profiles")
+        .select("id,full_name,email")
+        .in("id", staffIds);
+      setProfiles(p ?? []);
+    } else {
+      setItems([]);
+      setProfiles([]);
+    }
+
     const { data: lt } = await supabase.from("leave_types").select("*");
     setTypes(lt ?? []);
-    const { data: s } = await supabase.from("staff_profiles").select("id,employee_id");
-    setStaff(s ?? []);
-    const { data: p } = await supabase.from("profiles").select("id,full_name,email");
-    setProfiles(p ?? []);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [currentBranchId]);
 
   const totalDays = useMemo(() => form.start_date && form.end_date ? diffDays(form.start_date, form.end_date) : 0, [form.start_date, form.end_date]);
 
@@ -59,7 +85,12 @@ export default function Leaves() {
   };
 
   const decide = async (id: string, status: "approved" | "rejected", reason?: string) => {
-    const { error } = await supabase.from("leave_requests").update({ status, approved_by: user?.id, approved_at: new Date().toISOString(), rejection_reason: reason ?? null }).eq("id", id);
+    // Constrain the update to staff inside the active branch. Matching on id
+    // alone meant knowing (or guessing) a request id from another branch or
+    // tenant was enough to approve or reject it.
+    const allowedStaffIds = staff.map((row: any) => row.id).filter(Boolean);
+    if (!allowedStaffIds.length) return;
+    const { error } = await supabase.from("leave_requests").update({ status, approved_by: user?.id, approved_at: new Date().toISOString(), rejection_reason: reason ?? null }).eq("id", id).in("staff_id", allowedStaffIds);
     if (error) return toast.error(error.message);
     load();
   };

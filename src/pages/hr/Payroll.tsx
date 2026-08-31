@@ -62,8 +62,23 @@ export default function Payroll() {
     if (currentBranchId) qs = qs.eq("branch_id", currentBranchId);
     const { data: s } = await qs;
     setStaff(s ?? []);
-    const { data: p } = await supabase.from("profiles").select("id,full_name,email");
-    setProfiles(p ?? []);
+    // Only load the profile identities actually rendered on this page.
+    // This previously selected the whole profiles table, returning every
+    // user's name and email across all branches/tenants just to label
+    // rows. Mirrors the scoped pattern already used in Attendance.tsx.
+    const identityIds = Array.from(new Set([
+      ...(s ?? []).map((row: any) => row.id),
+      ...(data ?? []).map((row: any) => row.staff_id),
+    ].filter(Boolean)));
+    if (identityIds.length) {
+      const { data: p } = await supabase
+        .from("profiles")
+        .select("id,full_name,email")
+        .in("id", identityIds);
+      setProfiles(p ?? []);
+    } else {
+      setProfiles([]);
+    }
     // Build per-staff commission totals to show as a visible line on each payroll row.
     const rows = data ?? [];
     const out: Record<string, number> = {};
@@ -78,9 +93,14 @@ export default function Payroll() {
         return;
       }
       // Otherwise → preview unattached earned/partial for this doctor.
-      const { data: pend } = await (supabase as any)
+      // doctor_commissions carries its own branch_id. Without this filter a
+      // doctor working in more than one branch had the other branches'
+      // commissions summed into this branch's payroll preview.
+      let pendQ = (supabase as any)
         .from("doctor_commissions").select("commission_amount")
         .eq("doctor_id", pr.staff_id).is("payroll_id", null).in("status", ["earned", "partial"]);
+      if (currentBranchId) pendQ = pendQ.eq("branch_id", currentBranchId);
+      const { data: pend } = await pendQ;
       out[pr.id] = (pend ?? []).reduce((sum: number, r: any) => sum + Number(r.commission_amount || 0), 0);
       attachedFlag[pr.id] = false;
     }));
@@ -193,6 +213,9 @@ export default function Payroll() {
       .eq("doctor_id", p.staff_id)
       .order("updated_at", { ascending: false })
       .limit(500);
+    // This query joins patient names, so an unscoped read exposed patients
+    // belonging to other branches/tenants in the commission breakdown.
+    if (currentBranchId) q = q.eq("branch_id", currentBranchId);
     const hasAttached = await (supabase as any)
       .from("doctor_commissions").select("id", { count: "exact", head: true }).eq("payroll_id", p.id);
     if ((hasAttached?.count ?? 0) > 0) {

@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
+import { useBranch } from "@/contexts/BranchContext";
 import { formatMoney } from "@/lib/format";
 import { ReportFilterBar, ReportPageHeader } from "./_shared";
 import { defaultDateRange, exportReportPDF, exportReportExcel, CHART_COLORS } from "@/lib/reportExport";
@@ -11,6 +12,7 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 
 export default function MedicalReports() {
   const { t, lang } = useI18n();
+  const { currentBranchId } = useBranch();
   const dr = defaultDateRange(30);
   const [start, setStart] = useState(dr.start);
   const [end, setEnd] = useState(dr.end);
@@ -23,20 +25,26 @@ export default function MedicalReports() {
           <TabsTrigger value="dx">{t("diagnosesReport")}</TabsTrigger>
           <TabsTrigger value="proc">{t("proceduresReport")}</TabsTrigger>
         </TabsList>
-        <TabsContent value="dx"><DxTab start={start} end={end} setStart={setStart} setEnd={setEnd} lang={lang} t={t} /></TabsContent>
-        <TabsContent value="proc"><ProcTab start={start} end={end} setStart={setStart} setEnd={setEnd} lang={lang} t={t} /></TabsContent>
+        <TabsContent value="dx"><DxTab start={start} end={end} setStart={setStart} setEnd={setEnd} lang={lang} t={t} branchId={currentBranchId} /></TabsContent>
+        <TabsContent value="proc"><ProcTab start={start} end={end} setStart={setStart} setEnd={setEnd} lang={lang} t={t} branchId={currentBranchId} /></TabsContent>
       </Tabs>
     </div>
   );
 }
 
-function DxTab({ start, end, setStart, setEnd, lang, t }: any) {
+function DxTab({ start, end, setStart, setEnd, lang, t, branchId }: any) {
   const [data, setData] = useState<any[]>([]);
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from("record_diagnoses")
-        .select("diagnoses(name_en, name_ar, code), medical_records!inner(visit_date)")
+      // record_diagnoses has no branch_id of its own — branch scope is
+      // derived through the parent medical record, matching the RESTRICTIVE
+      // RLS policy. Without this, a multi-branch user's report aggregated
+      // every accessible branch into figures that read as branch-specific.
+      let q = supabase.from("record_diagnoses")
+        .select("diagnoses(name_en, name_ar, code), medical_records!inner(visit_date,branch_id)")
         .gte("medical_records.visit_date", start).lte("medical_records.visit_date", end);
+      if (branchId) q = q.eq("medical_records.branch_id", branchId);
+      const { data } = await q;
       const map = new Map<string, number>();
       (data ?? []).forEach((r: any) => {
         const k = lang === "ar" ? r.diagnoses?.name_ar : r.diagnoses?.name_en;
@@ -45,7 +53,7 @@ function DxTab({ start, end, setStart, setEnd, lang, t }: any) {
       const total = Array.from(map.values()).reduce((s, v) => s + v, 0);
       setData(Array.from(map.entries()).map(([name, count]) => ({ name, count, pct: total ? ((count / total) * 100).toFixed(1) : "0" })).sort((a, b) => b.count - a.count));
     })();
-  }, [start, end, lang]);
+  }, [start, end, lang, branchId]);
 
   const cols = [{ header: t("diagnosisLabel"), key: "name" }, { header: t("count"), key: "count" }, { header: "%", key: "pct" }];
 
@@ -73,13 +81,16 @@ function DxTab({ start, end, setStart, setEnd, lang, t }: any) {
   );
 }
 
-function ProcTab({ start, end, setStart, setEnd, lang, t }: any) {
+function ProcTab({ start, end, setStart, setEnd, lang, t, branchId }: any) {
   const [data, setData] = useState<any[]>([]);
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from("record_procedures")
-        .select("quantity, procedures(name_en, name_ar, default_price), medical_records!inner(visit_date)")
+      // Same indirection as DxTab: scope through the parent medical record.
+      let q = supabase.from("record_procedures")
+        .select("quantity, procedures(name_en, name_ar, default_price), medical_records!inner(visit_date,branch_id)")
         .gte("medical_records.visit_date", start).lte("medical_records.visit_date", end);
+      if (branchId) q = q.eq("medical_records.branch_id", branchId);
+      const { data } = await q;
       const map = new Map<string, { count: number; revenue: number }>();
       (data ?? []).forEach((r: any) => {
         const k = lang === "ar" ? r.procedures?.name_ar : r.procedures?.name_en; if (!k) return;
@@ -90,7 +101,7 @@ function ProcTab({ start, end, setStart, setEnd, lang, t }: any) {
       });
       setData(Array.from(map.entries()).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.count - a.count));
     })();
-  }, [start, end, lang]);
+  }, [start, end, lang, branchId]);
 
   const cols = [{ header: t("procedureLabel"), key: "name" }, { header: t("count"), key: "count" }, { header: t("revenue"), key: "revenue" }];
   const expRows = data.map((d) => ({ name: d.name, count: d.count, revenue: d.revenue.toFixed(2) }));

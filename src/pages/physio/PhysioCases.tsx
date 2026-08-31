@@ -66,6 +66,14 @@ export default function PhysioCases() {
     setLoading(false);
   };
 
+  // The list never loaded on mount: `load` was defined but nothing invoked it,
+  // so the page sat on the skeleton forever (it only refreshed after creating
+  // a case). Load on mount and whenever the active branch changes.
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branchSelectionReady, currentBranchId]);
+
   useEffect(() => {
     const requestId = ++optionsRequestRef.current;
     const branchId = currentBranchId;

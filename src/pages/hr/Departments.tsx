@@ -27,16 +27,37 @@ export default function Departments() {
   const [form, setForm] = useState({ name: "", description: "", branch_id: "", manager_id: "" });
 
   const load = async () => {
-    const { data } = await supabase.from("departments").select("*").is("deleted_at", null).order("name_en");
+    // Scope the department list and the per-department staff counts to the
+    // active branch, matching the convention used across HR pages
+    // (Attendance, Payroll, Schedules). departments has a branch_id column;
+    // without the filter a multi-branch user gets all their branches merged
+    // into one list with merged counts.
+    let qd = supabase.from("departments").select("*").is("deleted_at", null).order("name_en");
+    if (currentBranchId) qd = qd.eq("branch_id", currentBranchId);
+    const { data } = await qd;
     setItems(data ?? []);
-    const { data: profs } = await supabase.from("profiles").select("id,full_name,email");
-    setProfiles(profs ?? []);
-    const { data: staff } = await supabase.from("staff_profiles").select("department_id").not("department_id","is",null);
+
+    let qs = supabase.from("staff_profiles").select("id,department_id");
+    if (currentBranchId) qs = qs.eq("branch_id", currentBranchId);
+    const { data: staff } = await qs;
     const c: Record<string, number> = {};
-    (staff ?? []).forEach((s: any) => { c[s.department_id] = (c[s.department_id] ?? 0) + 1; });
+    (staff ?? []).forEach((s: any) => { if (s.department_id) c[s.department_id] = (c[s.department_id] ?? 0) + 1; });
     setCounts(c);
+
+    // Only the identities this page actually renders: branch staff for the
+    // manager picker, plus current department managers so their names still
+    // resolve. Previously this selected the entire profiles table.
+    const idSet = new Set<string>();
+    (staff ?? []).forEach((s: any) => { if (s.id) idSet.add(s.id); });
+    (data ?? []).forEach((d: any) => { if (d.manager_id) idSet.add(d.manager_id); });
+    if (idSet.size) {
+      const { data: profs } = await supabase.from("profiles").select("id,full_name,email").in("id", Array.from(idSet));
+      setProfiles(profs ?? []);
+    } else {
+      setProfiles([]);
+    }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [currentBranchId]);
 
   const openNew = () => { setE(null); setForm({ name: "", description: "", branch_id: "", manager_id: "" }); setOpen(true); };
   const openEdit = (d: Dept) => { setE(d); setForm({ name: d.name_en || d.name_ar || "", description: d.description ?? "", branch_id: d.branch_id ?? "", manager_id: d.manager_id ?? "" }); setOpen(true); };

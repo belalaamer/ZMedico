@@ -71,7 +71,13 @@ export default function TargetBonusesPage() {
     let q = supabase.from("staff_targets").select("*").order("period_end", { ascending: false }).limit(200);
     if (currentBranchId) q = q.or(`branch_id.eq.${currentBranchId},branch_id.is.null`);
     const { data: ts, error } = await q;
-    const { data: sps } = await supabase.from("staff_profiles").select("id").eq("status","active").limit(500);
+    // The picker previously listed every active staff member across all the
+    // user's branches, while the created target is always saved with
+    // branch_id = currentBranchId — so a target could be assigned to a staff
+    // member from another branch. Scope the picker to the active branch.
+    let qsps = supabase.from("staff_profiles").select("id").eq("status","active").limit(500);
+    if (currentBranchId) qsps = qsps.eq("branch_id", currentBranchId);
+    const { data: sps } = await qsps;
     const ids = (sps ?? []).map((s: any) => s.id);
     let sp: StaffOpt[] = [];
     if (ids.length) {

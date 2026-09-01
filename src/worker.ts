@@ -226,8 +226,14 @@ export default {
       return new Response(null, { status: 204, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
     }
     const isHtmlRequest = request.method === "GET" && (pathname === "/" || pathname === "/index.html" || !pathname.includes("."));
-    const providerSubdomain = isProviderSubdomainHost(hostname);
-    const customTenantHostname = !PLATFORM_HOSTNAMES.has(hostname) && !hostname.endsWith(".workers.dev");
+    const isPlatformHostname = PLATFORM_HOSTNAMES.has(hostname);
+    // A platform hostname (the marketing site itself, on the apex or www) is
+    // never a tenant's booking/app portal, even though "www" happens to also
+    // satisfy the generic subdomain-slug pattern below. Without this guard,
+    // www.belalaamer.com was misclassified as an unregistered tenant
+    // subdomain and got a 404 instead of the marketing site.
+    const providerSubdomain = !isPlatformHostname && isProviderSubdomainHost(hostname);
+    const customTenantHostname = !isPlatformHostname && !hostname.endsWith(".workers.dev");
     if (isHtmlRequest && (providerSubdomain || customTenantHostname)) {
       const active = await hasActiveTenantDomain(hostname);
       if (!active) return new Response(providerSubdomain ? "Tenant subdomain is not active" : "Tenant domain is not active", { status: 404, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });

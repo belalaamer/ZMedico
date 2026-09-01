@@ -1,1 +1,11 @@
-project_id = "scfyurskflckiazppvxh"
+# This file is only CLI metadata (used by `supabase link` / local dev tooling).
+# It is NOT read by the running app and does not affect production.
+#
+# Deliberately points at the QA project (cyrsirozfhadonuittrc), never at
+# Production (rqcmnfzfytyyicelvifk). Production migrations are only ever
+# applied via `apply_migration` on individual, reviewed statements --
+# `supabase db push` must never be run against Production: this repo's
+# migrations directory does not match Production's applied migration
+# history (they were applied out-of-band), so a push would attempt to
+# re-run hundreds of already-applied migrations.
+project_id = "cyrsirozfhadonuittrc"

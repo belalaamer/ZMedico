@@ -1,7 +1,13 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 const DEFAULT_ORIGIN = "https://zmedico2.belalaamer.workers.dev";
-const PROVIDER_SUBDOMAIN_SUFFIX = (Deno.env.get("CUSTOM_DOMAIN_SUBDOMAIN_SUFFIX") ?? "belalaamer.com").trim().toLowerCase();
+// Default base for newly created "provider subdomain" (ZMedico-branded)
+// clinic subdomains. Changed from belalaamer.com to zmedico.com now that
+// zmedico.com is a registered platform hostname with its own wildcard DNS +
+// Workers Route. Existing subdomains already created under belalaamer.com
+// (blitz-physio, amr, hady) are unaffected -- their hostname is stored
+// literally per-row and worker.ts recognizes both suffixes.
+const PROVIDER_SUBDOMAIN_SUFFIX = (Deno.env.get("CUSTOM_DOMAIN_SUBDOMAIN_SUFFIX") ?? "zmedico.com").trim().toLowerCase();
 const MAX_BODY_BYTES = 32 * 1024;
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = Math.max(1, Number(Deno.env.get("CUSTOM_DOMAIN_RL_PER_MIN") ?? "20"));

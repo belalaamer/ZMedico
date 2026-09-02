@@ -93,16 +93,21 @@ function localDateInputValue(date: Date) {
   return new Date(date.getTime() - tz * 60_000).toISOString().slice(0, 10);
 }
 
+// Same-day booking is allowed (the actual "how soon" cutoff is enforced by
+// the branch's min_advance_booking_hours in public_booking_slots_for_tenant,
+// not by the date picker), so the search starts from today (offset 0) and
+// lets the slots endpoint naturally hide any time closer than the required
+// advance-booking buffer.
 function nextBookableDate(branch?: Branch | null) {
   const today = new Date();
-  for (let offset = 1; offset <= 14; offset += 1) {
+  for (let offset = 0; offset <= 14; offset += 1) {
     const candidate = new Date(today);
     candidate.setDate(today.getDate() + offset);
     if (!branch?.working_days?.length || branch.working_days.includes(candidate.getDay())) {
       return localDateInputValue(candidate);
     }
   }
-  return localDateInputValue(new Date(today.getTime() + 86_400_000));
+  return localDateInputValue(today);
 }
 
 function displayName(item: { name_en?: string | null; name_ar?: string | null }, lang: Lang) {
@@ -296,7 +301,10 @@ export default function PublicBooking() {
     if (step === 3 && !selectedSlot) setStep(2);
   }, [step, selectedSlot]);
 
-  const minDate = localDateInputValue(new Date(Date.now() + 86_400_000));
+  // Same-day booking is allowed; the branch's min_advance_booking_hours
+  // setting (enforced by public_booking_slots_for_tenant) is what actually
+  // hides same-day slots that are too soon, not this date picker.
+  const minDate = localDateInputValue(new Date());
   const maxDate = useMemo(() => {
     const days = branch?.max_future_booking_days ?? 30;
     const max = new Date();
@@ -406,7 +414,7 @@ export default function PublicBooking() {
               </div>
               <p className="rounded-xl bg-muted/60 p-4 text-sm leading-6 text-muted-foreground">
                 {result.status === "confirmed"
-                  ? (isArabic ? "احتفظ برقم الحجز. سيصلك تذكير قبل الموعد حسب إعدادات العيادة." : "Keep your booking reference. You will receive a reminder according to the clinic settings.")
+                  ? (isArabic ? "احتفظ برقم الحجز الخاص بك لأي استفسار مستقبلي." : "Keep your booking reference for any future inquiry.")
                   : (isArabic ? "سيقوم فريق الاستقبال بمراجعة الطلب والتواصل معك لتأكيد الموعد." : "Our reception team will review the request and contact you to confirm the appointment.")}
               </p>
               <Button className="w-full" variant="outline" onClick={() => window.location.reload()}>
@@ -472,17 +480,29 @@ export default function PublicBooking() {
                         <p className="mt-1 text-sm text-muted-foreground">{isArabic ? "اختر الفرع والخدمة والتاريخ، ثم سنعرض الأطباء والمواعيد المؤهلين فقط." : "Choose a branch, service, and date. We will then show only eligible doctors and times."}</p>
                       </div>
                       <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="booking-branch">{isArabic ? "الفرع" : "Branch"}</Label>
-                          <select id="booking-branch" value={branchId} onChange={(event) => setBranchId(event.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-ring">
-                            <option value="">{isArabic ? "اختر الفرع" : "Choose branch"}</option>
-                            {branches.map((item) => <option key={item.id} value={item.id}>{displayName(item, lang)}</option>)}
-                          </select>
-                          {branch?.address ? <p className="flex items-start gap-1 text-xs text-muted-foreground"><MapPin className="mt-0.5 size-3 shrink-0" />{branch.address}</p> : null}
-                        </div>
+                        {branches.length > 1 ? (
+                          <div className="space-y-2">
+                            <Label htmlFor="booking-branch">{isArabic ? "الفرع" : "Branch"}</Label>
+                            <select id="booking-branch" value={branchId} onChange={(event) => setBranchId(event.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-ring">
+                              <option value="">{isArabic ? "اختر الفرع" : "Choose branch"}</option>
+                              {branches.map((item) => <option key={item.id} value={item.id}>{displayName(item, lang)}</option>)}
+                            </select>
+                            {branch?.address ? <p className="flex items-start gap-1 text-xs text-muted-foreground"><MapPin className="mt-0.5 size-3 shrink-0" />{branch.address}</p> : null}
+                          </div>
+                        ) : branches.length === 1 ? (
+                          // A single-branch workspace has nothing to choose between, so the
+                          // field is pinned to that branch instead of showing a one-item dropdown.
+                          <div className="space-y-2">
+                            <Label>{isArabic ? "الفرع" : "Branch"}</Label>
+                            <div className="flex h-10 items-center rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground">
+                              <MapPin className="me-2 size-3.5 shrink-0" />
+                              {displayName(branches[0], lang)}
+                            </div>
+                            {branch?.address ? <p className="flex items-start gap-1 text-xs text-muted-foreground"><MapPin className="mt-0.5 size-3 shrink-0" />{branch.address}</p> : null}
+                          </div>
+                        ) : null}
                         <div className="space-y-2">
                           <Label htmlFor="booking-service">{isArabic ? "الخدمة" : "Service"}</Label>
-                          <p className="text-xs text-muted-foreground">{isArabic ? "اختر الخدمة التي تريد حجزها. الإجراءات الطبية تُسجل داخل الملف بعد الزيارة." : "Choose the service you want to book. Clinical procedures are recorded in the patient file after the visit."}</p>
                           <select id="booking-service" value={serviceId} onChange={(event) => setServiceId(event.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-ring">
                             <option value="">{isArabic ? "اختر الخدمة" : "Choose service"}</option>
                             {services.map((item) => <option key={`${item.source}-${item.id}`} value={item.id}>{displayName(item, lang)}</option>)}

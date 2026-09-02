@@ -845,6 +845,10 @@ export default function CalendarPage() {
         // dashed ring calls that out so the pinned position isn't mistaken
         // for the actual appointment time (shown correctly below regardless).
         isOutOfHours && "ring-2 ring-dashed ring-muted-foreground/50",
+        // A public booking awaiting staff confirmation must be easy to spot
+        // without opening it -- without this ring it renders identically to
+        // any other scheduled appointment on the grid.
+        a.booking_request_status === "pending" && "ring-2 ring-amber-500 ring-offset-1",
       )}
       style={style}
       title={`${fullName(a.patients!)} · ${timeStr(new Date(a.scheduled_at))}${isOutOfHours ? ` (${lang === "ar" ? "خارج ساعات العمل" : "outside working hours"})` : ""}`}
@@ -855,6 +859,11 @@ export default function CalendarPage() {
       <div className="text-[11px] leading-tight truncate text-muted-foreground">
         {timeStr(new Date(a.scheduled_at))}
         {isOutOfHours && <span className="ms-1" aria-hidden>⚠</span>}
+        {a.booking_request_status === "pending" && (
+          <span className="ms-1 font-semibold text-amber-600 dark:text-amber-400" title={lang === "ar" ? "طلب حجز في انتظار التأكيد" : "Booking request awaiting confirmation"}>
+            {lang === "ar" ? "بانتظار التأكيد" : "Needs confirmation"}
+          </span>
+        )}
       </div>
       {(appointmentServiceLabel(a) || a.room) && (
         <div className="text-[10px] leading-tight truncate text-muted-foreground/90">

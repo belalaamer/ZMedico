@@ -17,7 +17,18 @@ const SUPABASE_EMAIL_TEMPLATE_URL = "https://rqcmnfzfytyyicelvifk.supabase.co/re
 const PROVIDER_SUBDOMAIN_HEALTH_PATH = "/_zmedico/provisioning-check";
 const MAX_GATEWAY_BODY_BYTES = 32 * 1024;
 const DEFAULT_ORIGIN = "https://zmedico2.belalaamer.workers.dev";
-const PLATFORM_HOSTNAMES = new Set(["belalaamer.com", "www.belalaamer.com", "zmedico2.belalaamer.workers.dev"]);
+// Both platform-owned marketing domains. zmedico.com/www were registered as
+// Workers Custom Domains alongside belalaamer.com/www -- without listing them
+// here they would be misread as an unregistered tenant custom domain (same
+// bug fixed for www.belalaamer.com earlier) and 404 instead of serving the
+// marketing site.
+const PLATFORM_HOSTNAMES = new Set([
+  "belalaamer.com",
+  "www.belalaamer.com",
+  "zmedico.com",
+  "www.zmedico.com",
+  "zmedico2.belalaamer.workers.dev",
+]);
 
 type PortalEmailInput = {
   patient_id?: unknown;

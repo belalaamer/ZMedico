@@ -32,9 +32,13 @@ export default function AppointmentSettings() {
   const { t, lang } = useI18n();
   const { branches, currentBranchId } = useBranch();
   const [branchId, setBranchId] = useState(currentBranchId ?? "");
+  // RBOOK-01: mirrors appointment_settings.require_confirmation's own
+  // database column default (true) for a branch that has no row yet, so
+  // this form's displayed toggle matches what public_create_booking_for_tenant
+  // actually does for that branch instead of silently showing "off".
   const [f, setF] = useState<any>({
     slot_duration_minutes: 30, buffer_minutes: 0, max_appointments_per_slot: 1,
-    allow_online_booking: true, require_confirmation: false, booking_request_hold_minutes: 15,
+    allow_online_booking: true, require_confirmation: true, booking_request_hold_minutes: 15,
     cancellation_deadline_hours: 24, reminder_hours_before: [24, 2],
     max_future_booking_days: 30, min_advance_booking_hours: 1,
   });

@@ -27,8 +27,14 @@ type QAAccount = {
   requiresBranch: boolean;
 };
 
+// RBAC-09 fix: "admin" was marked requiresBranch: false on the same
+// mistaken assumption fixed across admin-create-user / settings_assign_user_role
+// / UserManagement.tsx -- user_has_branch_access() requires a staff_branches
+// row for role='admin' exactly like every other role, so this QA identity
+// was itself provisioned branch-less and would have been just as locked out
+// (zero branches from RLS) as the real tenant admins this bug affected.
 const ACCOUNTS: QAAccount[] = [
-  { key: "admin", email: "qa.admin@qa.local", role: "admin", envPrefix: "TEST_ADMIN", requiresBranch: false },
+  { key: "admin", email: "qa.admin@qa.local", role: "admin", envPrefix: "TEST_ADMIN", requiresBranch: true },
   { key: "manager", email: "qa.manager@qa.local", role: "manager", envPrefix: "TEST_MANAGER", requiresBranch: true },
   { key: "accountant", email: "qa.accountant@qa.local", role: "accountant", envPrefix: "TEST_ACCOUNTANT", requiresBranch: true },
   { key: "receptionist", email: "qa.receptionist@qa.local", role: "receptionist", envPrefix: "TEST_RECEPTIONIST", requiresBranch: true },

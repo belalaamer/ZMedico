@@ -229,8 +229,8 @@ export default function UserManagement() {
 
   const saveEdit = async () => {
     if (!editTarget) return;
-    if (eRole === "manager" && !eBranch) {
-      toast.error(lang === "ar" ? "يجب اختيار فرع لدور المدير" : "Branch is required for the manager role");
+    if (ROLES_REQUIRING_BRANCH.includes(eRole) && !eBranch) {
+      toast.error(lang === "ar" ? "يجب اختيار فرع لهذا الدور" : "Branch is required for this role");
       return;
     }
     setSavingEdit(true);
@@ -1076,7 +1076,7 @@ export default function UserManagement() {
               <div className="space-y-2">
                 <Label>
                   {lang === "ar" ? "الفرع" : "Branch"}
-                  {eRole === "manager" && (lang === "ar" ? " (مطلوب للمدير)" : " (required for manager)")}
+                  {ROLES_REQUIRING_BRANCH.includes(eRole) && (lang === "ar" ? " (مطلوب لهذا الدور)" : " (required for this role)")}
                 </Label>
                 <Select value={eBranch} onValueChange={setEBranch}>
                   <SelectTrigger><SelectValue placeholder={lang === "ar" ? "اختر فرعاً" : "Select a branch"} /></SelectTrigger>

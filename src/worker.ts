@@ -1,1 +1,314 @@
-ZXhwb3J0IGludGVyZmFjZSBFbnYgewogIEFTU0VUUzogRmV0Y2hlcjsKICBFTUFJTDogU2VuZEVtYWlsOwogIEVNQUlMX0ZST006IHN0cmluZzsKICBSRVNFTkRfQVBJX0tFWT86IHN0cmluZzsKfQoKY29uc3QgRE9NQUlOX0ZVTkNUSU9OX1VSTCA9ICJodHRwczovL3JxY21uZnpmeXR5eWljZWx2aWZrLnN1cGFiYXNlLmNvL2Z1bmN0aW9ucy92MS9tYW5hZ2UtY3VzdG9tLWRvbWFpbiI7CmNvbnN0IFNVUEFCQVNFX1JFU1RfVVJMID0gImh0dHBzOi8vcnFjbW5memZ5dHl5aWNlbHZpZmsuc3VwYWJhc2UuY28vcmVzdC92MS9ycGMvcmVzb2x2ZV9hY3RpdmVfdGVuYW50X2RvbWFpbiI7CmNvbnN0IFNVUEFCQVNFX1BVQkxJU0hBQkxFX0tFWSA9ICJzYl9wdWJsaXNoYWJsZV9WdTNvaTBONGhteFB6VHNTY3dyd0ZBX1d0My1DVXlVIjsKLy8gQm90aCBzdWZmaXhlcyBhIHByb3ZpZGVyLWlzc3VlZCBjbGluaWMgc3ViZG9tYWluIGNhbiBlbmQgaW4uIGJlbGFsYWFtZXIuY29tCi8vIGhhcyB0aHJlZSBsaXZlIGNsaW5pY3Mgb24gaXQgYWxyZWFkeSAoYmxpdHotcGh5c2lvLCBhbXIsIGhhZHkpOyB6bWVkaWNvLmNvbQovLyBpcyB0aGUgbmV3IGRlZmF1bHQgc3VmZml4IGZvciBzdWJkb21haW5zIGNyZWF0ZWQgZ29pbmcgZm9yd2FyZCAtLSBib3RoIG11c3QKLy8ga2VlcCB3b3JraW5nLgpjb25zdCBQUk9WSURFUl9TVUJET01BSU5fU1VGRklYRVMgPSBbImJlbGFsYWFtZXIuY29tIiwgInptZWRpY28uY29tIl07CmNvbnN0IERPTUFJTl9HQVRFV0FZX1BBVEggPSAiL2FwaS9kb21haW5zIjsKY29uc3QgUEFUSUVOVF9QT1JUQUxfRU1BSUxfUEFUSCA9ICIvYXBpL3BhdGllbnQtcG9ydGFsLWVtYWlsIjsKY29uc3QgU1VQQUJBU0VfQVVUSF9VU0VSX1VSTCA9ICJodHRwczovL3JxY21uZnpmeXR5eWljZWx2aWZrLnN1cGFiYXNlLmNvL2F1dGgvdjEvdXNlciI7CmNvbnN0IFNVUEFCQVNFX1BBVElFTlRfQ09OVEVYVF9VUkwgPSAiaHR0cHM6Ly9ycWNtbmZ6Znl0eXlpY2Vsdmlmay5zdXBhYmFzZS5jby9yZXN0L3YxL3JwYy9wYXRpZW50X3BvcnRhbF9zZW5kX2NvbnRleHQiOwpjb25zdCBTVVBBQkFTRV9FTUFJTF9URU1QTEFURV9VUkwgPSAiaHR0cHM6Ly9ycWNtbmZ6Znl0eXlpY2Vsdmlmay5zdXBhYmFzZS5jby9yZXN0L3YxL2VtYWlsX3RlbXBsYXRlcyI7CmNvbnN0IFBST1ZJREVSX1NVQkRPTUFJTl9IRUFMVEhfUEFUSCA9ICIvX3ptZWRpY28vcHJvdmlzaW9uaW5nLWNoZWNrIjsKY29uc3QgTUFYX0dBVEVXQVlfQk9EWV9CWVRFUyA9IDMyICogMTAyNDsKY29uc3QgREVGQVVMVF9PUklHSU4gPSAiaHR0cHM6Ly96bWVkaWNvMi5iZWxhbGFhbWVyLndvcmtlcnMuZGV2IjsKLy8gQm90aCBwbGF0Zm9ybS1vd25lZCBtYXJrZXRpbmcgZG9tYWlucy4gem1lZGljby5jb20vd3d3IHdlcmUgcmVnaXN0ZXJlZCBhcwovLyBXb3JrZXJzIEN1c3RvbSBEb21haW5zIGFsb25nc2lkZSBiZWxhbGFhbWVyLmNvbS93d3cgLS0gd2l0aG91dCBsaXN0aW5nIHRoZW0KLy8gaGVyZSB0aGV5IHdvdWxkIGJlIG1pc3JlYWQgYXMgYW4gdW5yZWdpc3RlcmVkIHRlbmFudCBjdXN0b20gZG9tYWluIChzYW1lCi8vIGJ1ZyBmaXhlZCBmb3Igd3d3LmJlbGFsYWFtZXIuY29tIGVhcmxpZXIpIGFuZCA0MDQgaW5zdGVhZCBvZiBzZXJ2aW5nIHRoZQovLyBtYXJrZXRpbmcgc2l0ZS4KY29uc3QgUExBVEZPUk1fSE9TVE5BTUVTID0gbmV3IFNldChbCiAgImJlbGFsYWFtZXIuY29tIiwKICAid3d3LmJlbGFsYWFtZXIuY29tIiwKICAiem1lZGljby5jb20iLAogICJ3d3cuem1lZGljby5jb20iLAogICJ6bWVkaWNvMi5iZWxhbGFhbWVyLndvcmtlcnMuZGV2IiwKXSk7Cgp0eXBlIFBvcnRhbEVtYWlsSW5wdXQgPSB7CiAgcGF0aWVudF9pZD86IHVua25vd247CiAgdGVtcG9yYXJ5X3Bhc3N3b3JkPzogdW5rbm93bjsKICB1c2VybmFtZT86IHVua25vd247CiAgbGFuZ3VhZ2U/OiB1bmtub3duOwp9OwoKdHlwZSBQb3J0YWxTZW5kQ29udGV4dCA9IHsKICBhbGxvd2VkPzogYm9vbGVhbjsKICBlbWFpbD86IHN0cmluZyB8IG51bGw7CiAgcGF0aWVudF9uYW1lPzogc3RyaW5nIHwgbnVsbDsKICBwYXRpZW50X25hbWVfYXI/OiBzdHJpbmcgfCBudWxsOwogIHN1cHBvcnRfZW1haWw/OiBzdHJpbmcgfCBudWxsOwogIHN1cHBvcnRfcGhvbmU/OiBzdHJpbmcgfCBudWxsOwogIGNsaW5pY19uYW1lPzogc3RyaW5nIHwgbnVsbDsKICBjbGluaWNfbmFtZV9hcj86IHN0cmluZyB8IG51bGw7CiAgZW1haWxfZW5hYmxlZD86IGJvb2xlYW47CiAgZW1haWxfcHJvdmlkZXI/OiBzdHJpbmcgfCBudWxsOwogIGVtYWlsX3NlbmRlcl9uYW1lPzogc3RyaW5nIHwgbnVsbDsKICBlbWFpbF9zZW5kZXJfYWRkcmVzcz86IHN0cmluZyB8IG51bGw7CiAgZW1haWxfcmVwbHlfdG8/OiBzdHJpbmcgfCBudWxsOwp9OwoKdHlwZSBQb3J0YWxFbWFpbFRlbXBsYXRlID0gewogIHN1YmplY3RfZW4/OiBzdHJpbmcgfCBudWxsOwogIHN1YmplY3RfYXI/OiBzdHJpbmcgfCBudWxsOwogIGJvZHlfZW4/OiBzdHJpbmcgfCBudWxsOwogIGJvZHlfYXI/OiBzdHJpbmcgfCBudWxsOwp9OwoKZnVuY3Rpb24gZ2F0ZXdheUhlYWRlcnMocmVxdWVzdDogUmVxdWVzdCk6IEhlYWRlcnMgewogIGNvbnN0IG9yaWdpbiA9IHJlcXVlc3QuaGVhZGVycy5nZXQoIk9yaWdpbiIpOwogIGNvbnN0IGhlYWRlcnMgPSBuZXcgSGVhZGVycyh7CiAgICAiQWNjZXNzLUNvbnRyb2wtQWxsb3ctT3JpZ2luIjogb3JpZ2luID09PSBERUZBVUxUX09SSUdJTiA/IG9yaWdpbiA6IERFRkFVTFRfT1JJR0lOLAogICAgIlZhcnkiOiAiT3JpZ2luIiwKICAgICJBY2Nlc3MtQ29udHJvbC1BbGxvdy1IZWFkZXJzIjogImF1dGhvcml6YXRpb24sIGFwaWtleSwgY29udGVudC10eXBlLCB4LWNsaWVudC1pbmZvLCB4LWlkZW1wb3RlbmN5LWtleSIsCiAgICAiQWNjZXNzLUNvbnRyb2wtQWxsb3ctTWV0aG9kcyI6ICJQT1NULCBPUFRJT05TIiwKICAgICJDYWNoZS1Db250cm9sIjogIm5vLXN0b3JlIiwKICAgICJYLUNvbnRlbnQtVHlwZS1PcHRpb25zIjogIm5vc25pZmYiLAogIH0pOwogIHJldHVybiBoZWFkZXJzOwp9CgpmdW5jdGlvbiBpc1Byb3ZpZGVyU3ViZG9tYWluSG9zdChob3N0bmFtZTogc3RyaW5nKTogYm9vbGVhbiB7CiAgZm9yIChjb25zdCBzdWZmaXggb2YgUFJPVklERVJfU1VCRE9NQUlOX1NVRkZJWEVTKSB7CiAgICBjb25zdCB3aXRoRG90ID0gYC4ke3N1ZmZpeH1gOwogICAgaWYgKCFob3N0bmFtZS5lbmRzV2l0aCh3aXRoRG90KSkgY29udGludWU7CiAgICBjb25zdCBzbHVnID0gaG9zdG5hbWUuc2xpY2UoMCwgLXdpdGhEb3QubGVuZ3RoKTsKICAgIGlmICgvXlthLXowLTldKD86W2EtejAtOS1dezAsNjF9W2EtejAtOV0pPyQvLnRlc3Qoc2x1ZykpIHJldHVybiB0cnVlOwogIH0KICByZXR1cm4gZmFsc2U7Cn0KCmFzeW5jIGZ1bmN0aW9uIGhhc0FjdGl2ZVRlbmFudERvbWFpbihob3N0bmFtZTogc3RyaW5nKTogUHJvbWlzZTxib29sZWFuPiB7CiAgY29uc3QgY29udHJvbGxlciA9IG5ldyBBYm9ydENvbnRyb2xsZXIoKTsKICBjb25zdCB0aW1lb3V0ID0gc2V0VGltZW91dCgoKSA9PiBjb250cm9sbGVyLmFib3J0KCksIDJfMDAwKTsKICB0cnkgewogICAgY29uc3QgcmVzcG9uc2UgPSBhd2FpdCBmZXRjaChTVVBBQkFTRV9SRVNUX1VSTCwgewogICAgICBtZXRob2Q6ICJQT1NUIiwKICAgICAgaGVhZGVyczogeyBhcGlrZXk6IFNVUEFCQVNFX1BVQkxJU0hBQkxFX0tFWSwgIkNvbnRlbnQtVHlwZSI6ICJhcHBsaWNhdGlvbi9qc29uIiB9LAogICAgICBib2R5OiBKU09OLnN0cmluZ2lmeSh7IF9ob3N0bmFtZTogaG9zdG5hbWUgfSksCiAgICAgIHNpZ25hbDogY29udHJvbGxlci5zaWduYWwsCiAgICB9KTsKICAgIGlmICghcmVzcG9uc2Uub2spIHJldHVybiBmYWxzZTsKICAgIGNvbnN0IHBheWxvYWQgPSBhd2FpdCByZXNwb25zZS5qc29uKCkgYXMgdW5rbm93bjsKICAgIHJldHVybiBBcnJheS5pc0FycmF5KHBheWxvYWQpICYmIHBheWxvYWQubGVuZ3RoID4gMDsKICB9IGNhdGNoIHsKICAgIHJldHVybiBmYWxzZTsKICB9IGZpbmFsbHkgewogICAgY2xlYXJUaW1lb3V0KHRpbWVvdXQpOwogIH0KfQoKZnVuY3Rpb24ganNvblJlc3BvbnNlKGJvZHk6IHVua25vd24sIHN0YXR1czogbnVtYmVyLCByZXF1ZXN0OiBSZXF1ZXN0KTogUmVzcG9uc2UgewogIHJldHVybiBuZXcgUmVzcG9uc2UoSlNPTi5zdHJpbmdpZnkoYm9keSksIHsgc3RhdHVzLCBoZWFkZXJzOiB7IC4uLk9iamVjdC5mcm9tRW50cmllcyhnYXRld2F5SGVhZGVycyhyZXF1ZXN0KSksICJDb250ZW50LVR5cGUiOiAiYXBwbGljYXRpb24vanNvbiIgfSB9KTsKfQoKZnVuY3Rpb24gcmVuZGVyVGVtcGxhdGUodGVtcGxhdGU6IHN0cmluZywgdmFsdWVzOiBSZWNvcmQ8c3RyaW5nLCBzdHJpbmc+KTogc3RyaW5nIHsKICByZXR1cm4gdGVtcGxhdGUucmVwbGFjZSgve3tccyooW2EtejAtOV9dKylccyp9fS9naSwgKF8sIGtleTogc3RyaW5nKSA9PiB2YWx1ZXNba2V5XSA/PyAiIik7Cn0KZnVuY3Rpb24gY2xlYW5IZWFkZXIodmFsdWU6IHN0cmluZywgZmFsbGJhY2s6IHN0cmluZywgbWF4ID0gMTIwKTogc3RyaW5nIHsKICBjb25zdCBjbGVhbmVkID0gdmFsdWUucmVwbGFjZSgvW1xyXG5dKy9nLCAiICIpLnRyaW0oKS5zbGljZSgwLCBtYXgpOwogIHJldHVybiBjbGVhbmVkIHx8IGZhbGxiYWNrOwp9CmZ1bmN0aW9uIHZhbGlkRW1haWwodmFsdWU6IHN0cmluZyB8IG51bGwgfCB1bmRlZmluZWQpOiB2YWx1ZSBpcyBzdHJpbmcgewogIHJldHVybiAhIXZhbHVlICYmIC9eW15cc0A8Pl0rQFteXHNAPD5dK1wuW15cc0A8Pl0rJC8udGVzdCh2YWx1ZSkgJiYgIS9bXHJcbl0vLnRlc3QodmFsdWUpOwp9CmZ1bmN0aW9uIGVzY2FwZUh0bWwodmFsdWU6IHN0cmluZyk6IHN0cmluZyB7CiAgcmV0dXJuIHZhbHVlLnJlcGxhY2UoLyYvZywgIiZhbXA7IikucmVwbGFjZSgvPC9nLCAiJmx0OyIpLnJlcGxhY2UoLz4vZywgIiZndDsiKS5yZXBsYWNlKC9cIi9nLCAiJnF1b3Q7Iik7Cn0KCmFzeW5jIGZ1bmN0aW9uIGZldGNoSnNvbjxUPih1cmw6IHN0cmluZywgdG9rZW46IHN0cmluZywgaW5pdD86IFJlcXVlc3RJbml0KTogUHJvbWlzZTx7IHJlc3BvbnNlOiBSZXNwb25zZTsgZGF0YTogVCB8IG51bGwgfT4gewogIGNvbnN0IHJlc3BvbnNlID0gYXdhaXQgZmV0Y2godXJsLCB7CiAgICAuLi5pbml0LAogICAgaGVhZGVyczogewogICAgICBhcGlrZXk6IFNVUEFCQVNFX1BVQkxJU0hBQkxFX0tFWSwKICAgICAgQXV0aG9yaXphdGlvbjogYEJlYXJlciAke3Rva2VufWAsCiAgICAgICJDb250ZW50LVR5cGUiOiAiYXBwbGljYXRpb24vanNvbiIsCiAgICAgIC4uLihpbml0Py5oZWFkZXJzID8/IHt9KSwKICAgIH0sCiAgfSk7CiAgY29uc3QgZGF0YSA9IGF3YWl0IHJlc3BvbnNlLmpzb24oKS5jYXRjaCgoKSA9PiBudWxsKSBhcyBUIHwgbnVsbDsKICByZXR1cm4geyByZXNwb25zZSwgZGF0YSB9Owp9Cgphc3luYyBmdW5jdGlvbiBzZW5kUGF0aWVudFBvcnRhbEVtYWlsKHJlcXVlc3Q6IFJlcXVlc3QsIGVudjogRW52KTogUHJvbWlzZTxSZXNwb25zZT4gewogIGlmIChyZXF1ZXN0Lm1ldGhvZCA9PT0gIk9QVElPTlMiKSByZXR1cm4gbmV3IFJlc3BvbnNlKG51bGwsIHsgc3RhdHVzOiAyMDQsIGhlYWRlcnM6IGdhdGV3YXlIZWFkZXJzKHJlcXVlc3QpIH0pOwogIGlmIChyZXF1ZXN0Lm1ldGhvZCAhPT0gIlBPU1QiKSByZXR1cm4ganNvblJlc3BvbnNlKHsgZXJyb3I6ICJNZXRob2Qgbm90IGFsbG93ZWQiIH0sIDQwNSwgcmVxdWVzdCk7CiAgY29uc3QgYXV0aG9yaXphdGlvbiA9IHJlcXVlc3QuaGVhZGVycy5nZXQoIkF1dGhvcml6YXRpb24iKSA/PyAiIjsKICBpZiAoIWF1dGhvcml6YXRpb24uc3RhcnRzV2l0aCgiQmVhcmVyICIpKSByZXR1cm4ganNvblJlc3BvbnNlKHsgZXJyb3I6ICJVbmF1dGhvcml6ZWQiIH0sIDQwMSwgcmVxdWVzdCk7CiAgY29uc3QgdG9rZW4gPSBhdXRob3JpemF0aW9uLnNsaWNlKCJCZWFyZXIgIi5sZW5ndGgpLnRyaW0oKTsKICBpZiAoIXRva2VuKSByZXR1cm4ganNvblJlc3BvbnNlKHsgZXJyb3I6ICJVbmF1dGhvcml6ZWQiIH0sIDQwMSwgcmVxdWVzdCk7CgogIGxldCBib2R5OiBQb3J0YWxFbWFpbElucHV0OwogIHRyeSB7IGJvZHkgPSBhd2FpdCByZXF1ZXN0Lmpzb24oKSBhcyBQb3J0YWxFbWFpbElucHV0OyB9IGNhdGNoIHsgcmV0dXJuIGpzb25SZXNwb25zZSh7IGVycm9yOiAiSW52YWxpZCBKU09OIiB9LCA0MDAsIHJlcXVlc3QpOyB9CiAgY29uc3QgcGF0aWVudElkID0gdHlwZW9mIGJvZHkucGF0aWVudF9pZCA9PT0gInN0cmluZyIgPyBib2R5LnBhdGllbnRfaWQgOiAiIjsKICBjb25zdCB0ZW1wb3JhcnlQYXNzd29yZCA9IHR5cGVvZiBib2R5LnRlbXBvcmFyeV9wYXNzd29yZCA9PT0gInN0cmluZyIgPyBib2R5LnRlbXBvcmFyeV9wYXNzd29yZCA6ICIiOwogIGNvbnN0IHVzZXJuYW1lID0gdHlwZW9mIGJvZHkudXNlcm5hbWUgPT09ICJzdHJpbmciID8gYm9keS51c2VybmFtZSA6ICIiOwogIGNvbnN0IGxhbmd1YWdlID0gYm9keS5sYW5ndWFnZSA9PT0gImVuIiA/ICJlbiIgOiAiYXIiOwogIGlmICghL15bMC05YS1mLV17MzZ9JC9pLnRlc3QocGF0aWVudElkKSB8fCAhdXNlcm5hbWUgfHwgdGVtcG9yYXJ5UGFzc3dvcmQubGVuZ3RoIDwgOCB8fCB0ZW1wb3JhcnlQYXNzd29yZC5sZW5ndGggPiAyNTYpIHsKICAgIHJldHVybiBqc29uUmVzcG9uc2UoeyBlcnJvcjogIkludmFsaWQgcG9ydGFsIGVtYWlsIHJlcXVlc3QiIH0sIDQwMCwgcmVxdWVzdCk7CiAgfQoKICBjb25zdCB1c2VyUmVzdWx0ID0gYXdhaXQgZmV0Y2hKc29uPHsgaWQ/OiBzdHJpbmcgfT4oU1VQQUJBU0VfQVVUSF9VU0VSX1VSTCwgdG9rZW4pOwogIGlmICghdXNlclJlc3VsdC5yZXNwb25zZS5vayB8fCAhdXNlclJlc3VsdC5kYXRhPy5pZCkgcmV0dXJuIGpzb25SZXNwb25zZSh7IGVycm9yOiAiVW5hdXRob3JpemVkIiB9LCA0MDEsIHJlcXVlc3QpOwogIGNvbnN0IGNvbnRleHRSZXN1bHQgPSBhd2FpdCBmZXRjaEpzb248UG9ydGFsU2VuZENvbnRleHQ+KFNVUEFCQVNFX1BBVElFTlRfQ09OVEVYVF9VUkwsIHRva2VuLCB7IG1ldGhvZDogIlBPU1QiLCBib2R5OiBKU09OLnN0cmluZ2lmeSh7IHBfcGF0aWVudF9pZDogcGF0aWVudElkIH0pIH0pOwogIGlmICghY29udGV4dFJlc3VsdC5yZXNwb25zZS5vayB8fCAhY29udGV4dFJlc3VsdC5kYXRhPy5hbGxvd2VkIHx8ICFjb250ZXh0UmVzdWx0LmRhdGEuZW1haWwpIHJldHVybiBqc29uUmVzcG9uc2UoeyBlcnJvcjogIkZvcmJpZGRlbiIgfSwgNDAzLCByZXF1ZXN0KTsKICBpZiAoY29udGV4dFJlc3VsdC5kYXRhLmVtYWlsX2VuYWJsZWQgIT09IHRydWUpIHJldHVybiBqc29uUmVzcG9uc2UoeyBlcnJvcjogIkVtYWlsIGRlbGl2ZXJ5IGlzIGRpc2FibGVkIGZvciB0aGlzIHdvcmtzcGFjZSIgfSwgNDAwLCByZXF1ZXN0KTsKCiAgY29uc3QgdGVtcGxhdGVVcmwgPSBgJHtTVVBBQkFTRV9FTUFJTF9URU1QTEFURV9VUkx9P3RlbXBsYXRlX2tleT1lcS5wYXRpZW50X3BvcnRhbF9jcmVkZW50aWFscyZpc19hY3RpdmU9ZXEudHJ1ZSZzZWxlY3Q9c3ViamVjdF9lbixzdWJqZWN0X2FyLGJvZHlfZW4sYm9keV9hciZsaW1pdD0xYDsKICBjb25zdCB0ZW1wbGF0ZVJlc3VsdCA9IGF3YWl0IGZldGNoSnNvbjxQb3J0YWxFbWFpbFRlbXBsYXRlW10+KHRlbXBsYXRlVXJsLCB0b2tlbik7CiAgY29uc3QgdGVtcGxhdGUgPSB0ZW1wbGF0ZVJlc3VsdC5kYXRhPy5bMF07CiAgaWYgKCF0ZW1wbGF0ZSkgcmV0dXJuIGpzb25SZXNwb25zZSh7IGVycm9yOiAiUGF0aWVudCBwb3J0YWwgZW1haWwgdGVtcGxhdGUgaXMgbm90IGNvbmZpZ3VyZWQiIH0sIDUwMywgcmVxdWVzdCk7CgogIGNvbnN0IG9yaWdpbiA9IG5ldyBVUkwocmVxdWVzdC51cmwpLm9yaWdpbjsKICBjb25zdCBzdXBwb3J0Q29udGFjdCA9IFtjb250ZXh0UmVzdWx0LmRhdGEuc3VwcG9ydF9lbWFpbCwgY29udGV4dFJlc3VsdC5kYXRhLnN1cHBvcnRfcGhvbmVdLmZpbHRlcihCb29sZWFuKS5qb2luKCIgLyAiKSB8fCAobGFuZ3VhZ2UgPT09ICJhciIgPyAi2KrZiNin2LXZhCDZhdi5INin2YTYudmK2KfYr9ipIiA6ICJDb250YWN0IHRoZSBjbGluaWMiKTsKICBjb25zdCB2YWx1ZXMgPSB7CiAgICBwYXRpZW50X25hbWU6IGNvbnRleHRSZXN1bHQuZGF0YS5wYXRpZW50X25hbWUgPz8gIlBhdGllbnQiLAogICAgcGF0aWVudF9uYW1lX2FyOiBjb250ZXh0UmVzdWx0LmRhdGEucGF0aWVudF9uYW1lX2FyID8/IGNvbnRleHRSZXN1bHQuZGF0YS5wYXRpZW50X25hbWUgPz8gItin2YTZhdix2YrYtiIsCiAgICBwYXRpZW50X3BvcnRhbF91c2VybmFtZTogdXNlcm5hbWUsCiAgICBwYXRpZW50X3BvcnRhbF9wYXNzd29yZDogdGVtcG9yYXJ5UGFzc3dvcmQsCiAgICBwYXRpZW50X3BvcnRhbF91cmw6IGAke29yaWdpbn0vcGF0aWVudC1wb3J0YWwvbG9naW5gLAogICAgc3VwcG9ydF9jb250YWN0OiBzdXBwb3J0Q29udGFjdCwKICB9OwogIGNvbnN0IHN1YmplY3QgPSBjbGVhbkhlYWRlcihyZW5kZXJUZW1wbGF0ZSgobGFuZ3VhZ2UgPT09ICJhciIgPyB0ZW1wbGF0ZS5zdWJqZWN0X2FyIDogdGVtcGxhdGUuc3ViamVjdF9lbikgPz8gIlBhdGllbnQgUG9ydGFsIGFjY2VzcyIsIHZhbHVlcyksICJQYXRpZW50IFBvcnRhbCBhY2Nlc3MiKTsKICBjb25zdCB0ZXh0ID0gcmVuZGVyVGVtcGxhdGUoKGxhbmd1YWdlID09PSAiYXIiID8gdGVtcGxhdGUuYm9keV9hciA6IHRlbXBsYXRlLmJvZHlfZW4pID8/ICIiLCB2YWx1ZXMpOwogIGNvbnN0IGh0bWwgPSBgPGRpdiBkaXI9IiR7bGFuZ3VhZ2UgPT09ICJhciIgPyAicnRsIiA6ICJsdHIifSIgc3R5bGU9ImZvbnQtZmFtaWx5OkFyaWFsLHNhbnMtc2VyaWY7d2hpdGUtc3BhY2U6cHJlLWxpbmUiPiR7ZXNjYXBlSHRtbCh0ZXh0KX08L2Rpdj5gOwogIGNvbnN0IHNlbmRlckFkZHJlc3MgPSB2YWxpZEVtYWlsKGNvbnRleHRSZXN1bHQuZGF0YS5lbWFpbF9zZW5kZXJfYWRkcmVzcykgPyBjb250ZXh0UmVzdWx0LmRhdGEuZW1haWxfc2VuZGVyX2FkZHJlc3MgOiBlbnYuRU1BSUxfRlJPTTsKICBjb25zdCBkaXNwbGF5TmFtZSA9IGNsZWFuSGVhZGVyKGNvbnRleHRSZXN1bHQuZGF0YS5lbWFpbF9zZW5kZXJfbmFtZSB8fCAobGFuZ3VhZ2UgPT09ICJhciIgPyBjb250ZXh0UmVzdWx0LmRhdGEuY2xpbmljX25hbWVfYXIgOiBjb250ZXh0UmVzdWx0LmRhdGEuY2xpbmljX25hbWUpIHx8ICJaTWVkaWNvIiwgIlpNZWRpY28iKTsKICBjb25zdCBmcm9tID0gYCR7ZGlzcGxheU5hbWV9IDwke3NlbmRlckFkZHJlc3N9PmA7CiAgY29uc3QgcmVwbHlUbyA9IHZhbGlkRW1haWwoY29udGV4dFJlc3VsdC5kYXRhLmVtYWlsX3JlcGx5X3RvKSA/IGNvbnRleHRSZXN1bHQuZGF0YS5lbWFpbF9yZXBseV90byA6IHVuZGVmaW5lZDsKICBjb25zdCBwcm92aWRlciA9IGNvbnRleHRSZXN1bHQuZGF0YS5lbWFpbF9wcm92aWRlciA9PT0gInJlc2VuZCIgPyAicmVzZW5kIiA6ICJjbG91ZGZsYXJlIjsKCiAgdHJ5IHsKICAgIGlmIChwcm92aWRlciA9PT0gInJlc2VuZCIpIHsKICAgICAgaWYgKCFlbnYuUkVTRU5EX0FQSV9LRVkpIHJldHVybiBqc29uUmVzcG9uc2UoeyBlcnJvcjogIlJlc2VuZCBpcyBub3QgY29uZmlndXJlZCBvbiB0aGUgV29ya2VyIiB9LCA1MDMsIHJlcXVlc3QpOwogICAgICBjb25zdCByZXNlbmRSZXNwb25zZSA9IGF3YWl0IGZldGNoKCJodHRwczovL2FwaS5yZXNlbmQuY29tL2VtYWlscyIsIHsKICAgICAgICBtZXRob2Q6ICJQT1NUIiwKICAgICAgICBoZWFkZXJzOiB7IEF1dGhvcml6YXRpb246IGBCZWFyZXIgJHtlbnYuUkVTRU5EX0FQSV9LRVl9YCwgIkNvbnRlbnQtVHlwZSI6ICJhcHBsaWNhdGlvbi9qc29uIiB9LAogICAgICAgIGJvZHk6IEpTT04uc3RyaW5naWZ5KHsgZnJvbSwgdG86IFtjb250ZXh0UmVzdWx0LmRhdGEuZW1haWxdLCBzdWJqZWN0LCB0ZXh0LCBodG1sLCAuLi4ocmVwbHlUbyA/IHsgcmVwbHlfdG86IHJlcGx5VG8gfSA6IHt9KSB9KSwKICAgICAgfSk7CiAgICAgIGNvbnN0IHJlc2VuZEJvZHkgPSBhd2FpdCByZXNlbmRSZXNwb25zZS5qc29uKCkuY2F0Y2goKCkgPT4gbnVsbCkgYXMgeyBpZD86IHN0cmluZyB9IHwgbnVsbDsKICAgICAgaWYgKCFyZXNlbmRSZXNwb25zZS5vayB8fCAhcmVzZW5kQm9keT8uaWQpIHJldHVybiBqc29uUmVzcG9uc2UoeyBlcnJvcjogIlJlc2VuZCByZWplY3RlZCB0aGUgZW1haWwiIH0sIHJlc2VuZFJlc3BvbnNlLnN0YXR1cyA+PSA1MDAgPyA1MDIgOiA0MDAsIHJlcXVlc3QpOwogICAgICByZXR1cm4ganNvblJlc3BvbnNlKHsgc3VjY2VzczogdHJ1ZSwgYWNjZXB0ZWQ6IHRydWUsIHByb3ZpZGVyX21lc3NhZ2VfaWQ6IHJlc2VuZEJvZHkuaWQgfSwgMjAwLCByZXF1ZXN0KTsKICAgIH0KICAgIGF3YWl0IGVudi5FTUFJTC5zZW5kKHsgdG86IGNvbnRleHRSZXN1bHQuZGF0YS5lbWFpbCwgZnJvbSwgLi4uKHJlcGx5VG8gPyB7IHJlcGx5VG8gfSA6IHt9KSwgc3ViamVjdCwgdGV4dCwgaHRtbCB9KTsKICAgIHJldHVybiBqc29uUmVzcG9uc2UoeyBzdWNjZXNzOiB0cnVlLCBhY2NlcHRlZDogdHJ1ZSB9LCAyMDAsIHJlcXVlc3QpOwogIH0gY2F0Y2ggewogICAgcmV0dXJuIGpzb25SZXNwb25zZSh7IGVycm9yOiAiRW1haWwgcHJvdmlkZXIgcmVqZWN0ZWQgdGhlIG1lc3NhZ2UiIH0sIDUwMiwgcmVxdWVzdCk7CiAgfQp9Cgphc3luYyBmdW5jdGlvbiBwcm94eURvbWFpblJlcXVlc3QocmVxdWVzdDogUmVxdWVzdCk6IFByb21pc2U8UmVzcG9uc2U+IHsKICBpZiAocmVxdWVzdC5tZXRob2QgPT09ICJPUFRJT05TIikgcmV0dXJuIG5ldyBSZXNwb25zZShudWxsLCB7IHN0YXR1czogMjA0LCBoZWFkZXJzOiBnYXRld2F5SGVhZGVycyhyZXF1ZXN0KSB9KTsKICBpZiAocmVxdWVzdC5tZXRob2QgIT09ICJQT1NUIikgcmV0dXJuIG5ldyBSZXNwb25zZShKU09OLnN0cmluZ2lmeSh7IGVycm9yOiAiTWV0aG9kIG5vdCBhbGxvd2VkIiB9KSwgeyBzdGF0dXM6IDQwNSwgaGVhZGVyczogeyAuLi5PYmplY3QuZnJvbUVudHJpZXMoZ2F0ZXdheUhlYWRlcnMocmVxdWVzdCkpLCAiQ29udGVudC1UeXBlIjogImFwcGxpY2F0aW9uL2pzb24iIH0gfSk7CgogIGNvbnN0IGNvbnRlbnRMZW5ndGggPSBOdW1iZXIocmVxdWVzdC5oZWFkZXJzLmdldCgiQ29udGVudC1MZW5ndGgiKSA/PyAiMCIpOwogIGlmIChjb250ZW50TGVuZ3RoID4gTUFYX0dBVEVXQVlfQk9EWV9CWVRFUykgcmV0dXJuIG5ldyBSZXNwb25zZShKU09OLnN0cmluZ2lmeSh7IGVycm9yOiAiUmVxdWVzdCBib2R5IGlzIHRvbyBsYXJnZSIgfSksIHsgc3RhdHVzOiA0MTMsIGhlYWRlcnM6IHsgLi4uT2JqZWN0LmZyb21FbnRyaWVzKGdhdGV3YXlIZWFkZXJzKHJlcXVlc3QpKSwgIkNvbnRlbnQtVHlwZSI6ICJhcHBsaWNhdGlvbi9qc29uIiB9IH0pOwoKICBjb25zdCBib2R5ID0gYXdhaXQgcmVxdWVzdC50ZXh0KCk7CiAgaWYgKG5ldyBUZXh0RW5jb2RlcigpLmVuY29kZShib2R5KS5ieXRlTGVuZ3RoID4gTUFYX0dBVEVXQVlfQk9EWV9CWVRFUykgcmV0dXJuIG5ldyBSZXNwb25zZShKU09OLnN0cmluZ2lmeSh7IGVycm9yOiAiUmVxdWVzdCBib2R5IGlzIHRvbyBsYXJnZSIgfSksIHsgc3RhdHVzOiA0MTMsIGhlYWRlcnM6IHsgLi4uT2JqZWN0LmZyb21FbnRyaWVzKGdhdGV3YXlIZWFkZXJzKHJlcXVlc3QpKSwgIkNvbnRlbnQtVHlwZSI6ICJhcHBsaWNhdGlvbi9qc29uIiB9IH0pOwoKICBjb25zdCBmb3J3YXJkZWRIZWFkZXJzID0gbmV3IEhlYWRlcnMoewogICAgQXV0aG9yaXphdGlvbjogcmVxdWVzdC5oZWFkZXJzLmdldCgiQXV0aG9yaXphdGlvbiIpID8/ICIiLAogICAgYXBpa2V5OiByZXF1ZXN0LmhlYWRlcnMuZ2V0KCJhcGlrZXkiKSA/PyAiIiwKICAgICJDb250ZW50LVR5cGUiOiAiYXBwbGljYXRpb24vanNvbiIsCiAgfSk7CiAgZm9yIChjb25zdCBuYW1lIG9mIFsieC1jbGllbnQtaW5mbyIsICJ4LWlkZW1wb3RlbmN5LWtleSJdKSB7CiAgICBjb25zdCB2YWx1ZSA9IHJlcXVlc3QuaGVhZGVycy5nZXQobmFtZSk7CiAgICBpZiAodmFsdWUpIGZvcndhcmRlZEhlYWRlcnMuc2V0KG5hbWUsIHZhbHVlKTsKICB9CgogIGNvbnN0IHVwc3RyZWFtID0gYXdhaXQgZmV0Y2goRE9NQUlOX0ZVTkNUSU9OX1VSTCwgeyBtZXRob2Q6ICJQT1NUIiwgaGVhZGVyczogZm9yd2FyZGVkSGVhZGVycywgYm9keSB9KTsKICBjb25zdCByZXNwb25zZUhlYWRlcnMgPSBnYXRld2F5SGVhZGVycyhyZXF1ZXN0KTsKICByZXNwb25zZUhlYWRlcnMuc2V0KCJDb250ZW50LVR5cGUiLCB1cHN0cmVhbS5oZWFkZXJzLmdldCgiQ29udGVudC1UeXBlIikgPz8gImFwcGxpY2F0aW9uL2pzb24iKTsKICByZXR1cm4gbmV3IFJlc3BvbnNlKHVwc3RyZWFtLmJvZHksIHsgc3RhdHVzOiB1cHN0cmVhbS5zdGF0dXMsIHN0YXR1c1RleHQ6IHVwc3RyZWFtLnN0YXR1c1RleHQsIGhlYWRlcnM6IHJlc3BvbnNlSGVhZGVycyB9KTsKfQoKZXhwb3J0IGRlZmF1bHQgewogIGFzeW5jIGZldGNoKHJlcXVlc3Q6IFJlcXVlc3QsIGVudjogRW52KTogUHJvbWlzZTxSZXNwb25zZT4gewogICAgY29uc3QgdXJsID0gbmV3IFVSTChyZXF1ZXN0LnVybCk7CiAgICBpZiAodXJsLnBhdGhuYW1lID09PSBET01BSU5fR0FURVdBWV9QQVRIKSByZXR1cm4gcHJveHlEb21haW5SZXF1ZXN0KHJlcXVlc3QpOwogICAgaWYgKHVybC5wYXRobmFtZSA9PT0gUEFUSUVOVF9QT1JUQUxfRU1BSUxfUEFUSCkgcmV0dXJuIHNlbmRQYXRpZW50UG9ydGFsRW1haWwocmVxdWVzdCwgZW52KTsKCiAgICBjb25zdCBwYXRobmFtZSA9IHVybC5wYXRobmFtZTsKICAgIGNvbnN0IGhvc3RuYW1lID0gdXJsLmhvc3RuYW1lLnRvTG93ZXJDYXNlKCk7CiAgICBpZiAocmVxdWVzdC5tZXRob2QgPT09ICJHRVQiICYmIHBhdGhuYW1lID09PSBQUk9WSURFUl9TVUJET01BSU5fSEVBTFRIX1BBVEggJiYgaXNQcm92aWRlclN1YmRvbWFpbkhvc3QoaG9zdG5hbWUpKSB7CiAgICAgIHJldHVybiBuZXcgUmVzcG9uc2UobnVsbCwgeyBzdGF0dXM6IDIwNCwgaGVhZGVyczogeyAiQ2FjaGUtQ29udHJvbCI6ICJuby1zdG9yZSIsICJYLUNvbnRlbnQtVHlwZS1PcHRpb25zIjogIm5vc25pZmYiIH0gfSk7CiAgICB9CiAgICBjb25zdCBpc0h0bWxSZXF1ZXN0ID0gcmVxdWVzdC5tZXRob2QgPT09ICJHRVQiICYmIChwYXRobmFtZSA9PT0gIi8iIHx8IHBhdGhuYW1lID09PSAiL2luZGV4Lmh0bWwiIHx8ICFwYXRobmFtZS5pbmNsdWRlcygiLiIpKTsKICAgIGNvbnN0IGlzUGxhdGZvcm1Ib3N0bmFtZSA9IFBMQVRGT1JNX0hPU1ROQU1FUy5oYXMoaG9zdG5hbWUpOwogICAgLy8gQSBwbGF0Zm9ybSBob3N0bmFtZSAodGhlIG1hcmtldGluZyBzaXRlIGl0c2VsZiwgb24gdGhlIGFwZXggb3Igd3d3KSBpcwogICAgLy8gbmV2ZXIgYSB0ZW5hbnQncyBib29raW5nL2FwcCBwb3J0YWwsIGV2ZW4gdGhvdWdoICJ3d3ciIGhhcHBlbnMgdG8gYWxzbwogICAgLy8gc2F0aXNmeSB0aGUgZ2VuZXJpYyBzdWJkb21haW4tc2x1ZyBwYXR0ZXJuIGJlbG93LiBXaXRob3V0IHRoaXMgZ3VhcmQsCiAgICAvLyB3d3cuYmVsYWxhYW1lci5jb20gd2FzIG1pc2NsYXNzaWZpZWQgYXMgYW4gdW5yZWdpc3RlcmVkIHRlbmFudAogICAgLy8gc3ViZG9tYWluIGFuZCBnb3QgYSA0MDQgaW5zdGVhZCBvZiB0aGUgbWFya2V0aW5nIHNpdGUuCiAgICBjb25zdCBwcm92aWRlclN1YmRvbWFpbiA9ICFpc1BsYXRmb3JtSG9zdG5hbWUgJiYgaXNQcm92aWRlclN1YmRvbWFpbkhvc3QoaG9zdG5hbWUpOwogICAgY29uc3QgY3VzdG9tVGVuYW50SG9zdG5hbWUgPSAhaXNQbGF0Zm9ybUhvc3RuYW1lICYmICFob3N0bmFtZS5lbmRzV2l0aCgiLndvcmtlcnMuZGV2Iik7CiAgICBpZiAoaXNIdG1sUmVxdWVzdCAmJiAocHJvdmlkZXJTdWJkb21haW4gfHwgY3VzdG9tVGVuYW50SG9zdG5hbWUpKSB7CiAgICAgIGNvbnN0IGFjdGl2ZSA9IGF3YWl0IGhhc0FjdGl2ZVRlbmFudERvbWFpbihob3N0bmFtZSk7CiAgICAgIGlmICghYWN0aXZlKSByZXR1cm4gbmV3IFJlc3BvbnNlKHByb3ZpZGVyU3ViZG9tYWluID8gIlRlbmFudCBzdWJkb21haW4gaXMgbm90IGFjdGl2ZSIgOiAiVGVuYW50IGRvbWFpbiBpcyBub3QgYWN0aXZlIiwgeyBzdGF0dXM6IDQwNCwgaGVhZGVyczogeyAiQ2FjaGUtQ29udHJvbCI6ICJuby1zdG9yZSIsICJYLUNvbnRlbnQtVHlwZS1PcHRpb25zIjogIm5vc25pZmYiIH0gfSk7CiAgICAgIC8vIEEgdGVuYW50LW93bmVkIGhvc3RuYW1lIGlzIGFuIGFwcGxpY2F0aW9uIHBvcnRhbCwgbm90IHRoZSBwdWJsaWMKICAgICAgLy8gbWFya2V0aW5nIHNpdGUuIFJlZGlyZWN0IHRoZSBicm93c2VyIHNvIFJlYWN0IFJvdXRlciBhbHNvIHNlZXMgL2F1dGguCiAgICAgIGlmIChwYXRobmFtZSA9PT0gIi8iIHx8IHBhdGhuYW1lID09PSAiL2luZGV4Lmh0bWwiKSB7CiAgICAgICAgY29uc3QgbG9naW5VcmwgPSBuZXcgVVJMKHJlcXVlc3QudXJsKTsKICAgICAgICBsb2dpblVybC5wYXRobmFtZSA9ICIvYXV0aCI7CiAgICAgICAgbG9naW5Vcmwuc2VhcmNoID0gIiI7CiAgICAgICAgcmV0dXJuIFJlc3BvbnNlLnJlZGlyZWN0KGxvZ2luVXJsLnRvU3RyaW5nKCksIDMwMik7CiAgICAgIH0KICAgIH0KICAgIGlmIChpc0h0bWxSZXF1ZXN0KSB7CiAgICAgIHVybC5zZWFyY2hQYXJhbXMuc2V0KCJfX3ptZWRpY29fYnVpbGQiLCAid2hpdGVsYWJlbC0yMDI2MDgyNSIpOwogICAgfQogICAgY29uc3QgYXNzZXRSZXF1ZXN0ID0gaXNIdG1sUmVxdWVzdCA/IG5ldyBSZXF1ZXN0KHVybCwgcmVxdWVzdCkgOiByZXF1ZXN0OwogICAgY29uc3QgcmVzcG9uc2UgPSBhd2FpdCBlbnYuQVNTRVRTLmZldGNoKGFzc2V0UmVxdWVzdCk7CiAgICBjb25zdCBjb250ZW50VHlwZSA9IHJlc3BvbnNlLmhlYWRlcnMuZ2V0KCJjb250ZW50LXR5cGUiKSA/PyAiIjsKICAgIGNvbnN0IGlzSmF2YVNjcmlwdFJlcXVlc3QgPSAvXC4oPzptP2pzKSQvLnRlc3QocGF0aG5hbWUpOwoKICAgIC8vIE5ldmVyIHNlcnZlIHRoZSBTUEEgc2hlbGwgZm9yIGEgbWlzc2luZyBKYXZhU2NyaXB0IG1vZHVsZS4gQSBzdGFsZSBIVE1MCiAgICAvLyBkb2N1bWVudCBtdXN0IGZhaWwgd2l0aCBhIGNsZWFyIDQwNCBpbnN0ZWFkIG9mIHRyeWluZyB0byBldmFsdWF0ZQogICAgLy8gaW5kZXguaHRtbCBhcyBKYXZhU2NyaXB0IGFuZCBwcm9kdWNpbmcgYSBtaXNsZWFkaW5nIGR5bmFtaWMtaW1wb3J0IGVycm9yLgogICAgaWYgKGlzSmF2YVNjcmlwdFJlcXVlc3QgJiYgKHJlc3BvbnNlLnN0YXR1cyA9PT0gNDA0IHx8IGNvbnRlbnRUeXBlLmluY2x1ZGVzKCJ0ZXh0L2h0bWwiKSkpIHsKICAgICAgcmV0dXJuIG5ldyBSZXNwb25zZSgiSmF2YVNjcmlwdCBhc3NldCBub3QgZm91bmQiLCB7CiAgICAgICAgc3RhdHVzOiA0MDQsCiAgICAgICAgaGVhZGVyczogewogICAgICAgICAgIkNhY2hlLUNvbnRyb2wiOiAibm8tc3RvcmUiLAogICAgICAgICAgIkNvbnRlbnQtVHlwZSI6ICJ0ZXh0L3BsYWluOyBjaGFyc2V0PVVURi04IiwKICAgICAgICAgICJYLUNvbnRlbnQtVHlwZS1PcHRpb25zIjogIm5vc25pZmYiLAogICAgICAgIH0sCiAgICAgIH0pOwogICAgfQoKICAgIC8vIFZpdGUgYXNzZXRzIGFyZSBjb250ZW50LWhhc2hlZCwgc28gdGhleSBjYW4gYmUgY2FjaGVkIGltbXV0YWJseS4gVGhpcwogICAgLy8gcHJldmVudHMgcmVwZWF0IHZpc2l0cyBvbiBtb2JpbGUgbmV0d29ya3MgZnJvbSByZXZhbGlkYXRpbmcgYW5kCiAgICAvLyBkb3dubG9hZGluZyB0aGUgc2hhcmVkIEphdmFTY3JpcHQvQ1NTIGJ1bmRsZSBvbiBldmVyeSBuYXZpZ2F0aW9uLgogICAgaWYgKHJlcXVlc3QubWV0aG9kID09PSAiR0VUIiAmJiByZXNwb25zZS5vayAmJiBwYXRobmFtZS5zdGFydHNXaXRoKCIvYXNzZXRzLyIpKSB7CiAgICAgIGNvbnN0IGhlYWRlcnMgPSBuZXcgSGVhZGVycyhyZXNwb25zZS5oZWFkZXJzKTsKICAgICAgaWYgKGlzSmF2YVNjcmlwdFJlcXVlc3QgJiYgIWNvbnRlbnRUeXBlKSB7CiAgICAgICAgaGVhZGVycy5zZXQoImNvbnRlbnQtdHlwZSIsICJ0ZXh0L2phdmFzY3JpcHQ7IGNoYXJzZXQ9VVRGLTgiKTsKICAgICAgfQogICAgICBoZWFkZXJzLnNldCgiY2FjaGUtY29udHJvbCIsICJwdWJsaWMsIG1heC1hZ2U9MzE1MzYwMDAsIGltbXV0YWJsZSIpOwogICAgICBoZWFkZXJzLnNldCgieC1jb250ZW50LXR5cGUtb3B0aW9ucyIsICJub3NuaWZmIik7CiAgICAgIHJldHVybiBuZXcgUmVzcG9uc2UocmVzcG9uc2UuYm9keSwgeyBzdGF0dXM6IHJlc3BvbnNlLnN0YXR1cywgc3RhdHVzVGV4dDogcmVzcG9uc2Uuc3RhdHVzVGV4dCwgaGVhZGVycyB9KTsKICAgIH0KCiAgICBpZiAoaXNIdG1sUmVxdWVzdCB8fCAoaXNKYXZhU2NyaXB0UmVxdWVzdCAmJiAhY29udGVudFR5cGUpKSB7CiAgICAgIGNvbnN0IGhlYWRlcnMgPSBuZXcgSGVhZGVycyhyZXNwb25zZS5oZWFkZXJzKTsKICAgICAgaWYgKGlzSHRtbFJlcXVlc3QpIHsKICAgICAgICBoZWFkZXJzLnNldCgiY2FjaGUtY29udHJvbCIsICJuby1zdG9yZSwgbWF4LWFnZT0wIik7CiAgICAgIH0gZWxzZSB7CiAgICAgICAgaGVhZGVycy5zZXQoImNvbnRlbnQtdHlwZSIsICJ0ZXh0L2phdmFzY3JpcHQ7IGNoYXJzZXQ9VVRGLTgiKTsKICAgICAgfQogICAgICByZXR1cm4gbmV3IFJlc3BvbnNlKHJlc3BvbnNlLmJvZHksIHsgc3RhdHVzOiByZXNwb25zZS5zdGF0dXMsIHN0YXR1c1RleHQ6IHJlc3BvbnNlLnN0YXR1c1RleHQsIGhlYWRlcnMgfSk7CiAgICB9CgogICAgcmV0dXJuIHJlc3BvbnNlOwogIH0sCn07Cg==
+export interface Env {
+  ASSETS: Fetcher;
+  EMAIL: SendEmail;
+  EMAIL_FROM: string;
+  RESEND_API_KEY?: string;
+}
+
+const DOMAIN_FUNCTION_URL = "https://rqcmnfzfytyyicelvifk.supabase.co/functions/v1/manage-custom-domain";
+const SUPABASE_REST_URL = "https://rqcmnfzfytyyicelvifk.supabase.co/rest/v1/rpc/resolve_active_tenant_domain";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_Vu3oi0N4hmxPzTsScwrwFA_Wt3-CUyU";
+// Both suffixes a provider-issued clinic subdomain can end in. belalaamer.com
+// has three live clinics on it already (blitz-physio, amr, hady); zmedico.com
+// is the new default suffix for subdomains created going forward -- both must
+// keep working.
+const PROVIDER_SUBDOMAIN_SUFFIXES = ["belalaamer.com", "zmedico.com"];
+const DOMAIN_GATEWAY_PATH = "/api/domains";
+const PATIENT_PORTAL_EMAIL_PATH = "/api/patient-portal-email";
+const SUPABASE_AUTH_USER_URL = "https://rqcmnfzfytyyicelvifk.supabase.co/auth/v1/user";
+const SUPABASE_PATIENT_CONTEXT_URL = "https://rqcmnfzfytyyicelvifk.supabase.co/rest/v1/rpc/patient_portal_send_context";
+const SUPABASE_EMAIL_TEMPLATE_URL = "https://rqcmnfzfytyyicelvifk.supabase.co/rest/v1/email_templates";
+const PROVIDER_SUBDOMAIN_HEALTH_PATH = "/_zmedico/provisioning-check";
+const MAX_GATEWAY_BODY_BYTES = 32 * 1024;
+const DEFAULT_ORIGIN = "https://zmedico2.belalaamer.workers.dev";
+// Both platform-owned marketing domains. zmedico.com/www were registered as
+// Workers Custom Domains alongside belalaamer.com/www -- without listing them
+// here they would be misread as an unregistered tenant custom domain (same
+// bug fixed for www.belalaamer.com earlier) and 404 instead of serving the
+// marketing site.
+const PLATFORM_HOSTNAMES = new Set([
+  "belalaamer.com",
+  "www.belalaamer.com",
+  "zmedico.com",
+  "www.zmedico.com",
+  "zmedico2.belalaamer.workers.dev",
+]);
+
+type PortalEmailInput = {
+  patient_id?: unknown;
+  temporary_password?: unknown;
+  username?: unknown;
+  language?: unknown;
+};
+
+type PortalSendContext = {
+  allowed?: boolean;
+  email?: string | null;
+  patient_name?: string | null;
+  patient_name_ar?: string | null;
+  support_email?: string | null;
+  support_phone?: string | null;
+  clinic_name?: string | null;
+  clinic_name_ar?: string | null;
+  email_enabled?: boolean;
+  email_provider?: string | null;
+  email_sender_name?: string | null;
+  email_sender_address?: string | null;
+  email_reply_to?: string | null;
+};
+
+type PortalEmailTemplate = {
+  subject_en?: string | null;
+  subject_ar?: string | null;
+  body_en?: string | null;
+  body_ar?: string | null;
+};
+
+function gatewayHeaders(request: Request): Headers {
+  const origin = request.headers.get("Origin");
+  const headers = new Headers({
+    "Access-Control-Allow-Origin": origin === DEFAULT_ORIGIN ? origin : DEFAULT_ORIGIN,
+    "Vary": "Origin",
+    "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info, x-idempotency-key",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+  });
+  return headers;
+}
+
+function isProviderSubdomainHost(hostname: string): boolean {
+  for (const suffix of PROVIDER_SUBDOMAIN_SUFFIXES) {
+    const withDot = `.${suffix}`;
+    if (!hostname.endsWith(withDot)) continue;
+    const slug = hostname.slice(0, -withDot.length);
+    if (/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(slug)) return true;
+  }
+  return false;
+}
+
+async function hasActiveTenantDomain(hostname: string): Promise<boolean> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 2_000);
+  try {
+    const response = await fetch(SUPABASE_REST_URL, {
+      method: "POST",
+      headers: { apikey: SUPABASE_PUBLISHABLE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ _hostname: hostname }),
+      signal: controller.signal,
+    });
+    if (!response.ok) return false;
+    const payload = await response.json() as unknown;
+    return Array.isArray(payload) && payload.length > 0;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function jsonResponse(body: unknown, status: number, request: Request): Response {
+  return new Response(JSON.stringify(body), { status, headers: { ...Object.fromEntries(gatewayHeaders(request)), "Content-Type": "application/json" } });
+}
+
+function renderTemplate(template: string, values: Record<string, string>): string {
+  return template.replace(/{{\s*([a-z0-9_]+)\s*}}/gi, (_, key: string) => values[key] ?? "");
+}
+function cleanHeader(value: string, fallback: string, max = 120): string {
+  const cleaned = value.replace(/[\r\n]+/g, " ").trim().slice(0, max);
+  return cleaned || fallback;
+}
+function validEmail(value: string | null | undefined): value is string {
+  return !!value && /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(value) && !/[\r\n]/.test(value);
+}
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;");
+}
+
+async function fetchJson<T>(url: string, token: string, init?: RequestInit): Promise<{ response: Response; data: T | null }> {
+  const response = await fetch(url, {
+    ...init,
+    headers: {
+      apikey: SUPABASE_PUBLISHABLE_KEY,
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {}),
+    },
+  });
+  const data = await response.json().catch(() => null) as T | null;
+  return { response, data };
+}
+
+async function sendPatientPortalEmail(request: Request, env: Env): Promise<Response> {
+  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: gatewayHeaders(request) });
+  if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405, request);
+  const authorization = request.headers.get("Authorization") ?? "";
+  if (!authorization.startsWith("Bearer ")) return jsonResponse({ error: "Unauthorized" }, 401, request);
+  const token = authorization.slice("Bearer ".length).trim();
+  if (!token) return jsonResponse({ error: "Unauthorized" }, 401, request);
+
+  let body: PortalEmailInput;
+  try { body = await request.json() as PortalEmailInput; } catch { return jsonResponse({ error: "Invalid JSON" }, 400, request); }
+  const patientId = typeof body.patient_id === "string" ? body.patient_id : "";
+  const temporaryPassword = typeof body.temporary_password === "string" ? body.temporary_password : "";
+  const username = typeof body.username === "string" ? body.username : "";
+  const language = body.language === "en" ? "en" : "ar";
+  if (!/^[0-9a-f-]{36}$/i.test(patientId) || !username || temporaryPassword.length < 8 || temporaryPassword.length > 256) {
+    return jsonResponse({ error: "Invalid portal email request" }, 400, request);
+  }
+
+  const userResult = await fetchJson<{ id?: string }>(SUPABASE_AUTH_USER_URL, token);
+  if (!userResult.response.ok || !userResult.data?.id) return jsonResponse({ error: "Unauthorized" }, 401, request);
+  const contextResult = await fetchJson<PortalSendContext>(SUPABASE_PATIENT_CONTEXT_URL, token, { method: "POST", body: JSON.stringify({ p_patient_id: patientId }) });
+  if (!contextResult.response.ok || !contextResult.data?.allowed || !contextResult.data.email) return jsonResponse({ error: "Forbidden" }, 403, request);
+  if (contextResult.data.email_enabled !== true) return jsonResponse({ error: "Email delivery is disabled for this workspace" }, 400, request);
+
+  const templateUrl = `${SUPABASE_EMAIL_TEMPLATE_URL}?template_key=eq.patient_portal_credentials&is_active=eq.true&select=subject_en,subject_ar,body_en,body_ar&limit=1`;
+  const templateResult = await fetchJson<PortalEmailTemplate[]>(templateUrl, token);
+  const template = templateResult.data?.[0];
+  if (!template) return jsonResponse({ error: "Patient portal email template is not configured" }, 503, request);
+
+  const origin = new URL(request.url).origin;
+  const supportContact = [contextResult.data.support_email, contextResult.data.support_phone].filter(Boolean).join(" / ") || (language === "ar" ? "تواصل مع العيادة" : "Contact the clinic");
+  const values = {
+    patient_name: contextResult.data.patient_name ?? "Patient",
+    patient_name_ar: contextResult.data.patient_name_ar ?? contextResult.data.patient_name ?? "المريض",
+    patient_portal_username: username,
+    patient_portal_password: temporaryPassword,
+    patient_portal_url: `${origin}/patient-portal/login`,
+    support_contact: supportContact,
+  };
+  const subject = cleanHeader(renderTemplate((language === "ar" ? template.subject_ar : template.subject_en) ?? "Patient Portal access", values), "Patient Portal access");
+  const text = renderTemplate((language === "ar" ? template.body_ar : template.body_en) ?? "", values);
+  const html = `<div dir="${language === "ar" ? "rtl" : "ltr"}" style="font-family:Arial,sans-serif;white-space:pre-line">${escapeHtml(text)}</div>`;
+  const senderAddress = validEmail(contextResult.data.email_sender_address) ? contextResult.data.email_sender_address : env.EMAIL_FROM;
+  const displayName = cleanHeader(contextResult.data.email_sender_name || (language === "ar" ? contextResult.data.clinic_name_ar : contextResult.data.clinic_name) || "ZMedico", "ZMedico");
+  const from = `${displayName} <${senderAddress}>`;
+  const replyTo = validEmail(contextResult.data.email_reply_to) ? contextResult.data.email_reply_to : undefined;
+  const provider = contextResult.data.email_provider === "resend" ? "resend" : "cloudflare";
+
+  try {
+    if (provider === "resend") {
+      if (!env.RESEND_API_KEY) return jsonResponse({ error: "Resend is not configured on the Worker" }, 503, request);
+      const resendResponse = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from, to: [contextResult.data.email], subject, text, html, ...(replyTo ? { reply_to: replyTo } : {}) }),
+      });
+      const resendBody = await resendResponse.json().catch(() => null) as { id?: string } | null;
+      if (!resendResponse.ok || !resendBody?.id) return jsonResponse({ error: "Resend rejected the email" }, resendResponse.status >= 500 ? 502 : 400, request);
+      return jsonResponse({ success: true, accepted: true, provider_message_id: resendBody.id }, 200, request);
+    }
+    await env.EMAIL.send({ to: contextResult.data.email, from, ...(replyTo ? { replyTo } : {}), subject, text, html });
+    return jsonResponse({ success: true, accepted: true }, 200, request);
+  } catch {
+    return jsonResponse({ error: "Email provider rejected the message" }, 502, request);
+  }
+}
+
+async function proxyDomainRequest(request: Request): Promise<Response> {
+  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: gatewayHeaders(request) });
+  if (request.method !== "POST") return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers: { ...Object.fromEntries(gatewayHeaders(request)), "Content-Type": "application/json" } });
+
+  const contentLength = Number(request.headers.get("Content-Length") ?? "0");
+  if (contentLength > MAX_GATEWAY_BODY_BYTES) return new Response(JSON.stringify({ error: "Request body is too large" }), { status: 413, headers: { ...Object.fromEntries(gatewayHeaders(request)), "Content-Type": "application/json" } });
+
+  const body = await request.text();
+  if (new TextEncoder().encode(body).byteLength > MAX_GATEWAY_BODY_BYTES) return new Response(JSON.stringify({ error: "Request body is too large" }), { status: 413, headers: { ...Object.fromEntries(gatewayHeaders(request)), "Content-Type": "application/json" } });
+
+  const forwardedHeaders = new Headers({
+    Authorization: request.headers.get("Authorization") ?? "",
+    apikey: request.headers.get("apikey") ?? "",
+    "Content-Type": "application/json",
+  });
+  for (const name of ["x-client-info", "x-idempotency-key"]) {
+    const value = request.headers.get(name);
+    if (value) forwardedHeaders.set(name, value);
+  }
+
+  const upstream = await fetch(DOMAIN_FUNCTION_URL, { method: "POST", headers: forwardedHeaders, body });
+  const responseHeaders = gatewayHeaders(request);
+  responseHeaders.set("Content-Type", upstream.headers.get("Content-Type") ?? "application/json");
+  return new Response(upstream.body, { status: upstream.status, statusText: upstream.statusText, headers: responseHeaders });
+}
+
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
+    if (url.pathname === DOMAIN_GATEWAY_PATH) return proxyDomainRequest(request);
+    if (url.pathname === PATIENT_PORTAL_EMAIL_PATH) return sendPatientPortalEmail(request, env);
+
+    const pathname = url.pathname;
+    const hostname = url.hostname.toLowerCase();
+    if (request.method === "GET" && pathname === PROVIDER_SUBDOMAIN_HEALTH_PATH && isProviderSubdomainHost(hostname)) {
+      return new Response(null, { status: 204, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+    }
+    const isHtmlRequest = request.method === "GET" && (pathname === "/" || pathname === "/index.html" || !pathname.includes("."));
+    const isPlatformHostname = PLATFORM_HOSTNAMES.has(hostname);
+    // A platform hostname (the marketing site itself, on the apex or www) is
+    // never a tenant's booking/app portal, even though "www" happens to also
+    // satisfy the generic subdomain-slug pattern below. Without this guard,
+    // www.belalaamer.com was misclassified as an unregistered tenant
+    // subdomain and got a 404 instead of the marketing site.
+    const providerSubdomain = !isPlatformHostname && isProviderSubdomainHost(hostname);
+    const customTenantHostname = !isPlatformHostname && !hostname.endsWith(".workers.dev");
+    if (isHtmlRequest && (providerSubdomain || customTenantHostname)) {
+      const active = await hasActiveTenantDomain(hostname);
+      if (!active) return new Response(providerSubdomain ? "Tenant subdomain is not active" : "Tenant domain is not active", { status: 404, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+      // A tenant-owned hostname is an application portal, not the public
+      // marketing site. Redirect the browser so React Router also sees /auth.
+      if (pathname === "/" || pathname === "/index.html") {
+        const loginUrl = new URL(request.url);
+        loginUrl.pathname = "/auth";
+        loginUrl.search = "";
+        return Response.redirect(loginUrl.toString(), 302);
+      }
+    }
+    if (isHtmlRequest) {
+      url.searchParams.set("__zmedico_build", "whitelabel-20260825");
+    }
+    const assetRequest = isHtmlRequest ? new Request(url, request) : request;
+    const response = await env.ASSETS.fetch(assetRequest);
+    const contentType = response.headers.get("content-type") ?? "";
+    const isJavaScriptRequest = /\.(?:m?js)$/.test(pathname);
+
+    // Never serve the SPA shell for a missing JavaScript module. A stale HTML
+    // document must fail with a clear 404 instead of trying to evaluate
+    // index.html as JavaScript and producing a misleading dynamic-import error.
+    if (isJavaScriptRequest && (response.status === 404 || contentType.includes("text/html"))) {
+      return new Response("JavaScript asset not found", {
+        status: 404,
+        headers: {
+          "Cache-Control": "no-store",
+          "Content-Type": "text/plain; charset=UTF-8",
+          "X-Content-Type-Options": "nosniff",
+        },
+      });
+    }
+
+    // Vite assets are content-hashed, so they can be cached immutably. This
+    // prevents repeat visits on mobile networks from revalidating and
+    // downloading the shared JavaScript/CSS bundle on every navigation.
+    if (request.method === "GET" && response.ok && pathname.startsWith("/assets/")) {
+      const headers = new Headers(response.headers);
+      if (isJavaScriptRequest && !contentType) {
+        headers.set("content-type", "text/javascript; charset=UTF-8");
+      }
+      headers.set("cache-control", "public, max-age=31536000, immutable");
+      headers.set("x-content-type-options", "nosniff");
+      return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+    }
+
+    if (isHtmlRequest || (isJavaScriptRequest && !contentType)) {
+      const headers = new Headers(response.headers);
+      if (isHtmlRequest) {
+        headers.set("cache-control", "no-store, max-age=0");
+      } else {
+        headers.set("content-type", "text/javascript; charset=UTF-8");
+      }
+      return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+    }
+
+    return response;
+  },
+};

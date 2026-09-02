@@ -58,7 +58,7 @@ type Role = typeof ROLES[number];
 // half of RBAC-08 was originally pushed to the already-merged PR #72
 // branch by mistake and never actually landed on main -- this commit is
 // the corrected, properly-merged version.)
-const ROLES_REQUIRING_BRANCH: readonly Role[] = ["manager", "doctor", "nurse", "receptionist", "accountant", "hr"];
+const ROLES_REQUIRING_BRANCH: readonly Role[] = ["admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr"];
 
 type StaffLink = { branch_id: string | null; employee_id: string | null };
 
@@ -371,8 +371,8 @@ export default function UserManagement() {
       toast.error(lang === "ar" ? "أدخل بريداً صالحاً" : "Enter a valid email");
       return;
     }
-    if (invRole === "manager" && !invBranch) {
-      toast.error(lang === "ar" ? "يجب اختيار فرع لدور المدير" : "Branch is required for the manager role");
+    if (ROLES_REQUIRING_BRANCH.includes(invRole) && !invBranch) {
+      toast.error(lang === "ar" ? "يجب اختيار فرع لهذا الدور" : "Branch is required for this role");
       return;
     }
     setSaving(true);
@@ -819,10 +819,10 @@ export default function UserManagement() {
                   </SelectContent>
                 </Select>
               </div>
-              {invRole === "manager" && (
+              {ROLES_REQUIRING_BRANCH.includes(invRole) && (
                 <div className="space-y-2">
                   <Label>
-                    {lang === "ar" ? "الفرع (مطلوب للمدير)" : "Branch (required for manager)"}
+                    {lang === "ar" ? "الفرع (مطلوب لهذا الدور)" : "Branch (required for this role)"}
                   </Label>
                   <Select value={invBranch} onValueChange={setInvBranch}>
                     <SelectTrigger><SelectValue placeholder={lang === "ar" ? "اختر فرعاً" : "Select a branch"} /></SelectTrigger>

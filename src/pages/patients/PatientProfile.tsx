@@ -21,6 +21,7 @@ import PatientSummaryStrip from "./PatientSummaryStrip";
 import PatientFinancialCard from "./PatientFinancialCard";
 import PatientQuickActions from "./PatientQuickActions";
 import PatientDocumentsTab from "./PatientDocumentsTab";
+import PatientPortalCard from "./PatientPortalCard";
 import { RecordPaymentDialog } from "../payments/RecordPaymentDialog";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import PatientOverviewSnapshot from "./PatientOverviewSnapshot";
@@ -296,6 +297,11 @@ export default function PatientProfile() {
               {patient.notes && <div className="sm:col-span-2"><div className="text-muted-foreground text-xs">{t("notes")}</div><div className="whitespace-pre-wrap">{patient.notes}</div></div>}
             </div>
           </Card>
+          <Can permission="patients.edit">
+            <div className="mt-4">
+              <PatientPortalCard patientId={patient.id} patientEmail={patient.email ?? null} />
+            </div>
+          </Can>
           {(insurer || patient.insurance_policy_number) && (
             <Card className="p-6 shadow-card mt-4">
               <div className="flex items-center gap-2 mb-3">

@@ -32,7 +32,7 @@ function labelStatus(value: string, lang: "ar" | "en") {
 
 export default function PatientPortal() {
   const { lang, setLang } = useI18n();
-  const { user, signOut } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
   const [data, setData] = useState<PortalData | null>(null);
   const [loading, setLoading] = useState(true);
   const [mustChangePassword, setMustChangePassword] = useState(false);
@@ -41,7 +41,22 @@ export default function PatientPortal() {
   const [username, setUsername] = useState("");
   const [usernameSaving, setUsernameSaving] = useState(false);
 
+  // RBAC-12 fix: this route was never wrapped in an auth check at all --
+  // visiting it with no session (or a session for a different account,
+  // e.g. a stale staff login) called patient_portal_password_state()
+  // anyway, which just returns {active:false} for a null/mismatched
+  // auth.uid() rather than erroring. The page then rendered the generic
+  // "Patient portal unavailable" message, indistinguishable from a
+  // genuinely disabled account, instead of sending an unauthenticated
+  // visitor to the login page where they belong.
   useEffect(() => {
+    if (!authLoading && !user) {
+      window.location.assign("/patient-portal/login");
+    }
+  }, [authLoading, user]);
+
+  useEffect(() => {
+    if (authLoading || !user) return;
     let active = true;
     (async () => {
       const { data: state, error: stateError } = await supabase.rpc("patient_portal_password_state");
@@ -69,7 +84,7 @@ export default function PatientPortal() {
       setLoading(false);
     })();
     return () => { active = false; };
-  }, [lang, user?.id]);
+  }, [lang, authLoading, user]);
 
   const logout = async () => { await signOut(); window.location.assign("/auth"); };
   const saveUsername = async (event: React.FormEvent) => {
@@ -98,6 +113,7 @@ export default function PatientPortal() {
     toast.success(lang === "ar" ? "تم تغيير كلمة المرور وتفعيل الحساب" : "Password changed and account activated");
     window.location.reload();
   };
+  if (authLoading || !user) return <main className="min-h-dvh grid place-items-center text-muted-foreground">…</main>;
   if (loading) return <main className="min-h-dvh grid place-items-center text-muted-foreground">…</main>;
   if (mustChangePassword) return <main className="min-h-dvh grid place-items-center bg-muted/30 p-6" dir={lang === "ar" ? "rtl" : "ltr"}><Card className="w-full max-w-md p-6"><div className="text-center"><ShieldCheck className="mx-auto size-10 text-primary" /><h1 className="mt-3 text-2xl font-black">{lang === "ar" ? "يجب تغيير كلمة المرور" : "Password change required"}</h1><p className="mt-2 text-sm text-muted-foreground">{lang === "ar" ? "لأمان حسابك، يجب تعيين كلمة مرور جديدة قبل عرض أي بيانات في بوابة المريض." : "For your security, set a new password before any Patient Portal data can be displayed."}</p></div><form onSubmit={savePassword} className="mt-6 space-y-3"><input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={8} required placeholder={lang === "ar" ? "كلمة مرور جديدة" : "New password"} className="h-10 w-full rounded-md border bg-background px-3 text-sm" autoComplete="new-password" /><Button type="submit" className="w-full" disabled={passwordSaving || newPassword.length < 8}>{passwordSaving ? "…" : (lang === "ar" ? "تغيير كلمة المرور والمتابعة" : "Change password and continue")}</Button></form><button type="button" className="mt-4 w-full text-center text-xs text-primary hover:underline" onClick={logout}>{lang === "ar" ? "تسجيل الخروج" : "Sign out"}</button></Card></main>;
   if (!data) return <main className="min-h-dvh grid place-items-center p-6"><Card className="max-w-md p-6 text-center"><ShieldCheck className="mx-auto mb-3 size-8 text-primary" /><h1 className="text-xl font-bold">{lang === "ar" ? "بوابة المريض غير متاحة" : "Patient portal unavailable"}</h1><p className="mt-2 text-sm text-muted-foreground">{lang === "ar" ? "استخدم رابط الدعوة أو تواصل مع العيادة لتفعيل الوصول." : "Use your invitation link or contact the clinic to activate access."}</p></Card></main>;

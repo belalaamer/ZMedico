@@ -13,7 +13,7 @@ import {
 import { useI18n } from "@/contexts/I18nContext";
 import { toast } from "sonner";
 import { hasPersistedAuthSession, persistAuthSessionForPreview } from "@/lib/authSessionPersistence";
-import { resolvePostAuthRedirect } from "@/lib/authRedirect";
+import { resolvePostAuthDestination } from "@/lib/authRedirect";
 import { useTenantBranding } from "@/contexts/TenantBrandingContext";
 import { signInWithIdentifier } from "@/lib/signInWithIdentifier";
 
@@ -92,7 +92,8 @@ export default function AuthPage() {
     const redirectExistingSession = async () => {
       const roles = await getRolesForRedirect(user.id);
       if (!active) return;
-      const destination = resolvePostAuthRedirect(from, roles);
+      const destination = await resolvePostAuthDestination(from, roles);
+      if (!active) return;
       authDebug("auth page detected existing session", { redirectAfterLogin: destination, roles });
       nav(destination, { replace: true });
     };
@@ -160,7 +161,7 @@ export default function AuthPage() {
       return;
     }
     const roles = await getRolesForRedirect(sessionData.session.user.id);
-    const destination = resolvePostAuthRedirect(from, roles);
+    const destination = await resolvePostAuthDestination(from, roles);
     authDebug("post-auth redirect resolved", { destination, roles });
     nav(destination, { replace: true });
   };

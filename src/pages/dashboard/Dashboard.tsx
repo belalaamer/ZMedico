@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "react-router-dom";
 import {
-  Wallet, Receipt, CalendarCheck, FileText, Clock, Users, UserPlus, Stethoscope, Inbox, Landmark, ArrowDownUp, ArrowUpRight, Sparkles, Activity, CheckCircle2, AlertCircle,
+  Wallet, Receipt, CalendarCheck, FileText, Clock, Users, UserPlus, Stethoscope, Inbox, Landmark, ArrowDownUp, ArrowUpRight, Sparkles, Activity, CheckCircle2, AlertCircle, CalendarClock,
 } from "lucide-react";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -84,6 +84,7 @@ export default function Dashboard() {
   const canClinical = authz.can("medical_records.view");
   const canOpsReports = authz.can("reports_operational.view");
   const canHR = authz.can("hr.view");
+  const canBookings = authz.can("appointments.view");
 
   const [loading, setLoading] = useState(true);
   const [todayAppts, setTodayAppts] = useState(0);
@@ -97,6 +98,7 @@ export default function Dashboard() {
   const [todayConsults, setTodayConsults] = useState(0);
   const [draftRecords, setDraftRecords] = useState(0);
   const [pendingLeaveRequests, setPendingLeaveRequests] = useState(0);
+  const [pendingBookingsCount, setPendingBookingsCount] = useState(0);
 
   // Treasury at-a-glance (today + last close)
   const [lastClose, setLastClose] = useState<{ business_date: string; counted_cash: number; variance: number } | null>(null);
@@ -184,6 +186,7 @@ export default function Dashboard() {
         doctorApptRes,
         topItemsRes,
         pendingLeaveRes,
+        pendingBookingsRes,
       ] = await Promise.all([
         branchEq(supabase.from("appointments").select("status,doctor_id")
           .is("deleted_at", null)
@@ -219,6 +222,7 @@ export default function Dashboard() {
         supabase.from("leave_requests").select("id", { count: "exact", head: true })
           .eq("status", "pending")
           .in("staff_id", branchStaffIds),
+        branchEq(supabase.from("appointments").select("id", { count: "exact", head: true }).eq("booking_request_status", "pending").is("deleted_at", null)),
       ]);
 
       // Treasury (mirrors Treasury page: filter by treasury_id for this branch,
@@ -277,6 +281,7 @@ export default function Dashboard() {
       setTodayConsults(consultsRes.count ?? 0);
       setDraftRecords(draftsRes.count ?? 0);
       setPendingLeaveRequests(pendingLeaveRes.count ?? 0);
+      setPendingBookingsCount(pendingBookingsRes.count ?? 0);
 
       // Revenue over selected range
       const buckets = new Map<string, number>();
@@ -403,8 +408,9 @@ export default function Dashboard() {
     pendingInvoicesCount === 0 && todayConsults === 0 && draftRecords === 0 &&
     recentPatients.length === 0 && recentAppts.length === 0 && recentPayments.length === 0 &&
     revenue7d.every((r) => r.revenue === 0) && apptStatusAll.length === 0 &&
-    (!canHR || pendingLeaveRequests === 0),
-  [loading, todayAppts, newPatientsToday, todayRevenue, pendingInvoicesCount, todayConsults, draftRecords, recentPatients, recentAppts, recentPayments, revenue7d, apptStatusAll, canHR, pendingLeaveRequests]);
+    (!canHR || pendingLeaveRequests === 0) &&
+    (!canBookings || pendingBookingsCount === 0),
+  [loading, todayAppts, newPatientsToday, todayRevenue, pendingInvoicesCount, todayConsults, draftRecords, recentPatients, recentAppts, recentPayments, revenue7d, apptStatusAll, canHR, pendingLeaveRequests, canBookings, pendingBookingsCount]);
 
   const completedAppointments = apptStatusToday.completed ?? 0;
   const trackedAppointments = Object.values(apptStatusToday).reduce((sum, value) => sum + value, 0);
@@ -412,7 +418,7 @@ export default function Dashboard() {
     ? Math.round((completedAppointments / trackedAppointments) * 100)
     : 0;
   const netTreasuryToday = todayTreasuryIn - todayTreasuryOut;
-  const hasAttentionItems = (canFinance && pendingInvoicesCount > 0) || (canClinical && draftRecords > 0) || (canHR && pendingLeaveRequests > 0);
+  const hasAttentionItems = (canFinance && pendingInvoicesCount > 0) || (canClinical && draftRecords > 0) || (canHR && pendingLeaveRequests > 0) || (canBookings && pendingBookingsCount > 0);
 
 
   const selectedRangeLabel = rangePreset === "7d"
@@ -591,6 +597,12 @@ export default function Dashboard() {
                   <ArrowUpRight className="size-4 text-muted-foreground shrink-0 transition-transform group-hover:-translate-y-0.5" aria-hidden="true" />
                 </Link>
               )}
+              {canBookings && pendingBookingsCount > 0 && (
+                <Link to="/appointments/pending" className="group flex items-center justify-between gap-3 rounded-xl border border-warning/20 bg-background/70 px-3 py-2.5 transition-colors hover:bg-background focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <span className="flex items-center gap-2 min-w-0"><CalendarClock className="size-4 text-warning shrink-0" /><span className="text-xs font-medium truncate">{lang === "ar" ? `${pendingBookingsCount} طلب حجز يحتاج تأكيدًا` : `${pendingBookingsCount} booking request${pendingBookingsCount === 1 ? "" : "s"} awaiting confirmation`}</span></span>
+                  <ArrowUpRight className="size-4 text-muted-foreground shrink-0 transition-transform group-hover:-translate-y-0.5" aria-hidden="true" />
+                </Link>
+              )}
             </div>
           </div>
         </Card>
@@ -660,6 +672,12 @@ export default function Dashboard() {
               <StatCard
                 label={t("pendingLeaveRequests")} value={pendingLeaveRequests}
                 icon={Clock} tone="from-warning to-warning" to="/hr/leaves"
+              />
+            )}
+            {canBookings && (
+              <StatCard
+                label={lang === "ar" ? "طلبات حجز معلقة" : "Pending Bookings"} value={pendingBookingsCount}
+                icon={CalendarClock} tone="from-warning to-warning" to="/appointments/pending"
               />
             )}
           </div>

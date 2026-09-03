@@ -34,6 +34,12 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
   const { pathname, search } = useLocation();
   const branchAwarePath = (to: string) => currentBranchId ? `${to}?branch=${encodeURIComponent(currentBranchId)}` : to;
   const [alertCount, setAlertCount] = useState(0);
+  // RBOOK-03: staff previously had no way to discover a booking request
+  // awaiting confirmation except scanning the calendar day-by-day for an
+  // amber highlight. This mirrors the exact stock_alerts count pattern below
+  // so the new "Pending Bookings" nav entry carries a live badge the same
+  // way the inventory alerts one does.
+  const [pendingBookingsCount, setPendingBookingsCount] = useState(0);
   const { authz, loading: authzLoading } = useAuthorization("sidebar");
   const isSystemOwner = authz.holdsAnyRole("system_owner");
   const isWorkspaceHandoff = isSystemOwnerWorkspaceHandoff(isSystemOwner, `${pathname}${search}`, currentBranchId);
@@ -54,6 +60,32 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       bind: (ch) => ch.on(
         "postgres_changes",
         { event: "*", schema: "public", table: "stock_alerts", filter: `branch_id=eq.${currentBranchId}` },
+        () => refresh()
+      ),
+      onReconnect: () => refresh(),
+    });
+  }, [branchSelectionReady, currentBranchId]);
+
+  useEffect(() => {
+    if (!branchSelectionReady || !currentBranchId) {
+      setPendingBookingsCount(0);
+      return;
+    }
+    const refresh = () => {
+      supabase
+        .from("appointments")
+        .select("*", { count: "exact", head: true })
+        .eq("booking_request_status", "pending")
+        .eq("branch_id", currentBranchId)
+        .is("deleted_at", null)
+        .then(({ count }) => setPendingBookingsCount(count ?? 0));
+    };
+    refresh();
+    return subscribeResilient({
+      name: `pending-bookings-badge:${currentBranchId}`,
+      bind: (ch) => ch.on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "appointments", filter: `branch_id=eq.${currentBranchId}` },
         () => refresh()
       ),
       onReconnect: () => refresh(),
@@ -88,6 +120,10 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       icon: Stethoscope,
       items: [
         authz.can("appointments.view") && { to: "/calendar", icon: Calendar, label: t("calendar") },
+        // RBOOK-03: the actionable follow-up list for booking_request_status
+        // = 'pending' appointments -- see PendingBookings.tsx for why this
+        // was missing (only a calendar-day highlight existed before).
+        authz.can("appointments.view") && { to: "/appointments/pending", icon: ClipboardList, label: lang === "ar" ? "طلبات الحجز المعلقة" : "Pending Bookings", badge: pendingBookingsCount },
         authz.can("leads.view") && isModuleEnabled("marketing") && { to: "/leads", icon: Target, label: lang === "ar" ? "العملاء المحتملون" : "Leads" },
         authz.can("appointments.view") && { to: "/queue", icon: ListChecks, label: t("queue") },
         authz.can("appointments.view") && { to: "/queue/audit", icon: ScrollText, label: lang === "ar" ? "تدقيق الطابور" : "Queue Audit" },
@@ -179,7 +215,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
         authz.isSuperAdmin() && { to: "/settings", icon: Settings, label: t("settings") },
       ].filter(Boolean) as NavItem[],
     },
-  ].filter(g => g.items.length > 0), [t, lang, authz, alertCount, reportItems, isModuleEnabled, isPlatformSurface]);
+  ].filter(g => g.items.length > 0), [t, lang, authz, alertCount, pendingBookingsCount, reportItems, isModuleEnabled, isPlatformSurface]);
 
   // Platform administration is a separate surface. A System Owner may still
   // see the full clinic navigation after an explicit workspace handoff.

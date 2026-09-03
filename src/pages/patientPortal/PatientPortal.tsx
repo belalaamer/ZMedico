@@ -30,6 +30,20 @@ function labelStatus(value: string, lang: "ar" | "en") {
   return labels[value]?.[lang === "ar" ? 0 : 1] || value;
 }
 
+// A real RPC-call error (as opposed to a normal {active:false} business
+// result) from these SECURITY DEFINER functions almost always means the
+// session's JWT was rejected outright -- expired/invalid access token
+// restored from localStorage past its lifetime, refresh failure, etc.
+// PostgREST/GoTrue surface that as an HTTP 401 with wording like
+// "JWT expired" / "invalid JWT" / "invalid claim" / "session ... not found".
+function isAuthSessionError(error: unknown): boolean {
+  const anyErr = error as { status?: number; code?: string; message?: string } | null;
+  if (!anyErr) return false;
+  if (anyErr.status === 401) return true;
+  const text = `${anyErr.code ?? ""} ${anyErr.message ?? ""}`.toLowerCase();
+  return /jwt|token|session|unauthoriz|not authenticated|invalid claim/.test(text);
+}
+
 export default function PatientPortal() {
   const { lang, setLang } = useI18n();
   const { user, loading: authLoading, signOut } = useAuth();
@@ -61,6 +75,22 @@ export default function PatientPortal() {
     (async () => {
       const { data: state, error: stateError } = await supabase.rpc("patient_portal_password_state");
       if (!active) return;
+      // RBAC-12 follow-up: patient_portal_password_state() only ever returns
+      // {active:false} through normal business logic (no matching account,
+      // disabled, etc.) -- it does not error for that case, since it runs
+      // fine even when auth.uid() is null. An actual `stateError` here means
+      // the RPC call itself was rejected, almost always because the session
+      // held in this tab is stale (expired/invalid JWT restored from
+      // localStorage past its lifetime). Treating that the same as "genuinely
+      // no account" showed the same misleading "portal unavailable" card a
+      // patient with a real, active account could hit just by returning to
+      // an old tab -- it should instead be treated like no session at all
+      // and bounce to login, not told their account is unavailable.
+      if (stateError && isAuthSessionError(stateError)) {
+        await supabase.auth.signOut();
+        window.location.assign("/patient-portal/login");
+        return;
+      }
       if (stateError || !(state as any)?.active) {
         toast.error(lang === "ar" ? "لا يمكن الوصول إلى بوابة المريض بهذا الحساب" : "This account cannot access the patient portal");
         setLoading(false);
@@ -78,6 +108,11 @@ export default function PatientPortal() {
         user?.id ? supabase.from("profiles").select("username").eq("id", user.id).maybeSingle() : Promise.resolve({ data: null }),
       ]);
       if (!active) return;
+      if (error && isAuthSessionError(error)) {
+        await supabase.auth.signOut();
+        window.location.assign("/patient-portal/login");
+        return;
+      }
       if (error) { toast.error(lang === "ar" ? "لا يمكن الوصول إلى بوابة المريض بهذا الحساب" : "This account cannot access the patient portal"); setLoading(false); return; }
       setData(snapshot as unknown as PortalData);
       setUsername(profile?.username ?? "");

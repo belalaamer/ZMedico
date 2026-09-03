@@ -1,4 +1,13 @@
-export const ROLES = ["system_owner", "admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr"] as const;
+// RBAC-10 fix: "system_owner" is a platform-wide identity, not a clinic
+// role. It must never be selectable, visible, or configurable from inside
+// a clinic workspace's Role Permissions matrix (accessible to any tenant
+// "admin", not just the actual system owner) -- that page rendered it as a
+// normal option in the Role dropdown, letting a clinic admin see (and try
+// to edit) a permission row for the system owner. system_owner's real
+// authorization is enforced directly via has_role()/has_permission() checks
+// throughout the app and database, never through this configurable matrix,
+// so removing it here only removes an unintended leak, not any real access.
+export const ROLES = ["admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr"] as const;
 export const MODULES = [
   "patients",
   "appointments",

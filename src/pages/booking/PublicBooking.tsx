@@ -74,6 +74,22 @@ type PublicBookingOptions = {
   doctors: Doctor[];
 };
 
+// A logged-in patient-portal session that clicked "Book new appointment" from
+// inside their own portal lands here too (the two share this same booking
+// flow). This context, when present, identifies them server-side so the
+// resulting appointment is attached to their existing patient record instead
+// of asking them to re-type name/phone/email -- which previously risked
+// creating a disconnected duplicate patient if anything didn't match exactly.
+type PortalBookingContext = {
+  tenant_id: string;
+  branch_id: string;
+  branch_name_en: string | null;
+  branch_name_ar: string | null;
+  patient_name_en: string | null;
+  patient_name_ar: string | null;
+  patient_phone: string | null;
+};
+
 type RpcError = { message?: string } | null;
 
 function publicRpc<T>(name: string, args?: Record<string, unknown>) {
@@ -165,9 +181,30 @@ export default function PublicBooking() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<BookingResult | null>(null);
   const [form, setForm] = useState({ fullName: "", phone: "", email: "", complaint: "" });
+  // Portal-aware booking: null while checking / not a portal session, an object
+  // once a logged-in patient with an active portal account is confirmed.
+  const [portalContext, setPortalContext] = useState<PortalBookingContext | null>(null);
 
   const branch = useMemo(() => branches.find((item) => item.id === branchId) ?? null, [branches, branchId]);
   const service = useMemo(() => services.find((item) => item.id === serviceId) ?? null, [services, serviceId]);
+
+  // Detect an authenticated patient-portal session up front. This never trusts
+  // anything from the client for the actual booking (the RPC re-resolves the
+  // patient/branch/tenant from auth.uid() itself) -- it only decides whether
+  // to render the "book as yourself" UI shortcut instead of the anonymous form.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (cancelled || !userData?.user) return;
+      const { data, error } = await publicRpc<PortalBookingContext | null>("patient_portal_booking_context");
+      if (cancelled) return;
+      if (!error && data) setPortalContext(data);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const isPortalPatient = Boolean(portalContext && tenantId && portalContext.tenant_id === tenantId);
 
   useEffect(() => {
     let cancelled = false;
@@ -234,6 +271,17 @@ export default function PublicBooking() {
     if (!branch) return;
     setDate((current) => current || getInitialDate(branch));
   }, [branch]);
+
+  // A portal patient always books at the branch their own patient record
+  // belongs to -- branches are a strict isolation boundary elsewhere in the
+  // product, so cross-branch booking isn't offered here either. Once we know
+  // this is a portal session for the tenant the page resolved to, pin the
+  // branch and stop deferring to whatever the options payload preselected.
+  useEffect(() => {
+    if (isPortalPatient && portalContext) {
+      setBranchId(portalContext.branch_id);
+    }
+  }, [isPortalPatient, portalContext]);
 
   useEffect(() => {
     // A doctor selection belongs to the current branch + catalog item. Clear it
@@ -342,32 +390,52 @@ export default function PublicBooking() {
   const submitBooking = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!selectedSlot || !branchId || !serviceId) return;
-    if (!form.fullName.trim() || !form.phone.trim()) {
+    if (!isPortalPatient && (!form.fullName.trim() || !form.phone.trim())) {
       toast.error(isArabic ? "اكتب الاسم ورقم الهاتف" : "Enter your name and phone number");
       return;
     }
     setSubmitting(true);
     const params = new URLSearchParams(window.location.search);
     if (!tenantId) { setSubmitting(false); return; }
-    const { data, error } = await publicRpc<BookingResult>("public_create_booking_for_tenant", {
-      p_tenant_id: tenantId,
-      p_branch_id: branchId,
-      p_service_id: serviceId,
-      p_slot_start: selectedSlot.slot_start,
-      p_full_name: form.fullName.trim(),
-      p_phone: form.phone.trim(),
-      p_doctor_id: doctorId || null,
-      p_email: form.email.trim() || null,
-      p_complaint: form.complaint.trim() || null,
-      p_source: params.get("utm_source") || "public_booking",
-      p_metadata: {
-        utm_source: params.get("utm_source"),
-        utm_medium: params.get("utm_medium"),
-        utm_campaign: params.get("utm_campaign"),
-        landing_path: window.location.pathname,
-        ...(getStoredAdAttribution() ? { attribution: getStoredAdAttribution() } : {}),
-      },
-    });
+
+    // A portal patient's booking is always attached to their own existing
+    // patient record: the RPC resolves patient/branch/tenant from auth.uid()
+    // via patient_portal_accounts, ignoring anything the client sends for
+    // identity. This is what actually fixes the duplicate-patient risk --
+    // previously this page always called the anonymous RPC below even for a
+    // logged-in patient, matching by re-typed phone digits only.
+    const { data, error } = isPortalPatient
+      ? await publicRpc<BookingResult>("patient_portal_create_booking", {
+          p_service_id: serviceId,
+          p_slot_start: selectedSlot.slot_start,
+          p_doctor_id: doctorId || null,
+          p_complaint: form.complaint.trim() || null,
+          p_metadata: {
+            utm_source: params.get("utm_source"),
+            utm_medium: params.get("utm_medium"),
+            utm_campaign: params.get("utm_campaign"),
+            landing_path: window.location.pathname,
+          },
+        })
+      : await publicRpc<BookingResult>("public_create_booking_for_tenant", {
+          p_tenant_id: tenantId,
+          p_branch_id: branchId,
+          p_service_id: serviceId,
+          p_slot_start: selectedSlot.slot_start,
+          p_full_name: form.fullName.trim(),
+          p_phone: form.phone.trim(),
+          p_doctor_id: doctorId || null,
+          p_email: form.email.trim() || null,
+          p_complaint: form.complaint.trim() || null,
+          p_source: params.get("utm_source") || "public_booking",
+          p_metadata: {
+            utm_source: params.get("utm_source"),
+            utm_medium: params.get("utm_medium"),
+            utm_campaign: params.get("utm_campaign"),
+            landing_path: window.location.pathname,
+            ...(getStoredAdAttribution() ? { attribution: getStoredAdAttribution() } : {}),
+          },
+        });
     setSubmitting(false);
     if (error) {
       const message = String(error.message || "");
@@ -375,7 +443,9 @@ export default function PublicBooking() {
         ? (isArabic ? "هذا الموعد حُجز للتو. اختر وقتًا آخر." : "This time was just booked. Please choose another time.")
         : message.includes("invalid_phone")
           ? (isArabic ? "اكتب رقم هاتف صحيحًا." : "Enter a valid phone number.")
-          : (isArabic ? "تعذر إتمام الحجز. حاول مرة أخرى." : "We could not complete the booking. Please try again.");
+          : message.includes("portal_account_inactive")
+            ? (isArabic ? "تعذر التحقق من حساب بوابة المريض. أعد تحميل الصفحة وحاول مرة أخرى." : "Could not verify your patient portal account. Reload the page and try again.")
+            : (isArabic ? "تعذر إتمام الحجز. حاول مرة أخرى." : "We could not complete the booking. Please try again.");
       toast.error(friendly);
       if (message.includes("slot_unavailable")) {
         setStep(2);
@@ -417,9 +487,15 @@ export default function PublicBooking() {
                   ? (isArabic ? "احتفظ برقم الحجز الخاص بك لأي استفسار مستقبلي." : "Keep your booking reference for any future inquiry.")
                   : (isArabic ? "سيقوم فريق الاستقبال بمراجعة الطلب والتواصل معك لتأكيد الموعد." : "Our reception team will review the request and contact you to confirm the appointment.")}
               </p>
-              <Button className="w-full" variant="outline" onClick={() => window.location.reload()}>
-                {isArabic ? "حجز موعد آخر" : "Book another appointment"}
-              </Button>
+              {isPortalPatient ? (
+                <Button className="w-full" onClick={() => window.location.assign("/patient-portal")}>
+                  {isArabic ? "الرجوع إلى بوابة المريض" : "Back to patient portal"}
+                </Button>
+              ) : (
+                <Button className="w-full" variant="outline" onClick={() => window.location.reload()}>
+                  {isArabic ? "حجز موعد آخر" : "Book another appointment"}
+                </Button>
+              )}
             </div>
           </Card>
         </div>
@@ -465,7 +541,7 @@ export default function PublicBooking() {
               <span className={step >= 2 ? "text-foreground" : "text-muted-foreground"}>{isArabic ? "الوقت" : "Time"}</span>
               <span className="mx-1 text-muted-foreground">/</span>
               <span className={cn("flex size-8 items-center justify-center rounded-full", step >= 3 ? "bg-primary text-primary-foreground" : "bg-muted")}>3</span>
-              <span className={step >= 3 ? "text-foreground" : "text-muted-foreground"}>{isArabic ? "بياناتك" : "Your details"}</span>
+              <span className={step >= 3 ? "text-foreground" : "text-muted-foreground"}>{isArabic ? (isPortalPatient ? "تأكيد الحجز" : "بياناتك") : (isPortalPatient ? "Confirm" : "Your details")}</span>
             </div>
 
             <div className="space-y-6 p-5 md:p-7">
@@ -480,7 +556,18 @@ export default function PublicBooking() {
                         <p className="mt-1 text-sm text-muted-foreground">{isArabic ? "اختر الفرع والخدمة والتاريخ، ثم سنعرض الأطباء والمواعيد المؤهلين فقط." : "Choose a branch, service, and date. We will then show only eligible doctors and times."}</p>
                       </div>
                       <div className="grid gap-4 sm:grid-cols-2">
-                        {branches.length > 1 ? (
+                        {isPortalPatient ? (
+                          // A portal patient's branch is fixed to their own patient
+                          // record's branch (see the pin effect above) -- never a
+                          // dropdown, same treatment as the single-branch case below.
+                          <div className="space-y-2">
+                            <Label>{isArabic ? "الفرع" : "Branch"}</Label>
+                            <div className="flex h-10 items-center rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground">
+                              <MapPin className="me-2 size-3.5 shrink-0" />
+                              {displayName({ name_en: portalContext?.branch_name_en, name_ar: portalContext?.branch_name_ar }, lang)}
+                            </div>
+                          </div>
+                        ) : branches.length > 1 ? (
                           <div className="space-y-2">
                             <Label htmlFor="booking-branch">{isArabic ? "الفرع" : "Branch"}</Label>
                             <select id="booking-branch" value={branchId} onChange={(event) => setBranchId(event.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-ring">
@@ -549,16 +636,29 @@ export default function PublicBooking() {
                     <form className="space-y-5" onSubmit={submitBooking} aria-labelledby="booking-step-three">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <h2 id="booking-step-three" className="text-xl font-bold">{isArabic ? "أكمل بيانات الحجز" : "Complete your booking"}</h2>
+                          <h2 id="booking-step-three" className="text-xl font-bold">{isArabic ? (isPortalPatient ? "تأكيد الحجز" : "أكمل بيانات الحجز") : (isPortalPatient ? "Confirm your booking" : "Complete your booking")}</h2>
                           <p className="mt-1 text-sm text-muted-foreground">{formatBookingDate(selectedSlot!.slot_start, lang)} · {formatSlot(selectedSlot!.slot_start, lang)}</p>
                         </div>
                         <Button type="button" variant="ghost" size="sm" onClick={() => setStep(2)} className="gap-1"><ChevronLeft className="size-4 rtl:rotate-180" />{isArabic ? "رجوع" : "Back"}</Button>
                       </div>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-2"><Label htmlFor="booking-name">{isArabic ? "الاسم بالكامل" : "Full name"}</Label><div className="relative"><UserRound className="pointer-events-none absolute start-3 top-2.5 size-4 text-muted-foreground" /><Input id="booking-name" className="ps-9" value={form.fullName} onChange={(event) => setField("fullName", event.target.value)} autoComplete="name" required /></div></div>
-                        <div className="space-y-2"><Label htmlFor="booking-phone">{isArabic ? "رقم الهاتف" : "Mobile number"}</Label><div className="relative"><Phone className="pointer-events-none absolute start-3 top-2.5 size-4 text-muted-foreground" /><Input id="booking-phone" className="ps-9" value={form.phone} onChange={(event) => setField("phone", event.target.value)} placeholder="01xxxxxxxxx" autoComplete="tel" inputMode="tel" required /></div></div>
-                      </div>
-                      <div className="space-y-2"><Label htmlFor="booking-email">{isArabic ? "البريد الإلكتروني (اختياري)" : "Email (optional)"}</Label><Input id="booking-email" type="email" value={form.email} onChange={(event) => setField("email", event.target.value)} autoComplete="email" /></div>
+                      {isPortalPatient ? (
+                        // Booking as an already-identified patient: no name/phone/email
+                        // re-entry, just a read-only confirmation of who this booking
+                        // will be attached to (their own existing patient record).
+                        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+                          <p className="flex items-center gap-2 text-sm font-semibold"><UserRound className="size-4 text-primary" />{isArabic ? "الحجز باسم" : "Booking as"}</p>
+                          <p className="mt-1 text-sm">{isArabic ? (portalContext?.patient_name_ar || portalContext?.patient_name_en) : (portalContext?.patient_name_en || portalContext?.patient_name_ar)}</p>
+                          {portalContext?.patient_phone ? <p className="mt-0.5 text-xs text-muted-foreground">{portalContext.patient_phone}</p> : null}
+                        </div>
+                      ) : (
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div className="space-y-2"><Label htmlFor="booking-name">{isArabic ? "الاسم بالكامل" : "Full name"}</Label><div className="relative"><UserRound className="pointer-events-none absolute start-3 top-2.5 size-4 text-muted-foreground" /><Input id="booking-name" className="ps-9" value={form.fullName} onChange={(event) => setField("fullName", event.target.value)} autoComplete="name" required /></div></div>
+                          <div className="space-y-2"><Label htmlFor="booking-phone">{isArabic ? "رقم الهاتف" : "Mobile number"}</Label><div className="relative"><Phone className="pointer-events-none absolute start-3 top-2.5 size-4 text-muted-foreground" /><Input id="booking-phone" className="ps-9" value={form.phone} onChange={(event) => setField("phone", event.target.value)} placeholder="01xxxxxxxxx" autoComplete="tel" inputMode="tel" required /></div></div>
+                        </div>
+                      )}
+                      {!isPortalPatient ? (
+                        <div className="space-y-2"><Label htmlFor="booking-email">{isArabic ? "البريد الإلكتروني (اختياري)" : "Email (optional)"}</Label><Input id="booking-email" type="email" value={form.email} onChange={(event) => setField("email", event.target.value)} autoComplete="email" /></div>
+                      ) : null}
                       <div className="space-y-2"><Label htmlFor="booking-complaint">{isArabic ? "سبب الزيارة باختصار (اختياري)" : "Short reason for visit (optional)"}</Label><Textarea id="booking-complaint" value={form.complaint} onChange={(event) => setField("complaint", event.target.value)} rows={3} /></div>
                       <div className="rounded-xl bg-muted/60 p-4 text-xs leading-5 text-muted-foreground"><ShieldCheck className="mb-1 inline-block size-4 text-primary" /> {isArabic ? "نستخدم بياناتك لتنسيق الموعد والتواصل بشأنه فقط." : "We use your details only to coordinate and communicate about this appointment."}</div>
                       <Button type="submit" className="w-full" disabled={submitting}>{submitting ? (isArabic ? "جارٍ تأكيد الحجز…" : "Confirming booking…") : (isArabic ? "تأكيد الحجز" : "Confirm booking")}</Button>
@@ -573,7 +673,7 @@ export default function PublicBooking() {
             <Card className="border-primary/10 bg-background/85 p-5 shadow-lg">
               <div className="mb-4 flex items-center gap-3"><div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><CalendarDays className="size-5" /></div><div><h2 className="font-bold">{isArabic ? "ملخص الحجز" : "Booking summary"}</h2><p className="text-xs text-muted-foreground">{isArabic ? "سيظهر هنا بعد الاختيار" : "Updates as you choose"}</p></div></div>
               <div className="space-y-3 text-sm">
-                <div className="flex justify-between gap-3"><span className="text-muted-foreground">{isArabic ? "الفرع" : "Branch"}</span><span className="text-end font-medium">{branch ? displayName(branch, lang) : "—"}</span></div>
+                <div className="flex justify-between gap-3"><span className="text-muted-foreground">{isArabic ? "الفرع" : "Branch"}</span><span className="text-end font-medium">{isPortalPatient ? displayName({ name_en: portalContext?.branch_name_en, name_ar: portalContext?.branch_name_ar }, lang) : (branch ? displayName(branch, lang) : "—")}</span></div>
                 <div className="flex justify-between gap-3"><span className="text-muted-foreground">{isArabic ? "الخدمة" : "Service"}</span><span className="text-end font-medium">{service ? displayName(service, lang) : "—"}</span></div>
                 <div className="flex justify-between gap-3"><span className="text-muted-foreground">{isArabic ? "الطبيب" : "Doctor"}</span><span className="text-end font-medium">{doctorId ? doctorName(doctors.find((item) => item.id === doctorId) ?? { id: doctorId, full_name: null, full_name_en: null, full_name_ar: null }, lang) : (isArabic ? "سيختاره النظام" : "Selected automatically")}</span></div>
                 <div className="flex justify-between gap-3"><span className="text-muted-foreground">{isArabic ? "التاريخ" : "Date"}</span><span className="text-end font-medium">{date ? new Date(`${date}T12:00:00`).toLocaleDateString(isArabic ? "ar-EG" : "en-EG") : "—"}</span></div>

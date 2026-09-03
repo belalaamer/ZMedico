@@ -38,6 +38,7 @@ const QueuePage = lazy(() => import("@/pages/queue/Queue"));
 const QueueAuditPage = lazy(() => import("@/pages/queue/QueueAudit"));
 const QueueSelfAuditPage = lazy(() => import("@/pages/queue/QueueSelfAudit"));
 const AppointmentDetailPage = lazy(() => import("@/pages/appointments/AppointmentDetail"));
+const PendingBookingsPage = lazy(() => import("@/pages/appointments/PendingBookings"));
 const Invoices = lazy(() => import("@/pages/invoices/Invoices"));
 const InvoiceDetail = lazy(() => import("@/pages/invoices/InvoiceDetail"));
 const OutstandingDebts = lazy(() => import("@/pages/invoices/OutstandingDebts"));
@@ -187,6 +188,7 @@ function AppContent() {
               <Route path="/queue" element={<PermissionRoute><QueuePage /></PermissionRoute>} />
               <Route path="/queue/audit" element={<PermissionRoute><QueueAuditPage /></PermissionRoute>} />
               <Route path="/queue/self-audit" element={<PermissionRoute adminOnly><QueueSelfAuditPage /></PermissionRoute>} />
+              <Route path="/appointments/pending" element={<PermissionRoute><PendingBookingsPage /></PermissionRoute>} />
               <Route path="/appointments/:appointmentId" element={<PermissionRoute><AppointmentDetailPage /></PermissionRoute>} />
               <Route path="/invoices" element={<PermissionRoute><Invoices /></PermissionRoute>} />
               <Route path="/invoices/outstanding" element={<PermissionRoute><OutstandingDebts /></PermissionRoute>} />

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { CalendarDays, Clock3, FileText, LogOut, Mail, Phone, ShieldCheck, Activity } from "lucide-react";
+import { Link } from "react-router-dom";
+import { CalendarDays, CalendarPlus, Clock3, FileText, LogOut, Mail, Phone, ShieldCheck, Activity } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -108,9 +109,15 @@ export default function PatientPortal() {
 
   return <main className="min-h-dvh bg-muted/30 px-4 py-6 md:px-8" dir={lang === "ar" ? "rtl" : "ltr"}>
     <div className="mx-auto max-w-6xl space-y-6">
-      <header className="flex items-start justify-between gap-4 rounded-2xl border bg-background p-5 shadow-sm">
+      <header className="flex flex-wrap items-start justify-between gap-4 rounded-2xl border bg-background p-5 shadow-sm">
         <div><p className="text-sm font-semibold text-primary">{lang === "ar" ? data.clinic.name_ar : data.clinic.name_en}</p><h1 className="mt-1 text-2xl font-black">{lang === "ar" ? `مرحبًا ${patientName(data.patient, lang)}` : `Welcome, ${patientName(data.patient, lang)}`}</h1><p className="mt-1 text-sm text-muted-foreground">{lang === "ar" ? "ملفك الصحي ومواعيدك في مكان واحد" : "Your health information and appointments in one place"}</p></div>
-        <div className="flex shrink-0 gap-2"><Button variant="outline" size="sm" onClick={() => setLang(lang === "ar" ? "en" : "ar")}>{lang === "ar" ? "English" : "العربية"}</Button><Button variant="ghost" size="icon" onClick={logout} aria-label={lang === "ar" ? "تسجيل الخروج" : "Sign out"}><LogOut className="size-4" /></Button></div>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <Button asChild size="sm" className="gradient-primary text-primary-foreground">
+            <Link to="/book"><CalendarPlus className="me-2 size-4" />{lang === "ar" ? "حجز موعد جديد" : "Book new appointment"}</Link>
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setLang(lang === "ar" ? "en" : "ar")}>{lang === "ar" ? "English" : "العربية"}</Button>
+          <Button variant="ghost" size="icon" onClick={logout} aria-label={lang === "ar" ? "تسجيل الخروج" : "Sign out"}><LogOut className="size-4" /></Button>
+        </div>
       </header>
 
       <section className="grid gap-4 md:grid-cols-3">
@@ -121,7 +128,15 @@ export default function PatientPortal() {
 
       <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-6">
-          <Card className="overflow-hidden"><div className="border-b p-5"><h2 className="flex items-center gap-2 text-lg font-bold"><CalendarDays className="size-5 text-primary" />{lang === "ar" ? "المواعيد" : "Appointments"}</h2></div><div className="divide-y">{data.appointments.length ? data.appointments.map((item) => <div key={item.id} className="p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold">{lang === "ar" ? item.service_name_ar || item.service_name_en : item.service_name_en || item.service_name_ar}</p><p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground"><Clock3 className="size-3.5" />{dateTime(item.scheduled_at, lang)}</p></div><Badge variant="outline">{labelStatus(item.status, lang)}</Badge></div>{item.doctor_name_en || item.doctor_name_ar ? <p className="mt-2 text-sm text-muted-foreground">{lang === "ar" ? item.doctor_name_ar || item.doctor_name_en : item.doctor_name_en || item.doctor_name_ar}</p> : null}</div>) : <p className="p-6 text-center text-sm text-muted-foreground">{lang === "ar" ? "لا توجد مواعيد مسجلة" : "No appointments recorded"}</p>}</div></Card>
+          <Card className="overflow-hidden">
+            <div className="flex items-center justify-between gap-3 border-b p-5">
+              <h2 className="flex items-center gap-2 text-lg font-bold"><CalendarDays className="size-5 text-primary" />{lang === "ar" ? "المواعيد" : "Appointments"}</h2>
+              <Button asChild size="sm" variant="outline">
+                <Link to="/book"><CalendarPlus className="me-2 size-4" />{lang === "ar" ? "حجز جديد" : "New booking"}</Link>
+              </Button>
+            </div>
+            <div className="divide-y">{data.appointments.length ? data.appointments.map((item) => <div key={item.id} className="p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold">{lang === "ar" ? item.service_name_ar || item.service_name_en : item.service_name_en || item.service_name_ar}</p><p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground"><Clock3 className="size-3.5" />{dateTime(item.scheduled_at, lang)}</p></div><Badge variant="outline">{labelStatus(item.status, lang)}</Badge></div>{item.doctor_name_en || item.doctor_name_ar ? <p className="mt-2 text-sm text-muted-foreground">{lang === "ar" ? item.doctor_name_ar || item.doctor_name_en : item.doctor_name_en || item.doctor_name_ar}</p> : null}</div>) : <div className="p-6 text-center space-y-3"><p className="text-sm text-muted-foreground">{lang === "ar" ? "لا توجد مواعيد مسجلة" : "No appointments recorded"}</p><Button asChild size="sm"><Link to="/book"><CalendarPlus className="me-2 size-4" />{lang === "ar" ? "احجز أول موعد" : "Book your first appointment"}</Link></Button></div>}</div>
+          </Card>
 
           <Card className="overflow-hidden"><div className="border-b p-5"><h2 className="flex items-center gap-2 text-lg font-bold"><Activity className="size-5 text-primary" />{lang === "ar" ? "الجلسات وما تم تنفيذُه" : "Sessions and what was done"}</h2></div><div className="divide-y">{data.sessions.length ? data.sessions.map((item) => <div key={item.id} className="space-y-2 p-5"><div className="flex flex-wrap items-center justify-between gap-3"><p className="font-semibold">{lang === "ar" ? `الجلسة رقم ${item.session_number}` : `Session ${item.session_number}`} · {date(item.session_date, lang)}</p><Badge variant="outline">{labelStatus(item.attendance, lang)}</Badge></div>{item.interventions ? <p className="text-sm"><strong>{lang === "ar" ? "ما تم تنفيذه: " : "What was done: "}</strong>{item.interventions}</p> : null}{item.symptom_change ? <p className="text-sm"><strong>{lang === "ar" ? "التغير الملحوظ: " : "Progress: "}</strong>{item.symptom_change}</p> : null}{item.home_exercise ? <p className="rounded-md bg-primary/5 p-3 text-sm"><strong>{lang === "ar" ? "تمرين منزلي: " : "Home exercise: "}</strong>{item.home_exercise}</p> : null}{item.next_recommendation ? <p className="text-sm text-muted-foreground"><strong>{lang === "ar" ? "التوصية التالية: " : "Next recommendation: "}</strong>{item.next_recommendation}</p> : null}</div>) : <p className="p-6 text-center text-sm text-muted-foreground">{lang === "ar" ? "لا توجد جلسات مسجلة" : "No sessions recorded"}</p>}</div></Card>
         </div>
@@ -144,7 +159,7 @@ export default function PatientPortal() {
         <p className="mt-1 text-sm text-muted-foreground">{lang === "ar" ? "بعد فتح رابط الدعوة، يمكنك تعيين كلمة مرور خاصة بك لاستخدام البريد الإلكتروني في الدخول لاحقًا." : "After opening your invitation link, set a personal password to sign in with your email next time."}</p>
         <form onSubmit={savePassword} className="mt-3 flex flex-col gap-3 sm:flex-row"><input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={8} placeholder={lang === "ar" ? "كلمة مرور جديدة" : "New password"} className="h-10 flex-1 rounded-md border bg-background px-3 text-sm" autoComplete="new-password" /><Button type="submit" disabled={passwordSaving || newPassword.length < 8}>{passwordSaving ? "…" : (lang === "ar" ? "حفظ كلمة المرور" : "Save password")}</Button></form>
       </Card>
-      <p className="text-center text-xs text-muted-foreground">{lang === "ar" ? "هذه البوابة للعرض فقط. لا تحتوي على أدوات تعديل أو حذف للسجلات الطبية." : "This portal is read-only. It does not provide tools to edit or delete medical records."}</p>
+      <p className="text-center text-xs text-muted-foreground">{lang === "ar" ? "هذه البوابة تعرض بياناتك الصحية فقط ولا تحتوي على أدوات تعديل أو حذف للسجلات الطبية." : "This portal shows only your own health information. It does not provide tools to edit or delete medical records."}</p>
       <p className="text-center text-xs text-muted-foreground">{user?.email}</p>
     </div>
   </main>;

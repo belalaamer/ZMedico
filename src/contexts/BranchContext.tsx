@@ -173,7 +173,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void loadBranches();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, isSystemOwner, roleLoading, domainTenantId, location.search]);
+  }, [user?.id, isSystemOwner, roleLoading, domainTenantId, location.search]);
 
   useEffect(() => {
     let active = true;

@@ -24,7 +24,14 @@ export type ToolDefinition = {
   };
 };
 
-export type ToolCall = { name: string; args: Record<string, unknown> };
+// `thoughtSignature` is optional and Gemini-specific: gemini-2.5+/3.x
+// "thinking" models sign each functionCall part they emit, and REQUIRE that
+// exact signature to be replayed back verbatim on that same functionCall part
+// when the conversation history is sent back to them on a later turn. Without
+// it, a follow-up request fails with:
+//   "Function call is missing a thought_signature in functionCall parts"
+// Other providers simply never populate this field.
+export type ToolCall = { name: string; args: Record<string, unknown>; thoughtSignature?: string };
 
 export type ProviderMessage = {
   role: "user" | "model";
@@ -54,9 +61,19 @@ function mapHistoryToGeminiContents(history: ProviderMessage[]): unknown[] {
   const contents: unknown[] = [];
   for (const msg of history) {
     if (msg.toolCall) {
+      const part: Record<string, unknown> = {
+        functionCall: { name: msg.toolCall.name, args: msg.toolCall.args },
+      };
+      // Replay the exact thoughtSignature Gemini attached to THIS functionCall
+      // part when it was first returned. Required for gemini-2.5+/3.x models;
+      // omitted entirely when absent (e.g. non-thinking models, or providers
+      // that never set it) so we don't send a bogus empty field.
+      if (msg.toolCall.thoughtSignature) {
+        part.thoughtSignature = msg.toolCall.thoughtSignature;
+      }
       contents.push({
         role: "model",
-        parts: [{ functionCall: { name: msg.toolCall.name, args: msg.toolCall.args } }],
+        parts: [part],
       });
     } else if (msg.toolResponse) {
       contents.push({
@@ -148,7 +165,16 @@ export class GeminiProvider implements AIProvider {
 
     for (const part of parts) {
       if (part?.functionCall?.name) {
-        toolCalls.push({ name: part.functionCall.name, args: part.functionCall.args ?? {} });
+        const toolCall: ToolCall = { name: part.functionCall.name, args: part.functionCall.args ?? {} };
+        // Each part carries its OWN thoughtSignature (a turn can contain
+        // several functionCall parts, e.g. parallel tool calls, and their
+        // signatures can differ) -- capture it here, scoped to this exact
+        // part, so it stays attached to the right ToolCall and is never
+        // mixed up with a sibling part's signature.
+        if (typeof part.thoughtSignature === "string" && part.thoughtSignature.length > 0) {
+          toolCall.thoughtSignature = part.thoughtSignature;
+        }
+        toolCalls.push(toolCall);
       } else if (typeof part?.text === "string") {
         textParts.push(part.text);
       }

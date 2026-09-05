@@ -837,6 +837,7 @@ export const dict = {
     // Settings (Phase 6) — English
     settingsHub: "Settings",
     adminSection: "Administration",
+    aiSettings: "AI Settings",
     qaIdentities: "QA identities",
     qaDescription: "Create the eight test identities used for isolated role and branch checks. Passwords appear only once in this session.",
     provisionQA: "Create identity",
@@ -1981,6 +1982,7 @@ export const dict = {
     // Settings (Phase 6) — Arabic
     settingsHub: "الإعدادات",
     adminSection: "الإدارة",
+    aiSettings: "إعدادات الذكاء الاصطناعي",
     qaIdentities: "هويات الاختبار",
     qaDescription: "إنشاء هويات الاختبار الثمانية لفحص الأدوار وعزل الفروع. تظهر كلمات المرور مرة واحدة داخل هذه الجلسة فقط.",
     provisionQA: "إنشاء الهوية",

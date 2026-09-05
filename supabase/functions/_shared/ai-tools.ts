@@ -4,8 +4,20 @@
 // arguments. Every dispatch call receives a server-resolved `trustedContext`
 // built BEFORE the model was ever invoked (from conversations/channel_accounts
 // rows), and that trusted context -- not toolCall.args -- is what gets passed
-// into the underlying Postgres RPCs. Any `tenant_id`/`branch_id` key present
-// in toolCall.args is ignored/discarded.
+// into the underlying Postgres RPCs. Any `tenant_id` key present in
+// toolCall.args is ignored/discarded.
+//
+// branch_id specifically: if trustedContext.branch_id is already resolved
+// (a branch-specific channel account, or a branch confirmed earlier in this
+// conversation), it is used UNCONDITIONALLY -- the model can never override
+// it to a different branch of the same tenant, even though the underlying
+// RPCs would themselves reject a branch belonging to a different tenant. Only
+// when trustedContext.branch_id is null (a tenant-level channel account that
+// hasn't resolved a branch yet) may a model-supplied branch_id be used, and
+// even then it is validated server-side (against `branches`, scoped to
+// trustedContext.tenant_id) before use. Once that first model-supplied
+// branch_id is validated and the tool call using it succeeds, the resolved
+// branch becomes the conversation's confirmed branch going forward.
 
 import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
 import type { ToolCall, ToolDefinition } from "./ai-provider.ts";
@@ -140,12 +152,83 @@ async function auditLog(
   }
 }
 
+// Resolves the branch_id a tool call should actually use.
+//
+// - If trustedContext.branch_id is already set, it is returned as-is and any
+//   toolCall.args.branch_id is ignored entirely (resolvedFromModel: false) --
+//   the model can never move the conversation to a different branch of the
+//   same tenant once one is already resolved.
+// - If trustedContext.branch_id is null, a model-supplied branch_id may be
+//   used, but only after confirming it actually belongs to
+//   trustedContext.tenant_id and is active. This mirrors (defense-in-depth)
+//   the validation the underlying RPCs already perform server-side.
+async function resolveBranchId(
+  supabase: SupabaseClient,
+  toolCall: ToolCall,
+  trustedContext: TrustedContext,
+): Promise<{ branchId: string | null; resolvedFromModel: boolean; error?: string }> {
+  if (trustedContext.branch_id) {
+    return { branchId: trustedContext.branch_id, resolvedFromModel: false };
+  }
+
+  const candidate = (toolCall.args as Record<string, unknown>)?.branch_id;
+  if (typeof candidate !== "string" || candidate.trim().length === 0) {
+    return { branchId: null, resolvedFromModel: false };
+  }
+
+  const { data: branch, error: branchError } = await supabase
+    .from("branches")
+    .select("id")
+    .eq("id", candidate)
+    .eq("tenant_id", trustedContext.tenant_id)
+    .maybeSingle();
+
+  if (branchError) {
+    return { branchId: null, resolvedFromModel: false, error: branchError.message };
+  }
+  if (!branch) {
+    return {
+      branchId: null,
+      resolvedFromModel: false,
+      error: "Supplied branch_id does not belong to this tenant.",
+    };
+  }
+
+  return { branchId: branch.id as string, resolvedFromModel: true };
+}
+
+// Once a tenant-level conversation's branch has been resolved for the first
+// time from a validated model-supplied branch_id AND the tool call using it
+// has succeeded, persist that branch onto the conversation so it becomes the
+// trusted/confirmed branch for every subsequent turn (candidate -> confirmed
+// once validated).
+async function confirmConversationBranch(
+  supabase: SupabaseClient,
+  trustedContext: TrustedContext,
+  branchId: string,
+) {
+  try {
+    const { error } = await supabase
+      .from("conversations")
+      .update({ branch_id: branchId })
+      .eq("id", trustedContext.conversation_id)
+      .is("branch_id", null);
+    if (error) {
+      console.error(`[ai-tools] failed to persist confirmed branch_id for conversation_id=${trustedContext.conversation_id}:`, error);
+    }
+  } catch (err) {
+    console.error(`[ai-tools] threw while persisting confirmed branch_id for conversation_id=${trustedContext.conversation_id}:`, err);
+  }
+}
+
 export async function dispatchTool(
   supabase: SupabaseClient,
   toolCall: ToolCall,
   trustedContext: TrustedContext,
 ): Promise<{ result: unknown; success: boolean; error?: string }> {
-  // Strip any model-supplied tenant_id/branch_id -- never trusted.
+  // Strip any model-supplied tenant_id/branch_id from what gets audit-logged
+  // as "arguments" -- never trusted, and resolveBranchId() above is the only
+  // path that may (conditionally, validated) use a model-supplied branch_id.
   const args = { ...toolCall.args };
   delete (args as Record<string, unknown>).tenant_id;
   delete (args as Record<string, unknown>).branch_id;
@@ -167,7 +250,8 @@ export async function dispatchTool(
       }
 
       case "check_available_slots": {
-        const branchId = (toolCall.args.branch_id as string) ?? trustedContext.branch_id;
+        const { branchId, resolvedFromModel, error: branchError } = await resolveBranchId(supabase, toolCall, trustedContext);
+        if (branchError) { error = branchError; break; }
         if (!branchId) { error = "branch_id is required and could not be determined."; break; }
         const { data, error: rpcError } = await supabase.rpc("public_booking_slots_for_tenant", {
           p_tenant_id: trustedContext.tenant_id,
@@ -179,6 +263,9 @@ export async function dispatchTool(
         if (rpcError) { error = rpcError.message; break; }
         result = data;
         success = true;
+        if (resolvedFromModel) {
+          await confirmConversationBranch(supabase, trustedContext, branchId);
+        }
         break;
       }
 
@@ -200,7 +287,8 @@ export async function dispatchTool(
       }
 
       case "create_booking": {
-        const branchId = (toolCall.args.branch_id as string) ?? trustedContext.branch_id;
+        const { branchId, resolvedFromModel, error: branchError } = await resolveBranchId(supabase, toolCall, trustedContext);
+        if (branchError) { error = branchError; break; }
         if (!branchId) {
           error = "branch_id is missing and this conversation has no default branch. Ask the customer which branch they want before booking.";
           break;
@@ -221,6 +309,9 @@ export async function dispatchTool(
         if (rpcError) { error = rpcError.message; break; }
         result = data;
         success = true;
+        if (resolvedFromModel) {
+          await confirmConversationBranch(supabase, trustedContext, branchId);
+        }
         break;
       }
 

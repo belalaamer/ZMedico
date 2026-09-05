@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap, FolderOpen, Briefcase, UserCog, Clock, CalendarDays, DollarSign, Star, Target, Ticket, ListChecks, ChevronDown, Wallet, ScrollText, Percent, type LucideIcon } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap, FolderOpen, Briefcase, UserCog, Clock, CalendarDays, DollarSign, Star, Target, Ticket, ListChecks, ChevronDown, Wallet, ScrollText, Percent, Bot, type LucideIcon } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { subscribeResilient } from "@/lib/realtime";
@@ -213,9 +213,12 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
         // surfaced directly instead of one extra click deep.
         authz.isSuperAdmin() && { to: "/branches/dashboard", icon: LayoutDashboard, label: lang === "ar" ? "لوحة الفرع" : "Branch Dashboard" },
         authz.isSuperAdmin() && { to: "/settings", icon: Settings, label: t("settings") },
+        // /settings/ai is gated systemOwnerOnly (stricter than the adminOnly
+        // /settings above) because it holds the tenant's AI provider API key.
+        isSystemOwner && { to: "/settings/ai", icon: Bot, label: lang === "ar" ? "إعدادات الذكاء الاصطناعي" : "AI Settings" },
       ].filter(Boolean) as NavItem[],
     },
-  ].filter(g => g.items.length > 0), [t, lang, authz, alertCount, pendingBookingsCount, reportItems, isModuleEnabled, isPlatformSurface]);
+  ].filter(g => g.items.length > 0), [t, lang, authz, alertCount, pendingBookingsCount, reportItems, isModuleEnabled, isPlatformSurface, isSystemOwner]);
 
   // Platform administration is a separate surface. A System Owner may still
   // see the full clinic navigation after an explicit workspace handoff.

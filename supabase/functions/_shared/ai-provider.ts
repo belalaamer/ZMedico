@@ -97,7 +97,7 @@ export class GeminiProvider implements AIProvider {
       throw new Error("GeminiProvider requires a non-empty apiKey.");
     }
     this.apiKey = apiKey;
-    this.model = model || "gemini-2.0-flash";
+    this.model = model || "gemini-3.6-flash";
   }
 
   async generate(input: {

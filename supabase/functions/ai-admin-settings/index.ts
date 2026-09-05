@@ -16,7 +16,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsPreflight, jsonResponse } from "./_shared/cors.ts";
 import { getAIProvider } from "./_shared/ai-provider.ts";
 
-const DEFAULT_MODEL = "gemini-2.0-flash";
+const DEFAULT_MODEL = "gemini-3.6-flash";
 
 type PlatformConfigRow = {
   id: string;

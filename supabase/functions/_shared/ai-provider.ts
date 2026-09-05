@@ -6,6 +6,13 @@
 // provider implementation is used -- swap Gemini for OpenAI/Anthropic later by
 // changing only this function (and adding a new class), without touching
 // anything else in the codebase.
+//
+// SECURITY: the API key is passed in as a constructor parameter (resolved by
+// the caller from Supabase Vault via ai_provider_config / get_ai_provider_secret,
+// see ai-agent-respond/index.ts and ai-admin-settings/index.ts) -- this file
+// never reads GEMINI_API_KEY (or any other secret) from Deno.env itself. That
+// keeps this module swappable to a DB-resolved key and avoids a second place
+// where the raw key could leak into logs.
 
 export type ToolDefinition = {
   name: string;
@@ -32,6 +39,11 @@ export interface AIProvider {
     history: ProviderMessage[];
     tools: ToolDefinition[];
   }): Promise<{ text: string | null; toolCalls: ToolCall[] }>;
+
+  // Minimal connectivity check used by Settings > AI's "Test connection"
+  // action. Must never include the API key in its returned error message,
+  // even if the provider's error body happens to echo request details.
+  testConnection(): Promise<{ success: boolean; latencyMs: number; error?: string }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -61,17 +73,31 @@ function mapHistoryToGeminiContents(history: ProviderMessage[]): unknown[] {
   return contents;
 }
 
+// Strip anything that looks like it could contain the API key from an error
+// message before it is ever logged or returned to a caller. Gemini keys are
+// passed as a `?key=...` query param, and some error bodies echo back the
+// request URL -- so in addition to redacting the literal key value, also
+// redact any `key=...` query-param pattern defensively.
+function sanitizeGeminiError(raw: string, apiKey: string): string {
+  let cleaned = raw;
+  if (apiKey) {
+    cleaned = cleaned.split(apiKey).join("[REDACTED]");
+  }
+  cleaned = cleaned.replace(/key=[^&\s"']+/gi, "key=[REDACTED]");
+  cleaned = cleaned.replace(/[\x00-\x1f\x7f]+/g, " ").trim();
+  return cleaned.length > 300 ? cleaned.slice(0, 300) + "…" : cleaned;
+}
+
 export class GeminiProvider implements AIProvider {
   private apiKey: string;
   private model: string;
 
-  constructor() {
-    const apiKey = Deno.env.get("GEMINI_API_KEY");
+  constructor(apiKey: string, model?: string) {
     if (!apiKey) {
-      throw new Error("GEMINI_API_KEY is not configured (Deno.env). Cannot use GeminiProvider.");
+      throw new Error("GeminiProvider requires a non-empty apiKey.");
     }
     this.apiKey = apiKey;
-    this.model = Deno.env.get("GEMINI_MODEL") || "gemini-2.0-flash";
+    this.model = model || "gemini-2.0-flash";
   }
 
   async generate(input: {
@@ -106,14 +132,14 @@ export class GeminiProvider implements AIProvider {
 
     const rawText = await res.text().catch(() => "");
     if (!res.ok) {
-      throw new Error(`Gemini API error ${res.status}: ${rawText.slice(0, 500)}`);
+      throw new Error(`Gemini API error ${res.status}: ${sanitizeGeminiError(rawText, this.apiKey).slice(0, 500)}`);
     }
 
     let data: any = null;
     try {
       data = JSON.parse(rawText);
     } catch {
-      throw new Error(`Gemini API returned non-JSON response: ${rawText.slice(0, 300)}`);
+      throw new Error(`Gemini API returned non-JSON response: ${sanitizeGeminiError(rawText, this.apiKey).slice(0, 300)}`);
     }
 
     const parts: any[] = data?.candidates?.[0]?.content?.parts ?? [];
@@ -133,10 +159,55 @@ export class GeminiProvider implements AIProvider {
       toolCalls,
     };
   }
+
+  async testConnection(): Promise<{ success: boolean; latencyMs: number; error?: string }> {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`;
+    const body = {
+      contents: [{ role: "user", parts: [{ text: "Reply with OK" }] }],
+    };
+
+    const startedAt = Date.now();
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const latencyMs = Date.now() - startedAt;
+      const rawText = await res.text().catch(() => "");
+
+      if (!res.ok) {
+        return {
+          success: false,
+          latencyMs,
+          error: `Gemini API error ${res.status}: ${sanitizeGeminiError(rawText, this.apiKey)}`,
+        };
+      }
+
+      // Confirm the response actually parses and contains a candidate --
+      // a 200 with an unexpected shape should still surface as a failure.
+      try {
+        const data = JSON.parse(rawText);
+        if (!data?.candidates) {
+          return { success: false, latencyMs, error: "Gemini API returned no candidates" };
+        }
+      } catch {
+        return { success: false, latencyMs, error: "Gemini API returned non-JSON response" };
+      }
+
+      return { success: true, latencyMs };
+    } catch (err) {
+      const latencyMs = Date.now() - startedAt;
+      const message = err instanceof Error ? err.message : String(err);
+      return { success: false, latencyMs, error: sanitizeGeminiError(message, this.apiKey) };
+    }
+  }
 }
 
 // The one place that decides which provider implementation is active.
 // Change this function (and only this function) to swap providers later.
-export function getAIProvider(): AIProvider {
-  return new GeminiProvider();
+// apiKey/model are resolved by the caller from ai_provider_config + Vault
+// (see ai-agent-respond/index.ts) -- this factory never reads env vars.
+export function getAIProvider(apiKey: string, model?: string): AIProvider {
+  return new GeminiProvider(apiKey, model);
 }

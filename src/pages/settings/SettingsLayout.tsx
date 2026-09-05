@@ -1,6 +1,6 @@
 import { ReactNode, createContext, useContext } from "react";
 import { NavLink } from "react-router-dom";
-import { Settings, Building2, Calendar, FileText, CreditCard, Briefcase, Bell, Languages, ShieldCheck, Users, HardDrive, ScrollText, Info, GitBranch, Shield, FileSignature, FlaskConical, type LucideIcon } from "lucide-react";
+import { Settings, Building2, Calendar, FileText, CreditCard, Briefcase, Bell, Languages, ShieldCheck, Users, HardDrive, ScrollText, Info, GitBranch, Shield, FileSignature, FlaskConical, Bot, type LucideIcon } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { cn } from "@/lib/utils";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
@@ -41,6 +41,10 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
       { to: "/settings/users", icon: Users, label: t("userManagement") },
       { to: "/settings/backup", icon: HardDrive, label: t("backupExport") },
       { to: "/settings/audit", icon: ScrollText, label: t("auditLogs") },
+      // Plain string label (not run through t()) -- DictKey is a strict
+      // union in src/lib/i18n.ts and adding a new translation entry is out
+      // of scope for this change; avoids a TS compile error from an unknown key.
+      ...(showPlatformTools ? [{ to: "/settings/ai", icon: Bot, label: "AI Receptionist" }] : []),
       ...(showPlatformTools ? [{ to: "/settings/qa", icon: FlaskConical, label: t("qaIdentities") }] : []),
   ] : [];
   const systemItems = [

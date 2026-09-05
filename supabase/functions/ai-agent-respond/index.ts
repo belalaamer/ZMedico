@@ -9,6 +9,20 @@
 // (tenant_id, branch_id, channel_account_id, external_contact_id) is resolved
 // server-side from the conversations/channel_accounts rows before the model
 // is ever invoked.
+//
+// AI PROVIDER RESOLUTION (updated): the Gemini API key is no longer read
+// directly from Deno.env("GEMINI_API_KEY"). It is resolved per-request from
+// public.ai_provider_config (scope='platform', is_active=true) + Supabase
+// Vault, via the get_ai_provider_secret() RPC, using the service-role client.
+// This lets Settings > AI manage provider/model/key from within the app
+// without redeploying secrets. See supabase/functions/ai-admin-settings for
+// the admin API that writes this config.
+//
+// TODO (Level 2 / tenant override): once per-tenant AI provider config is
+// needed, look up ai_provider_config WHERE scope='tenant' AND tenant_id=<this
+// conversation's tenant_id> first, and fall back to the platform row only if
+// no tenant-scoped row exists. For now, per today's explicit scope, this
+// function always uses the platform-scope row.
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -106,6 +120,35 @@ Deno.serve(async (req: Request) => {
     return response({ ok: true, skipped: true, reason: "ai_disabled_or_not_configured" });
   }
 
+  // 2b. Resolve the AI provider's API key + model from ai_provider_config +
+  // Vault (platform scope only, for now -- see TODO above). Never crash if
+  // this is missing; log clearly and skip the AI reply for this turn instead.
+  const { data: providerConfig, error: providerConfigError } = await supabase
+    .from("ai_provider_config")
+    .select("provider, model, temperature, secret_id")
+    .eq("scope", "platform")
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (providerConfigError) {
+    console.error(`[ai-agent-respond] error loading ai_provider_config for conversation_id=${conversationId}:`, providerConfigError);
+    return response({ ok: false, reason: "provider_config_load_error" });
+  }
+
+  if (!providerConfig || !providerConfig.secret_id) {
+    console.error(`[ai-agent-respond] no active AI provider configured (ai_provider_config platform row missing or secret_id null) -- skipping AI reply for conversation_id=${conversationId}`);
+    return response({ ok: true, skipped: true, reason: "ai_provider_not_configured" });
+  }
+
+  const { data: resolvedApiKey, error: secretError } = await supabase.rpc("get_ai_provider_secret", {
+    p_secret_id: providerConfig.secret_id,
+  });
+
+  if (secretError || !resolvedApiKey) {
+    console.error(`[ai-agent-respond] failed to resolve AI provider secret for conversation_id=${conversationId}:`, secretError?.message ?? "empty secret value");
+    return response({ ok: true, skipped: true, reason: "ai_provider_secret_unavailable" });
+  }
+
   const trustedContext: TrustedContext = {
     tenant_id: conversation.tenant_id,
     branch_id: conversation.branch_id,
@@ -137,7 +180,7 @@ Deno.serve(async (req: Request) => {
     }));
 
   const systemInstruction = buildSystemInstruction(settings);
-  const provider = getAIProvider();
+  const provider = getAIProvider(resolvedApiKey as string, providerConfig.model ?? undefined);
 
   let finalText: string | null = null;
   let handedOff = false;

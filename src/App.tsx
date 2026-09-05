@@ -115,6 +115,7 @@ const BackupExport = lazy(() => import("@/pages/settings/BackupExport"));
 const AuditLogs = lazy(() => import("@/pages/settings/AuditLogs"));
 const SystemInfo = lazy(() => import("@/pages/settings/SystemInfo"));
 const QAIdentities = lazy(() => import("@/pages/settings/QAIdentities"));
+const AISettings = lazy(() => import("@/pages/settings/AISettings"));
 const SystemSelfAudit = lazy(() => import("@/pages/system/SystemSelfAudit"));
 const Branches = lazy(() => import("@/pages/branches/Branches"));
 const BranchDashboard = lazy(() => import("@/pages/branches/BranchDashboard"));
@@ -285,6 +286,8 @@ function AppContent() {
               <Route path="/settings/system-info" element={<Navigate to="/settings/system" replace />} />
               {/* QA identities are an internal platform tool, never a clinic-admin setting. */}
               <Route path="/settings/qa" element={<PermissionRoute systemOwnerOnly><QAIdentities /></PermissionRoute>} />
+              {/* AI receptionist provider config is a platform-level, security-sensitive tool -- system_owner only. */}
+              <Route path="/settings/ai" element={<PermissionRoute systemOwnerOnly><AISettings /></PermissionRoute>} />
               <Route path="/commissions" element={<Navigate to="/reports/commissions" replace />} />
               <Route path="/medical-records" element={<Navigate to="/medical/records" replace />} />
               <Route path="/system/self-audit" element={<PermissionRoute adminOnly><SystemSelfAudit /></PermissionRoute>} />

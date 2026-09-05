@@ -45,6 +45,31 @@ async function verifySignature(rawBody: string, req: Request): Promise<boolean> 
   return timingSafeEqual(digest, hexToBytes(signature));
 }
 
+// Fires the AI agent orchestrator for a conversation without blocking (or
+// failing) the webhook's own response to Meta. Uses EdgeRuntime.waitUntil
+// when available (keeps the function instance alive long enough for the
+// background fetch to complete) and falls back to a plain un-awaited fetch
+// with a .catch otherwise.
+function triggerAIAgentRespond(supabaseUrl: string, serviceRoleKey: string, conversationId: string) {
+  const task = fetch(`${supabaseUrl}/functions/v1/ai-agent-respond`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${serviceRoleKey}`,
+    },
+    body: JSON.stringify({ conversation_id: conversationId }),
+  }).catch((err) => {
+    console.error(`[whatsapp-webhook] failed to invoke ai-agent-respond for conversation_id=${conversationId}:`, err);
+  });
+
+  const rt = (globalThis as any).EdgeRuntime;
+  if (rt && typeof rt.waitUntil === "function") {
+    rt.waitUntil(task);
+  }
+  // If EdgeRuntime.waitUntil isn't available, the fire-and-forget fetch above
+  // still runs; we simply don't block the response waiting on it.
+}
+
 // Processes a single inbound customer message (Meta "messages" webhook payload shape).
 // Resolves the tenant via channel_accounts, finds-or-creates the conversation, and
 // inserts the message idempotently on external_message_id. Never throws — all errors
@@ -53,6 +78,8 @@ async function handleInboundMessage(
   supabase: ReturnType<typeof createClient>,
   phoneNumberId: string,
   message: any,
+  supabaseUrl: string,
+  serviceRoleKey: string,
 ) {
   try {
     const { data: channelAccount, error: channelAccountError } = await supabase
@@ -149,6 +176,10 @@ async function handleInboundMessage(
     if (touchConversationError) {
       console.error(`[whatsapp-webhook] error updating last_message_at for conversation_id=${conversationId}:`, touchConversationError);
     }
+
+    // AI agent hook (Phase 2). Fire-and-forget: a failure here must never
+    // fail this webhook's response to Meta.
+    triggerAIAgentRespond(supabaseUrl, serviceRoleKey, conversationId);
   } catch (err) {
     console.error(`[whatsapp-webhook] unexpected error handling inbound message id=${message?.id}:`, err);
   }
@@ -234,7 +265,7 @@ Deno.serve(async (req: Request) => {
           console.warn("[whatsapp-webhook] inbound messages payload missing metadata.phone_number_id; skipping entry");
         } else {
           for (const message of value.messages) {
-            await handleInboundMessage(supabase, phoneNumberId, message);
+            await handleInboundMessage(supabase, phoneNumberId, message, supabaseUrl, serviceRoleKey);
           }
         }
       }

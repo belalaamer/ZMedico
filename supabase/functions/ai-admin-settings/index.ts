@@ -13,8 +13,8 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { corsPreflight, jsonResponse } from "../_shared/cors.ts";
-import { getAIProvider } from "../_shared/ai-provider.ts";
+import { corsPreflight, jsonResponse } from "./_shared/cors.ts";
+import { getAIProvider } from "./_shared/ai-provider.ts";
 
 const DEFAULT_MODEL = "gemini-2.0-flash";
 

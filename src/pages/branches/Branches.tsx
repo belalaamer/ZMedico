@@ -210,6 +210,7 @@ export default function Branches() {
     };
     let error;
     let savedBranchId = editId;
+    const isNewBranch = !editId;
     if (editId) {
       ({ error } = await supabase.from("branches").update(payload).eq("id", editId));
     } else {
@@ -218,6 +219,34 @@ export default function Branches() {
       savedBranchId = created.data?.id ?? null;
     }
     if (error) { toast({ title: error.message, variant: "destructive" }); return; }
+    // Newly created branches need explicit staff_branches rows — branch-scoped
+    // RLS everywhere requires one (see user_has_branch_access()). Without this,
+    // the branch exists but nobody can access it until someone manually
+    // assigns access later via User Management. Grant the creating admin (and
+    // the assigned manager, if different) access right away. This is a
+    // best-effort grant: if it fails, the branch itself still stands — warn
+    // instead of blocking.
+    if (isNewBranch && savedBranchId) {
+      const grantUserIds = new Set<string>();
+      if (user?.id) grantUserIds.add(user.id);
+      if (form.manager_id) grantUserIds.add(form.manager_id);
+      const grantErrors: string[] = [];
+      for (const grantUserId of grantUserIds) {
+        const { error: grantError } = await supabase
+          .from("staff_branches")
+          .insert({ user_id: grantUserId, branch_id: savedBranchId });
+        if (grantError) grantErrors.push(grantError.message);
+      }
+      if (grantErrors.length > 0) {
+        toast({
+          title: lang === "ar"
+            ? "تم إنشاء الفرع، لكن يجب منح صلاحية الوصول يدويًا من إدارة المستخدمين"
+            : "Branch created, but access must be granted manually via User Management",
+          description: grantErrors.join(" · "),
+          variant: "destructive",
+        });
+      }
+    }
     // Keep the main-branch invariant inside this tenant only.
     if (form.is_main_branch && savedBranchId) {
       const { error: mainBranchError } = await supabase

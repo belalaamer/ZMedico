@@ -27,6 +27,9 @@ const PatientPortalLogin = lazy(() => import("@/pages/patientPortal/PatientPorta
 const SelfCheckin = lazy(() => import("@/pages/checkin/SelfCheckin"));
 const RequestTrial = lazy(() => import("@/pages/subscription/RequestTrial"));
 const Trust = lazy(() => import("@/pages/Trust"));
+const PrivacyPolicy = lazy(() => import("@/pages/PrivacyPolicy"));
+const TermsOfService = lazy(() => import("@/pages/TermsOfService"));
+const DataDeletion = lazy(() => import("@/pages/DataDeletion"));
 const Dashboard = lazy(() => import("@/pages/dashboard/Dashboard"));
 const PatientsPage = lazy(() => import("@/pages/patients/Patients"));
 const LeadsPage = lazy(() => import("@/pages/leads/Leads"));
@@ -160,6 +163,9 @@ function AppContent() {
             <Route path="/check-in" element={<SelfCheckin />} />
             <Route path="/request-trial" element={<RequestTrial />} />
             <Route path="/trust" element={<Trust />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<TermsOfService />} />
+            <Route path="/data-deletion" element={<DataDeletion />} />
             <Route path="/patient-portal/login" element={<PatientPortalLogin />} />
             <Route path="/patient-portal" element={<PatientPortal />} />
               <Route

@@ -1,81 +1,13 @@
 import { Link } from "react-router-dom";
+import { Globe2, ShieldCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useI18n } from "@/contexts/I18nContext";
 
 export default function Trust() {
-  return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto max-w-3xl px-6 py-12 space-y-8">
-        <header className="space-y-2">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Trust &amp; Privacy</p>
-          <h1 className="text-3xl font-semibold">Security &amp; Privacy</h1>
-          <p className="text-sm text-muted-foreground">
-            This page is maintained by the clinic operator to answer common
-            security and privacy questions about this application. It is
-            editable content, not an independent certification.
-          </p>
-        </header>
-
-        <section className="space-y-2">
-          <h2 className="text-xl font-medium">Who this app is for</h2>
-          <p className="text-sm text-muted-foreground">
-            The application is an internal staff tool used by clinic
-            personnel to manage appointments, patients, billing and inventory.
-            It is not a public-facing patient portal.
-          </p>
-        </section>
-
-        <section className="space-y-2">
-          <h2 className="text-xl font-medium">Access &amp; authentication</h2>
-          <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
-            <li>Access requires a staff account; there is no anonymous use.</li>
-            <li>User roles (admin, manager, doctor, receptionist, staff, HR) determine which features and data a user can reach.</li>
-            <li>Branch-level isolation restricts staff to the branches they are explicitly assigned to.</li>
-            <li>Sensitive admin operations (user creation, password reset, exports) run through audited server-side functions.</li>
-          </ul>
-        </section>
-
-        <section className="space-y-2">
-          <h2 className="text-xl font-medium">Data protection</h2>
-          <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
-            <li>Row-level security is enabled on application tables, scoped by branch or ownership.</li>
-            <li>Patient documents are stored in a private bucket and served via short-lived signed URLs.</li>
-            <li>Third-party credentials (SMS, WhatsApp, email) are readable only by administrators.</li>
-            <li>Background jobs that bypass per-row rules authenticate with a shared cron secret.</li>
-          </ul>
-        </section>
-
-        <section className="space-y-2">
-          <h2 className="text-xl font-medium">Platform &amp; hosting</h2>
-          <p className="text-sm text-muted-foreground">
-            The application is built on Lovable and uses Lovable Cloud
-            (Supabase) for authentication, database, storage and edge
-            functions. Listing these platform capabilities is not a
-            certification of the operator&apos;s practices.
-          </p>
-        </section>
-
-        <section className="space-y-2">
-          <h2 className="text-xl font-medium">Shared responsibility</h2>
-          <p className="text-sm text-muted-foreground">
-            The platform provides the secure infrastructure. The clinic
-            operator is responsible for configuring access, managing staff
-            accounts, defining retention practices, responding to data
-            requests, and complying with applicable local regulations.
-          </p>
-        </section>
-
-        <section className="space-y-2">
-          <h2 className="text-xl font-medium">Reporting a security issue</h2>
-          <p className="text-sm text-muted-foreground">
-            If you believe you have found a vulnerability or a privacy
-            concern, contact the clinic administrator directly so they can
-            investigate and coordinate a fix.
-          </p>
-        </section>
-
-        <footer className="pt-8 border-t text-xs text-muted-foreground">
-          <Link to="/" className="underline hover:text-foreground">Return to app</Link>
-        </footer>
-      </div>
-    </div>
-  );
+  const { lang, setLang } = useI18n();
+  const isAr = lang === "ar";
+  return <div dir={isAr ? "rtl" : "ltr"} className="min-h-screen bg-background text-foreground"><div className="mx-auto max-w-4xl px-6 py-12"><header className="mb-10 flex items-start justify-between gap-4 border-b pb-6"><div><div className="mb-3 flex items-center gap-2 text-primary"><ShieldCheck className="size-5"/><span className="font-semibold">ZMedico</span></div><h1 className="text-3xl font-bold">{isAr ? "سياسة الخصوصية" : "Privacy Policy"}</h1><p className="mt-2 text-sm text-muted-foreground">{isAr ? "آخر تحديث: سبتمبر 2026" : "Last updated: September 2026"}</p></div><Button variant="outline" size="sm" onClick={() => setLang(isAr ? "en" : "ar")}><Globe2 className="me-2 size-4"/>{isAr ? "English" : "العربية"}</Button></header>{isAr ? <Arabic/> : <English/>}<footer className="mt-12 border-t pt-6 text-sm text-muted-foreground"><Link className="hover:underline" to="/">{isAr ? "العودة إلى ZMedico" : "Back to ZMedico"}</Link></footer></div></div>;
 }
+function Arabic(){return <div className="space-y-8 leading-7"><S t="1. نطاق السياسة">توضح هذه السياسة كيفية تعامل ZMedico مع المعلومات التي يتم جمعها أو معالجتها عند استخدام منصة إدارة العيادات وخدمات التواصل المرتبطة بها.</S><S t="2. البيانات التي قد تتم معالجتها">قد تشمل البيانات معلومات الحساب والموظفين، بيانات العيادة والفروع، بيانات المرضى والمواعيد، الفواتير والمدفوعات والسجلات الطبية التي تدخلها العيادة، وبيانات التواصل مثل أرقام الهواتف والرسائل الواردة عبر القنوات التي تربطها العيادة بالمنصة. وقد تشمل أيضًا معلومات تقنية مثل عنوان IP ونوع الجهاز وسجلات الأخطاء وأحداث الاستخدام اللازمة للأمان والتشغيل.</S><S t="3. استخدام البيانات"><ul className="list-disc space-y-2 ps-6"><li>تقديم وتشغيل وإدارة خدمات ZMedico.</li><li>إدارة الحسابات والصلاحيات والفروع والمواعيد وعمليات العيادة.</li><li>تشغيل تكاملات WhatsApp وInstagram وMessenger عند تفعيلها.</li><li>تحسين الأمان ومنع إساءة الاستخدام واكتشاف الأخطاء.</li><li>تقديم ميزات الأتمتة والذكاء الاصطناعي عند تفعيلها.</li><li>الامتثال للالتزامات القانونية والاستجابة للطلبات المشروعة.</li></ul></S><S t="4. القنوات الخارجية">عند ربط العيادة بخدمات Meta أو مزود قنوات آخر، قد تتم معالجة الرسائل وبيانات الحساب وفق إعدادات العيادة وسياسات المزود المعني. لا تستخدم ZMedico التكاملات للوصول إلى معلومات خارج النطاق المصرح به.</S><S t="5. الذكاء الاصطناعي">قد توفر ZMedico ميزات AI للرد على الاستفسارات والتأهيل والمساعدة في الحجز والتواصل. عند تفعيلها، تتم معالجة المعلومات اللازمة لتنفيذ الطلب. الردود الآلية ليست تشخيصًا طبيًا ولا بديلًا عن قرار المختص.</S><S t="6. العزل والصلاحيات">تم تصميم المنصة لدعم تعدد العيادات والفروع مع فصل بيانات المستأجرين والصلاحيات. الوصول إلى بيانات المرضى والموظفين والعمليات يقتصر على المستخدمين المصرح لهم وفق أدوارهم وإعدادات العيادة.</S><S t="7. الاحتفاظ والحذف">تحتفظ ZMedico بالبيانات للمدة اللازمة لتقديم الخدمة والأمان والمتطلبات التشغيلية أو القانونية. يمكن طلب الحذف من خلال آلية حذف البيانات أو وسيلة الاتصال الرسمية.</S><S t="8. حماية البيانات">نستخدم ضوابط وصول وصلاحيات، وحماية على مستوى الصفوف حيثما ينطبق، وتخزينًا خاصًا للملفات الحساسة وروابط مؤقتة للملفات الخاصة وسجلات تدقيق للأحداث المهمة. لا توجد وسيلة إلكترونية يمكن ضمان أنها آمنة بنسبة 100%.</S><S t="9. مسؤولية العيادة">العيادة مسؤولة عن مشروعية جمع بيانات مرضاها، صحة البيانات، تحديد الصلاحيات، مدد الاحتفاظ، والموافقات أو الإخطارات المطلوبة وفق القانون المطبق.</S><S t="10. حقوق أصحاب البيانات">بحسب القانون المطبق، قد يحق لصاحب البيانات طلب الوصول أو التصحيح أو الحذف أو تقييد المعالجة. تبدأ هذه الطلبات عادةً من خلال الجهة التي جمعت البيانات.</S><S t="11. التغييرات والتواصل">قد يتم تحديث هذه السياسة عند إضافة وظائف أو تكاملات أو تغير المتطلبات القانونية. للاستفسارات المتعلقة بالخصوصية، استخدم وسيلة الاتصال الرسمية المعلنة في موقع ZMedico.</S></div>}
+function English(){return <div className="space-y-8 leading-7"><S t="1. Scope">This policy explains how ZMedico handles information collected or processed when you use the clinic-management platform and connected communication services.</S><S t="2. Information We May Process">Information may include account and staff details, clinic and branch data, patient and appointment data, billing and payment information and medical records entered by a clinic, communication data such as phone numbers and messages received through connected channels, and technical information such as IP address, device type, error logs, and usage events needed for security and operation.</S><S t="3. How We Use Information"><ul className="list-disc space-y-2 ps-6"><li>Provide and administer ZMedico services.</li><li>Manage accounts, permissions, branches, appointments, and clinic operations.</li><li>Operate WhatsApp, Instagram, and Messenger integrations when enabled.</li><li>Maintain security, prevent abuse, and diagnose technical problems.</li><li>Provide automation and AI features when enabled.</li><li>Comply with legal obligations and respond to lawful requests.</li></ul></S><S t="4. Third-Party Channels">When a clinic connects Meta or another communication provider, messages and account information may be processed according to the clinic configuration and provider policies. ZMedico does not use integrations to access information beyond the authorized scope.</S><S t="5. Artificial Intelligence">ZMedico may provide AI features for inquiries, qualification, booking assistance, and communication. When enabled, necessary information may be processed. Automated responses are not medical diagnosis and do not replace professional judgment.</S><S t="6. Isolation and Access Controls">The platform is designed to support multiple clinics and branches with tenant and permission isolation. Access is limited to authorized users according to roles and clinic configuration.</S><S t="7. Retention and Deletion">ZMedico retains information as necessary to provide the service, maintain security, meet operational requirements, or comply with legal obligations. Deletion may be requested through the platform's deletion process or official contact channel.</S><S t="8. Data Security">We use access controls, row-level controls where applicable, private storage for sensitive files, temporary links for private files, and audit logging for important events. No electronic method can be guaranteed to be completely secure.</S><S t="9. Clinic Responsibilities">The clinic is responsible for lawful collection of patient information, data accuracy, access permissions, retention practices, and required notices or consents under applicable law.</S><S t="10. Data Subject Rights">Depending on applicable law, individuals may have rights to access, correct, delete, or restrict processing of their information. Such requests will generally begin with the organization that collected the information.</S><S t="11. Changes and Contact">We may update this policy when functionality, integrations, or legal requirements change. For privacy questions, use the official contact method published on the ZMedico website.</S></div>}
+function S({t,children}:{t:string;children:React.ReactNode}){return <section className="space-y-3"><h2 className="text-xl font-semibold">{t}</h2><div className="space-y-3 text-muted-foreground">{children}</div></section>}

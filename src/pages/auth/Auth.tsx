@@ -58,7 +58,7 @@ export default function AuthPage() {
   const location = useLocation();
   const selectedPlan = useMemo(() => new URLSearchParams(location.search).get("plan"), [location.search]);
   const requestTrialHref = selectedPlan ? `/request-trial?plan=${encodeURIComponent(selectedPlan)}` : "/request-trial";
-  const brandName = branding?.display_name || (isBrandedTenantHost ? window.location.hostname.split(".")[0] : t("appName"));
+  const brandName = branding?.display_name || t("appName");
   const from = useMemo(() => {
     const params = new URLSearchParams(location.search);
     const next = params.get("next");

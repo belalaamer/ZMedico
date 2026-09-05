@@ -40,7 +40,7 @@ type BrandingContextValue = {
 const BrandingContext = createContext<BrandingContextValue>({ branding: null, loading: false, isBrandedTenantHost: false });
 
 function isPlatformHost(hostname: string) {
-  return !hostname || hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".workers.dev") || hostname === "belalaamer.com" || hostname === "www.belalaamer.com";
+  return !hostname || hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".workers.dev") || hostname === "belalaamer.com" || hostname === "www.belalaamer.com" || hostname === "zmedico.com" || hostname === "www.zmedico.com";
 }
 
 export function TenantBrandingProvider({ children }: { children: ReactNode }) {

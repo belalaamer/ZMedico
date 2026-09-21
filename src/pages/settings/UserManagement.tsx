@@ -34,6 +34,7 @@ import { roleLabel } from "@/lib/roleLabels";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 
 const ROLES = ["system_owner", "admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr"] as const;
+const ADMIN_PASSWORD_RESET_ENABLED = false;
 type Role = typeof ROLES[number];
 
 // RBAC-05 fix: the admin-create-user edge function requires branch_id for
@@ -716,10 +717,12 @@ export default function UserManagement() {
                                 </>
                               )}
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => { setRPassword(""); setResetTarget(u); }}>
-                                <Lock className="me-2 size-4" />
-                                {lang === "ar" ? "إعادة تعيين كلمة المرور" : "Reset password"}
-                              </DropdownMenuItem>
+                              {ADMIN_PASSWORD_RESET_ENABLED && (
+                                <DropdownMenuItem onClick={() => { setRPassword(""); setResetTarget(u); }}>
+                                  <Lock className="me-2 size-4" />
+                                  {lang === "ar" ? "إعادة تعيين كلمة المرور" : "Reset password"}
+                                </DropdownMenuItem>
+                              )}
                               {!isSelf && (
                                 <DropdownMenuItem
                                   className="text-destructive focus:text-destructive"

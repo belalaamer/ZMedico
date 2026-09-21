@@ -550,7 +550,7 @@ export function CreateInvoiceDialog({
         )}
 
         <div className="border border-border rounded-lg overflow-hidden">
-          <div className="grid grid-cols-12 gap-2 bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground">
+          <div className="hidden md:grid grid-cols-12 gap-2 bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground">
             <div className="col-span-2">{t("itemType")}</div>
             <div className="col-span-3">{t("description")}</div>
             <div className="col-span-2 text-end">{t("quantity")}</div>
@@ -559,8 +559,9 @@ export function CreateInvoiceDialog({
             <div className="col-span-1"></div>
           </div>
           {items.map((it, idx) => (
-            <div key={idx} className="grid grid-cols-12 gap-2 px-3 py-2 border-t border-border">
-              <div className="col-span-2">
+            <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-2 px-3 py-3 border-t border-border">
+              <div className="md:col-span-2">
+                <div className="mb-1 text-[11px] text-muted-foreground md:hidden">{t("itemType")}</div>
                 <Select value={it.item_type} onValueChange={(v) => updateItem(idx, { item_type: v as Item["item_type"], product_id: v === "product" ? it.product_id : null })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -570,7 +571,8 @@ export function CreateInvoiceDialog({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="col-span-3 grid gap-1">
+              <div className="md:col-span-3 grid gap-1">
+                <div className="text-[11px] text-muted-foreground md:hidden">{t("description")}</div>
                 {it.item_type === "product" ? (
                   <Select value={it.product_id ?? ""} onValueChange={(v) => pickProduct(idx, v)}>
                     <SelectTrigger><SelectValue placeholder={t("selectProduct")} /></SelectTrigger>
@@ -609,13 +611,28 @@ export function CreateInvoiceDialog({
                   <Input value={it.description_en} placeholder="Description" onChange={(e) => updateItem(idx, { description_en: e.target.value, description_ar: e.target.value })} />
                 )}
               </div>
-              <NumberInput className="col-span-2 text-end" value={it.quantity} onChange={(v) => updateItem(idx, { quantity: v })} />
-              <NumberInput className="col-span-2 text-end" value={it.unit_price} onChange={(v) => updateItem(idx, { unit_price: v })} />
-              <div className="col-span-2 text-end self-center font-medium tabular-nums">
-                {formatMoney((Number(it.quantity)||0) * (Number(it.unit_price)||0), lang)}
+              <div className="md:col-span-2">
+                <div className="mb-1 text-[11px] text-muted-foreground md:hidden">{t("quantity")}</div>
+                <NumberInput className="w-full text-end" value={it.quantity} onChange={(v) => updateItem(idx, { quantity: v })} />
               </div>
-              <div className="col-span-1 self-center">
-                <Button type="button" variant="ghost" size="icon" onClick={() => setItems((a) => a.filter((_, i) => i !== idx))}>
+              <div className="md:col-span-2">
+                <div className="mb-1 text-[11px] text-muted-foreground md:hidden">{t("unitPrice")}</div>
+                <NumberInput className="w-full text-end" value={it.unit_price} onChange={(v) => updateItem(idx, { unit_price: v })} />
+              </div>
+              <div className="md:col-span-2 md:text-end self-center">
+                <div className="mb-1 text-[11px] text-muted-foreground md:hidden">{t("total")}</div>
+                <div className="font-medium tabular-nums">
+                  {formatMoney((Number(it.quantity)||0) * (Number(it.unit_price)||0), lang)}
+                </div>
+              </div>
+              <div className="md:col-span-1 self-center flex justify-end">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={lang === "ar" ? "حذف البند" : "Remove item"}
+                  onClick={() => setItems((a) => a.filter((_, i) => i !== idx))}
+                >
                   <Trash2 className="size-4" />
                 </Button>
               </div>

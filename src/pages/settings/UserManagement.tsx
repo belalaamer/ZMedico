@@ -31,14 +31,14 @@ import { ListSkeleton } from "@/components/ListSkeleton";
 import { TablePager } from "@/components/TablePager";
 import { toast } from "sonner";
 import { roleLabel } from "@/lib/roleLabels";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 
 const ROLES = ["system_owner", "admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr"] as const;
 type Role = typeof ROLES[number];
 
 // RBAC-05 fix: the admin-create-user edge function requires branch_id for
-// manager, doctor, nurse, receptionist, and accountant (its own
-// rolesRequiringBranch list also includes the retired "staff" role, which is
-// omitted here since it can never be selected from this UI's ROLES list).
+// every operational role. The retired "staff" role is intentionally absent,
+// and system_owner is only exposed to an existing System Owner.
 // This form previously only collected/validated branch for "manager",
 // so creating a doctor/nurse/receptionist/accountant account here always
 // failed server-side with "Branch is required for role: <role>" -- a
@@ -94,6 +94,10 @@ function suggestRoleFromPosition(titleEn: string | null | undefined, groupKey: s
 export default function UserManagement() {
   const { t, lang } = useI18n();
   const { currentBranchId, branchSelectionReady } = useBranch();
+  const { authz } = useAuthorization("UserManagement");
+  const visibleRoleOptions = authz.holdsAnyRole("system_owner")
+    ? ROLES
+    : ROLES.filter((role) => role !== "system_owner");
   const [users, setUsers] = useState<any[]>([]);
   const [roles, setRoles] = useState<Record<string, string[]>>({});
   const [q, setQ] = useState("");
@@ -588,7 +592,7 @@ export default function UserManagement() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{lang === "ar" ? "كل الأدوار" : "All roles"}</SelectItem>
-                {ROLES.map((r) => (
+                {visibleRoleOptions.map((r) => (
                   <SelectItem key={r} value={r}>{roleLabel(r, lang)}</SelectItem>
                 ))}
               </SelectContent>
@@ -813,7 +817,7 @@ export default function UserManagement() {
                 <Select value={invRole} onValueChange={(v) => setInvRole(v as Role)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {ROLES.map((r) => (
+                    {visibleRoleOptions.map((r) => (
                       <SelectItem key={r} value={r}>{roleLabel(r, lang)}</SelectItem>
                     ))}
                   </SelectContent>
@@ -926,7 +930,7 @@ export default function UserManagement() {
                 <Select value={cRole} onValueChange={(v) => setCRole(v as Role)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {ROLES.map((r) => (
+                    {visibleRoleOptions.map((r) => (
                       <SelectItem key={r} value={r}>{roleLabel(r, lang)}</SelectItem>
                     ))}
                   </SelectContent>
@@ -1067,7 +1071,7 @@ export default function UserManagement() {
                 <Select value={eRole} onValueChange={(v) => setERole(v as Role)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {ROLES.map((r) => (
+                    {visibleRoleOptions.map((r) => (
                       <SelectItem key={r} value={r}>{roleLabel(r, lang)}</SelectItem>
                     ))}
                   </SelectContent>
@@ -1246,7 +1250,7 @@ export default function UserManagement() {
                 <Select value={pickedRole} onValueChange={(v) => setPickedRole(v as Role)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {ROLES.map((r) => (
+                    {visibleRoleOptions.map((r) => (
                       <SelectItem key={r} value={r}>{roleLabel(r, lang)}</SelectItem>
                     ))}
                   </SelectContent>

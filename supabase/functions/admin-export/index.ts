@@ -44,6 +44,7 @@ Deno.serve(async (req) => {
     if (roleErr || !roleRow) {
       return json({ error: "Forbidden: administrator access required" }, 403);
     }
+    const isSystemOwner = roleRow.role === "system_owner";
 
     const body = await req.json().catch(() => ({}));
     const mode = body?.mode === "all" ? "all" : "table";
@@ -62,7 +63,26 @@ Deno.serve(async (req) => {
     }
 
     const requestId = crypto.randomUUID();
-    const branchId = typeof body?.branch_id === "string" ? body.branch_id : null;
+    const branchId = typeof body?.branch_id === "string" && body.branch_id.trim()
+      ? body.branch_id.trim()
+      : null;
+
+    if (!isSystemOwner && !branchId) {
+      return json({ error: "branch_id is required for branch administrators" }, 400);
+    }
+
+    if (branchId && !isSystemOwner) {
+      const { data: branchLink, error: branchLinkErr } = await admin
+        .from("staff_branches")
+        .select("branch_id")
+        .eq("user_id", userData.user.id)
+        .eq("branch_id", branchId)
+        .maybeSingle();
+      if (branchLinkErr || !branchLink) {
+        return json({ error: "Requested branch is outside your scope" }, 403);
+      }
+    }
+
     const startedAt = new Date().toISOString();
     // Pre-export audit record: written BEFORE any data is read so a caller
     // cannot exfiltrate data without leaving a trail. Row counts are
@@ -84,8 +104,36 @@ Deno.serve(async (req) => {
     });
 
     const out: Record<string, unknown[]> = {};
+    let branchProductIds: string[] | null = null;
+
+    if (branchId && tables.includes("products")) {
+      const { data: inventoryRows, error: inventoryErr } = await admin
+        .from("inventory")
+        .select("product_id")
+        .eq("branch_id", branchId)
+        .not("product_id", "is", null)
+        .limit(10000);
+      if (inventoryErr) return json({ error: "Failed to resolve branch products" }, 500);
+      branchProductIds = Array.from(new Set((inventoryRows ?? []).map((row) => row.product_id).filter(Boolean)));
+    }
+
     for (const tbl of tables) {
-      const { data, error } = await admin.from(tbl).select("*").limit(10000);
+      let query = admin.from(tbl).select("*");
+
+      if (branchId) {
+        if (tbl === "products") {
+          if (!branchProductIds?.length) {
+            out[tbl] = [];
+            rowCounts[tbl] = 0;
+            continue;
+          }
+          query = query.in("id", branchProductIds);
+        } else {
+          query = query.eq("branch_id", branchId);
+        }
+      }
+
+      const { data, error } = await query.limit(10000);
       if (error) return json({ error: `Failed to read ${tbl}` }, 500);
       out[tbl] = data ?? [];
       rowCounts[tbl] = (data ?? []).length;

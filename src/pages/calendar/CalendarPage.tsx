@@ -978,15 +978,25 @@ export default function CalendarPage() {
               <LayoutGrid className="size-4" />{lang === "ar" ? "جدول الغرف" : "Room board"}
             </Button>
           ) : null}
-          <Button variant="outline" size="icon" onClick={() => {
-            if (view === "month") setDate(new Date(date.getFullYear(), date.getMonth() - 1, 1));
-            else setDate(addDays(date, view === "week" ? -7 : -1));
-          }}><ChevronLeft className="size-4 rtl:rotate-180" /></Button>
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label={lang === "ar" ? "الفترة السابقة" : "Previous period"}
+            onClick={() => {
+              if (view === "month") setDate(new Date(date.getFullYear(), date.getMonth() - 1, 1));
+              else setDate(addDays(date, view === "week" ? -7 : -1));
+            }}
+          ><ChevronLeft className="size-4 rtl:rotate-180" /></Button>
           <Button variant="outline" size="sm" onClick={() => setDate(startOfDay(new Date()))}>{t("today")}</Button>
-          <Button variant="outline" size="icon" onClick={() => {
-            if (view === "month") setDate(new Date(date.getFullYear(), date.getMonth() + 1, 1));
-            else setDate(addDays(date, view === "week" ? 7 : 1));
-          }}><ChevronRight className="size-4 rtl:rotate-180" /></Button>
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label={lang === "ar" ? "الفترة التالية" : "Next period"}
+            onClick={() => {
+              if (view === "month") setDate(new Date(date.getFullYear(), date.getMonth() + 1, 1));
+              else setDate(addDays(date, view === "week" ? 7 : 1));
+            }}
+          ><ChevronRight className="size-4 rtl:rotate-180" /></Button>
           <Popover open={miniOpen} onOpenChange={setMiniOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" size="icon" aria-label={lang === "ar" ? "التقويم" : "Calendar"}>

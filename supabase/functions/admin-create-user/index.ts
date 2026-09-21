@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
     const full_name = body.full_name ? String(body.full_name).trim() : null;
     const full_name_en = body.full_name_en ? String(body.full_name_en).trim() : null;
     const full_name_ar = body.full_name_ar ? String(body.full_name_ar).trim() : null;
-    const role = String(body.role ?? "staff");
+    const role = String(body.role ?? "");
     const branch_id = body.branch_id ? String(body.branch_id) : null;
     // If the admin supplied an explicit password, use it. Otherwise generate a
     // temporary password. In both cases the account can sign in immediately.
@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
     }
     const allowedRoles = [
       "admin", "manager", "doctor", "nurse",
-      "receptionist", "accountant", "hr", "staff",
+      "receptionist", "accountant", "hr",
     ];
     if (!allowedRoles.includes(role)) {
       return jsonResponse({ error: "Invalid role" }, 400);

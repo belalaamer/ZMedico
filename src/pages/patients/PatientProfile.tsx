@@ -158,7 +158,7 @@ export default function PatientProfile() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <Button asChild variant="ghost" size="sm"><Link to="/patients"><ArrowLeft className="me-2 size-4" />{t("patients")}</Link></Button>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full sm:w-auto flex-wrap items-center justify-end gap-2">
           <Button asChild variant="outline" size="sm"><Link to={`/patients/${patient.id}/dental`}><Stethoscope className="me-2 size-4"/>{t("dentalChart")}</Link></Button>
           <Can permission="patients.edit">
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>

@@ -3,11 +3,11 @@ import { ACTIONS, DEFAULT_PERMISSIONS, MODULES, ROLES, defaultActionsFor, module
 
 describe("role-based permission matrix", () => {
   it("keeps the supported role catalog explicit", () => {
-    expect(ROLES).toEqual(["system_owner", "admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr"]);
+    expect(ROLES).toEqual(["admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr"]);
   });
 
   it("allows delete only to the clinic admin role", () => {
-    for (const role of ROLES.filter((candidate) => candidate !== "system_owner")) {
+    for (const role of ROLES) {
       for (const module of MODULES) {
         const actions = defaultActionsFor(role, module);
         if (role === "admin") expect(actions).toContain("delete");

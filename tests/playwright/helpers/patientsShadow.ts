@@ -14,7 +14,7 @@ const ENV_MAP: Record<ShadowPatientsRole, { email: string; pass: string }> = {
   admin:        { email: "TEST_ADMIN_EMAIL",        pass: "TEST_ADMIN_PASSWORD" },
   manager:      { email: "TEST_MANAGER_EMAIL",      pass: "TEST_MANAGER_PASSWORD" },
   receptionist: { email: "TEST_RECEPTIONIST_EMAIL", pass: "TEST_RECEPTIONIST_PASSWORD" },
-  staff:        { email: "TEST_STAFF_EMAIL",        pass: "TEST_STAFF_PASSWORD" },
+  hr:           { email: "TEST_HR_EMAIL",           pass: "TEST_HR_PASSWORD" },
 };
 
 export function getPatientsRoleCreds(role: ShadowPatientsRole): RoleCreds | null {

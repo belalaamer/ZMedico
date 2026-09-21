@@ -80,9 +80,13 @@ export default function Dashboard() {
   const { authz } = useAuthorization("Dashboard");
   const canFinance = authz.can("invoices.view") || authz.can("treasury.view");
   const canTreasury = authz.can("treasury.view");
-  const canFrontDeskIntake = authz.can("patients.create") || authz.can("appointments.create");
+  const canPatients = authz.can("patients.view");
+  const canCreatePatient = authz.can("patients.create");
+  const canCreateAppointment = authz.can("appointments.create");
+  const canCreateInvoice = authz.can("invoices.create");
   const canClinical = authz.can("medical_records.view");
   const canOpsReports = authz.can("reports_operational.view");
+  const canReports = authz.can("reports.view") || canOpsReports;
   const canHR = authz.can("hr.view");
   const canBookings = authz.can("appointments.view");
 
@@ -484,10 +488,10 @@ export default function Dashboard() {
             <p className="text-xs text-primary-foreground/65 mt-4">{formatDate(new Date(), lang)}</p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap lg:max-w-md lg:justify-end">
-            {canFrontDeskIntake && <Button asChild className="min-h-11 w-full bg-white text-primary hover:bg-white/90 shadow-sm sm:w-auto"><Link to="/patients"><UserPlus className="size-4 me-2" />{t("addPatient")}</Link></Button>}
-            <Button asChild variant="outline" className="min-h-11 w-full border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white sm:w-auto"><Link to="/calendar"><CalendarCheck className="size-4 me-2" />{t("newAppointment")}</Link></Button>
-            {canFinance && <Button asChild variant="outline" className="min-h-11 w-full border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white sm:w-auto"><Link to="/invoices"><Receipt className="size-4 me-2" />{t("createInvoice")}</Link></Button>}
-            <Button asChild variant="outline" className="min-h-11 w-full border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white sm:w-auto"><Link to="/reports"><FileText className="size-4 me-2" />{t("viewAllReports")}</Link></Button>
+            {canCreatePatient && <Button asChild className="min-h-11 w-full bg-white text-primary hover:bg-white/90 shadow-sm sm:w-auto"><Link to="/patients"><UserPlus className="size-4 me-2" />{t("addPatient")}</Link></Button>}
+            {canCreateAppointment && <Button asChild variant="outline" className="min-h-11 w-full border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white sm:w-auto"><Link to="/calendar"><CalendarCheck className="size-4 me-2" />{t("newAppointment")}</Link></Button>}
+            {canCreateInvoice && <Button asChild variant="outline" className="min-h-11 w-full border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white sm:w-auto"><Link to="/invoices"><Receipt className="size-4 me-2" />{t("createInvoice")}</Link></Button>}
+            {canReports && <Button asChild variant="outline" className="min-h-11 w-full border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white sm:w-auto"><Link to="/reports"><FileText className="size-4 me-2" />{t("viewAllReports")}</Link></Button>}
           </div>
         </div>
       </section>
@@ -616,9 +620,9 @@ export default function Dashboard() {
           <h2 className="mt-4 text-xl font-semibold">{t("noDataYet")}</h2>
           <p className="mt-1 text-sm text-muted-foreground">{t("noDataYetDesc")}</p>
           <div className="mt-5 flex justify-center gap-2 flex-wrap">
-            {canFrontDeskIntake && <Button asChild><Link to="/patients">{t("addPatient")}</Link></Button>}
-            <Button asChild variant="outline"><Link to="/calendar">{t("newAppointment")}</Link></Button>
-            {canFinance && <Button asChild variant="outline"><Link to="/invoices">{t("createInvoice")}</Link></Button>}
+            {canCreatePatient && <Button asChild><Link to="/patients">{t("addPatient")}</Link></Button>}
+            {canCreateAppointment && <Button asChild variant="outline"><Link to="/calendar">{t("newAppointment")}</Link></Button>}
+            {canCreateInvoice && <Button asChild variant="outline"><Link to="/invoices">{t("createInvoice")}</Link></Button>}
           </div>
         </Card>
       ) : (
@@ -637,7 +641,7 @@ export default function Dashboard() {
                 icon={Stethoscope} tone="from-primary-glow to-primary" to={`/calendar?date=${localToday()}`}
               />
             )}
-            {canFrontDeskIntake && (
+            {canPatients && (
               <StatCard
                 label={t("newPatientsToday")} value={newPatientsToday}
                 icon={UserPlus} tone="from-info to-info" to="/patients"

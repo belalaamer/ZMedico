@@ -13,7 +13,7 @@ export const STORAGE_STATE_ADMIN = path.resolve(
 // Per-role storage state files for the Settings shadow QA. Files are
 // written by `settings.setup.ts` if the corresponding TEST_<ROLE>_EMAIL /
 // TEST_<ROLE>_PASSWORD env vars are set; otherwise that role is skipped.
-export const SHADOW_ROLES = ["admin", "manager", "accountant", "staff"] as const;
+export const SHADOW_ROLES = ["admin", "manager", "accountant", "doctor"] as const;
 export type ShadowRole = (typeof SHADOW_ROLES)[number];
 export const shadowStorageState = (role: ShadowRole) =>
   path.resolve(__dirname, `tests/playwright/.auth/shadow-${role}.json`);
@@ -25,7 +25,7 @@ export const SHADOW_PATIENTS_ROLES = [
   "admin",
   "manager",
   "receptionist",
-  "staff",
+  "hr",
 ] as const;
 export type ShadowPatientsRole = (typeof SHADOW_PATIENTS_ROLES)[number];
 export const patientsShadowStorageState = (role: ShadowPatientsRole) =>
@@ -38,7 +38,7 @@ export const SHADOW_MEDICAL_ROLES = [
   "admin",
   "doctor",
   "manager",
-  "staff",
+  "accountant",
 ] as const;
 export type ShadowMedicalRole = (typeof SHADOW_MEDICAL_ROLES)[number];
 export const medicalShadowStorageState = (role: ShadowMedicalRole) =>
@@ -51,7 +51,7 @@ export const SHADOW_HR_ROLES = [
   "admin",
   "hr",
   "manager",
-  "staff",
+  "accountant",
 ] as const;
 export type ShadowHrRole = (typeof SHADOW_HR_ROLES)[number];
 export const hrShadowStorageState = (role: ShadowHrRole) =>
@@ -59,12 +59,12 @@ export const hrShadowStorageState = (role: ShadowHrRole) =>
 
 // Per-role storage state files for the Invoices / Finance shadow QA.
 // Uses accountant + receptionist as the two non-admin write roles;
-// staff is the required denied role.
+// doctor is the required denied role (the retired staff role can no longer be provisioned).
 export const SHADOW_INVOICES_ROLES = [
   "admin",
   "accountant",
   "receptionist",
-  "staff",
+  "doctor",
 ] as const;
 export type ShadowInvoicesRole = (typeof SHADOW_INVOICES_ROLES)[number];
 export const invoicesShadowStorageState = (role: ShadowInvoicesRole) =>

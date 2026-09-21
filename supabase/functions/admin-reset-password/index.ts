@@ -53,6 +53,57 @@ Deno.serve(async (req) => {
       : null;
     const nextPassword = suppliedPassword ?? genTemporaryPassword(32);
 
+    const { data: callerIsSystemOwner, error: callerOwnerErr } = await admin.rpc("has_role", {
+      _user_id: userData.user.id,
+      _role: "system_owner",
+    });
+    if (callerOwnerErr) {
+      return jsonResponse({ error: "Unable to verify caller scope" }, 500);
+    }
+
+    const { data: targetIsSystemOwner, error: targetOwnerErr } = await admin.rpc("has_role", {
+      _user_id: user_id,
+      _role: "system_owner",
+    });
+    if (targetOwnerErr) {
+      return jsonResponse({ error: "Unable to verify target role" }, 500);
+    }
+
+    if (targetIsSystemOwner && !callerIsSystemOwner) {
+      return jsonResponse({ error: "Only the System Owner may reset another System Owner password" }, 403);
+    }
+
+    if (!callerIsSystemOwner) {
+      const { data: targetBranches, error: branchErr } = await admin
+        .from("staff_branches")
+        .select("branch_id")
+        .eq("user_id", user_id);
+      if (branchErr) {
+        return jsonResponse({ error: "Unable to verify target branch" }, 500);
+      }
+      if (!targetBranches?.length) {
+        return jsonResponse({ error: "Target user is outside your branch scope" }, 403);
+      }
+
+      let inScope = false;
+      for (const row of targetBranches) {
+        const { data: allowed, error: scopeErr } = await admin.rpc("user_has_branch_access_for_user", {
+          _user_id: userData.user.id,
+          _branch: row.branch_id,
+        });
+        if (scopeErr) {
+          return jsonResponse({ error: "Unable to verify branch scope" }, 500);
+        }
+        if (allowed === true) {
+          inScope = true;
+          break;
+        }
+      }
+      if (!inScope) {
+        return jsonResponse({ error: "Target user is outside your branch scope" }, 403);
+      }
+    }
+
     // Look up email for the target user so the admin UI can display it with
     // the one-time password returned below.
     const { data: target, error: getErr } =

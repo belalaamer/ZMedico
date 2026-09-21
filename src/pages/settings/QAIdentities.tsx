@@ -16,8 +16,7 @@ type QARoleKey =
   | "receptionist"
   | "doctor"
   | "nurse"
-  | "hr"
-  | "staff";
+  | "hr";
 
 type QAAccount = {
   key: QARoleKey;
@@ -41,7 +40,6 @@ const ACCOUNTS: QAAccount[] = [
   { key: "doctor", email: "qa.doctor@qa.local", role: "doctor", envPrefix: "TEST_DOCTOR", requiresBranch: true },
   { key: "nurse", email: "qa.nurse@qa.local", role: "nurse", envPrefix: "TEST_NURSE", requiresBranch: true },
   { key: "hr", email: "qa.hr@qa.local", role: "hr", envPrefix: "TEST_HR", requiresBranch: true },
-  { key: "staff", email: "qa.staff@qa.local", role: "staff", envPrefix: "TEST_STAFF", requiresBranch: true },
 ];
 
 type ExistingMap = Record<string, { id: string; email: string } | null>;

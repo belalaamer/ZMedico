@@ -78,7 +78,8 @@ export default function Dashboard() {
   // still does — Postgres RLS remains the sole data-authorization boundary.
   // Hiding a card here never substitutes for, or weakens, that boundary.
   const { authz } = useAuthorization("Dashboard");
-  const canFinance = authz.can("invoices.view") || authz.can("treasury.view");
+  const canInvoices = authz.can("invoices.view");
+  const canFinance = canInvoices || authz.can("treasury.view");
   const canTreasury = authz.can("treasury.view");
   const canPatients = authz.can("patients.view");
   const canCreatePatient = authz.can("patients.create");
@@ -162,14 +163,15 @@ export default function Dashboard() {
     const re = new Date(rangeEnd + "T23:59:59");
 
     const branchEq = (q: any) => q.eq("branch_id", currentBranchId);
+    const emptyResult = () => Promise.resolve({ data: [], count: 0, error: null });
 
     // `leave_requests` has no branch_id column of its own, so branch scope
     // must be derived through staff_profiles -- the same indirection the
     // treasury widgets below use via treasury_id. Without this the pending
     // approvals badge counted every tenant's requests, not this branch's.
-    const { data: branchStaffRows } = await branchEq(
-      supabase.from("staff_profiles").select("id")
-    );
+    const { data: branchStaffRows } = canHR
+      ? await branchEq(supabase.from("staff_profiles").select("id"))
+      : { data: [] as any[] };
     const branchStaffIds = ((branchStaffRows ?? []) as any[])
       .map((r) => r.id)
       .filter(Boolean);
@@ -192,41 +194,41 @@ export default function Dashboard() {
         pendingLeaveRes,
         pendingBookingsRes,
       ] = await Promise.all([
-        branchEq(supabase.from("appointments").select("status,doctor_id")
+        canBookings ? branchEq(supabase.from("appointments").select("status,doctor_id")
           .is("deleted_at", null)
-          .gte("scheduled_at", start.toISOString()).lte("scheduled_at", end.toISOString())),
-        branchEq(supabase.from("patients").select("id", { count: "exact", head: true })
+          .gte("scheduled_at", start.toISOString()).lte("scheduled_at", end.toISOString())) : emptyResult(),
+        canPatients ? branchEq(supabase.from("patients").select("id", { count: "exact", head: true })
           .is("deleted_at", null)
-          .gte("created_at", start.toISOString()).lte("created_at", end.toISOString())),
-        branchEq(supabase.from("payments").select("amount").is("deleted_at", null).eq("payment_date", todayDate)),
-        branchEq(supabase.from("invoices").select("id,total,paid_amount").is("deleted_at", null).in("status", ["pending", "partial"])),
-        branchEq(supabase.from("medical_records").select("id", { count: "exact", head: true }).eq("visit_date", todayDate)),
-        branchEq(supabase.from("medical_records").select("id", { count: "exact", head: true }).eq("status", "draft")),
-        branchEq(supabase.from("payments").select("payment_date,amount").is("deleted_at", null)
-          .gte("payment_date", rangeStart).lte("payment_date", rangeEnd)),
-        branchEq(supabase.from("appointments").select("status").is("deleted_at", null).gte("scheduled_at", rs.toISOString()).lte("scheduled_at", re.toISOString())),
-        branchEq(supabase.from("patients").select("dob,referral_source").is("deleted_at", null)),
-        branchEq(supabase.from("patients").select("id,first_name_en,first_name_ar,last_name_en,last_name_ar,name_language,phone,created_at")
+          .gte("created_at", start.toISOString()).lte("created_at", end.toISOString())) : emptyResult(),
+        canInvoices ? branchEq(supabase.from("payments").select("amount").is("deleted_at", null).eq("payment_date", todayDate)) : emptyResult(),
+        canInvoices ? branchEq(supabase.from("invoices").select("id,total,paid_amount").is("deleted_at", null).in("status", ["pending", "partial"])) : emptyResult(),
+        canClinical ? branchEq(supabase.from("medical_records").select("id", { count: "exact", head: true }).eq("visit_date", todayDate)) : emptyResult(),
+        canClinical ? branchEq(supabase.from("medical_records").select("id", { count: "exact", head: true }).eq("status", "draft")) : emptyResult(),
+        canInvoices ? branchEq(supabase.from("payments").select("payment_date,amount").is("deleted_at", null)
+          .gte("payment_date", rangeStart).lte("payment_date", rangeEnd)) : emptyResult(),
+        canBookings ? branchEq(supabase.from("appointments").select("status").is("deleted_at", null).gte("scheduled_at", rs.toISOString()).lte("scheduled_at", re.toISOString())) : emptyResult(),
+        canPatients ? branchEq(supabase.from("patients").select("dob,referral_source").is("deleted_at", null)) : emptyResult(),
+        canPatients ? branchEq(supabase.from("patients").select("id,first_name_en,first_name_ar,last_name_en,last_name_ar,name_language,phone,created_at")
           .is("deleted_at", null)
-          .order("created_at", { ascending: false }).limit(5)),
-        branchEq(supabase.from("appointments").select("id,scheduled_at,status,doctor_id,patient:patients(first_name_en,first_name_ar,last_name_en,last_name_ar,name_language)")
+          .order("created_at", { ascending: false }).limit(5)) : emptyResult(),
+        canBookings ? branchEq(supabase.from("appointments").select("id,scheduled_at,status,doctor_id,patient:patients(first_name_en,first_name_ar,last_name_en,last_name_ar,name_language)")
           .is("deleted_at", null)
-          .order("created_at", { ascending: false }).limit(5)),
-        branchEq(supabase.from("payments").select("id,amount,payment_method,payment_date,patient:patients(first_name_en,first_name_ar,last_name_en,last_name_ar,name_language)")
+          .order("created_at", { ascending: false }).limit(5)) : emptyResult(),
+        canInvoices ? branchEq(supabase.from("payments").select("id,amount,payment_method,payment_date,patient:patients(first_name_en,first_name_ar,last_name_en,last_name_ar,name_language)")
           .is("deleted_at", null)
-          .order("created_at", { ascending: false }).limit(5)),
-        branchEq(supabase.from("appointments").select("doctor_id,status")
+          .order("created_at", { ascending: false }).limit(5)) : emptyResult(),
+        canBookings ? branchEq(supabase.from("appointments").select("doctor_id,status")
           .is("deleted_at", null)
           .gte("scheduled_at", rs.toISOString()).lte("scheduled_at", re.toISOString())
-          .not("doctor_id", "is", null)),
-        supabase.from("invoice_items").select("description_en,description_ar,quantity,total,invoice:invoices!inner(branch_id,invoice_date,deleted_at)")
+          .not("doctor_id", "is", null)) : emptyResult(),
+        canInvoices ? supabase.from("invoice_items").select("description_en,description_ar,quantity,total,invoice:invoices!inner(branch_id,invoice_date,deleted_at)")
           .is("invoice.deleted_at", null)
           .eq("invoice.branch_id", currentBranchId)
-          .gte("invoice.invoice_date", rangeStart).lte("invoice.invoice_date", rangeEnd),
-        supabase.from("leave_requests").select("id", { count: "exact", head: true })
+          .gte("invoice.invoice_date", rangeStart).lte("invoice.invoice_date", rangeEnd) : emptyResult(),
+        canHR ? supabase.from("leave_requests").select("id", { count: "exact", head: true })
           .eq("status", "pending")
-          .in("staff_id", branchStaffIds),
-        branchEq(supabase.from("appointments").select("id", { count: "exact", head: true }).eq("booking_request_status", "pending").is("deleted_at", null)),
+          .in("staff_id", branchStaffIds) : emptyResult(),
+        canBookings ? branchEq(supabase.from("appointments").select("id", { count: "exact", head: true }).eq("booking_request_status", "pending").is("deleted_at", null)) : emptyResult(),
       ]);
 
       // Treasury (mirrors Treasury page: filter by treasury_id for this branch,

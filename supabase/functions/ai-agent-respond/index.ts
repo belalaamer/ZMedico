@@ -1,10 +1,9 @@
 // ZMedico AI agent orchestrator.
 //
 // Called internally (service-role to service-role) by whatsapp-webhook after
-// an inbound message has been stored. Never invoked from outside our own
-// backend, so `verify_jwt: false` is used (consistent with whatsapp-webhook,
-// which also sets verify_jwt: false and does its own trust checks instead of
-// relying on Supabase's JWT gate). This function does not accept any
+// an inbound message has been stored. The deployed function keeps
+// `verify_jwt: true`; whatsapp-webhook invokes it with the service-role JWT.
+// This function does not accept any
 // caller-supplied trust data beyond a conversation_id -- everything else
 // (tenant_id, branch_id, channel_account_id, external_contact_id) is resolved
 // server-side from the conversations/channel_accounts rows before the model

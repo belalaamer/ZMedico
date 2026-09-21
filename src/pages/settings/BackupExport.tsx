@@ -10,10 +10,12 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { formatDateTime } from "@/lib/format";
+import { useBranch } from "@/contexts/BranchContext";
 
 export default function BackupExport() {
   const { t, lang } = useI18n();
   const { user } = useAuth();
+  const { currentBranchId, branchSelectionReady } = useBranch();
   // R2: admin gate routed through the canonical AuthorizationService.
   // Replaces a bespoke user_roles fetch that mirrored `isSuperAdmin()`.
   const { authz, loading: authzLoading } = useAuthorization("BackupExport");
@@ -41,6 +43,10 @@ export default function BackupExport() {
 
   const guard = () => {
     if (!canBackup) { toast.error(t("backupRestricted")); return false; }
+    if (!branchSelectionReady || !currentBranchId) {
+      toast.error(lang === "ar" ? "اختر فرعًا قبل التصدير" : "Select a branch before exporting");
+      return false;
+    }
     return true;
   };
 
@@ -49,7 +55,7 @@ export default function BackupExport() {
     setExporting(table);
     try {
       const { data: result, error } = await supabase.functions.invoke("admin-export", {
-        body: { mode: "table", table },
+        body: { mode: "table", table, branch_id: currentBranchId },
       });
       if (error || (result as any)?.error) throw error ?? new Error(String((result as any)?.error));
       const rows = (result as any)?.data?.[table];
@@ -72,7 +78,7 @@ export default function BackupExport() {
     setExporting("all");
     try {
       const { data: result, error } = await supabase.functions.invoke("admin-export", {
-        body: { mode: "all" },
+        body: { mode: "all", branch_id: currentBranchId },
       });
       if (error || (result as any)?.error) throw error ?? new Error(String((result as any)?.error));
       const out = (result as any)?.data;

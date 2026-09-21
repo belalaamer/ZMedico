@@ -80,11 +80,21 @@ Deno.serve(async (req) => {
       if (taken?.length) return jsonResponse({ error: "Username is already in use" }, 409);
     }
     const allowedRoles = [
-      "admin", "manager", "doctor", "nurse",
+      "system_owner", "admin", "manager", "doctor", "nurse",
       "receptionist", "accountant", "hr",
     ];
     if (!allowedRoles.includes(role)) {
       return jsonResponse({ error: "Invalid role" }, 400);
+    }
+
+    if (role === "system_owner") {
+      const { data: isSystemOwner, error: ownerRoleErr } = await admin.rpc("has_role", {
+        _user_id: userData.user.id,
+        _role: "system_owner",
+      });
+      if (ownerRoleErr || !isSystemOwner) {
+        return jsonResponse({ error: "Only the System Owner may create another System Owner" }, 403);
+      }
     }
 
     // RBAC-08 fix: "hr" was missing from this list even though every

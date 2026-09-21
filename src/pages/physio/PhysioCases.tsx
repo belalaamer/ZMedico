@@ -190,7 +190,7 @@ export default function PhysioCases() {
           <DialogTrigger asChild>
             <Button className="gradient-primary text-primary-foreground"><Plus className="me-2 size-4" />{lang === "ar" ? "حالة جديدة" : "New case"}</Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl w-[calc(100vw-2rem)] sm:w-full max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>{lang === "ar" ? "حالة علاج طبيعي جديدة" : "New physiotherapy case"}</DialogTitle></DialogHeader>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="md:col-span-2">

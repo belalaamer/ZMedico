@@ -316,9 +316,10 @@ export async function dispatchTool(
       }
 
       case "reschedule_booking": {
-        const { data, error: rpcError } = await supabase.rpc("public_reschedule_appointment_for_tenant", {
+        const { data, error: rpcError } = await supabase.rpc("ai_reschedule_appointment_for_contact", {
           p_tenant_id: trustedContext.tenant_id,
           p_appointment_id: toolCall.args.appointment_id,
+          p_expected_phone: trustedContext.external_contact_id,
           p_new_slot_start: toolCall.args.new_slot_start,
         });
         if (rpcError) { error = rpcError.message; break; }
@@ -328,9 +329,10 @@ export async function dispatchTool(
       }
 
       case "cancel_booking": {
-        const { data, error: rpcError } = await supabase.rpc("public_cancel_appointment_for_tenant", {
+        const { data, error: rpcError } = await supabase.rpc("ai_cancel_appointment_for_contact", {
           p_tenant_id: trustedContext.tenant_id,
           p_appointment_id: toolCall.args.appointment_id,
+          p_expected_phone: trustedContext.external_contact_id,
           p_reason: toolCall.args.reason ?? null,
         });
         if (rpcError) { error = rpcError.message; break; }

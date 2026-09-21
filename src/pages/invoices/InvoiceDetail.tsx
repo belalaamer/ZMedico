@@ -246,21 +246,34 @@ export default function InvoiceDetail() {
         </div>
 
         <div className="mt-8 border border-border rounded-lg overflow-hidden">
-          <div className="grid grid-cols-12 gap-2 bg-muted/60 rounded-t-md px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          <div className="hidden sm:grid grid-cols-12 gap-2 bg-muted/60 rounded-t-md px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             <div className="col-span-6">{t("description")}</div>
             <div className="col-span-2 text-end">{t("quantity")}</div>
             <div className="col-span-2 text-end">{t("unitPrice")}</div>
             <div className="col-span-2 text-end">{t("total")}</div>
           </div>
           {items.map((it) => (
-            <div key={it.id} className="grid grid-cols-12 gap-2 px-4 py-4 border-t border-border text-sm hover:bg-muted/20 transition-colors">
-              <div className="col-span-6">
-                <div className="font-medium">{lang === "ar" ? (it.description_ar || it.description_en) : it.description_en}</div>
-                {lang === "en" && it.description_ar && <div className="text-xs text-muted-foreground" dir="rtl">{it.description_ar}</div>}
+            <div key={it.id} className="px-4 py-4 border-t first:border-t-0 sm:first:border-t border-border text-sm hover:bg-muted/20 transition-colors">
+              <div className="sm:grid sm:grid-cols-12 sm:gap-2">
+                <div className="sm:col-span-6">
+                  <div className="font-medium">{lang === "ar" ? (it.description_ar || it.description_en) : it.description_en}</div>
+                  {lang === "en" && it.description_ar && <div className="text-xs text-muted-foreground" dir="rtl">{it.description_ar}</div>}
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-3 sm:contents">
+                  <div className="sm:col-span-2 sm:text-end">
+                    <div className="text-[11px] text-muted-foreground sm:hidden">{t("quantity")}</div>
+                    <div className="tabular-nums">{it.quantity}</div>
+                  </div>
+                  <div className="sm:col-span-2 sm:text-end">
+                    <div className="text-[11px] text-muted-foreground sm:hidden">{t("unitPrice")}</div>
+                    <div className="tabular-nums">{formatMoney(it.unit_price, lang)}</div>
+                  </div>
+                  <div className="sm:col-span-2 sm:text-end">
+                    <div className="text-[11px] text-muted-foreground sm:hidden">{t("total")}</div>
+                    <div className="tabular-nums font-medium">{formatMoney(it.total, lang)}</div>
+                  </div>
+                </div>
               </div>
-              <div className="col-span-2 text-end tabular-nums">{it.quantity}</div>
-              <div className="col-span-2 text-end tabular-nums">{formatMoney(it.unit_price, lang)}</div>
-              <div className="col-span-2 text-end tabular-nums font-medium">{formatMoney(it.total, lang)}</div>
             </div>
           ))}
         </div>

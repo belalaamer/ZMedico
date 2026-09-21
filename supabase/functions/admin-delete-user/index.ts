@@ -91,20 +91,16 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "Target user is outside your branch scope" }, 403);
       }
 
-      let inScope = false;
-      for (const row of targetBranches) {
-        const { data: allowed, error: scopeErr } = await admin.rpc("user_has_branch_access_for_user", {
-          _user_id: userData.user.id,
-          _branch: row.branch_id,
-        });
-        if (scopeErr) {
-          return jsonResponse({ error: "Unable to verify branch scope" }, 500);
-        }
-        if (allowed === true) {
-          inScope = true;
-          break;
-        }
+      const { data: callerBranches, error: callerBranchErr } = await admin
+        .from("staff_branches")
+        .select("branch_id")
+        .eq("user_id", userData.user.id);
+      if (callerBranchErr) {
+        return jsonResponse({ error: "Unable to verify caller branch" }, 500);
       }
+
+      const callerBranchIds = new Set((callerBranches ?? []).map((row) => row.branch_id));
+      const inScope = targetBranches.some((row) => callerBranchIds.has(row.branch_id));
       if (!inScope) {
         return jsonResponse({ error: "Target user is outside your branch scope" }, 403);
       }

@@ -38,7 +38,7 @@ const BASE = process.env.BASE_URL || "http://localhost:8080";
 
 type Role =
   | "admin" | "manager" | "doctor" | "nurse"
-  | "receptionist" | "accountant" | "hr" | "staff";
+  | "receptionist" | "accountant" | "hr";
 
 const CREDS: Record<Role, { email?: string; pass?: string }> = {
   admin:        { email: process.env.ADMIN_EMAIL,        pass: process.env.ADMIN_PASS },
@@ -48,7 +48,6 @@ const CREDS: Record<Role, { email?: string; pass?: string }> = {
   receptionist: { email: process.env.RECEPTIONIST_EMAIL, pass: process.env.RECEPTIONIST_PASS },
   accountant:   { email: process.env.ACCOUNTANT_EMAIL,   pass: process.env.ACCOUNTANT_PASS },
   hr:           { email: process.env.HR_EMAIL,           pass: process.env.HR_PASS },
-  staff:        { email: process.env.STAFF_EMAIL,        pass: process.env.STAFF_PASS },
 };
 
 async function login(page: Page, role: Role) {
@@ -199,18 +198,6 @@ test.describe("hr", () => {
     for (const p of [
       "/patients", "/calendar", "/invoices", "/treasury",
       "/medical/records", "/inventory", "/settings",
-    ]) await expectAccessDenied(page, p);
-  });
-});
-
-// ---------- STAFF ----------
-test.describe("staff", () => {
-  test("only the dashboard is reachable after staff retirement", async ({ page }) => {
-    await login(page, "staff");
-    await expectRouteOk(page, "/");
-    for (const p of [
-      "/calendar", "/patients", "/invoices", "/payments", "/treasury",
-      "/medical/records", "/inventory", "/reports", "/hr/staff", "/settings",
     ]) await expectAccessDenied(page, p);
   });
 });

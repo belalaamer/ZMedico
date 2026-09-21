@@ -70,7 +70,7 @@ export function TransferDialog({
           <DialogDescription>{t("transferDialogDesc")}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
-          <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] items-end gap-2">
             <div className="space-y-2">
               <Label>{t("fromTreasury")}</Label>
               <Select value={fromId} onValueChange={setFromId}>
@@ -80,7 +80,7 @@ export function TransferDialog({
                 </SelectContent>
               </Select>
             </div>
-            <ArrowRight className="size-5 text-muted-foreground mb-3 rtl:rotate-180" />
+            <ArrowRight className="mx-auto size-5 text-muted-foreground rotate-90 sm:mb-3 sm:rotate-0 rtl:sm:rotate-180" />
             <div className="space-y-2">
               <Label>{t("toTreasury")}</Label>
               <Select value={toId} onValueChange={setToId}>

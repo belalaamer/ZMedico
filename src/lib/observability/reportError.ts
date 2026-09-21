@@ -44,21 +44,33 @@ let _errorCount = 0;
 /** Throttle map: fingerprint → timestamp of last report. */
 const _throttleMap = new Map<string, number>();
 
+function isBrowserExtensionError(input: ReportClientErrorInput): boolean {
+  const text = [input.message, input.stack, input.component]
+    .filter(Boolean)
+    .join("\n");
+
+  return /(?:chrome|moz|safari-web)-extension:\/\//i.test(text);
+}
+
 // ── Public API ───────────────────────────────────────────────────────────────
 export async function reportClientError(
   input: ReportClientErrorInput
 ): Promise<void> {
-  // 1. Recursion guard.
+  // 1. Ignore errors injected by browser extensions. They are outside the
+  // application's execution context and otherwise pollute production telemetry.
+  if (isBrowserExtensionError(input)) return;
+
+  // 2. Recursion guard.
   if (_reporting) return;
 
-  // 2. Volume cap.
+  // 3. Volume cap.
   if (_errorCount >= MAX_ERRORS_PER_SESSION) return;
 
   // Wrap everything so a bug here never propagates to the caller.
   try {
     _reporting = true;
 
-    // 3. Throttle: drop identical (kind + first 200 chars of message) within
+    // 4. Throttle: drop identical (kind + first 200 chars of message) within
     //    the window.
     const fingerprint =
       input.kind + "|" + input.message.slice(0, 200).replace(/\s+/g, " ");
@@ -69,18 +81,18 @@ export async function reportClientError(
     }
     _throttleMap.set(fingerprint, now);
 
-    // 4. Session check — skip if no authenticated user (RLS rejects anonymous).
+    // 5. Session check — skip if no authenticated user (RLS rejects anonymous).
     const {
       data: { session },
     } = await supabase.auth.getSession();
     if (!session) return;
     const userId = session.user.id;
 
-    // 5. Truncate to satisfy CHECK constraints.
+    // 6. Truncate to satisfy CHECK constraints.
     const message = input.message.slice(0, MAX_MESSAGE_LEN);
     const stack = input.stack ? input.stack.slice(0, MAX_STACK_LEN) : undefined;
 
-    // 6. Build the row.  URL: path only — never include query string.
+    // 7. Build the row.  URL: path only — never include query string.
     const row = {
       user_id: userId,
       branch_id: input.branch_id ?? null,
@@ -95,10 +107,10 @@ export async function reportClientError(
       correlation_id: getSessionCorrelationId(),
     };
 
-    // 7. Insert — ignore any DB error (constraint violation, network issue…).
+    // 8. Insert — ignore any DB error (constraint violation, network issue…).
     await supabase.from("client_errors").insert(row);
 
-    // 8. Increment only on successful path through (throttle already passed).
+    // 9. Increment only on successful path through (throttle already passed).
     _errorCount++;
   } catch {
     // Intentionally swallowed — telemetry must never surface to the user.

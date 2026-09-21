@@ -10,6 +10,11 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 
+async function sha256Hex(value: string): Promise<string> {
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)));
+  return Array.from(digest, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
@@ -23,10 +28,22 @@ Deno.serve(async (req) => {
     const password = typeof body.password === "string" ? body.password : "";
     if (!identifier || password.length < 6 || password.length > 128) return json({ error: "Invalid credentials" }, 401);
 
-    let email = identifier.toLowerCase();
+    const normalizedIdentifier = identifier.toLowerCase();
+    const forwardedFor = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+    const clientIp = req.headers.get("cf-connecting-ip")?.trim() || forwardedFor || "unknown";
+    const bucketKey = await sha256Hex(`${clientIp}|${normalizedIdentifier}`);
+    const admin = createClient(url, serviceKey);
+    const { data: allowed, error: rateError } = await admin.rpc("consume_login_rate_limit", {
+      p_key: bucketKey,
+      p_limit: 10,
+      p_window_seconds: 900,
+    });
+    if (rateError) return json({ error: "Authentication service temporarily unavailable" }, 503);
+    if (allowed !== true) return json({ error: "Too many attempts. Try again later." }, 429);
+
+    let email = normalizedIdentifier;
     if (!identifier.includes("@")) {
       if (!/^[A-Za-z0-9][A-Za-z0-9._-]{2,31}$/.test(identifier)) return json({ error: "Invalid credentials" }, 401);
-      const admin = createClient(url, serviceKey);
       const { data: profile } = await admin.from("profiles").select("email").ilike("username", identifier).maybeSingle();
       if (!profile?.email) return json({ error: "Invalid credentials" }, 401);
       email = String(profile.email).trim().toLowerCase();

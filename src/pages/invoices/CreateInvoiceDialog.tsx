@@ -284,7 +284,15 @@ export function CreateInvoiceDialog({
     const code = couponCode.trim();
     if (!code) return;
     setCouponLoading(true);
-    const { data, error } = await (supabase as any).rpc("apply_coupon_code", { _code: code, _subtotal: subtotal - discount });
+    if (!branchSelectionReady || !currentBranchId) {
+      toast.error(t("selectBranch"));
+      return;
+    }
+    const { data, error } = await (supabase as any).rpc("apply_coupon_code", {
+      _code: code,
+      _subtotal: subtotal - discount,
+      _branch_id: currentBranchId,
+    });
     setCouponLoading(false);
     if (error) { toast.error(error.message); return; }
     if (!data?.ok) {
@@ -330,13 +338,47 @@ export function CreateInvoiceDialog({
     if (error || !inv) { setSaving(false); submittingRef.current = false; toast.error(error?.message ?? "Failed"); return; }
 
     if (couponInfo) {
-      await (supabase as any).from("coupon_redemptions").insert({
-        coupon_id: couponInfo.id,
-        invoice_id: inv.id,
-        patient_id: patientId,
-        discount_amount: couponDiscount,
-        redeemed_by: user?.id ?? null,
-      });
+      const { error: couponRedemptionError } = await (supabase as any)
+        .from("coupon_redemptions")
+        .insert({
+          coupon_id: couponInfo.id,
+          invoice_id: inv.id,
+          patient_id: patientId,
+          branch_id: currentBranchId,
+          discount_amount: couponDiscount,
+          redeemed_by: user?.id ?? null,
+        });
+
+      if (couponRedemptionError) {
+        const taxWithoutCoupon = +((subtotal - discount) * (Number(taxPct) || 0) / 100).toFixed(2);
+        const { error: rollbackCouponError } = await supabase
+          .from("invoices")
+          .update({
+            discount,
+            tax: taxWithoutCoupon,
+          } as any)
+          .eq("id", inv.id)
+          .eq("branch_id", currentBranchId);
+
+        if (rollbackCouponError) {
+          setSaving(false);
+          submittingRef.current = false;
+          toast.error(
+            lang === "ar"
+              ? "تعذر تسجيل الكوبون وإلغاء خصمه تلقائيًا. راجع الفاتورة قبل المتابعة."
+              : "Coupon redemption failed and its discount could not be removed automatically. Review the invoice before continuing.",
+          );
+          return;
+        }
+
+        setCouponInfo(null);
+        setCouponCode("");
+        toast.warning(
+          lang === "ar"
+            ? "لم يتم تسجيل الكوبون، لذلك تم إنشاء الفاتورة بدون خصم الكوبون."
+            : "The coupon could not be redeemed, so the invoice was kept without the coupon discount.",
+        );
+      }
     }
 
     // Per-line audit coverage so SUM(insurance_covered_amount) === invoices.claim_amount.

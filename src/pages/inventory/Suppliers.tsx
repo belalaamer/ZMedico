@@ -18,11 +18,14 @@ import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Can } from "@/components/Can";
+import { useBranch } from "@/contexts/BranchContext";
 
 type Supplier = any;
 
 export default function Suppliers() {
   const { t, lang } = useI18n();
+  const { subscription, branchSelectionReady } = useBranch();
+  const tenantId = subscription?.tenant_id ?? null;
   const [items, setItems] = useState<Supplier[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [q, setQ] = useState("");
@@ -34,14 +37,15 @@ export default function Suppliers() {
   const [deleteTarget, setDeleteTarget] = useState<Supplier | null>(null);
 
   const load = async () => {
-    const { data } = await supabase.from("suppliers").select("*").is("deleted_at", null).order("name_en");
+    if (!branchSelectionReady || !tenantId) { setItems([]); setCounts({}); return; }
+    const { data } = await supabase.from("suppliers").select("*").eq("tenant_id", tenantId).is("deleted_at", null).order("name_en");
     setItems(data ?? []);
-    const { data: prods } = await supabase.from("products").select("supplier_id").is("deleted_at", null).not("supplier_id", "is", null);
+    const { data: prods } = await supabase.from("products").select("supplier_id").eq("tenant_id", tenantId).is("deleted_at", null).not("supplier_id", "is", null);
     const c: Record<string, number> = {};
     (prods ?? []).forEach((p: any) => { c[p.supplier_id] = (c[p.supplier_id] ?? 0) + 1; });
     setCounts(c);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [tenantId, branchSelectionReady]);
 
   const openNew = () => { setEdit(null); setForm({ name: "", contact_person: "", phone: "", email: "", address: "", tax_number: "", notes: "" }); setOpen(true); };
   const openEdit = (s: Supplier) => {
@@ -57,27 +61,29 @@ export default function Suppliers() {
   const save = async () => {
     const name = form.name.trim();
     if (!name) { toast.error(t("nameRequired")); return; }
+    if (!tenantId) { toast.error(t("selectBranch")); return; }
     const payload: any = {
+      tenant_id: tenantId,
       name_en: name, name_ar: name,
       contact_person: form.contact_person || null,
       phone: form.phone || null, email: form.email || null,
       address: form.address || null, tax_number: form.tax_number || null, notes: form.notes || null,
     };
     const { error } = edit
-      ? await supabase.from("suppliers").update(payload).eq("id", edit.id)
+      ? await supabase.from("suppliers").update(payload).eq("id", edit.id).eq("tenant_id", tenantId)
       : await supabase.from("suppliers").insert(payload);
     if (error) { toast.error(error.message); return; }
     toast.success(t("save")); setOpen(false); load();
   };
 
   const toggleActive = async (s: Supplier) => {
-    const { error } = await supabase.from("suppliers").update({ is_active: !s.is_active }).eq("id", s.id);
+    const { error } = await supabase.from("suppliers").update({ is_active: !s.is_active }).eq("id", s.id).eq("tenant_id", tenantId);
     if (error) { toast.error(error.message); return; }
     load();
   };
 
   const softDelete = async (s: Supplier) => {
-    const { error } = await supabase.from("suppliers").update({ deleted_at: new Date().toISOString() } as any).eq("id", s.id);
+    const { error } = await supabase.from("suppliers").update({ deleted_at: new Date().toISOString() } as any).eq("id", s.id).eq("tenant_id", tenantId);
     if (error) { toast.error(error.message); return; }
     toast.success(t("delete"));
     load();

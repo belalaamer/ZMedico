@@ -4931,6 +4931,7 @@ export type Database = {
           selling_price?: number
           sku?: string
           supplier_id?: string | null
+          tenant_id?: string | null
           unit?: string
           updated_at?: string
         }
@@ -6816,6 +6817,7 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           tax_number?: string | null
+          tenant_id?: string | null
           updated_at?: string
         }
         Relationships: [

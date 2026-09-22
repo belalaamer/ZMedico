@@ -44,7 +44,7 @@ export default function StockOverview() {
       return;
     }
     const [{ data: ps }, { data: bs }] = await Promise.all([
-      supabase.from("products").select("*").eq("is_active", true).is("deleted_at", null),
+      supabase.from("products").select("*").eq("tenant_id", tenantId).eq("is_active", true).is("deleted_at", null),
       supabase.from("branches").select("*").eq("tenant_id", tenantId).order("name_en"),
     ]);
     const { data: invs } = await supabase.from("inventory").select("*").eq("branch_id", branchId);

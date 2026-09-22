@@ -4808,6 +4808,7 @@ export type Database = {
           name_ar: string
           name_en: string
           parent_id: string | null
+          tenant_id: string | null
           updated_at: string
         }
         Insert: {
@@ -4818,6 +4819,7 @@ export type Database = {
           name_ar: string
           name_en: string
           parent_id?: string | null
+          tenant_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -4828,6 +4830,7 @@ export type Database = {
           name_ar?: string
           name_en?: string
           parent_id?: string | null
+          tenant_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -4836,6 +4839,13 @@ export type Database = {
             columns: ["parent_id"]
             isOneToOne: false
             referencedRelation: "product_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_categories_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -4875,6 +4885,7 @@ export type Database = {
           selling_price: number
           sku: string
           supplier_id: string | null
+          tenant_id: string | null
           unit: string
           updated_at: string
         }
@@ -4897,6 +4908,7 @@ export type Database = {
           selling_price?: number
           sku: string
           supplier_id?: string | null
+          tenant_id?: string | null
           unit?: string
           updated_at?: string
         }
@@ -4935,6 +4947,13 @@ export type Database = {
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -6765,6 +6784,7 @@ export type Database = {
           notes: string | null
           phone: string | null
           tax_number: string | null
+          tenant_id: string | null
           updated_at: string
         }
         Insert: {
@@ -6780,6 +6800,7 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           tax_number?: string | null
+          tenant_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -6797,7 +6818,15 @@ export type Database = {
           tax_number?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "suppliers_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       system_backups: {
         Row: {

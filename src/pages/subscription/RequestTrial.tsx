@@ -57,15 +57,19 @@ export default function RequestTrial() {
       return;
     }
     setSaving(true);
-    const { data, error: requestError } = await supabase.rpc("public_create_subscription_request" as never, {
-      p_payload: normalizeSubscriptionRequest(draft),
-    } as never);
+    const { data, error: requestError } = await supabase.functions.invoke("public-subscription-request", {
+      body: { payload: normalizeSubscriptionRequest(draft) },
+    });
     setSaving(false);
     if (requestError) {
       setError(isAr ? "تعذر إرسال الطلب الآن. حاول مرة أخرى أو تواصل معنا مباشرة." : "We could not send your request. Please try again or contact us directly.");
       return;
     }
     const result = data as RequestResult | null;
+    if ((result as any)?.code === "rate_limited") {
+      setError(isAr ? "تم إرسال عدد كبير من الطلبات من هذا الاتصال. حاول مرة أخرى لاحقًا." : "Too many requests were sent from this connection. Please try again later.");
+      return;
+    }
     if (result?.code === "already_requested") {
       setError(isAr ? "تم استلام طلب من هذا البريد خلال آخر 24 ساعة. سنعاود التواصل معك." : "We already received a request from this email in the last 24 hours. We will contact you.");
       return;

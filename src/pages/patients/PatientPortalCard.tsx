@@ -73,15 +73,24 @@ export default function PatientPortalCard({ patientId, patientEmail }: { patient
   const resetPassword = async () => {
     if (!account?.auth_user_id) return;
     setBusy(true);
-    const { data, error } = await supabase.functions.invoke("admin-reset-password", {
-      body: { user_id: account.auth_user_id },
+    const { data, error } = await supabase.functions.invoke("patient-portal-reset-password", {
+      body: { patient_id: patientId },
     });
     setBusy(false);
     if (error || (data as any)?.error) {
       toast.error((data as any)?.error ?? error?.message ?? (lang === "ar" ? "تعذر إعادة تعيين كلمة المرور" : "Could not reset the password"));
       return;
     }
-    setCredentials({ email: (data as any).email, password: (data as any).password });
+    const creds = (data as any)?.credentials;
+    if (!creds?.password) {
+      toast.error(lang === "ar" ? "تعذر إنشاء بيانات الدخول الجديدة" : "Could not create new credentials");
+      return;
+    }
+    setCredentials({
+      username: creds.username ?? null,
+      email: creds.email ?? patientEmail ?? "",
+      password: creds.password,
+    });
     toast.success(lang === "ar" ? "تم توليد كلمة مرور جديدة" : "New password generated");
   };
 

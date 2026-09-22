@@ -40,7 +40,8 @@ function emptyForm() {
 
 export default function Products() {
   const { t, lang } = useI18n();
-  const { currentBranchId } = useBranch();
+  const { currentBranchId, subscription, branchSelectionReady } = useBranch();
+  const tenantId = subscription?.tenant_id ?? null;
   const [items, setItems] = useState<Product[]>([]);
   const [cats, setCats] = useState<any[]>([]);
   const [sups, setSups] = useState<any[]>([]);
@@ -87,10 +88,14 @@ export default function Products() {
   };
 
   const load = async () => {
+    if (!branchSelectionReady || !tenantId) {
+      setItems([]); setCats([]); setSups([]); setStocks({});
+      return;
+    }
     const [{ data: ps }, { data: cs }, { data: ss }] = await Promise.all([
-      supabase.from("products").select("*").is("deleted_at", null).order("created_at", { ascending: false }),
-      supabase.from("product_categories").select("*").eq("is_active", true).order("name_en"),
-      supabase.from("suppliers").select("*").eq("is_active", true).is("deleted_at", null).order("name_en"),
+      supabase.from("products").select("*").eq("tenant_id", tenantId).is("deleted_at", null).order("created_at", { ascending: false }),
+      supabase.from("product_categories").select("*").eq("tenant_id", tenantId).eq("is_active", true).order("name_en"),
+      supabase.from("suppliers").select("*").eq("tenant_id", tenantId).eq("is_active", true).is("deleted_at", null).order("name_en"),
     ]);
     setItems(ps ?? []); setCats(cs ?? []); setSups(ss ?? []);
     if (currentBranchId) {
@@ -105,7 +110,7 @@ export default function Products() {
       setStocks(map);
     }
   };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId, tenantId, branchSelectionReady]);
   useDataSync(["products", "inventory", "inventory_transactions"], () => { load(); });
 
   const openNew = () => { setEdit(null); setForm(emptyForm()); setOpen(true); };
@@ -141,7 +146,9 @@ export default function Products() {
     const name = form.name.trim();
     const desc = form.description.trim();
     if (!name) { toast.error(lang === "ar" ? "الاسم مطلوب" : "Name required"); return; }
+    if (!tenantId) { toast.error(t("selectBranch")); return; }
     const payload: any = {
+      tenant_id: tenantId,
       barcode: form.barcode || null,
       name_en: name, name_ar: name,
       description_en: desc || null, description_ar: desc || null,
@@ -152,7 +159,7 @@ export default function Products() {
       expiry_tracking: form.expiry_tracking, image_url: form.image_url || null,
     };
     if (edit) {
-      const { error } = await supabase.from("products").update(payload).eq("id", edit.id);
+      const { error } = await supabase.from("products").update(payload).eq("id", edit.id).eq("tenant_id", tenantId);
       if (error) { toast.error(error.message); return; }
     } else {
       if (form.sku) payload.sku = form.sku;
@@ -163,13 +170,13 @@ export default function Products() {
   };
 
   const toggleActive = async (p: Product) => {
-    const { error } = await supabase.from("products").update({ is_active: !p.is_active }).eq("id", p.id);
+    const { error } = await supabase.from("products").update({ is_active: !p.is_active }).eq("id", p.id).eq("tenant_id", tenantId);
     if (error) { toast.error(error.message); return; }
     load();
   };
 
   const softDelete = async (p: Product): Promise<void> => {
-    const { error } = await supabase.from("products").update({ deleted_at: new Date().toISOString() } as any).eq("id", p.id);
+    const { error } = await supabase.from("products").update({ deleted_at: new Date().toISOString() } as any).eq("id", p.id).eq("tenant_id", tenantId);
     if (error) { toast.error(error.message); return; }
     toast.success(t("delete")); load();
   };

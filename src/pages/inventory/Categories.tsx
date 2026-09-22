@@ -10,11 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useBranch } from "@/contexts/BranchContext";
 
 type Cat = { id: string; name_en: string; name_ar: string; parent_id: string | null; is_active: boolean; description: string | null };
 
 export default function Categories() {
   const { t, lang } = useI18n();
+  const { subscription, branchSelectionReady } = useBranch();
+  const tenantId = subscription?.tenant_id ?? null;
   const [cats, setCats] = useState<Cat[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [open, setOpen] = useState(false);
@@ -22,14 +25,15 @@ export default function Categories() {
   const [form, setForm] = useState({ name: "", parent_id: "" as string, description: "" });
 
   const load = async () => {
-    const { data } = await supabase.from("product_categories").select("*").order("name_en");
+    if (!branchSelectionReady || !tenantId) { setCats([]); setCounts({}); return; }
+    const { data } = await supabase.from("product_categories").select("*").eq("tenant_id", tenantId).order("name_en");
     setCats((data ?? []) as Cat[]);
-    const { data: prods } = await supabase.from("products").select("category_id").is("deleted_at", null).not("category_id", "is", null);
+    const { data: prods } = await supabase.from("products").select("category_id").eq("tenant_id", tenantId).is("deleted_at", null).not("category_id", "is", null);
     const c: Record<string, number> = {};
     (prods ?? []).forEach((p: any) => { c[p.category_id] = (c[p.category_id] ?? 0) + 1; });
     setCounts(c);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [tenantId, branchSelectionReady]);
 
   const openNew = () => { setEdit(null); setForm({ name: "", parent_id: "", description: "" }); setOpen(true); };
   const openEdit = (c: Cat) => { setEdit(c); setForm({ name: c.name_en || c.name_ar || "", parent_id: c.parent_id ?? "", description: c.description ?? "" }); setOpen(true); };
@@ -37,14 +41,16 @@ export default function Categories() {
   const save = async () => {
     const name = form.name.trim();
     if (!name) { toast.error(t("nameRequired")); return; }
+    if (!tenantId) { toast.error(t("selectBranch")); return; }
     const payload = {
+      tenant_id: tenantId,
       name_en: name,
       name_ar: name,
       parent_id: form.parent_id || null,
       description: form.description || null,
     };
     const { error } = edit
-      ? await supabase.from("product_categories").update(payload).eq("id", edit.id)
+      ? await supabase.from("product_categories").update(payload).eq("id", edit.id).eq("tenant_id", tenantId)
       : await supabase.from("product_categories").insert(payload);
     if (error) { toast.error(error.message); return; }
     toast.success(t("save"));
@@ -53,7 +59,7 @@ export default function Categories() {
 
   const del = async (id: string) => {
     if (counts[id]) { toast.error(t("categoryHasProducts")); return; }
-    const { error } = await supabase.from("product_categories").delete().eq("id", id);
+    const { error } = await supabase.from("product_categories").delete().eq("id", id).eq("tenant_id", tenantId);
     if (error) { toast.error(error.message); return; }
     toast.success(t("delete")); load();
   };

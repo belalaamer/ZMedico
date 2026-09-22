@@ -86,6 +86,17 @@ Deno.serve(async (req: Request) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !serviceRoleKey) return response({ error: "Server configuration missing" }, 500);
+
+  // Internal orchestrator only. The WhatsApp webhook invokes this function
+  // with the service-role bearer token after validating/storing the inbound
+  // message. A normal authenticated user must never be able to supply an
+  // arbitrary conversation_id and make this service-role function read or
+  // mutate that conversation outside RLS.
+  const authorization = req.headers.get("Authorization") ?? "";
+  if (authorization !== `Bearer ${serviceRoleKey}`) {
+    return response({ error: "Forbidden: internal service caller required" }, 403);
+  }
+
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
   // 1. Load conversation + trusted context.

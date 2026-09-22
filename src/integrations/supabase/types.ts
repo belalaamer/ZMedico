@@ -8427,7 +8427,7 @@ export type Database = {
         }
       }
       apply_coupon_code: {
-        Args: { _code: string; _subtotal: number }
+        Args: { _branch_id: string; _code: string; _subtotal: number }
         Returns: Json
       }
       apply_inventory_tx: {

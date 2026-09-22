@@ -117,7 +117,7 @@ export function CreateInvoiceDialog({
       return;
     }
     void refetchPatients();
-    supabase.from("products").select("id,sku,name_en,name_ar,selling_price,min_stock_level").eq("is_active", true).is("deleted_at", null).order("name_en").limit(1000)
+    supabase.from("products").select("id,sku,name_en,name_ar,selling_price,min_stock_level").eq("tenant_id", subscription.tenant_id).eq("is_active", true).is("deleted_at", null).order("name_en").limit(1000)
       .then(({ data }) => setProducts(data ?? []));
     supabase.from("procedures").select("id,name_en,name_ar,default_price,is_active,deleted_at").eq("is_active", true).is("deleted_at", null).eq("tenant_id", subscription.tenant_id).order("name_en").limit(1000)
       .then(({ data }) => setProcedures((data ?? []).filter((p: any) => p.deleted_at == null && p.is_active !== false)));

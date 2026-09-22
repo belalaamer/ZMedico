@@ -59,7 +59,7 @@ export default function CouponsPage() {
   const load = async () => {
     if (!branchSelectionReady || !currentBranchId) { setItems([]); setLoading(false); return; }
     setLoading(true);
-    const qy = supabase.from("coupons").select("*").or(`branch_id.eq.${currentBranchId},branch_id.is.null`).order("created_at", { ascending: false }).limit(200);
+    const qy = supabase.from("coupons").select("*").eq("branch_id", currentBranchId).order("created_at", { ascending: false }).limit(200);
     const { data, error } = await qy;
     setLoading(false);
     if (error) { toast.error(error.message); return; }

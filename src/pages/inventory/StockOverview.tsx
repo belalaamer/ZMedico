@@ -137,39 +137,26 @@ export default function StockOverview() {
   };
 
   const submitTransfer = async () => {
-    // Bug fix: same copy-paste mismatch as submitAdj above -- always said
-    // "select product" no matter which of the three required fields was
-    // actually missing.
     if (!branchSelectionReady || !currentBranchId) { toast.error(t("selectBranch")); return; }
     if (!tr.product_id) { toast.error(t("selectProduct")); return; }
     if (!tr.from_branch || !tr.to_branch) { toast.error(t("selectBranch")); return; }
     if (tr.from_branch === tr.to_branch) { toast.error(t("transferSameBranchError")); return; }
     if (!branches.some((branch) => branch.id === tr.from_branch) || !branches.some((branch) => branch.id === tr.to_branch)) { toast.error(t("selectBranch")); return; }
     if (!tr.qty || tr.qty <= 0) { toast.error(t("amount")); return; }
-    const refId = crypto.randomUUID();
-    const fromName = branchName(tr.from_branch); const toName = branchName(tr.to_branch);
-    const { error: e1 } = await supabase.rpc("apply_inventory_tx", {
-      _product_id: tr.product_id, _branch_id: tr.from_branch,
-      _type: "transfer_out", _signed_qty: -tr.qty, _unit_cost: null,
-      _ref_type: "transfer", _ref_id: refId,
-      _notes_en: `Transfer to ${toName}${tr.notes ? " — " + tr.notes : ""}`,
-      _notes_ar: `تحويل إلى ${toName}${tr.notes ? " — " + tr.notes : ""}`,
-      _expiry: null, _batch: null, _by: user?.id ?? null,
-    } as any);
-    if (e1) { toast.error(e1.message); return; }
-    const { error: e2 } = await supabase.rpc("apply_inventory_tx", {
-      _product_id: tr.product_id, _branch_id: tr.to_branch,
-      _type: "transfer_in", _signed_qty: tr.qty, _unit_cost: null,
-      _ref_type: "transfer", _ref_id: refId,
-      _notes_en: `Transfer from ${fromName}${tr.notes ? " — " + tr.notes : ""}`,
-      _notes_ar: `تحويل من ${fromName}${tr.notes ? " — " + tr.notes : ""}`,
-      _expiry: null, _batch: null, _by: user?.id ?? null,
-    } as any);
-    if (e2) { toast.error(e2.message); return; }
+
+    const { error } = await supabase.rpc("transfer_inventory_stock", {
+      p_product_id: tr.product_id,
+      p_from_branch_id: tr.from_branch,
+      p_to_branch_id: tr.to_branch,
+      p_quantity: Number(tr.qty),
+      p_notes: tr.notes || null,
+    });
+    if (error) { toast.error(error.message); return; }
+
     toast.success(t("save"));
     setTrOpen(false);
     setTr({ product_id: "", from_branch: "", to_branch: "", qty: 0, notes: "" });
-    load();
+    void load();
   };
 
   return (
@@ -179,7 +166,7 @@ export default function StockOverview() {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("stockOverview")}</h1>
         </div>
         <div className="flex gap-2">
-          <Can permission="inventory.tx">
+          <Can permission="inventory.tx.write">
             <Button variant="outline" onClick={() => setTrOpen(true)} disabled={branches.length < 2}>
               <ArrowLeftRight className="me-2 size-4" />{t("transferStock")}
             </Button>

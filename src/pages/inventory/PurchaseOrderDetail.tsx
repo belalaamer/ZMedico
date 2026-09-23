@@ -44,6 +44,7 @@ export default function PurchaseOrderDetail() {
   if (!po) return <div className="text-center text-muted-foreground py-10">…</div>;
 
   const statusLabel = ({ draft: t("statusDraft"), pending: t("statusPending"), partial: t("statusPartial"), received: t("statusReceived"), cancelled: t("statusCancelled") } as any)[po.status];
+  const canReceiveItems = po.status === "pending" || po.status === "partial";
 
   const cancelPo = async () => {
     const { error } = await supabase.from("purchase_orders").update({ status: "cancelled" }).eq("id", po.id);
@@ -82,7 +83,7 @@ export default function PurchaseOrderDetail() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <Button asChild variant="ghost" size="sm"><Link to="/inventory/purchase-orders"><ArrowLeft className="me-2 size-4" />{t("purchaseOrders")}</Link></Button>
         <div className="flex gap-2">
-          {po.status !== "cancelled" && po.status !== "received" && (
+          {canReceiveItems && (
             <Can permission="purchase_orders.receive">
               <Button className="gradient-primary text-primary-foreground" onClick={openReceive}>
                 <PackageCheck className="me-2 size-4" />{t("receiveItems")}

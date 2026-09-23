@@ -8518,6 +8518,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      archive_product: { Args: { p_product_id: string }; Returns: undefined }
+      archive_supplier: { Args: { p_supplier_id: string }; Returns: undefined }
       branch_invoice_code: { Args: { _branch: string }; Returns: string }
       check_expiry_alerts: { Args: never; Returns: number }
       resolve_stock_alert: {
@@ -8541,6 +8543,10 @@ export type Database = {
         }[]
       }
       current_user_branch_id: { Args: never; Returns: string }
+      delete_product_category: {
+        Args: { p_category_id: string }
+        Returns: undefined
+      }
       default_treasury_for_branch: {
         Args: { _branch_id: string }
         Returns: string

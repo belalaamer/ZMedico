@@ -430,29 +430,16 @@ export function CreateInvoiceDialog({
       if (e2) { setSaving(false); submittingRef.current = false; toast.error(e2.message); return; }
     }
 
-    // Auto-deduct inventory for product items (non-cancelled invoices)
-    if (status !== "draft") {
-      for (const it of rows) {
-        if (it.item_type === "product" && it.product_id) {
-          const qty = Number(it.quantity) || 0;
-          if (qty > 0) {
-            const { error: txErr } = await (supabase as any).rpc("apply_inventory_tx", {
-              _product_id: it.product_id,
-              _branch_id: currentBranchId,
-              _type: "sale",
-              _signed_qty: -qty,
-              _unit_cost: null,
-              _ref_type: "invoice",
-              _ref_id: inv.id,
-              _notes_en: `Invoice ${inv.invoice_number}`,
-              _notes_ar: `فاتورة ${inv.invoice_number}`,
-              _expiry: null,
-              _batch: null,
-              _by: user?.id ?? null,
-            });
-            if (txErr) toast.error(txErr.message);
-          }
-        }
+    // Product stock is posted by a protected invoice workflow RPC. This keeps
+    // invoice permissions separate from manual inventory-adjustment permissions.
+    if (status !== "draft" && rows.some((it) => it.item_type === "product" && it.product_id)) {
+      const { error: inventoryError } = await supabase.rpc("consume_invoice_products", {
+        p_invoice_id: inv.id,
+      });
+      if (inventoryError) {
+        toast.error(inventoryError.message);
+      } else {
+        notifyDataChange("inventory");
       }
     }
 

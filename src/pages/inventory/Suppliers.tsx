@@ -83,10 +83,10 @@ export default function Suppliers() {
   };
 
   const softDelete = async (s: Supplier) => {
-    const { error } = await supabase.from("suppliers").update({ deleted_at: new Date().toISOString() } as any).eq("id", s.id).eq("tenant_id", tenantId);
+    const { error } = await supabase.rpc("archive_supplier", { p_supplier_id: s.id });
     if (error) { toast.error(error.message); return; }
     toast.success(t("delete"));
-    load();
+    void load();
   };
 
   const filtered = items.filter((s) => {

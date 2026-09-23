@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, PackageCheck, X, Pencil, Send, Plus, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -63,11 +63,11 @@ export default function PurchaseOrderDetail() {
   const statusLabel = ({ draft: t("statusDraft"), pending: t("statusPending"), partial: t("statusPartial"), received: t("statusReceived"), cancelled: t("statusCancelled") } as any)[po.status];
   const canReceiveItems = po.status === "pending" || po.status === "partial";
 
-  const editSubtotal = useMemo(
-    () => editLines.reduce((sum, line) => sum + (Number(line.quantity_ordered) || 0) * (Number(line.unit_cost) || 0), 0),
-    [editLines],
+  const editSubtotal = editLines.reduce(
+    (sum, line) => sum + (Number(line.quantity_ordered) || 0) * (Number(line.unit_cost) || 0),
+    0,
   );
-  const editTax = useMemo(() => +(editSubtotal * (Number(editTaxPct) || 0) / 100).toFixed(2), [editSubtotal, editTaxPct]);
+  const editTax = +(editSubtotal * (Number(editTaxPct) || 0) / 100).toFixed(2);
   const editTotal = +(editSubtotal + editTax).toFixed(2);
 
   const cancelPo = async () => {

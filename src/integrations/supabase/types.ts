@@ -8895,6 +8895,10 @@ export type Database = {
         Args: { _invoice_id: string }
         Returns: undefined
       }
+      cancel_purchase_order: {
+        Args: { p_purchase_order_id: string }
+        Returns: undefined
+      }
       create_purchase_order: {
         Args: {
           p_branch_id: string
@@ -8909,6 +8913,56 @@ export type Database = {
         Returns: {
           purchase_order_id: string
           purchase_order_number: string
+        }[]
+      }
+      delete_purchase_order_draft: {
+        Args: { p_purchase_order_id: string }
+        Returns: undefined
+      }
+      search_purchase_orders_page: {
+        Args: {
+          p_branch_id?: string | null
+          p_limit?: number
+          p_offset?: number
+          p_search?: string | null
+          p_status?: Database["public"]["Enums"]["po_status"] | null
+          p_supplier_id?: string | null
+        }
+        Returns: {
+          created_at: string
+          expected_date: string | null
+          id: string
+          order_date: string
+          po_number: string
+          status: Database["public"]["Enums"]["po_status"]
+          subtotal: number
+          supplier_id: string
+          supplier_name_ar: string | null
+          supplier_name_en: string
+          tax: number
+          total: number
+          total_count: number
+        }[]
+      }
+      submit_purchase_order: {
+        Args: { p_purchase_order_id: string }
+        Returns: undefined
+      }
+      update_purchase_order_draft: {
+        Args: {
+          p_expected_date: string | null
+          p_items: Json
+          p_notes: string | null
+          p_order_date: string
+          p_purchase_order_id: string
+          p_submit?: boolean
+          p_supplier_id: string
+          p_tax_pct: number
+        }
+        Returns: {
+          purchase_order_id: string
+          purchase_order_number: string
+          purchase_order_status: Database["public"]["Enums"]["po_status"]
         }[]
       }
       recalc_po_subtotal: { Args: { _po_id: string }; Returns: undefined }

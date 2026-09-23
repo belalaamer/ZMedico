@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
-import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatDateTime } from "@/lib/format";
+import { Can } from "@/components/Can";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 
 const alertConfig: Record<string, { icon: any; cls: string }> = {
   low_stock: { icon: AlertTriangle, cls: "status-progress" },
@@ -21,7 +22,7 @@ const alertConfig: Record<string, { icon: any; cls: string }> = {
 export default function Alerts() {
   const { t, lang } = useI18n();
   const { currentBranchId, branchSelectionReady } = useBranch();
-  const { user } = useAuth();
+  const { authz, loading: authzLoading } = useAuthorization("InventoryAlerts");
   const [alerts, setAlerts] = useState<any[]>([]);
   const [products, setProducts] = useState<Record<string, any>>({});
   const [branches, setBranches] = useState<Record<string, any>>({});
@@ -31,8 +32,12 @@ export default function Alerts() {
     const requestId = ++loadRequestRef.current;
     const branchId = currentBranchId;
     if (!branchSelectionReady || !branchId) { setAlerts([]); setProducts({}); setBranches({}); return; }
-    // Run expiry check on each load (lightweight; idempotent)
-    try { await (supabase as any).rpc("check_expiry_alerts"); } catch { /* ignore */ }
+    if (!authzLoading && authz.can("inventory.alerts.manage")) {
+      const { error: expiryError } = await supabase.rpc("check_expiry_alerts");
+      if (expiryError) {
+        console.warn("check_expiry_alerts failed", expiryError);
+      }
+    }
     const q = supabase.from("stock_alerts").select("*").eq("branch_id", branchId).eq("is_resolved", false).order("created_at", { ascending: false });
     const [{ data: al }, { data: ps }, { data: bs }] = await Promise.all([
       q,
@@ -44,15 +49,14 @@ export default function Alerts() {
     const pm: Record<string, any> = {}; (ps ?? []).forEach((p: any) => { pm[p.id] = p; }); setProducts(pm);
     const bm: Record<string, any> = {}; (bs ?? []).forEach((b: any) => { bm[b.id] = b; }); setBranches(bm);
   };
-  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [branchSelectionReady, currentBranchId]);
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [branchSelectionReady, currentBranchId, authzLoading]);
 
   const resolve = async (id: string) => {
     if (!branchSelectionReady || !currentBranchId) { toast.error(t("selectBranch")); return; }
-    const { error } = await supabase.from("stock_alerts").update({
-      is_resolved: true, resolved_at: new Date().toISOString(), resolved_by: user?.id ?? null,
-    }).eq("id", id).eq("branch_id", currentBranchId);
+    const { error } = await supabase.rpc("resolve_stock_alert", { p_alert_id: id });
     if (error) { toast.error(error.message); return; }
-    toast.success(t("markResolved")); load();
+    toast.success(t("markResolved"));
+    void load();
   };
 
   const counts = {
@@ -115,7 +119,9 @@ export default function Alerts() {
                   </div>
                   <Button asChild variant="outline" size="sm"><Link to="/inventory/purchase-orders"><ClipboardList className="me-1 size-3.5" />{t("newPO")}</Link></Button>
                   <Button asChild variant="outline" size="sm"><Link to="/inventory/stock"><Plus className="me-1 size-3.5" />{t("adjustStock")}</Link></Button>
-                  <Button variant="ghost" size="sm" onClick={() => resolve(a.id)}><CheckCircle2 className="me-1 size-3.5" />{t("markResolved")}</Button>
+                  <Can permission="inventory.alerts.manage">
+                    <Button variant="ghost" size="sm" onClick={() => resolve(a.id)}><CheckCircle2 className="me-1 size-3.5" />{t("markResolved")}</Button>
+                  </Can>
                 </div>
               );
             })}

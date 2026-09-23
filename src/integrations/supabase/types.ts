@@ -8520,6 +8520,10 @@ export type Database = {
       }
       branch_invoice_code: { Args: { _branch: string }; Returns: string }
       check_expiry_alerts: { Args: never; Returns: number }
+      resolve_stock_alert: {
+        Args: { p_alert_id: string }
+        Returns: undefined
+      }
       communication_event_enabled: {
         Args: { p_branch_id: string; p_event_type: string }
         Returns: boolean

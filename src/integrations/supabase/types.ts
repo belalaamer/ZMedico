@@ -8530,6 +8530,10 @@ export type Database = {
         Args: { p_branch_id: string; p_event_type: string }
         Returns: boolean
       }
+      consume_invoice_products: {
+        Args: { p_invoice_id: string }
+        Returns: undefined
+      }
       consume_custom_domain_rate_limit: {
         Args: { _action: string; _actor_id: string; _limit?: number }
         Returns: boolean

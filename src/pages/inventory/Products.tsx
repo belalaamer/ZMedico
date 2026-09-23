@@ -206,21 +206,21 @@ export default function Products() {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("products")}</h1>
           <p className="text-sm text-muted-foreground mt-1">{filtered.length}</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1 bg-card border border-border shadow-sm rounded-lg p-1.5">
-            <div className="relative w-56">
+        <div className="flex w-full sm:w-auto items-center gap-2 flex-wrap">
+          <div className="flex w-full sm:w-auto flex-col sm:flex-row sm:items-center gap-1 bg-card border border-border shadow-sm rounded-lg p-1.5">
+            <div className="relative w-full sm:w-56">
               <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
               <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("search")} className="ps-9 border-0 shadow-none focus-visible:ring-1" />
             </div>
             <Select value={catFilter} onValueChange={setCatFilter}>
-              <SelectTrigger className="w-44 border-0 shadow-none focus:ring-1"><SelectValue placeholder={t("category")} /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-44 border-0 shadow-none focus:ring-1"><SelectValue placeholder={t("category")} /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("category")}: {t("none")}</SelectItem>
                 {cats.map((c) => <SelectItem key={c.id} value={c.id}>{lang === "ar" ? c.name_ar : c.name_en}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={activeFilter} onValueChange={setActiveFilter}>
-              <SelectTrigger className="w-32 border-0 shadow-none focus:ring-1"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-32 border-0 shadow-none focus:ring-1"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("status")}</SelectItem>
                 <SelectItem value="active">{t("active")}</SelectItem>
@@ -231,7 +231,7 @@ export default function Products() {
           <Can permission="inventory.create">
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
-                <Button className="gradient-primary text-primary-foreground" onClick={openNew}><Plus className="me-2 size-4" />{t("addProduct")}</Button>
+                <Button className="gradient-primary text-primary-foreground w-full sm:w-auto" onClick={openNew}><Plus className="me-2 size-4" />{t("addProduct")}</Button>
               </DialogTrigger>
               <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader><DialogTitle>{edit ? t("editProduct") : t("newProduct")}</DialogTitle></DialogHeader>

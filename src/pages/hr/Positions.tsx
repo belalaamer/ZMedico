@@ -136,19 +136,19 @@ export default function Positions() {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("positions")}</h1>
           <p className="text-sm text-muted-foreground mt-1">{sortedFiltered.length}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full sm:w-auto flex-wrap items-center gap-2">
           <Select value={filterDept} onValueChange={setFilterDept}>
-            <SelectTrigger className="w-48"><SelectValue placeholder={t("department")} /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-48"><SelectValue placeholder={t("department")} /></SelectTrigger>
             <SelectContent><SelectItem value="all">{t("filterAll") || "All"}</SelectItem>{depts.map((d) => <SelectItem key={d.id} value={d.id}>{lang === "ar" ? d.name_ar : d.name_en}</SelectItem>)}</SelectContent>
           </Select>
           <Can permission="hr.edit">
-            <Button variant="outline" onClick={() => { setMergeSrc(""); setMergeTgt(""); setMergeOpen(true); }}>
+            <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => { setMergeSrc(""); setMergeTgt(""); setMergeOpen(true); }}>
               <GitMerge className="me-2 size-4" />{lang === "ar" ? "دمج" : "Merge"}
             </Button>
           </Can>
           <Can permission="hr.create">
             <Dialog open={open} onOpenChange={setOpen}>
-              <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground" onClick={openNew}><Plus className="me-2 size-4" />{t("addPosition")}</Button></DialogTrigger>
+              <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground flex-1 sm:flex-none" onClick={openNew}><Plus className="me-2 size-4" />{t("addPosition")}</Button></DialogTrigger>
               <DialogContent className="max-w-2xl">
                 <DialogHeader><DialogTitle>{edit ? t("position") : t("newPosition")}</DialogTitle></DialogHeader>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

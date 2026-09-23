@@ -8912,6 +8912,13 @@ export type Database = {
         }[]
       }
       recalc_po_subtotal: { Args: { _po_id: string }; Returns: undefined }
+      receive_purchase_order_items: {
+        Args: {
+          p_items: Json
+          p_purchase_order_id: string
+        }
+        Returns: undefined
+      }
       receive_po_item: {
         Args: {
           _batch: string

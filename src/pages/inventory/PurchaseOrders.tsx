@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Search, Trash2, ClipboardList } from "lucide-react";
+import { Plus, Search, Trash2, ClipboardList, ChevronLeft, ChevronRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,6 @@ import { toast } from "sonner";
 import { formatMoney, formatDate } from "@/lib/format";
 import { RowActions } from "@/components/RowActions";
 import { useNavigate } from "react-router-dom";
-import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { Can } from "@/components/Can";
 
 const statusClass: Record<string, string> = {
@@ -29,12 +28,13 @@ export default function PurchaseOrders() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
   const navigate = useNavigate();
-  // R2: admin-can-override-status gate routed through AuthorizationService.
-  const { authz } = useAuthorization("PurchaseOrders");
-  const canOverride = authz.isSuperAdmin();
   const [pos, setPos] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [debouncedQ, setDebouncedQ] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [supFilter, setSupFilter] = useState("all");
   const [q, setQ] = useState("");
@@ -49,26 +49,74 @@ export default function PurchaseOrders() {
   const [lines, setLines] = useState<LineItem[]>([{ product_id: "", quantity_ordered: 1, unit_cost: 0 }]);
   const [saving, setSaving] = useState(false);
 
-  const load = async () => {
-    let q1 = supabase.from("purchase_orders").select("*, suppliers(name_en,name_ar)").is("deleted_at", null).order("created_at", { ascending: false }).limit(200);
-    if (currentBranchId) q1 = q1.eq("branch_id", currentBranchId);
-    const [{ data: posData }, { data: sups }, { data: prods }] = await Promise.all([
-      q1,
+  const PAGE_SIZE = 25;
+
+  const loadOptions = async () => {
+    const [{ data: sups }, { data: prods }] = await Promise.all([
       supabase.from("suppliers").select("*").eq("is_active", true).is("deleted_at", null).order("name_en"),
       supabase.from("products").select("*").eq("is_active", true).is("deleted_at", null).order("name_en"),
     ]);
-    setPos(posData ?? []); setSuppliers(sups ?? []); setProducts(prods ?? []);
+    setSuppliers(sups ?? []);
+    setProducts(prods ?? []);
   };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId]);
+
+  const loadOrders = async () => {
+    setLoading(true);
+    const { data, error } = await supabase.rpc("search_purchase_orders_page", {
+      p_branch_id: currentBranchId || null,
+      p_search: debouncedQ.trim() || null,
+      p_status: statusFilter === "all" ? null : statusFilter as any,
+      p_supplier_id: supFilter === "all" ? null : supFilter,
+      p_limit: PAGE_SIZE,
+      p_offset: page * PAGE_SIZE,
+    });
+    setLoading(false);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    const rows = data ?? [];
+    if (!rows.length && page > 0) {
+      setPage((p) => Math.max(0, p - 1));
+      return;
+    }
+
+    setPos(rows);
+    setTotalCount(Number(rows[0]?.total_count ?? 0));
+  };
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQ(q), 300);
+    return () => window.clearTimeout(timer);
+  }, [q]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [currentBranchId, debouncedQ, statusFilter, supFilter]);
+
+  useEffect(() => {
+    void loadOptions();
+    /* eslint-disable-next-line */
+  }, [currentBranchId]);
+
+  useEffect(() => {
+    void loadOrders();
+    /* eslint-disable-next-line */
+  }, [currentBranchId, debouncedQ, statusFilter, supFilter, page]);
 
   const softDelete = async (po: any): Promise<void> => {
-    if (po.status !== "draft" && !canOverride) {
+    if (po.status !== "draft") {
       toast.error(t("onlyDraftPurchaseOrders"));
       return;
     }
-    const { error } = await supabase.from("purchase_orders").update({ deleted_at: new Date().toISOString() } as any).eq("id", po.id);
+    const { error } = await supabase.rpc("delete_purchase_order_draft", {
+      p_purchase_order_id: po.id,
+    });
     if (error) { toast.error(error.message); return; }
-    toast.success(t("delete")); load();
+    toast.success(t("delete"));
+    void loadOrders();
   };
 
   const subtotal = useMemo(() => lines.reduce((s, l) => s + (Number(l.quantity_ordered) || 0) * (Number(l.unit_cost) || 0), 0), [lines]);
@@ -115,22 +163,18 @@ export default function PurchaseOrders() {
         onClick: () => navigate(`/inventory/purchase-orders/${po.purchase_order_id}`),
       },
     });
-    reset(); setOpen(false); load();
+    reset();
+    setOpen(false);
+    if (page !== 0) setPage(0);
+    else void loadOrders();
   };
-
-  const filtered = pos.filter((p) => {
-    if (statusFilter !== "all" && p.status !== statusFilter) return false;
-    if (supFilter !== "all" && p.supplier_id !== supFilter) return false;
-    if (q && !p.po_number.toLowerCase().includes(q.toLowerCase())) return false;
-    return true;
-  });
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("purchaseOrders")}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{filtered.length}</p>
+          <p className="text-sm text-muted-foreground mt-1">{totalCount}</p>
         </div>
         <div className="flex w-full sm:w-auto items-center gap-2 flex-wrap">
           <div className="flex w-full sm:w-auto flex-col sm:flex-row sm:items-center gap-1 bg-card border border-border shadow-sm rounded-lg p-1.5">
@@ -231,11 +275,13 @@ export default function PurchaseOrders() {
       </div>
 
       <Card className="shadow-card overflow-hidden">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="p-10 text-center text-muted-foreground">{lang === "ar" ? "جارٍ التحميل…" : "Loading…"}</div>
+        ) : pos.length === 0 ? (
           <div className="p-10 text-center text-muted-foreground">{t("noPOs")}</div>
         ) : (
           <div className="divide-y divide-border">
-            {filtered.map((po) => {
+            {pos.map((po) => {
               const statusLabel = ({ draft: t("statusDraft"), pending: t("statusPending"), partial: t("statusPartial"), received: t("statusReceived"), cancelled: t("statusCancelled") } as any)[po.status];
               return (
                 <div key={po.id} className="flex items-center gap-4 p-4 hover:bg-muted/40 transition-colors">
@@ -243,7 +289,7 @@ export default function PurchaseOrders() {
                   <div className="size-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center"><ClipboardList className="size-5" /></div>
                   <div className="flex-1 min-w-0">
                     <div className="font-bold text-base">{po.po_number}</div>
-                    <div className="text-xs text-muted-foreground">{lang === "ar" ? po.suppliers?.name_ar : po.suppliers?.name_en} · {formatDate(po.order_date, lang)}</div>
+                    <div className="text-xs text-muted-foreground">{lang === "ar" ? po.supplier_name_ar : po.supplier_name_en} · {formatDate(po.order_date, lang)}</div>
                   </div>
                   {po.expected_date && <div className="text-xs text-muted-foreground"><div>{t("expectedDate")}</div><div>{formatDate(po.expected_date, lang)}</div></div>}
                   <Badge variant="outline" className={statusClass[po.status]}>{statusLabel}</Badge>
@@ -253,7 +299,7 @@ export default function PurchaseOrders() {
                     <RowActions
                       onEdit={() => navigate(`/inventory/purchase-orders/${po.id}`)}
                       onDelete={() => softDelete(po)}
-                      canDelete={canOverride || po.status === "draft"}
+                      canDelete={po.status === "draft"}
                     />
                   </Can>
                 </div>
@@ -262,6 +308,35 @@ export default function PurchaseOrders() {
           </div>
         )}
       </Card>
+
+      {totalCount > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-sm">
+          <div className="text-muted-foreground">
+            {Math.min(page * PAGE_SIZE + 1, totalCount)}–{Math.min((page + 1) * PAGE_SIZE, totalCount)}
+            {" "}{lang === "ar" ? "من" : "of"}{" "}{totalCount}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page === 0 || loading}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+            >
+              <ChevronLeft className="size-4 me-1" />
+              {lang === "ar" ? "السابق" : "Previous"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={(page + 1) * PAGE_SIZE >= totalCount || loading}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              {lang === "ar" ? "التالي" : "Next"}
+              <ChevronRight className="size-4 ms-1" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

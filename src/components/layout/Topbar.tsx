@@ -71,18 +71,13 @@ export function Topbar() {
 
   const loadNotifs = async () => {
     if (!user?.id) { setNotifs([]); setUnreadCount(0); return; }
-    const { data } = await supabase
+    const { data, count } = await supabase
       .from("notifications")
-      .select("id,title_en,title_ar,message_en,message_ar,type,related_entity_type,related_entity_id,is_read,created_at")
+      .select("id,title_en,title_ar,message_en,message_ar,type,related_entity_type,related_entity_id,is_read,created_at", { count: "exact" })
       .eq("user_id", user.id)
       .eq("is_read", false)
       .order("created_at", { ascending: false })
       .limit(10);
-    const { count } = await supabase
-      .from("notifications")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .eq("is_read", false);
     setUnreadCount(count ?? 0);
 
     // De-duplicate the dropdown preview by related entity, but keep the badge

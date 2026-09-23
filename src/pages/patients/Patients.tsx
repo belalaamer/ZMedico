@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useDataSync } from "@/lib/dataSync";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -98,7 +98,7 @@ export default function PatientsPage() {
   const [items, setItems] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
-  const deferredQ = useDeferredValue(q.trim());
+  const [searchTerm, setSearchTerm] = useState("");
   const [open, setOpen] = useState(false);
   const [confirmDel, setConfirmDel] = useState<Patient | null>(null);
   const [duesByPatient, setDuesByPatient] = useState<Record<string, number>>({});
@@ -110,6 +110,7 @@ export default function PatientsPage() {
   const [portalTemplates, setPortalTemplates] = useState<Record<"email" | "sms" | "whatsapp", PortalTemplate | null>>({ email: null, sms: null, whatsapp: null });
   const [portalSupportContact, setPortalSupportContact] = useState("");
   const [sendingPortalChannel, setSendingPortalChannel] = useState<"email" | "whatsapp" | null>(null);
+  const loadRequestRef = useRef(0);
 
   const [form, setForm] = useState({
     name_en: "", name_ar: "", phone: "", phone2: "", email: "",
@@ -118,7 +119,13 @@ export default function PatientsPage() {
     referred_by_patient_id: null as string | null,
   });
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSearchTerm(q.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [q]);
+
   const load = useCallback(async () => {
+    const requestId = ++loadRequestRef.current;
     setLoading(true);
     if (!branchSelectionReady || !currentBranchId) {
       setItems([]);
@@ -143,30 +150,31 @@ export default function PatientsPage() {
       .is("deleted_at", null)
       .eq("branch_id", currentBranchId);
 
-    const searchTerm = sanitizeSearch(deferredQ);
-    if (searchTerm) {
+    const safeSearchTerm = sanitizeSearch(searchTerm);
+    if (safeSearchTerm) {
       const filters = [
-        `first_name_en.ilike.%${searchTerm}%`,
-        `last_name_en.ilike.%${searchTerm}%`,
-        `first_name_ar.ilike.%${searchTerm}%`,
-        `last_name_ar.ilike.%${searchTerm}%`,
-        `phone.ilike.%${searchTerm}%`,
-        `phone2.ilike.%${searchTerm}%`,
-        `email.ilike.%${searchTerm}%`,
+        `first_name_en.ilike.%${safeSearchTerm}%`,
+        `last_name_en.ilike.%${safeSearchTerm}%`,
+        `first_name_ar.ilike.%${safeSearchTerm}%`,
+        `last_name_ar.ilike.%${safeSearchTerm}%`,
+        `phone.ilike.%${safeSearchTerm}%`,
+        `phone2.ilike.%${safeSearchTerm}%`,
+        `email.ilike.%${safeSearchTerm}%`,
       ];
-      if (/^\d+$/.test(searchTerm)) filters.push(`patient_code.eq.${searchTerm}`);
+      if (/^\d+$/.test(safeSearchTerm)) filters.push(`patient_code.eq.${safeSearchTerm}`);
       query = query.or(filters.join(","));
     }
 
     query = query.order("patient_code", { ascending: false }).range(from, to);
     const { data, error, count } = await query;
+    if (requestId !== loadRequestRef.current) return;
     setLoading(false);
     if (error) { toast.error(error.message); return; }
     setItems((data ?? []) as Patient[]);
         setTotal(count ?? 0);
-  }, [branchSelectionReady, currentBranchId, deferredQ, page]);
+  }, [branchSelectionReady, currentBranchId, searchTerm, page]);
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => { setPage(0); }, [currentBranchId, deferredQ]);
+  useEffect(() => { setPage(0); }, [currentBranchId]);
   useDataSync(["patients"], () => { void load(); });
 
   // Lightweight batched outstanding-debt badge: a single query for the visible
@@ -345,7 +353,7 @@ export default function PatientsPage() {
         <div className="flex gap-2 items-center w-full sm:w-auto">
           <div className="relative flex-1 sm:w-64">
             <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("search")} className="ps-9" />
+            <Input value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} placeholder={t("search")} className="ps-9" />
           </div>
           <Can permission="patients.create">
             <Dialog open={open} onOpenChange={setOpen}>

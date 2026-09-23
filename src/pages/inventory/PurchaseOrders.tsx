@@ -11,7 +11,6 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
-import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney, formatDate } from "@/lib/format";
@@ -29,7 +28,6 @@ type LineItem = { product_id: string; quantity_ordered: number; unit_cost: numbe
 export default function PurchaseOrders() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
-  const { user } = useAuth();
   const navigate = useNavigate();
   // R2: admin-can-override-status gate routed through AuthorizationService.
   const { authz } = useAuthorization("PurchaseOrders");
@@ -87,30 +85,34 @@ export default function PurchaseOrders() {
     if (!currentBranchId) { toast.error(t("selectBranch")); return; }
     const valid = lines.filter((l) => l.product_id && l.quantity_ordered > 0);
     if (!valid.length) { toast.error(t("addAtLeastOneItem")); return; }
-    setSaving(true);
-    const { data: po, error } = await supabase.from("purchase_orders").insert({
-      supplier_id: supplierId, branch_id: currentBranchId,
-      order_date: orderDate, expected_date: expectedDate || null,
-      status, subtotal, tax, notes: notes || null,
-      created_by: user?.id ?? null,
-    } as any).select("id, po_number").single();
-    if (error || !po) { setSaving(false); toast.error(error?.message ?? t("failed")); return; }
 
-    const rows = valid.map((l) => ({
-      purchase_order_id: po.id, product_id: l.product_id,
-      quantity_ordered: Number(l.quantity_ordered),
-      unit_cost: Number(l.unit_cost),
-    }));
-    const { error: e2 } = await supabase.from("purchase_order_items").insert(rows as any);
+    setSaving(true);
+    const { data, error } = await supabase.rpc("create_purchase_order", {
+      p_branch_id: currentBranchId,
+      p_supplier_id: supplierId,
+      p_order_date: orderDate,
+      p_expected_date: expectedDate || null,
+      p_status: status,
+      p_tax_pct: Number(taxPct) || 0,
+      p_notes: notes || null,
+      p_items: valid.map((l) => ({
+        product_id: l.product_id,
+        quantity_ordered: Number(l.quantity_ordered),
+        unit_cost: Number(l.unit_cost),
+      })),
+    });
     setSaving(false);
-    if (e2) { toast.error(e2.message); return; }
-    // po.id here is the exact row the insert above returned -- never a
-    // "latest purchase order" lookup -- so the action always opens the
-    // record that was actually just created.
-    toast.success(po.po_number, {
+
+    const po = data?.[0];
+    if (error || !po) {
+      toast.error(error?.message ?? t("failed"));
+      return;
+    }
+
+    toast.success(po.purchase_order_number, {
       action: {
         label: lang === "ar" ? "عرض السجل" : "View Record",
-        onClick: () => navigate(`/inventory/purchase-orders/${po.id}`),
+        onClick: () => navigate(`/inventory/purchase-orders/${po.purchase_order_id}`),
       },
     });
     reset(); setOpen(false); load();

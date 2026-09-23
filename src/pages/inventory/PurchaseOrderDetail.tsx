@@ -12,7 +12,6 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useI18n } from "@/contexts/I18nContext";
-import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney, formatDate } from "@/lib/format";
@@ -25,7 +24,6 @@ const statusClass: Record<string, string> = {
 export default function PurchaseOrderDetail() {
   const { id } = useParams();
   const { t, lang } = useI18n();
-  const { user } = useAuth();
   const [po, setPo] = useState<any>(null);
   const [items, setItems] = useState<any[]>([]);
   const [recvOpen, setRecvOpen] = useState(false);
@@ -67,13 +65,18 @@ export default function PurchaseOrderDetail() {
       .map((it) => ({ it, d: recvData[it.id] }))
       .filter(({ d }) => d && d.qty > 0);
     if (!ops.length) { toast.error(t("enterQuantities")); return; }
-    for (const { it, d } of ops) {
-      const { error } = await supabase.rpc("receive_po_item", {
-        _po_item_id: it.id, _qty: Number(d.qty),
-        _expiry: d.expiry || null, _batch: d.batch || null, _by: user?.id ?? null,
-      } as any);
-      if (error) { toast.error(error.message); return; }
-    }
+
+    const { error } = await supabase.rpc("receive_purchase_order_items", {
+      p_purchase_order_id: po.id,
+      p_items: ops.map(({ it, d }) => ({
+        po_item_id: it.id,
+        qty: Number(d.qty),
+        expiry: d.expiry || null,
+        batch: d.batch || null,
+      })),
+    });
+    if (error) { toast.error(error.message); return; }
+
     toast.success(t("received"));
     setRecvOpen(false); load();
   };

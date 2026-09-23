@@ -136,15 +136,15 @@ export default function Invoices() {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("invoices")}</h1>
           <p className="text-sm text-muted-foreground mt-1">{invoiceCountLabel(filtered.length, lang)}</p>
         </div>
-        <div className="flex gap-2 items-center flex-wrap">
-          <div className="flex items-center gap-2 bg-card border shadow-sm rounded-lg p-2">
-            <div className="relative w-56">
+        <div className="flex w-full sm:w-auto gap-2 items-center flex-wrap">
+          <div className="flex w-full sm:w-auto flex-col sm:flex-row sm:items-center gap-2 bg-card border shadow-sm rounded-lg p-2">
+            <div className="relative w-full sm:w-56">
               <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
               <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("search")} className="ps-9 border-0 shadow-none focus-visible:ring-1 bg-transparent" />
             </div>
-            <div className="h-6 w-px bg-border" />
+            <div className="hidden sm:block h-6 w-px bg-border" />
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[150px] border-0 shadow-none bg-transparent focus:ring-1"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-[150px] border-0 shadow-none bg-transparent focus:ring-1"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("status")}</SelectItem>
                 <SelectItem value="draft">{t("statusDraft")}</SelectItem>

@@ -211,7 +211,7 @@ export default function GeneralSettings() {
         </Card>
         </div>
 
-        <div className="fixed bottom-0 inset-x-0 z-30 border-t bg-background/90 backdrop-blur-md md:hidden">
+        <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] inset-x-0 z-30 border-t bg-background/90 backdrop-blur-md md:hidden">
           <div className="p-3 flex justify-end">
             <Button className="gradient-primary text-primary-foreground w-full" onClick={save}>{t("save")}</Button>
           </div>

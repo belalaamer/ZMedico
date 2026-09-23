@@ -57,7 +57,7 @@ export default function MedicalRecords() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("medicalRecords")}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{items.length}</p>
+          <p className="text-sm text-muted-foreground mt-1">{total}</p>
         </div>
         <Can permission="medical_records.create">
           <Button asChild className="gradient-primary text-primary-foreground"><Link to="/medical/quick-consult"><Plus className="me-2 size-4" />{t("addRecord")}</Link></Button>

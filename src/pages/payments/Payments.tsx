@@ -93,7 +93,7 @@ export default function Payments() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("payments")}</h1>
-        <p className="text-sm text-muted-foreground mt-1">{items.length} {t("payments").toLowerCase()}</p>
+        <p className="text-sm text-muted-foreground mt-1">{total} {t("payments").toLowerCase()}</p>
       </div>
 
       <div className="bg-card border shadow-sm rounded-lg p-2 flex items-center justify-between gap-3 flex-wrap">

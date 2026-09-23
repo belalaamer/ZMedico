@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
@@ -17,10 +18,18 @@ type Props = {
  */
 export function TablePager({ page, pageSize, total, onPageChange, className }: Props) {
   const { lang } = useI18n();
-  if (total <= pageSize) return null;
-  const start = total === 0 ? 0 : page * pageSize + 1;
-  const end = Math.min(total, (page + 1) * pageSize);
-  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const safePageSize = Math.max(1, pageSize);
+  const pages = Math.max(1, Math.ceil(Math.max(0, total) / safePageSize));
+  const lastPage = pages - 1;
+
+  useEffect(() => {
+    if (page > lastPage) onPageChange(lastPage);
+    else if (page < 0) onPageChange(0);
+  }, [lastPage, onPageChange, page]);
+
+  if (total <= safePageSize) return null;
+  const start = total === 0 ? 0 : page * safePageSize + 1;
+  const end = Math.min(total, (page + 1) * safePageSize);
   const canPrev = page > 0;
   const canNext = page + 1 < pages;
   const of = lang === "ar" ? "من" : "of";

@@ -8933,6 +8933,41 @@ export type Database = {
         Args: { p_purchase_order_id: string }
         Returns: undefined
       }
+      search_products_page: {
+        Args: {
+          p_active?: boolean | null
+          p_branch_id?: string | null
+          p_category_id?: string | null
+          p_limit?: number
+          p_offset?: number
+          p_search?: string | null
+          p_tenant_id: string
+        }
+        Returns: {
+          barcode: string | null
+          category_id: string | null
+          cost_price: number
+          created_at: string
+          description_ar: string | null
+          description_en: string | null
+          expiry_tracking: boolean
+          id: string
+          image_url: string | null
+          is_active: boolean
+          max_stock_level: number | null
+          min_stock_level: number
+          name_ar: string
+          name_en: string
+          selling_price: number
+          sku: string
+          stock_quantity: number
+          supplier_id: string | null
+          tenant_id: string | null
+          total_count: number
+          unit: string
+          updated_at: string
+        }[]
+      }
       search_purchase_orders_page: {
         Args: {
           p_branch_id?: string | null

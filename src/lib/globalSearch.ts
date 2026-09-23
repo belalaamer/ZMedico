@@ -118,7 +118,7 @@ export async function searchInvoices(
       .select("id,invoice_number,status,total,paid_amount,patient_id,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code)")
       .is("deleted_at", null)
       .in("patient_id", patientIds)
-      .order("issue_date", { ascending: false })
+      .order("invoice_date", { ascending: false })
       .limit(LIMIT);
     if (branchId) qByPatient = qByPatient.eq("branch_id", branchId);
     queries.push(qByPatient);
@@ -263,7 +263,7 @@ export async function searchStaff(
   // System Owner never receives a global profiles/staff result set.
   const { data: scopedStaff } = await (supabase as any)
     .from("staff_profiles")
-    .select("id,user_id,employee_id,phone,profiles(full_name)")
+    .select("id,employee_id,phone,profiles(full_name)")
     .eq("branch_id", branchId)
     .limit(300);
   const staffRows = ((scopedStaff ?? []) as any[]).filter((s) => {
@@ -282,7 +282,7 @@ export async function searchStaff(
     hits.push({ id: p.id, label: p.full_name || "—", to: `/hr/staff/${p.id}` });
   }
   for (const s of ((staffRes?.data ?? []) as any[])) {
-    const uid = s.user_id || s.id;
+    const uid = s.id;
     if (seen.has(uid)) continue;
     seen.add(uid);
     hits.push({

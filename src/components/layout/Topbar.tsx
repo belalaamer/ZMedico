@@ -42,6 +42,7 @@ export function Topbar() {
   const { isSystemOwner } = useUserRole();
   const [now, setNow] = useState(new Date());
   const [notifs, setNotifs] = useState<NotificationRow[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -69,7 +70,7 @@ export function Topbar() {
   }, [mobileOpen]);
 
   const loadNotifs = async () => {
-    if (!user?.id) { setNotifs([]); return; }
+    if (!user?.id) { setNotifs([]); setUnreadCount(0); return; }
     const { data } = await supabase
       .from("notifications")
       .select("id,title_en,title_ar,message_en,message_ar,type,related_entity_type,related_entity_id,is_read,created_at")
@@ -77,7 +78,15 @@ export function Topbar() {
       .eq("is_read", false)
       .order("created_at", { ascending: false })
       .limit(10);
-    // De-duplicate: collapse multiple notifications for the same related entity
+    const { count } = await supabase
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("is_read", false);
+    setUnreadCount(count ?? 0);
+
+    // De-duplicate the dropdown preview by related entity, but keep the badge
+    // count independent so it reflects the real unread total beyond the 10-row preview.
     const seen = new Set<string>();
     const unique = ((data ?? []) as NotificationRow[]).filter((n) => {
       const key = n.related_entity_type && n.related_entity_id
@@ -105,7 +114,6 @@ export function Topbar() {
     // eslint-disable-next-line
   }, [user?.id]);
 
-  const unreadCount = notifs.length;
   const iconFor = (type: string) => {
     switch (type) {
       case "appointment": return <Calendar className="size-4 text-primary" />;

@@ -59,16 +59,60 @@ export default function Staff() {
   });
 
   const load = async () => {
-    let q1 = supabase.from("staff_profiles").select("*, profile:profiles!staff_profiles_id_fkey(full_name,email,avatar_url)");
-    if (currentBranchId) q1 = q1.eq("branch_id", currentBranchId);
-    const { data } = await q1.is("deleted_at", null).order("created_at", { ascending: false });
-    setItems(data ?? []);
-    const { data: profs } = await supabase.from("profiles").select("id,full_name,email,avatar_url");
+    if (!currentBranchId) {
+      setItems([]);
+      setProfiles([]);
+      setDepts([]);
+      setPositions([]);
+      return;
+    }
+
+    const [{ data: staffRows }, { data: branchLinks }, { data: deptRows }] = await Promise.all([
+      supabase
+        .from("staff_profiles")
+        .select("*, profile:profiles!staff_profiles_id_fkey(full_name,email,avatar_url)")
+        .eq("branch_id", currentBranchId)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("staff_branches")
+        .select("user_id")
+        .eq("branch_id", currentBranchId),
+      supabase
+        .from("departments")
+        .select("id,name_en,name_ar")
+        .eq("branch_id", currentBranchId)
+        .is("deleted_at", null)
+        .order("name_en"),
+    ]);
+
+    const deptIds = (deptRows ?? []).map((d: any) => d.id);
+    const profileIds = Array.from(new Set([
+      ...(staffRows ?? []).map((s: any) => s.id),
+      ...(branchLinks ?? []).map((row: any) => row.user_id),
+    ].filter(Boolean))) as string[];
+
+    const profilesPromise = profileIds.length
+      ? supabase.from("profiles").select("id,full_name,email,avatar_url").in("id", profileIds)
+      : Promise.resolve({ data: [] as any[] });
+
+    const positionsPromise = deptIds.length
+      ? supabase
+          .from("staff_positions")
+          .select("id,title_en,title_ar,department_id")
+          .in("department_id", deptIds)
+          .is("deleted_at", null)
+      : Promise.resolve({ data: [] as any[] });
+
+    const [{ data: profs }, { data: positionRows }] = await Promise.all([
+      profilesPromise,
+      positionsPromise,
+    ]);
+
+    setItems(staffRows ?? []);
     setProfiles(profs ?? []);
-    const { data: d } = await supabase.from("departments").select("id,name_en,name_ar").is("deleted_at", null);
-    setDepts(d ?? []);
-    const { data: pos } = await supabase.from("staff_positions").select("id,title_en,title_ar,department_id").is("deleted_at", null);
-    setPositions(pos ?? []);
+    setDepts(deptRows ?? []);
+    setPositions(positionRows ?? []);
   };
   useEffect(() => { load(); }, [currentBranchId]);
   useDataSync(["staff", "departments", "positions"], () => { load(); });
@@ -76,7 +120,7 @@ export default function Staff() {
   const save = async () => {
     let profileId = editingId ?? form.profile_id;
 
-    const effectiveBranchId = form.branch_id || currentBranchId;
+    const effectiveBranchId = currentBranchId;
     if (!effectiveBranchId) {
       toast.error(t("errSelectBranchFirst"));
       return;
@@ -116,6 +160,21 @@ export default function Staff() {
     }
 
     if (!profileId) { toast.error(lang === "ar" ? "الملف الشخصي مطلوب" : "Profile required"); return; }
+    if (form.department_id && !depts.some((d) => d.id === form.department_id)) {
+      toast.error(lang === "ar" ? "القسم المحدد لا يتبع الفرع الحالي" : "Selected department does not belong to the current branch");
+      return;
+    }
+    if (form.position_id) {
+      const selectedPosition = positions.find((p) => p.id === form.position_id);
+      if (!selectedPosition) {
+        toast.error(lang === "ar" ? "المنصب المحدد لا يتبع الفرع الحالي" : "Selected position does not belong to the current branch");
+        return;
+      }
+      if (selectedPosition.department_id && selectedPosition.department_id !== form.department_id) {
+        toast.error(lang === "ar" ? "المنصب المحدد لا يتبع القسم المختار" : "Selected position does not belong to the selected department");
+        return;
+      }
+    }
 
     const payload: any = {
       id: profileId,
@@ -145,7 +204,11 @@ export default function Staff() {
     load();
   };
 
-  const profName = (id: string) => { const p = profiles.find((x) => x.id === id); return p?.full_name ?? p?.email ?? "—"; };
+  const profName = (id: string) => {
+    const row = items.find((x) => x.id === id);
+    const p = row?.profile ?? profiles.find((x) => x.id === id);
+    return p?.full_name ?? p?.email ?? "—";
+  };
   const posName = (id: string | null) => { const p = positions.find((x) => x.id === id); return p ? (lang === "ar" ? p.title_ar : p.title_en) : "—"; };
   const deptName = (id: string | null) => { const d = depts.find((x) => x.id === id); return d ? (lang === "ar" ? d.name_ar : d.name_en) : "—"; };
 
@@ -288,9 +351,14 @@ export default function Staff() {
                         </>
                       )}
                       <div className="space-y-2 sm:col-span-2"><Label>{t("branch")}</Label>
-                        <Select value={form.branch_id || "none"} onValueChange={(v) => setForm({ ...form, branch_id: v === "none" ? "" : v })}>
+                        <Select value={currentBranchId ?? "none"} disabled>
                           <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent><SelectItem value="none">— {t("none")} —</SelectItem>{branches.map((b) => <SelectItem key={b.id} value={b.id}>{lang === "ar" ? b.name_ar : b.name_en}</SelectItem>)}</SelectContent>
+                          <SelectContent>
+                            <SelectItem value="none">— {t("none")} —</SelectItem>
+                            {branches.filter((b) => b.id === currentBranchId).map((b) => (
+                              <SelectItem key={b.id} value={b.id}>{lang === "ar" ? b.name_ar : b.name_en}</SelectItem>
+                            ))}
+                          </SelectContent>
                         </Select>
                       </div>
                     </div>
@@ -299,10 +367,34 @@ export default function Staff() {
                   <TabsContent value="employment" className="mt-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-2"><Label>{t("position")}</Label>
-                        <JobRoleSelect value={form.position_id} onChange={(v) => setForm({ ...form, position_id: v ?? "" })} />
+                        <JobRoleSelect
+                          value={form.position_id}
+                          onChange={(v) => {
+                            const selected = positions.find((p) => p.id === v);
+                            setForm({
+                              ...form,
+                              position_id: v ?? "",
+                              department_id: selected?.department_id ?? form.department_id,
+                            });
+                          }}
+                        />
                       </div>
                       <div className="space-y-2"><Label>{t("department")}</Label>
-                        <Select value={form.department_id || "none"} onValueChange={(v) => setForm({ ...form, department_id: v === "none" ? "" : v })}>
+                        <Select
+                          value={form.department_id || "none"}
+                          onValueChange={(v) => {
+                            const departmentId = v === "none" ? "" : v;
+                            const selectedPosition = positions.find((p) => p.id === form.position_id);
+                            setForm({
+                              ...form,
+                              department_id: departmentId,
+                              position_id:
+                                selectedPosition?.department_id && selectedPosition.department_id !== departmentId
+                                  ? ""
+                                  : form.position_id,
+                            });
+                          }}
+                        >
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent><SelectItem value="none">— {t("none")} —</SelectItem>{depts.map((d) => <SelectItem key={d.id} value={d.id}>{lang === "ar" ? d.name_ar : d.name_en}</SelectItem>)}</SelectContent>
                         </Select>

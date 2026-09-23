@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useI18n } from "@/contexts/I18nContext";
+import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { RowActions } from "@/components/RowActions";
@@ -15,6 +16,7 @@ import { Can } from "@/components/Can";
 
 export default function Positions() {
   const { t, lang } = useI18n();
+  const { currentBranchId } = useBranch();
   const [items, setItems] = useState<any[]>([]);
   const [depts, setDepts] = useState<any[]>([]);
   const [filterDept, setFilterDept] = useState<string>("all");
@@ -27,12 +29,36 @@ export default function Positions() {
   const [merging, setMerging] = useState(false);
 
   const load = async () => {
-    const { data } = await supabase.from("staff_positions").select("*").is("deleted_at", null);
-    setItems(data ?? []);
-    const { data: d } = await supabase.from("departments").select("id,name_en,name_ar");
-    setDepts(d ?? []);
+    if (!currentBranchId) {
+      setItems([]);
+      setDepts([]);
+      return;
+    }
+
+    const { data: d } = await supabase
+      .from("departments")
+      .select("id,name_en,name_ar")
+      .eq("branch_id", currentBranchId)
+      .is("deleted_at", null)
+      .order("name_en");
+    const deptRows = d ?? [];
+    const deptIds = deptRows.map((department) => department.id);
+
+    let positionRows: any[] = [];
+    if (deptIds.length) {
+      const { data } = await supabase
+        .from("staff_positions")
+        .select("*")
+        .in("department_id", deptIds)
+        .is("deleted_at", null);
+      positionRows = data ?? [];
+    }
+
+    setItems(positionRows);
+    setDepts(deptRows);
+    setFilterDept("all");
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [currentBranchId]);
 
   const openNew = () => { setE(null); setForm({ title: "", department_id: "", description: "", salary_range_min: "", salary_range_max: "", group_key: "", sort_order: "" }); setOpen(true); };
   const openEdit = (p: any) => { setE(p); setForm({ title: p.title_en || p.title_ar || "", department_id: p.department_id ?? "", description: p.description_en || p.description_ar || "", salary_range_min: p.salary_range_min?.toString() ?? "", salary_range_max: p.salary_range_max?.toString() ?? "", group_key: p.group_key ?? "", sort_order: p.sort_order != null ? String(p.sort_order) : "" }); setOpen(true); };
@@ -42,6 +68,11 @@ export default function Positions() {
     // UX fix: hardcoded English regardless of `lang`, in a file where every
     // other message goes through t(...) or a lang === "ar" ternary.
     if (!title) { toast.error(lang === "ar" ? "المسمى الوظيفي مطلوب" : "Title required"); return; }
+    if (!currentBranchId) { toast.error(t("selectBranch")); return; }
+    if (!form.department_id || !depts.some((d) => d.id === form.department_id)) {
+      toast.error(lang === "ar" ? "اختر قسمًا من الفرع الحالي" : "Select a department from the current branch");
+      return;
+    }
     const payload: any = {
       title_en: title, title_ar: title,
       department_id: form.department_id || null,
@@ -125,7 +156,7 @@ export default function Positions() {
                   <div className="space-y-2 sm:col-span-2"><Label>{t("department")}</Label>
                     <Select value={form.department_id || "none"} onValueChange={(v) => setForm({ ...form, department_id: v === "none" ? "" : v })}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent><SelectItem value="none">— {t("none")} —</SelectItem>{depts.map((d) => <SelectItem key={d.id} value={d.id}>{lang === "ar" ? d.name_ar : d.name_en}</SelectItem>)}</SelectContent>
+                      <SelectContent>{depts.map((d) => <SelectItem key={d.id} value={d.id}>{lang === "ar" ? d.name_ar : d.name_en}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2"><Label>{lang === "ar" ? "المجموعة" : "Group"}</Label><Input value={form.group_key} placeholder="e.g. medical, admin, support" onChange={(e) => setForm({ ...form, group_key: e.target.value })} maxLength={60} /></div>

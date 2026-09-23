@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
+import { useBranch } from "@/contexts/BranchContext";
 
 type Position = {
   id: string;
@@ -27,17 +28,24 @@ interface Props {
  */
 export default function JobRoleSelect({ value, onChange, placeholder, allowNone = true, noneLabel, className }: Props) {
   const { t, lang } = useI18n();
+  const { currentBranchId } = useBranch();
   const [items, setItems] = useState<Position[]>([]);
 
   useEffect(() => {
     let alive = true;
+    if (!currentBranchId) {
+      setItems([]);
+      return () => { alive = false; };
+    }
+
     supabase
       .from("staff_positions")
-      .select("id,title_en,title_ar,group_key,sort_order")
+      .select("id,title_en,title_ar,group_key,sort_order,department_id,departments!inner(branch_id)")
       .is("deleted_at", null)
+      .eq("departments.branch_id", currentBranchId)
       .then(({ data }) => { if (alive) setItems((data as any) ?? []); });
     return () => { alive = false; };
-  }, []);
+  }, [currentBranchId]);
 
   const grouped = useMemo(() => {
     const label = (p: Position) => (lang === "ar" ? p.title_ar : p.title_en) || p.title_en || p.title_ar;

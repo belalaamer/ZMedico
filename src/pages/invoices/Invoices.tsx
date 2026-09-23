@@ -57,11 +57,17 @@ export default function Invoices() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [q, setQ] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
   const loadRequestRef = useRef(0);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSearchTerm(q.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [q]);
 
   const load = async () => {
     const requestId = ++loadRequestRef.current;
@@ -72,32 +78,66 @@ export default function Invoices() {
     }
     setLoading(true);
     setLoadError(false);
-    const from = page * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
-    let query = supabase.from("invoices")
-      .select("id, invoice_number, invoice_date, total, paid_amount, status, patient_id, patients!inner(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code)", { count: "exact" })
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false }).range(from, to);
-    query = query.eq("branch_id", branchId);
-    if (statusFilter !== "all") query = query.eq("status", statusFilter as Inv["status"]);
-    const { data, error, count } = await query;
+    const { data, error } = await (supabase as any).rpc("search_invoices_page", {
+      p_branch_id: branchId,
+      p_search: searchTerm || null,
+      p_status: statusFilter === "all" ? null : statusFilter,
+      p_limit: PAGE_SIZE,
+      p_offset: page * PAGE_SIZE,
+    });
     if (requestId !== loadRequestRef.current) return;
     setLoading(false);
     if (error) { setLoadError(true); toast.error(error.message); return; }
-    setItems((data ?? []) as any);
-    setTotal(count ?? 0);
+
+    const rows = (data ?? []) as Array<{
+      id: string;
+      invoice_number: string;
+      invoice_date: string;
+      total: number;
+      paid_amount: number;
+      status: Inv["status"];
+      patient_id: string;
+      first_name_en: string;
+      last_name_en: string | null;
+      first_name_ar: string | null;
+      last_name_ar: string | null;
+      name_language: "ar" | "en" | null;
+      patient_code: number;
+      total_count: number | string;
+    }>;
+
+    if (rows.length === 0 && page > 0) {
+      setItems([]);
+      setTotal(0);
+      setPage((current) => Math.max(0, current - 1));
+      return;
+    }
+
+    setItems(rows.map((row) => ({
+      id: row.id,
+      invoice_number: row.invoice_number,
+      invoice_date: row.invoice_date,
+      total: Number(row.total),
+      paid_amount: Number(row.paid_amount),
+      status: row.status,
+      patient_id: row.patient_id,
+      patients: {
+        first_name_en: row.first_name_en,
+        last_name_en: row.last_name_en,
+        first_name_ar: row.first_name_ar,
+        last_name_ar: row.last_name_ar,
+        name_language: row.name_language,
+        patient_code: row.patient_code,
+      },
+    })));
+    setTotal(rows.length ? Number(rows[0].total_count ?? rows.length) : 0);
   };
 
-  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [branchSelectionReady, currentBranchId, statusFilter, page]);
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [branchSelectionReady, currentBranchId, statusFilter, searchTerm, page]);
   useEffect(() => { setPage(0); }, [branchSelectionReady, currentBranchId, statusFilter]);
   useDataSync(["invoices", "payments"], () => { void load(); });
 
-  const filtered = items.filter((i) => {
-    if (!q) return true;
-    const p = i.patients!;
-    const n = `${i.invoice_number} ${p.first_name_en} ${p.last_name_en ?? ""} ${p.first_name_ar ?? ""} ${p.last_name_ar ?? ""}`.toLowerCase();
-    return n.includes(q.toLowerCase());
-  });
+  const filtered = items;
 
   const statusLabel = (s: Inv["status"]) =>
     ({ draft: t("statusDraft"), pending: t("statusPending"), paid: t("statusPaid"), partial: t("statusPartial"), cancelled: t("statusCancelled") }[s]);
@@ -134,13 +174,13 @@ export default function Invoices() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("invoices")}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{invoiceCountLabel(filtered.length, lang)}</p>
+          <p className="text-sm text-muted-foreground mt-1">{invoiceCountLabel(total, lang)}</p>
         </div>
         <div className="flex w-full sm:w-auto gap-2 items-center flex-wrap">
           <div className="flex w-full sm:w-auto flex-col sm:flex-row sm:items-center gap-2 bg-card border shadow-sm rounded-lg p-2">
             <div className="relative w-full sm:w-56">
               <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("search")} className="ps-9 border-0 shadow-none focus-visible:ring-1 bg-transparent" />
+              <Input value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} placeholder={t("search")} className="ps-9 border-0 shadow-none focus-visible:ring-1 bg-transparent" />
             </div>
             <div className="hidden sm:block h-6 w-px bg-border" />
             <Select value={statusFilter} onValueChange={setStatusFilter}>

@@ -20,7 +20,11 @@ const CORE_ROUTES = [
   { path: "/invoices", area: "invoices" },
   { path: "/treasury", area: "treasury" },
   { path: "/physio", area: "physio" },
-  { path: "/hr/staff", area: "hr" },
+  { path: "/inventory/products", area: "inventory products" },
+  { path: "/inventory/purchase-orders", area: "inventory purchase orders" },
+  { path: "/hr/staff", area: "hr staff" },
+  { path: "/hr/departments", area: "hr departments" },
+  { path: "/hr/positions", area: "hr positions" },
   { path: "/settings", area: "settings" },
 ] as const;
 

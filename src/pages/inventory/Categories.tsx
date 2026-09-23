@@ -11,6 +11,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useBranch } from "@/contexts/BranchContext";
+import { Can } from "@/components/Can";
 
 type Cat = { id: string; name_en: string; name_ar: string; parent_id: string | null; is_active: boolean; description: string | null };
 
@@ -59,9 +60,14 @@ export default function Categories() {
 
   const del = async (id: string) => {
     if (counts[id]) { toast.error(t("categoryHasProducts")); return; }
-    const { error } = await supabase.from("product_categories").delete().eq("id", id).eq("tenant_id", tenantId);
+    if (childrenOf(id).length > 0) {
+      toast.error(lang === "ar" ? "لا يمكن حذف تصنيف يحتوي على تصنيفات فرعية" : "Cannot delete a category with child categories");
+      return;
+    }
+    const { error } = await supabase.rpc("delete_product_category", { p_category_id: id });
     if (error) { toast.error(error.message); return; }
-    toast.success(t("delete")); load();
+    toast.success(t("delete"));
+    void load();
   };
 
   const roots = cats.filter((c) => !c.parent_id);
@@ -76,8 +82,12 @@ export default function Categories() {
           {c.description && <div className="text-xs text-muted-foreground truncate">{c.description}</div>}
         </div>
         <Badge variant="outline" className="text-[10px]">{counts[c.id] ?? 0} {t("productsCount")}</Badge>
-        <Button variant="ghost" size="icon" onClick={() => openEdit(c)}><Edit3 className="size-4" /></Button>
-        <Button variant="ghost" size="icon" onClick={() => del(c.id)} disabled={!!counts[c.id]}><Trash2 className="size-4" /></Button>
+        <Can permission="inventory.edit">
+          <Button variant="ghost" size="icon" onClick={() => openEdit(c)}><Edit3 className="size-4" /></Button>
+        </Can>
+        <Can permission="inventory.delete">
+          <Button variant="ghost" size="icon" onClick={() => del(c.id)} disabled={!!counts[c.id] || childrenOf(c.id).length > 0}><Trash2 className="size-4" /></Button>
+        </Can>
       </div>
       {childrenOf(c.id).map((ch) => <Row key={ch.id} c={ch} depth={depth + 1} />)}
     </>
@@ -90,10 +100,11 @@ export default function Categories() {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("categories")}</h1>
           <p className="text-sm text-muted-foreground mt-1">{cats.length}</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button className="gradient-primary text-primary-foreground" onClick={openNew}><Plus className="me-2 size-4" />{t("addCategory")}</Button>
-          </DialogTrigger>
+        <Can permission="inventory.create">
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button className="gradient-primary text-primary-foreground" onClick={openNew}><Plus className="me-2 size-4" />{t("addCategory")}</Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>{edit ? t("editProduct") : t("newCategory")}</DialogTitle></DialogHeader>
             <div className="space-y-3">
@@ -115,7 +126,8 @@ export default function Categories() {
               <Button className="gradient-primary text-primary-foreground" onClick={save}>{t("save")}</Button>
             </DialogFooter>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </Can>
       </div>
 
       <Card className="p-3 shadow-card">

@@ -9024,6 +9024,16 @@ export type Database = {
         Args: { _tenant_id: string }
         Returns: boolean
       }
+      transfer_inventory_stock: {
+        Args: {
+          p_from_branch_id: string
+          p_notes?: string | null
+          p_product_id: string
+          p_quantity: number
+          p_to_branch_id: string
+        }
+        Returns: string
+      }
       tenant_subscription_for_branch: {
         Args: { _branch_id: string }
         Returns: Json

@@ -176,9 +176,10 @@ export default function Products() {
   };
 
   const softDelete = async (p: Product): Promise<void> => {
-    const { error } = await supabase.from("products").update({ deleted_at: new Date().toISOString() } as any).eq("id", p.id).eq("tenant_id", tenantId);
+    const { error } = await supabase.rpc("archive_product", { p_product_id: p.id });
     if (error) { toast.error(error.message); return; }
-    toast.success(t("delete")); load();
+    toast.success(t("delete"));
+    void load();
   };
 
   const filtered = useMemo(() => items.filter((p) => {

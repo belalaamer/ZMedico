@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useState } from "react";
 import { useDataSync } from "@/lib/dataSync";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,7 @@ import { PullToRefresh } from "@/components/PullToRefresh";
 import { TablePager } from "@/components/TablePager";
 import { CreateInvoiceDialog } from "../invoices/CreateInvoiceDialog";
 import { containsArabicScript, patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
+import { sanitizeSearch } from "@/lib/sanitizeSearch";
 
 const PAGE_SIZE = 50;
 
@@ -97,6 +98,7 @@ export default function PatientsPage() {
   const [items, setItems] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
+  const deferredQ = useDeferredValue(q.trim());
   const [open, setOpen] = useState(false);
   const [confirmDel, setConfirmDel] = useState<Patient | null>(null);
   const [duesByPatient, setDuesByPatient] = useState<Record<string, number>>({});
@@ -138,15 +140,33 @@ export default function PatientsPage() {
     // guaranteeing the visible numbers are always in consistent order.
     let query = supabase.from("patients")
       .select("id,patient_code,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,phone,phone2,email,gender,city,address,dob,blood_type,notes,branch_id,created_at,whatsapp_opt_in", { count: "exact" })
-      .is("deleted_at", null).eq("branch_id", currentBranchId).order("patient_code", { ascending: false }).range(from, to);
+      .is("deleted_at", null)
+      .eq("branch_id", currentBranchId);
+
+    const searchTerm = sanitizeSearch(deferredQ);
+    if (searchTerm) {
+      const filters = [
+        `first_name_en.ilike.%${searchTerm}%`,
+        `last_name_en.ilike.%${searchTerm}%`,
+        `first_name_ar.ilike.%${searchTerm}%`,
+        `last_name_ar.ilike.%${searchTerm}%`,
+        `phone.ilike.%${searchTerm}%`,
+        `phone2.ilike.%${searchTerm}%`,
+        `email.ilike.%${searchTerm}%`,
+      ];
+      if (/^\d+$/.test(searchTerm)) filters.push(`patient_code.eq.${searchTerm}`);
+      query = query.or(filters.join(","));
+    }
+
+    query = query.order("patient_code", { ascending: false }).range(from, to);
     const { data, error, count } = await query;
     setLoading(false);
     if (error) { toast.error(error.message); return; }
     setItems((data ?? []) as Patient[]);
         setTotal(count ?? 0);
-  }, [branchSelectionReady, currentBranchId, page]);
+  }, [branchSelectionReady, currentBranchId, deferredQ, page]);
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => { setPage(0); }, [currentBranchId]);
+  useEffect(() => { setPage(0); }, [currentBranchId, deferredQ]);
   useDataSync(["patients"], () => { void load(); });
 
   // Lightweight batched outstanding-debt badge: a single query for the visible
@@ -312,11 +332,7 @@ export default function PatientsPage() {
     load();
   };
 
-  const filtered = items.filter((p) => {
-    if (!q) return true;
-    const n = `${p.first_name_en} ${p.last_name_en ?? ""} ${p.first_name_ar ?? ""} ${p.last_name_ar ?? ""} ${p.phone ?? ""} ${p.email ?? ""}`.toLowerCase();
-    return n.includes(q.toLowerCase());
-  });
+  const filtered = items;
 
   return (
     <PullToRefresh onRefresh={load}>
@@ -324,7 +340,7 @@ export default function PatientsPage() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("patients")}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{filtered.length} {t("patients").toLowerCase()}</p>
+          <p className="text-sm text-muted-foreground mt-1">{total} {t("patients").toLowerCase()}</p>
         </div>
         <div className="flex gap-2 items-center w-full sm:w-auto">
           <div className="relative flex-1 sm:w-64">

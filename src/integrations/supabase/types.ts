@@ -8895,6 +8895,22 @@ export type Database = {
         Args: { _invoice_id: string }
         Returns: undefined
       }
+      create_purchase_order: {
+        Args: {
+          p_branch_id: string
+          p_expected_date: string | null
+          p_items: Json
+          p_notes: string | null
+          p_order_date: string
+          p_status: Database["public"]["Enums"]["po_status"]
+          p_supplier_id: string
+          p_tax_pct: number
+        }
+        Returns: {
+          purchase_order_id: string
+          purchase_order_number: string
+        }[]
+      }
       recalc_po_subtotal: { Args: { _po_id: string }; Returns: undefined }
       receive_po_item: {
         Args: {

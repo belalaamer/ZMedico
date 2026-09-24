@@ -61,7 +61,15 @@ BEGIN
   -- Resolve the subject from the entity itself whenever an entity id exists.
   -- Never trust a caller-supplied patient id to authorize a different record.
   IF p_entity_id IS NOT NULL THEN
-    v_patient := CASE p_entity_type
+    -- Legacy UI versions log collection-level Documents/Dental views by
+    -- passing patientId as both entityId and patientId. Preserve that shape
+    -- during rollout while newer clients pass entityId=NULL for collections.
+    IF p_entity_type IN ('document', 'dental_chart')
+       AND p_patient_id IS NOT NULL
+       AND p_entity_id = p_patient_id THEN
+      v_patient := p_patient_id;
+    ELSE
+      v_patient := CASE p_entity_type
       WHEN 'patient'        THEN p_entity_id
       WHEN 'medical_record' THEN (SELECT patient_id FROM public.medical_records WHERE id = p_entity_id)
       WHEN 'physio_case'    THEN (SELECT patient_id FROM public.physio_cases WHERE id = p_entity_id)
@@ -73,7 +81,8 @@ BEGIN
       WHEN 'invoice'        THEN (SELECT patient_id FROM public.invoices WHERE id = p_entity_id)
       WHEN 'patient_list'   THEN NULL
       ELSE NULL
-    END;
+      END;
+    END IF;
 
     IF p_entity_type <> 'patient_list' AND v_patient IS NULL THEN
       RETURN;

@@ -103,6 +103,12 @@ export default defineConfig({
       testMatch: /rbac\.deep\.spec\.ts/,
       use: { baseURL: BASE_URL },
     },
+    // Full UI authorization walk. Each test signs in with its own QA role.
+    {
+      name: "rbac-ui",
+      testMatch: /rbac\.spec\.ts/,
+      use: { ...devices["Desktop Chrome"], baseURL: BASE_URL },
+    },
     // Read-only cross-tenant RLS checks. The tests skip safely until two
     // dedicated QA identities and fixture marker IDs are configured.
     {

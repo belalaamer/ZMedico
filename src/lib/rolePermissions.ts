@@ -140,6 +140,7 @@ export function moduleForPath(path: string): string | null {
   if (path.startsWith("/queue")) return "appointments";
   if (path.startsWith("/appointments")) return "appointments";
   if (path.startsWith("/physio")) return "medical_records";
+  if (/^\\/patients\\/[^/]+\\/dental(?:\\/|$)/.test(path)) return "medical_records";
   if (path.startsWith("/patients")) return "patients";
   if (path.startsWith("/invoices") || path.startsWith("/payments")) return "invoices";
   if (path.startsWith("/treasury") || path.startsWith("/expenses")) return "treasury";

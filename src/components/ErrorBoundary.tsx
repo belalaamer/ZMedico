@@ -1,5 +1,6 @@
 import { Component, ReactNode } from "react";
 import { reportClientError } from "@/lib/observability/reportError";
+import { recoverFromStaleChunk } from "@/lib/chunkRecovery";
 
 type Props = { children: ReactNode };
 type State = { error: Error | null };
@@ -31,6 +32,11 @@ export class ErrorBoundary extends Component<Props, State> {
       stack: error.stack,
       component: componentStack,
     });
+
+    // A tab left open across a deployment may still reference content-hashed
+    // lazy chunks that no longer exist. Reload the fresh no-store HTML shell
+    // once instead of leaving the user on a broken error screen.
+    recoverFromStaleChunk(error);
   }
 
   private reset = () => {

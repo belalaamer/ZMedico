@@ -9,14 +9,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useI18n } from "@/contexts/I18nContext";
+import { useBranch } from "@/contexts/BranchContext";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { RowActions } from "@/components/RowActions";
 
-type Dx = { id: string; code: string; name_en: string; name_ar: string; category: string | null; description_en: string | null; description_ar: string | null };
+type Dx = { id: string; tenant_id: string | null; code: string; name_en: string; name_ar: string; category: string | null; description_en: string | null; description_ar: string | null };
 
 export default function Diagnoses() {
   const { t, lang } = useI18n();
+  const { subscription } = useBranch();
+  const { authz } = useAuthorization("Diagnoses");
+  const canManageCatalog = authz.can("settings.catalog.update");
+  const isSystemOwner = authz.holdsAnyRole("system_owner");
   const [items, setItems] = useState<Dx[]>([]);
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<string>("all");
@@ -48,8 +54,12 @@ export default function Diagnoses() {
     return true;
   }), [items, q, cat]);
 
-  const openNew = () => { setEdit(null); setForm({ code: "", name: "", category: "", description: "" }); setOpen(true); };
-  const openEdit = (d: Dx) => { setEdit(d); setForm({ code: d.code, name: d.name_en || d.name_ar || "", category: d.category ?? "", description: d.description_en || d.description_ar || "" }); setOpen(true); };
+  const openNew = () => {
+    if (!canManageCatalog || !subscription?.tenant_id) return;
+    setEdit(null); setForm({ code: "", name: "", category: "", description: "" }); setOpen(true); };
+  const openEdit = (d: Dx) => {
+    if (!(isSystemOwner || (canManageCatalog && d.tenant_id === subscription?.tenant_id))) return;
+    setEdit(d); setForm({ code: d.code, name: d.name_en || d.name_ar || "", category: d.category ?? "", description: d.description_en || d.description_ar || "" }); setOpen(true); };
 
   const save = async () => {
     const name = form.name.trim();
@@ -58,6 +68,7 @@ export default function Diagnoses() {
     // "Cannot delete" message above in this same file.
     if (!form.code.trim() || !name) return toast.error(lang === "ar" ? "الرمز والاسم مطلوبان" : "Code & name required");
     const payload = {
+      ...(!edit ? { tenant_id: subscription?.tenant_id } : {}),
       code: form.code.trim().toUpperCase(),
       name_en: name, name_ar: name,
       category: form.category || null,
@@ -86,6 +97,7 @@ export default function Diagnoses() {
               {cats.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
             </SelectContent>
           </Select>
+          {canManageCatalog && subscription?.tenant_id ? (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground" onClick={openNew}><Plus className="me-2 size-4" />{t("addDiagnosisDx")}</Button></DialogTrigger>
             <DialogContent>
@@ -99,6 +111,7 @@ export default function Diagnoses() {
               <DialogFooter><Button variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button><Button className="gradient-primary text-primary-foreground" onClick={save}>{t("save")}</Button></DialogFooter>
             </DialogContent>
           </Dialog>
+          ) : null}
         </div>
       </div>
       <Card className="shadow-card overflow-hidden">
@@ -114,7 +127,9 @@ export default function Diagnoses() {
                   <div className="text-xs text-muted-foreground truncate" dir={lang === "ar" ? "ltr" : "rtl"}>{lang === "ar" ? d.name_en : d.name_ar}</div>
                 </div>
                 {d.category && <Badge variant="outline">{d.category}</Badge>}
-                <RowActions onEdit={() => openEdit(d)} onDelete={() => remove(d)} />
+                {(isSystemOwner || (canManageCatalog && d.tenant_id === subscription?.tenant_id)) ? (
+                  <RowActions onEdit={() => openEdit(d)} onDelete={() => remove(d)} />
+                ) : null}
               </div>
             ))}
           </div>

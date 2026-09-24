@@ -6,8 +6,9 @@
  * assert what RLS actually allows/denies. This proves least-privilege at
  * the backend, not just at the button-visibility layer.
  *
- * Skip-safe: any role without ROLE_EMAIL / ROLE_PASS env vars is skipped
- * so the suite can run partial coverage without failing.
+ * Skip-safe: a role with no configured password is skipped. Canonical QA
+ * emails default to qa.<role>@qa.local, so CI only needs password secrets.
+ * If a password is configured but login fails, the suite fails closed.
  *
  * Run:
  *   BASE_SUPABASE_URL=... BASE_SUPABASE_ANON_KEY=... \
@@ -33,14 +34,14 @@ type Role =
   | "receptionist" | "accountant" | "hr" | "staff";
 
 const CREDS: Record<Role, { email?: string; pass?: string }> = {
-  admin:        { email: process.env.ADMIN_EMAIL,        pass: process.env.ADMIN_PASS },
-  manager:      { email: process.env.MANAGER_EMAIL,      pass: process.env.MANAGER_PASS },
-  doctor:       { email: process.env.DOCTOR_EMAIL,       pass: process.env.DOCTOR_PASS },
-  nurse:        { email: process.env.NURSE_EMAIL,        pass: process.env.NURSE_PASS },
-  receptionist: { email: process.env.RECEPTIONIST_EMAIL, pass: process.env.RECEPTIONIST_PASS },
-  accountant:   { email: process.env.ACCOUNTANT_EMAIL,   pass: process.env.ACCOUNTANT_PASS },
-  hr:           { email: process.env.HR_EMAIL,           pass: process.env.HR_PASS },
-  staff:        { email: process.env.STAFF_EMAIL,        pass: process.env.STAFF_PASS },
+  admin:        { email: process.env.ADMIN_EMAIL ?? "qa.admin@qa.local",               pass: process.env.TEST_ADMIN_PASSWORD ?? process.env.ADMIN_PASS },
+  manager:      { email: process.env.MANAGER_EMAIL ?? "qa.manager@qa.local",           pass: process.env.TEST_MANAGER_PASSWORD ?? process.env.MANAGER_PASS },
+  doctor:       { email: process.env.DOCTOR_EMAIL ?? "qa.doctor@qa.local",             pass: process.env.TEST_DOCTOR_PASSWORD ?? process.env.DOCTOR_PASS },
+  nurse:        { email: process.env.NURSE_EMAIL ?? "qa.nurse@qa.local",               pass: process.env.TEST_NURSE_PASSWORD ?? process.env.NURSE_PASS },
+  receptionist: { email: process.env.RECEPTIONIST_EMAIL ?? "qa.receptionist@qa.local", pass: process.env.TEST_RECEPTIONIST_PASSWORD ?? process.env.RECEPTIONIST_PASS },
+  accountant:   { email: process.env.ACCOUNTANT_EMAIL ?? "qa.accountant@qa.local",     pass: process.env.TEST_ACCOUNTANT_PASSWORD ?? process.env.ACCOUNTANT_PASS },
+  hr:           { email: process.env.HR_EMAIL ?? "qa.hr@qa.local",                     pass: process.env.TEST_HR_PASSWORD ?? process.env.HR_PASS },
+  staff:        { email: process.env.STAFF_EMAIL ?? "qa.staff@qa.local",               pass: process.env.TEST_STAFF_PASSWORD ?? process.env.STAFF_PASS },
 };
 
 async function tokenFor(role: Role): Promise<{ token: string; userId: string } | null> {
@@ -51,7 +52,11 @@ async function tokenFor(role: Role): Promise<{ token: string; userId: string } |
     headers: { apikey: ANON, "Content-Type": "application/json" },
     data: { email: c.email, password: c.pass },
   });
-  if (!res.ok()) { await ctx.dispose(); return null; }
+  if (!res.ok()) {
+    const status = res.status();
+    await ctx.dispose();
+    throw new Error(`QA sign-in failed for ${role} (HTTP ${status}). Rotate the QA password secret instead of skipping RBAC coverage.`);
+  }
   const body = await res.json();
   await ctx.dispose();
   return { token: body.access_token, userId: body.user?.id };

@@ -45,8 +45,7 @@ synthetic rows.
 
 ## Provisioning
 
-- Route: `/settings/qa` (admin-only, gated by `PermissionRoute adminOnly` and
-  an in-page `useUserRole` guard).
+- Route: `/settings/qa` (**System Owner only**, gated by `PermissionRoute systemOwnerOnly`; clinic Admins cannot open this internal QA tool).
 - Backend: existing `admin-create-user` edge function. Role-scoped users
   (`manager`, `doctor`, `nurse`, `receptionist`, `accountant`, `hr`) receive an active branch as their
   `branch_id` — required by the existing function contract.

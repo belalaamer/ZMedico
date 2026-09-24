@@ -23,7 +23,8 @@ import PatientQuickActions from "./PatientQuickActions";
 import PatientDocumentsTab from "./PatientDocumentsTab";
 import PatientPortalCard from "./PatientPortalCard";
 import { RecordPaymentDialog } from "../payments/RecordPaymentDialog";
-import { useAuthorization } from "@/lib/authz/useAuthorization";\nimport { useBranch } from "@/contexts/BranchContext";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
+import { useBranch } from "@/contexts/BranchContext";
 import PatientOverviewSnapshot from "./PatientOverviewSnapshot";
 import { logPhiAccess } from "@/lib/observability/phiAudit";
 import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
@@ -38,7 +39,10 @@ export default function PatientProfile() {
   const navigate = useNavigate();
   const { t, lang } = useI18n();
   // R2: canonical authorization entry point.
-  const { authz } = useAuthorization("PatientProfile");\n  const { isModuleEnabled } = useBranch();\n  const canUseDental = authz.can("medical_records.view") && isModuleEnabled("dental");
+  const { authz } = useAuthorization("PatientProfile");
+  const { isModuleEnabled } = useBranch();
+  const canUseDental = authz.can("medical_records.view") && isModuleEnabled("dental");
+  const canUsePhysio = authz.can("medical_records.view") && isModuleEnabled("physio");
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab") ?? "overview";
   const uploadFlag = searchParams.get("upload") === "1";
@@ -60,7 +64,7 @@ export default function PatientProfile() {
 
   useEffect(() => {
     if (!id) return;
-    if (!authz.can("medical_records.view")) { setPhysioCases([]); return; }
+    if (!canUsePhysio) { setPhysioCases([]); setPhysioStats(null); setActivePhysioCaseId(null); return; }
     (async () => {
       // Full set (branch-scoped) for accurate stats.
       let allQ = supabase.from("physio_cases" as any)
@@ -101,7 +105,7 @@ export default function PatientProfile() {
       });
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, reloadKey, authz.can("medical_records.view"), patient?.branch_id]);
+  }, [id, reloadKey, canUsePhysio, patient?.branch_id]);
 
   const setTab = (next: string) => {
     const p = new URLSearchParams(searchParams);
@@ -159,7 +163,9 @@ export default function PatientProfile() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <Button asChild variant="ghost" size="sm"><Link to="/patients"><ArrowLeft className="me-2 size-4" />{t("patients")}</Link></Button>
         <div className="flex w-full sm:w-auto flex-wrap items-center justify-end gap-2">
-          {canUseDental && (\n            <Button asChild variant="outline" size="sm"><Link to={`/patients/${patient.id}/dental`}><Stethoscope className="me-2 size-4"/>{t("dentalChart")}</Link></Button>\n          )}
+          {canUseDental && (
+            <Button asChild variant="outline" size="sm"><Link to={`/patients/${patient.id}/dental`}><Stethoscope className="me-2 size-4"/>{t("dentalChart")}</Link></Button>
+          )}
           <Can permission="patients.edit">
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
               <Pencil className="me-2 size-4" />{t("edit")}
@@ -260,9 +266,9 @@ export default function PatientProfile() {
           <TabsTrigger value="overview">{t("overview")}</TabsTrigger>
           <TabsTrigger value="timeline">{t("timelineTab")}</TabsTrigger>
           <TabsTrigger value="clinical">{lang === "ar" ? "السريري" : "Clinical"}</TabsTrigger>
-          <Can module="medical_records" action="view">
+          {canUsePhysio && (
             <TabsTrigger value="physio">{lang === "ar" ? "العلاج الطبيعي" : "Physiotherapy"}</TabsTrigger>
-          </Can>
+          )}
           {authz.can("invoices.view") && (
             <TabsTrigger value="financial">{lang === "ar" ? "المالي" : "Financial"}</TabsTrigger>
           )}
@@ -359,6 +365,7 @@ export default function PatientProfile() {
           )}
         </TabsContent>
 
+        {canUsePhysio && (
         <TabsContent value="physio" className="mt-4">
           <Can module="medical_records" action="view" fallback={<div className="text-center text-muted-foreground py-10">{lang === "ar" ? "لا تملك صلاحية الوصول" : "Access denied"}</div>}>
             <div className="space-y-4">
@@ -455,6 +462,7 @@ export default function PatientProfile() {
             </div>
           </Can>
         </TabsContent>
+        )}
 
         <TabsContent value="financial" className="mt-4 space-y-6">
           <Can module="invoices" action="view" fallback={<div className="text-center text-muted-foreground py-10">{lang === "ar" ? "لا تملك صلاحية الوصول" : "Access denied"}</div>}>

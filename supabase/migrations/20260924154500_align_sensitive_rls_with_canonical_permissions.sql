@@ -169,6 +169,102 @@ WITH CHECK (
 --    already remain in force as RESTRICTIVE policies where present.
 -- ---------------------------------------------------------------------------
 
+-- The private patient-docs Storage bucket previously had no storage.objects
+-- policies at all, so browser upload/download could never succeed. Scope each
+-- object to the patient UUID prefix used by PatientDocumentsTab:
+--   <patient_id>/<timestamp>-<safe_filename>
+DROP POLICY IF EXISTS patient_docs_storage_select ON storage.objects;
+DROP POLICY IF EXISTS patient_docs_storage_insert ON storage.objects;
+DROP POLICY IF EXISTS patient_docs_storage_update ON storage.objects;
+DROP POLICY IF EXISTS patient_docs_storage_delete ON storage.objects;
+
+CREATE POLICY patient_docs_storage_select ON storage.objects
+FOR SELECT TO authenticated
+USING (
+  bucket_id = 'patient-docs'
+  AND (
+    public.has_role((SELECT auth.uid()), 'system_owner'::public.app_role)
+    OR public.has_permission((SELECT auth.uid()), 'medical_records.view')
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.patients p
+    WHERE storage.objects.name LIKE p.id::text || '/%'
+      AND p.deleted_at IS NULL
+      AND (
+        public.has_role((SELECT auth.uid()), 'system_owner'::public.app_role)
+        OR public.user_has_branch_access(p.branch_id)
+      )
+  )
+);
+
+CREATE POLICY patient_docs_storage_insert ON storage.objects
+FOR INSERT TO authenticated
+WITH CHECK (
+  bucket_id = 'patient-docs'
+  AND (
+    public.has_role((SELECT auth.uid()), 'system_owner'::public.app_role)
+    OR public.has_permission((SELECT auth.uid()), 'medical_records.create')
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.patients p
+    WHERE storage.objects.name LIKE p.id::text || '/%'
+      AND p.deleted_at IS NULL
+      AND (
+        public.has_role((SELECT auth.uid()), 'system_owner'::public.app_role)
+        OR public.user_has_branch_access(p.branch_id)
+      )
+  )
+);
+
+CREATE POLICY patient_docs_storage_update ON storage.objects
+FOR UPDATE TO authenticated
+USING (
+  bucket_id = 'patient-docs'
+  AND (
+    public.has_role((SELECT auth.uid()), 'system_owner'::public.app_role)
+    OR public.has_permission((SELECT auth.uid()), 'medical_records.edit')
+  )
+)
+WITH CHECK (
+  bucket_id = 'patient-docs'
+  AND (
+    public.has_role((SELECT auth.uid()), 'system_owner'::public.app_role)
+    OR public.has_permission((SELECT auth.uid()), 'medical_records.edit')
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.patients p
+    WHERE storage.objects.name LIKE p.id::text || '/%'
+      AND p.deleted_at IS NULL
+      AND (
+        public.has_role((SELECT auth.uid()), 'system_owner'::public.app_role)
+        OR public.user_has_branch_access(p.branch_id)
+      )
+  )
+);
+
+CREATE POLICY patient_docs_storage_delete ON storage.objects
+FOR DELETE TO authenticated
+USING (
+  bucket_id = 'patient-docs'
+  AND (
+    public.has_role((SELECT auth.uid()), 'system_owner'::public.app_role)
+    OR public.has_permission((SELECT auth.uid()), 'medical_records.delete')
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.patients p
+    WHERE storage.objects.name LIKE p.id::text || '/%'
+      AND p.deleted_at IS NULL
+      AND (
+        public.has_role((SELECT auth.uid()), 'system_owner'::public.app_role)
+        OR public.user_has_branch_access(p.branch_id)
+      )
+  )
+);
+
 DROP POLICY IF EXISTS doc_select_scoped ON public.patient_documents;
 DROP POLICY IF EXISTS doc_insert_staff ON public.patient_documents;
 DROP POLICY IF EXISTS doc_update_staff ON public.patient_documents;

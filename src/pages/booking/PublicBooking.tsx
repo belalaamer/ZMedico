@@ -36,7 +36,7 @@ type BookingOption = {
   name_en: string;
   name_ar: string;
   duration_minutes: number;
-  source: "service" | "procedure";
+  source: "service";
 };
 
 type Doctor = {
@@ -70,7 +70,6 @@ type PublicBookingOptions = {
   tenant_slug: string;
   branches: Branch[];
   services: BookingOption[];
-  procedures: BookingOption[];
   doctors: Doctor[];
 };
 
@@ -245,10 +244,7 @@ export default function PublicBooking() {
       setTenantNames({ en: data.tenant_name_en?.trim() || data.tenant_name || "", ar: data.tenant_name_ar?.trim() || data.tenant_name || "" });
       setTenantName(localizedTenantName({ name: data.tenant_name, name_en: data.tenant_name_en, name_ar: data.tenant_name_ar }, isArabic ? "ar" : "en"));
       const nextBranches = (data.branches ?? []) as Branch[];
-      const nextServices = [
-        ...((data?.services ?? []) as BookingOption[]),
-        ...((data?.procedures ?? []) as BookingOption[]),
-      ];
+      const nextServices = (data?.services ?? []) as BookingOption[];
       setBranches(nextBranches);
       setServices(nextServices);
       // Doctors are loaded through the service-aware RPC below; do not render
@@ -295,7 +291,7 @@ export default function PublicBooking() {
       const { data, error } = await publicRpc<Doctor[]>("list_doctors_for_service", {
         p_branch_id: branchId,
         p_service_id: serviceId,
-        p_service_kind: service?.source ?? "service",
+        p_service_kind: "service",
       });
       if (cancelled) return;
       if (error) {

@@ -392,7 +392,7 @@ export default function Dashboard() {
         .sort((a, b) => b.count - a.count).slice(0, 8));
 
       setLoading(false);
-  }, [branchSelectionReady, currentBranchId, rangeStart, rangeEnd, lang, user?.id]);
+  }, [branchSelectionReady, currentBranchId, rangeStart, rangeEnd, lang, user?.id, canBookings, canPatients, canInvoices, canClinical, canHR, canTreasury]);
 
   // Initial load + refetch on branch change
   useEffect(() => { run(); }, [run]);

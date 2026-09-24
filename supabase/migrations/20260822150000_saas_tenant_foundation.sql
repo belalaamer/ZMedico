@@ -13,21 +13,13 @@ BEGIN
   ORDER BY created_at
   LIMIT 1;
 
-  IF v_tenant_id IS NULL
-     AND EXISTS (SELECT 1 FROM public.branches WHERE tenant_id IS NULL) THEN
-    -- Historical seed data can contain branches before the tenant foundation
-    -- migration. Bootstrap their single owner so the tenant invariant remains
-    -- valid in both production upgrades and clean local test databases.
-    INSERT INTO public.tenants (name, slug)
-    VALUES ('Default Tenant', 'default-tenant')
-    RETURNING id INTO v_tenant_id;
+  IF v_tenant_id IS NULL THEN
+    RAISE EXCEPTION 'Cannot link branches: no tenant exists';
   END IF;
 
-  IF v_tenant_id IS NOT NULL THEN
-    UPDATE public.branches
-    SET tenant_id = v_tenant_id
-    WHERE tenant_id IS NULL;
-  END IF;
+  UPDATE public.branches
+  SET tenant_id = v_tenant_id
+  WHERE tenant_id IS NULL;
 END $$;
 
 DO $$

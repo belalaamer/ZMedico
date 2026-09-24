@@ -27,3 +27,7 @@ dist-ssr
 tests/playwright/.auth/
 playwright-report/
 test-results/
+
+# Python cache artifacts
+__pycache__/
+*.py[cod]

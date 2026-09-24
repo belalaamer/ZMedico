@@ -137,7 +137,11 @@ END;
 $function$;
 
 -- 2. Reschedule detect-queue-alerts cron with Authorization header so heartbeat refreshes
-SELECT cron.unschedule('detect-queue-alerts-every-5min');
+-- A clean local database has no prior job. Remove it only when it exists,
+-- then recreate the named job below.
+SELECT cron.unschedule(jobid)
+FROM cron.job
+WHERE jobname = 'detect-queue-alerts-every-5min';
 SELECT cron.schedule(
   'detect-queue-alerts-every-5min',
   '*/5 * * * *',

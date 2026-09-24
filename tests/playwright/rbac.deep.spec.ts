@@ -227,26 +227,42 @@ test.describe("RLS: hr", () => {
 });
 
 // ------------------------------------------------------------------
-// DELETE is admin-only across the board (spot-check)
+// DELETE is admin-only across the board (canonical permission check)
 // ------------------------------------------------------------------
-test.describe("RLS: DELETE is admin-only", () => {
+// A DELETE against a non-existent row is NOT a valid RLS-denial test:
+// PostgREST can return 204 for both "policy hid every row" and "zero rows
+// matched". Instead, verify the same canonical permission primitive that
+// the hardened DELETE policies use. This is read-only and deterministic.
+test.describe("RBAC: DELETE is admin-only", () => {
   const nonAdminRoles: Role[] = ["manager", "doctor", "receptionist", "accountant", "hr"];
+  const deletePermissions = [
+    "patients.delete",
+    "appointments.delete",
+    "invoices.delete",
+    "treasury.delete",
+    "medical_records.delete",
+    "hr.delete",
+    "coupons.delete",
+  ];
+
   for (const role of nonAdminRoles) {
-    test(`${role} cannot DELETE from invoices/appointments/patients`, async () => {
+    test(`${role} has no canonical hard-delete permissions`, async () => {
       const auth = await tokenFor(role);
       test.skip(!auth, `no ${role} credentials`);
-      const t = auth!.token;
-      // Attempt DELETE with a filter that matches nothing → still evaluates RLS.
-      // A denied policy returns 403; an allowed-but-empty returns 204.
-      for (const tbl of ["invoices", "appointments", "patients", "payments"]) {
-        const r = await rest(t, `${tbl}?id=eq.00000000-0000-0000-0000-000000000000`, {
-          method: "DELETE",
+
+      for (const permission of deletePermissions) {
+        const r = await rest(auth!.token, "rpc/has_permission", {
+          method: "POST",
+          body: {
+            _user_id: auth!.userId,
+            _permission_key: permission,
+          },
         });
-        // Anything other than 204 (deleted 0 rows OK) proves the policy blocks.
-        // We accept 204 too because some tables allow the role but no row matched.
-        if (r.status === 204 && (tbl === "invoices" || tbl === "patients" || tbl === "payments")) {
-          throw new Error(`${role} unexpectedly allowed DELETE on ${tbl}`);
-        }
+        assertAllowed(r, `has_permission(${permission})`);
+        expect(
+          r.body,
+          `${role} unexpectedly has canonical permission ${permission}`,
+        ).toBe(false);
       }
     });
   }

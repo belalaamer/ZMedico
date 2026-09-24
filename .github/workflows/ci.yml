@@ -71,6 +71,37 @@ jobs:
             --project=admin-desktop \
             --project=admin-mobile
 
+      - name: Deep RBAC / RLS E2E (when configured)
+        env:
+          BASE_SUPABASE_URL: ${{ secrets.QA_SUPABASE_URL }}
+          BASE_SUPABASE_ANON_KEY: ${{ secrets.QA_SUPABASE_PUBLISHABLE_KEY }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASS: ${{ secrets.ADMIN_PASS }}
+          MANAGER_EMAIL: ${{ secrets.MANAGER_EMAIL }}
+          MANAGER_PASS: ${{ secrets.MANAGER_PASS }}
+          DOCTOR_EMAIL: ${{ secrets.DOCTOR_EMAIL }}
+          DOCTOR_PASS: ${{ secrets.DOCTOR_PASS }}
+          NURSE_EMAIL: ${{ secrets.NURSE_EMAIL }}
+          NURSE_PASS: ${{ secrets.NURSE_PASS }}
+          RECEPTIONIST_EMAIL: ${{ secrets.RECEPTIONIST_EMAIL }}
+          RECEPTIONIST_PASS: ${{ secrets.RECEPTIONIST_PASS }}
+          ACCOUNTANT_EMAIL: ${{ secrets.ACCOUNTANT_EMAIL }}
+          ACCOUNTANT_PASS: ${{ secrets.ACCOUNTANT_PASS }}
+          HR_EMAIL: ${{ secrets.HR_EMAIL }}
+          HR_PASS: ${{ secrets.HR_PASS }}
+        run: |
+          set -euo pipefail
+          required=(BASE_SUPABASE_URL BASE_SUPABASE_ANON_KEY ADMIN_EMAIL ADMIN_PASS MANAGER_EMAIL MANAGER_PASS DOCTOR_EMAIL DOCTOR_PASS NURSE_EMAIL NURSE_PASS RECEPTIONIST_EMAIL RECEPTIONIST_PASS ACCOUNTANT_EMAIL ACCOUNTANT_PASS HR_EMAIL HR_PASS)
+          missing=()
+          for key in "${required[@]}"; do
+            if [ -z "${!key:-}" ]; then missing+=("$key"); fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::warning title=Deep RBAC E2E not active::Missing QA secrets: ${missing[*]}"
+            exit 0
+          fi
+          bunx playwright test --project=rbac-deep
+
       - name: Upload Playwright failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4

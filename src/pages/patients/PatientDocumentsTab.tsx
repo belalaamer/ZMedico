@@ -36,7 +36,7 @@ export default function PatientDocumentsTab({ patientId, autoOpenUpload }: Props
     if (data !== null) {
       if (!phiLogged.current) {
         phiLogged.current = true;
-        logPhiAccess("document", patientId, { patientId });
+        logPhiAccess("document", null, { patientId });
       }
     }
   };

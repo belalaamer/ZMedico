@@ -98,6 +98,29 @@ function publicRpc<T>(name: string, args?: Record<string, unknown>) {
   return client.rpc(name, args);
 }
 
+async function submitPublicBooking(args: Record<string, unknown>): Promise<{ data: BookingResult | null; error: RpcError }> {
+  const { data, error } = await supabase.functions.invoke("public-booking-submit", {
+    body: args,
+  });
+
+  if (!error && data && !(data as any)?.error) {
+    return { data: data as BookingResult, error: null };
+  }
+
+  let message = String((data as any)?.error ?? error?.message ?? "booking_failed");
+  try {
+    const context: any = (error as any)?.context;
+    if (context && typeof context.json === "function") {
+      const body = await context.json();
+      if (body?.error) message = String(body.error);
+    }
+  } catch {
+    // Best-effort extraction only.
+  }
+
+  return { data: null, error: { message } };
+}
+
 const WEEKDAY_NAMES: Record<Lang, string[]> = {
   en: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
   ar: ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"],
@@ -413,7 +436,7 @@ export default function PublicBooking() {
             landing_path: window.location.pathname,
           },
         })
-      : await publicRpc<BookingResult>("public_create_booking_for_tenant", {
+      : await submitPublicBooking({
           p_tenant_id: tenantId,
           p_branch_id: branchId,
           p_service_id: serviceId,
@@ -437,6 +460,8 @@ export default function PublicBooking() {
       const message = String(error.message || "");
       const friendly = message.includes("slot_unavailable")
         ? (isArabic ? "هذا الموعد حُجز للتو. اختر وقتًا آخر." : "This time was just booked. Please choose another time.")
+        : message.includes("rate_limited")
+          ? (isArabic ? "تم إرسال طلبات حجز كثيرة خلال وقت قصير. حاول مرة أخرى لاحقًا." : "Too many booking attempts in a short time. Please try again later.")
         : message.includes("invalid_phone")
           ? (isArabic ? "اكتب رقم هاتف صحيحًا." : "Enter a valid phone number.")
           : message.includes("portal_account_inactive")

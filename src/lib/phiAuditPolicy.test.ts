@@ -43,6 +43,11 @@ describe("PHI audit hardening migration", () => {
     expect(migration).toContain("public.user_has_branch_access(v_branch)");
   });
 
+  it("preserves deployed collection-view audit calls", () => {
+    expect(migration).toContain("p_entity_type IN ('document', 'dental_chart')");
+    expect(migration).toContain("p_entity_id = p_patient_id");
+  });
+
   it("preserves the non-blocking clinical logging contract", () => {
     expect(migration).toContain("EXCEPTION WHEN OTHERS");
     expect(migration).toContain("'phi_audit_failure'");

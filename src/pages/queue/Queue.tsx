@@ -129,6 +129,8 @@ export default function QueuePage() {
   // AuthorizationService's own short-circuit, which is why the bug went
   // unnoticed for admin testing.
   const canMutate = authz.can("appointments.edit");
+  const canViewClinical = authz.can("medical_records.view");
+  const canCreateClinical = authz.can("medical_records.create");
   const [rows, setRows] = useState<QueueRow[]>([]);
   const loadRequestRef = useRef(0);
   const [doctors, setDoctors] = useState<QueueDoctor[]>([]);
@@ -526,7 +528,7 @@ export default function QueuePage() {
       .order("created_at", { ascending: false })
       .limit(1);
     let recordId = existing?.[0]?.id as string | undefined;
-    if (!recordId && canMutate) {
+    if (!recordId && canCreateClinical) {
       const { data: created, error: insErr } = await supabase
         .from("medical_records")
         .insert({
@@ -620,8 +622,8 @@ export default function QueuePage() {
 
   const renderActions = (r: QueueRow) => {
     const items: { label: string; icon?: React.ReactNode; onClick: () => void }[] = [];
-    // Fast path to consultation/chart — shown for any active row.
-    if (r.status !== "cancelled" && r.status !== "no_show") {
+    // Clinical handoff is separate from queue-operation permission.
+    if (canViewClinical && r.status !== "cancelled" && r.status !== "no_show") {
       items.push({
         label: t("openConsultation"),
         icon: <Stethoscope className="size-4" />,

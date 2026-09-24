@@ -44,15 +44,15 @@ jobs:
           done
           BASE_URL=http://127.0.0.1:8080 bunx playwright test --project=public-mobile:compact-320
 
-      - name: Authenticated Admin E2E smoke (when configured)
+      - name: Authenticated Admin E2E smoke
         env:
           ADMIN_EMAIL: qa.admin@qa.local
           ADMIN_PASS: ${{ secrets.TEST_ADMIN_PASSWORD }}
         run: |
           set -euo pipefail
-          if [ -z "${ADMIN_EMAIL:-}" ] || [ -z "${ADMIN_PASS:-}" ]; then
-            echo "::warning title=Authenticated E2E not active::Fallback deploy is not exercising authenticated routes because TEST_ADMIN_PASSWORD is missing."
-            exit 0
+          if [ -z "${ADMIN_PASS:-}" ]; then
+            echo "::error title=Authenticated E2E required::Repository secret TEST_ADMIN_PASSWORD is missing."
+            exit 1
           fi
 
           bun run preview --host 127.0.0.1 --port 8080 >/tmp/zmedico-auth-preview.log 2>&1 &

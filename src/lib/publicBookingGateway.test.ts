@@ -31,6 +31,12 @@ describe("public booking gateway hardening", () => {
     expect(edge.match(/consume_public_booking_rate_limit/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
   });
 
+  it("bounds limiter storage growth with indexed TTL cleanup", () => {
+    expect(migration).toContain("public_booking_rate_limits_updated_at_idx");
+    expect(migration).toContain("cleanup-public-booking-rate-limits");
+    expect(migration).toContain("updated_at < now() - interval '48 hours'");
+  });
+
   it("closes the raw anonymous booking RPC bypass", () => {
     expect(migration).toContain("REVOKE EXECUTE ON FUNCTION public.public_create_booking_for_tenant");
     expect(migration).toContain("FROM PUBLIC, anon, authenticated");

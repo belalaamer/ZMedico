@@ -20,8 +20,8 @@ export default function Specialties() {
   const { t, lang } = useI18n();
   const { subscription } = useBranch();
   const { authz } = useAuthorization("Specialties");
-  const canManageCatalog = authz.can("settings.catalog.update");
   const isSystemOwner = authz.holdsAnyRole("system_owner");
+  const canManageCatalog = isSystemOwner || authz.can("settings.catalog.update");
   const [items, setItems] = useState<Spec[]>([]);
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<Spec | null>(null);

@@ -42,6 +42,8 @@ export default function PatientProfile() {
   const { authz } = useAuthorization("PatientProfile");
   const { isModuleEnabled } = useBranch();
   const canViewMedical = authz.can("medical_records.view");
+  const canViewBilling = authz.can("invoices.view");
+  const canViewAppointments = authz.can("appointments.view");
   const canUseDental = canViewMedical && isModuleEnabled("dental");
   const canUsePhysio = canViewMedical && isModuleEnabled("physio");
   const [searchParams, setSearchParams] = useSearchParams();
@@ -224,20 +226,22 @@ export default function PatientProfile() {
               {patient.dob && <span className="flex items-center gap-1"><Calendar className="size-3" />{formatDate(patient.dob, lang)}</span>}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4 text-end">
-            <div>
-              <div className="text-xs text-muted-foreground">{t("paid")}</div>
-              <div className="text-lg font-bold tabular-nums text-success">{formatMoney(totalPaid, lang)}</div>
+          {canViewBilling ? (
+            <div className="grid grid-cols-2 gap-4 text-end">
+              <div>
+                <div className="text-xs text-muted-foreground">{t("paid")}</div>
+                <div className="text-lg font-bold tabular-nums text-success">{formatMoney(totalPaid, lang)}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">{t("remaining")}</div>
+                <div className="text-lg font-bold tabular-nums text-warning">{formatMoney(totalOutstanding, lang)}</div>
+              </div>
             </div>
-            <div>
-              <div className="text-xs text-muted-foreground">{t("remaining")}</div>
-              <div className="text-lg font-bold tabular-nums text-warning">{formatMoney(totalOutstanding, lang)}</div>
-            </div>
-          </div>
+          ) : null}
         </div>
       </Card>
 
-      <PatientSummaryStrip patientId={patient.id} patient={patient} insurer={insurer} canViewClinical={canViewMedical} />
+      <PatientSummaryStrip patientId={patient.id} patient={patient} insurer={insurer} canViewClinical={canViewMedical} canViewAppointments={canViewAppointments} />
 
       <PatientQuickActions
         onBook={() => navigate("/calendar")}
@@ -251,7 +255,7 @@ export default function PatientProfile() {
         }}
       />
 
-      {authz.can("invoices.view") && (
+      {canViewBilling && (
         <PatientFinancialCard
           patientId={patient.id}
           invoices={invoices}
@@ -273,7 +277,7 @@ export default function PatientProfile() {
           {canUsePhysio && (
             <TabsTrigger value="physio">{lang === "ar" ? "العلاج الطبيعي" : "Physiotherapy"}</TabsTrigger>
           )}
-          {authz.can("invoices.view") && (
+          {canViewBilling && (
             <TabsTrigger value="financial">{lang === "ar" ? "المالي" : "Financial"}</TabsTrigger>
           )}
           {canViewMedical ? <TabsTrigger value="documents">{lang === "ar" ? "المستندات" : "Documents"}</TabsTrigger> : null}
@@ -284,7 +288,7 @@ export default function PatientProfile() {
             patientId={patient.id}
             invoices={invoices}
             payments={payments}
-            canViewBilling={authz.can("invoices.view")}
+            canViewBilling={canViewBilling}
             canPay={authz.can("invoices.create")}
             canTopup={authz.can("invoices.create")}
             reloadKey={reloadKey}

@@ -9,3 +9,9 @@
 # history (they were applied out-of-band), so a push would attempt to
 # re-run hundreds of already-applied migrations.
 project_id = "cyrsirozfhadonuittrc"
+
+# send-reminder accepts either a user JWT or the shared cron/service secret
+# and performs its own authorization inside the function. Gateway JWT
+# verification must stay disabled so pg_cron service-to-service calls can reach it.
+[functions.send-reminder]
+verify_jwt = false

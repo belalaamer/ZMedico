@@ -42,9 +42,12 @@ describe("role-based permission matrix", () => {
     expect(defaultActionsFor("hr", "treasury")).toEqual([]);
   });
 
-  it("keeps manager read-only over clinical and finance data while allowing operations oversight", () => {
+  it("keeps manager out of individual clinical data while allowing operations oversight", () => {
     expect(defaultActionsFor("manager", "appointments")).toEqual(["view", "create", "edit", "export"]);
-    expect(defaultActionsFor("manager", "medical_records")).toEqual(["view"]);
+    expect(defaultActionsFor("manager", "medical_records")).toEqual([]);
+    expect(defaultActionsFor("manager", "vitals")).toEqual([]);
+    expect(defaultActionsFor("manager", "treatment_plans")).toEqual([]);
+    expect(defaultActionsFor("manager", "reports_medical")).toEqual([]);
     expect(defaultActionsFor("manager", "invoices")).toEqual(["view", "export"]);
     expect(defaultActionsFor("manager", "treasury")).toEqual(["view", "export"]);
     expect(defaultActionsFor("manager", "reports_hr")).toEqual([]);

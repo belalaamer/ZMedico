@@ -27,5 +27,11 @@ SET patient_code = (SELECT m FROM active_max) + r.rn
 FROM ranked r
 WHERE p.id = r.id;
 
--- Reset sequence to one past the current max
-SELECT setval('patient_code_seq', COALESCE((SELECT MAX(patient_code) FROM public.patients), 0));
+-- Reset sequence to the current maximum.  PostgreSQL sequences have a
+-- minimum value of 1, so keep the empty-table case at 1 and mark it
+-- uncalled so the first generated code is 1.
+SELECT setval(
+  'public.patient_code_seq',
+  GREATEST(COALESCE((SELECT MAX(patient_code) FROM public.patients), 1), 1),
+  EXISTS (SELECT 1 FROM public.patients)
+);

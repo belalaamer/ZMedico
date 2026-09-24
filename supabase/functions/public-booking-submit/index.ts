@@ -85,11 +85,14 @@ Deno.serve(async (req) => {
     });
 
     const ipKey = await sha256Hex(`public-booking:ip:${tenantId}:${clientIp}`);
-    const phoneKey = await sha256Hex(
-      `public-booking:phone:${tenantId}:${normalizedPhone}`,
+    // Scope phone throttling to the source network too. A phone-only key
+    // lets anyone who knows a patient's number deliberately exhaust that
+    // patient's quota and block legitimate bookings for hours.
+    const phoneIpKey = await sha256Hex(
+      `public-booking:phone-ip:${tenantId}:${normalizedPhone}:${clientIp}`,
     );
 
-    const [{ data: ipAllowed, error: ipError }, { data: phoneAllowed, error: phoneError }] =
+    const [{ data: ipAllowed, error: ipError }, { data: phoneIpAllowed, error: phoneIpError }] =
       await Promise.all([
         admin.rpc("consume_public_booking_rate_limit", {
           p_key: ipKey,
@@ -97,16 +100,16 @@ Deno.serve(async (req) => {
           p_window_seconds: 3600,
         }),
         admin.rpc("consume_public_booking_rate_limit", {
-          p_key: phoneKey,
+          p_key: phoneIpKey,
           p_limit: 6,
           p_window_seconds: 21600,
         }),
       ]);
 
-    if (ipError || phoneError) {
+    if (ipError || phoneIpError) {
       return json({ error: "booking_service_temporarily_unavailable" }, 503);
     }
-    if (ipAllowed !== true || phoneAllowed !== true) {
+    if (ipAllowed !== true || phoneIpAllowed !== true) {
       return json({ error: "rate_limited" }, 429);
     }
 

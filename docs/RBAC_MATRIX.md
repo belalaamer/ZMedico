@@ -28,19 +28,19 @@ Delete column omitted — Admin-only everywhere.
 | Module / Role        | admin | manager | doctor | nurse | receptionist | accountant | hr    | staff |
 |----------------------|:-----:|:-------:|:------:|:-----:|:------------:|:----------:|:-----:|:-----:|
 | patients             | VCEX  | VCEX    | V      | V     | VCE          | V          | —     | —     |
-| appointments         | VCEX  | VCEX    | VCE    | VCE   | VCE*         | V          | —     | —     |
-| medical_records      | VCEX  | V       | VCE    | V     | —            | —          | —     | —     |
-| vitals               | VCEX  | V       | VCE    | VCE   | —            | —          | —     | —     |
-| treatment_plans      | VCEX  | V       | VCE    | V     | V            | V          | —     | —     |
+| appointments         | VCEX  | VCEX    | VCE    | VCE   | VCE*         | —          | —     | —     |
+| medical_records      | VCEX  | —       | VCE    | V     | —            | —          | —     | —     |
+| vitals               | VCEX  | —       | VCE    | VCE   | —            | —          | —     | —     |
+| treatment_plans      | VCEX  | —       | VCE    | V     | —            | —          | —     | —     |
 | invoices             | VCEX  | VX      | —      | —     | VC           | VCEX**     | —     | —     |
 | treasury             | VCEX  | VX      | —      | —     | —            | VCEX       | —     | —     |
 | inventory            | VCEX  | VCEX    | —      | V     | —            | V          | —     | —     |
 | coupons              | VCEX  | VX      | —      | —     | V            | VCEX       | —     | —     |
 | hr                   | VCEX  | V       | —      | —     | —            | —          | VCEX  | —     |
-| settings             | VCEX  | V       | —      | —     | —            | —          | —     | —     |
+| settings             | VCEX  | V       | —      | —     | —            | V          | —     | —     |
 | reports              | VX    | VX      | V      | —     | —            | VX         | V     | —     |
 | reports_finance      | VX    | VX      | —      | —     | —            | VX         | —     | —     |
-| reports_medical      | VX    | VX      | V      | —     | —            | —          | —     | —     |
+| reports_medical      | VX    | —       | V      | —     | —            | —          | —     | —     |
 | reports_operational  | VX    | VX      | V      | —     | —            | VX         | —     | —     |
 | reports_hr           | VX    | —       | —      | —     | —            | —          | VX    | —     |
 | reports_inventory    | VX    | VX      | —      | —     | —            | VX         | —     | —     |
@@ -59,7 +59,7 @@ Delete column omitted — Admin-only everywhere.
   writes. Also lost create/edit on expenses.
 - Doctor lost invoice view and all patient demographics edits.
 - Nurse lost medical_records/treatment_plans writes.
-- Accountant lost any medical_records access; gained treatment_plans view.
+- Accountant has no individual clinical-record or treatment-plan access.
 - HR unchanged in scope, but confirmed strict isolation to HR modules.
 - Staff was retired from the operational permission matrix; existing QA staff identities remain for negative-access regression tests and receive Dashboard-only access.
 
@@ -70,9 +70,10 @@ Sees every sidebar entry; passes every `PermissionRoute` (including all
 `adminOnly` routes). All CRUD + export allowed everywhere.
 
 ### manager
-Sidebar: Operations, Patients & Clinical (view), Finance (view), Inventory,
-HR (view), Settings (view), Reports (all except HR). No delete in any
-module. Cannot edit invoices, treasury, coupons, medical records.
+Operations oversight. Patients/appointments, Finance (view/export), Inventory,
+HR (view), Settings metadata (view), and non-clinical reports. Individual
+medical records, vitals, treatment plans, medical reports, and HR reports are
+blocked. No delete in any module.
 
 ### doctor
 Clinical only. Patients V, Appointments VCE, Medical Records VCE,
@@ -85,14 +86,15 @@ Assistant. Vitals VCE (nurses take vitals). Patients/Medical Records/
 Treatment Plans view-only. Appointments VCE. Inventory V. No reports.
 
 ### receptionist
-Front desk. Patients VCE, Appointments VCE (cancel via status update), Treatment
-Plans V, Invoices VC (create initial invoice, no edit), Coupons V (apply codes only). No expenses, no treasury, no reports. The `/payments` collection flow is intentionally available through the legacy `invoices.create` gate; the `20260804130000_reception_can_record_payments.sql` migration permits only ledger entries derived from an already-authorized payment and still blocks arbitrary treasury adjustments.
+Front desk. Patients VCE, Appointments VCE (cancel via status update), Invoices VC
+(create initial invoice, no edit), Coupons V (apply codes only). No individual
+clinical records/treatment plans, expenses, treasury, or reports. The `/payments` collection flow is intentionally available through the legacy `invoices.create` gate; the `20260804130000_reception_can_record_payments.sql` migration permits only ledger entries derived from an already-authorized payment and still blocks arbitrary treasury adjustments.
 
 
 ### accountant
 Finance only. Invoices VCEX (void, no hard-delete), Treasury VCEX,
-Coupons VCEX, Treatment Plans V, Inventory V, Finance/Operational/Inventory
-reports VX. No clinical access, no HR, no settings.
+Coupons VCEX, Inventory V, Finance/Operational/Inventory reports VX, plus
+settings metadata view used by shared catalogs. No individual clinical access or HR.
 
 ### hr
 HR VCEX, HR Reports VX. Nothing else.

@@ -47,6 +47,12 @@ describe("sensitive RLS alignment migration", () => {
     expect(migration).toContain("coupons.delete");
     expect(migration).toContain("DROP POLICY IF EXISTS hr_payroll_delete");
     expect(migration).toContain("staff_targets_role_delete");
+    expect(migration).toContain("coupon_redemptions_insert_apply");
+    expect(migration).toContain("invoices.coupon.apply");
+    expect(migration).toContain("sa_insert_hr_edit");
+    expect(migration).toContain("sa_delete_hr_delete");
+    expect(migration).toContain("commissions_update_hr_edit");
+    expect(migration).toContain("commissions_delete_hr_delete");
   });
 
   it("requires canonical integration permission for tenant integration writes", () => {

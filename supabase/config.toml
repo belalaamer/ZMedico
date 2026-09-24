@@ -15,3 +15,6 @@ project_id = "cyrsirozfhadonuittrc"
 # verification must stay disabled so pg_cron service-to-service calls can reach it.
 [functions.send-reminder]
 verify_jwt = false
+
+[functions.public-booking-submit]
+verify_jwt = false

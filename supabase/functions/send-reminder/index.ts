@@ -49,6 +49,7 @@ type Reminder = {
   message_ar: string;
   scheduled_time: string;
   status: string;
+  event_type: string;
   payload?: Record<string, unknown> | null;
   attempt_count?: number;
 };
@@ -416,7 +417,7 @@ Deno.serve(async (req) => {
   // Build query
   let q = supabase
     .from("reminders")
-    .select("id,branch_id,patient_id,reminder_type,message_en,message_ar,scheduled_time,status,payload,attempt_count");
+    .select("id,branch_id,patient_id,reminder_type,message_en,message_ar,scheduled_time,status,event_type,payload,attempt_count");
 
   if (body.reminder_id) {
     q = q.eq("id", body.reminder_id);

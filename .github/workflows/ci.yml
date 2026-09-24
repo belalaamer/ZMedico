@@ -16,7 +16,7 @@ jobs:
   frontend:
     name: Test and build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,3 +32,37 @@ jobs:
 
       - name: Typecheck and production build
         run: bun run build
+
+      - name: Install Playwright Chromium
+        run: bunx playwright install --with-deps chromium
+
+      - name: Start app for public mobile smoke
+        shell: bash
+        run: |
+          bun run dev -- --host 127.0.0.1 --port 8080 > /tmp/zmedico-vite.log 2>&1 &
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:8080/ >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/zmedico-vite.log
+          exit 1
+
+      - name: Public mobile smoke (320 / 390 / 430)
+        run: >
+          bunx playwright test
+          --project="public-mobile:compact-320"
+          --project="public-mobile:iphone-14"
+          --project="public-mobile:iphone-15-pro-max"
+
+      - name: Upload Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-mobile-smoke-artifacts
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7

@@ -15,6 +15,10 @@ describe("public booking gateway hardening", () => {
     resolve(process.cwd(), "supabase/migrations/20260924161000_rate_limit_public_booking.sql"),
     "utf8",
   );
+  const revokeMigration = readFileSync(
+    resolve(process.cwd(), "supabase/migrations/20260924162000_revoke_raw_public_booking_rpc.sql"),
+    "utf8",
+  );
   const config = readFileSync(
     resolve(process.cwd(), "supabase/config.toml"),
     "utf8",
@@ -31,6 +35,12 @@ describe("public booking gateway hardening", () => {
     expect(edge.match(/consume_public_booking_rate_limit/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
   });
 
+  it("keeps limiter infrastructure additive until the frontend cutover", () => {
+    expect(migration).toContain("consume_public_booking_rate_limit");
+    expect(migration).not.toContain("REVOKE EXECUTE ON FUNCTION public.public_create_booking_for_tenant");
+    expect(revokeMigration).toContain("SAFE RELEASE ORDER");
+  });
+
   it("bounds limiter storage growth with indexed TTL cleanup", () => {
     expect(migration).toContain("public_booking_rate_limits_updated_at_idx");
     expect(migration).toContain("cleanup-public-booking-rate-limits");
@@ -38,9 +48,10 @@ describe("public booking gateway hardening", () => {
   });
 
   it("closes the raw anonymous booking RPC bypass", () => {
-    expect(migration).toContain("REVOKE EXECUTE ON FUNCTION public.public_create_booking_for_tenant");
-    expect(migration).toContain("FROM PUBLIC, anon, authenticated");
-    expect(migration).toContain("TO service_role");
+    expect(migration).not.toContain("REVOKE EXECUTE ON FUNCTION public.public_create_booking_for_tenant");
+    expect(revokeMigration).toContain("REVOKE EXECUTE ON FUNCTION public.public_create_booking_for_tenant");
+    expect(revokeMigration).toContain("FROM PUBLIC, anon, authenticated");
+    expect(revokeMigration).toContain("TO service_role");
   });
 
   it("declares the public gateway as an unauthenticated Edge endpoint", () => {

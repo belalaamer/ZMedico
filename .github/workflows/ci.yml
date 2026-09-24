@@ -56,6 +56,21 @@ jobs:
           --project="public-mobile:iphone-14"
           --project="public-mobile:iphone-15-pro-max"
 
+      - name: Authenticated Admin E2E (when configured)
+        env:
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASS: ${{ secrets.ADMIN_PASS }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ADMIN_EMAIL:-}" ] || [ -z "${ADMIN_PASS:-}" ]; then
+            echo "::warning title=Authenticated E2E not active::Add repository secrets ADMIN_EMAIL and ADMIN_PASS so PRs are blocked when authenticated core routes regress."
+            exit 0
+          fi
+
+          BASE_URL=http://127.0.0.1:8080 bunx playwright test \
+            --project=admin-desktop \
+            --project=admin-mobile
+
       - name: Upload Playwright failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4

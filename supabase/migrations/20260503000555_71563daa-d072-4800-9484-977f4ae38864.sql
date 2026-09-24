@@ -1,6 +1,6 @@
 -- Renumber active patients from 1 and keep deleted patients after them.
--- Reset the sequence after the highest assigned code. PostgreSQL sequences
--- cannot be set to zero, so an empty table remains at 1 and uncalled.
+-- Then reset the sequence so the next new active patient gets max(active)+1,
+-- or 1 when there are no active patients.
 
 UPDATE public.patients
 SET patient_code = -patient_code;
@@ -31,6 +31,6 @@ WHERE p.id = r.id;
 
 SELECT setval(
   'public.patient_code_seq',
-  GREATEST(COALESCE((SELECT MAX(patient_code) FROM public.patients), 1), 1),
-  EXISTS (SELECT 1 FROM public.patients)
+  COALESCE((SELECT MAX(patient_code) FROM public.patients WHERE deleted_at IS NULL), 0),
+  true
 );

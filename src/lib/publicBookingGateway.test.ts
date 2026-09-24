@@ -31,8 +31,13 @@ describe("public booking gateway hardening", () => {
 
   it("rate limits by both client network and phone identity", () => {
     expect(edge).toContain("public-booking:ip:");
-    expect(edge).toContain("public-booking:phone:");
+    expect(edge).toContain("public-booking:phone-ip:");
     expect(edge.match(/consume_public_booking_rate_limit/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+  });
+
+  it("does not use a globally lockable phone-only key", () => {
+    expect(edge).not.toContain("public-booking:phone:${tenantId}:${normalizedPhone}");
+    expect(edge).toContain("public-booking:phone-ip:");
   });
 
   it("keeps limiter infrastructure additive until the frontend cutover", () => {

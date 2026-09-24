@@ -55,6 +55,14 @@ jobs:
             exit 0
           fi
 
+          bun run preview --host 127.0.0.1 --port 8080 >/tmp/zmedico-auth-preview.log 2>&1 &
+          PREVIEW_PID=$!
+          trap 'kill $PREVIEW_PID 2>/dev/null || true' EXIT
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            if curl -fsS http://127.0.0.1:8080/ >/dev/null; then break; fi
+            sleep 1
+          done
+
           BASE_URL=http://127.0.0.1:8080 bunx playwright test \
             --project=admin-desktop \
             --project=admin-mobile

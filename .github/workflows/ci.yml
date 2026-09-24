@@ -56,7 +56,7 @@ jobs:
           --project="public-mobile:iphone-14"
           --project="public-mobile:iphone-15-pro-max"
 
-      - name: Authenticated Admin + RBAC/RLS E2E (when configured)
+      - name: Authenticated Admin + RBAC/RLS E2E
         env:
           ADMIN_EMAIL: qa.admin@qa.local
           ADMIN_PASS: ${{ secrets.TEST_ADMIN_PASSWORD }}
@@ -75,8 +75,8 @@ jobs:
             if [ -z "${!key:-}" ]; then missing+=("$key"); fi
           done
           if [ "${#missing[@]}" -gt 0 ]; then
-            echo "::warning title=Authenticated RBAC E2E not active::Missing QA password secrets: ${missing[*]}"
-            exit 0
+            echo "::error title=Authenticated RBAC E2E required::Missing QA password secrets: ${missing[*]}"
+            exit 1
           fi
 
           # Supabase URL + publishable key are public client configuration,

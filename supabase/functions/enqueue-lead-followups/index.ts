@@ -42,8 +42,34 @@ Deno.serve(async (req) => {
   let skipped = 0;
   const errors: Array<{ lead_id: string; error: string }> = [];
 
-  for (const lead of leads ?? []) {
+  // Avoid turning the normal idempotent case into a PostgreSQL 23505 error
+  // on every scheduled run. Prefetch matching pending calls first, while
+  // keeping the unique-index error handling below as the race-condition guard.
+  const existingKeys = new Set<string>();
+  const leadRows = leads ?? [];
+  const leadIds = leadRows.map((lead) => lead.id);
+  if (leadIds.length) {
+    const { data: existing, error: existingError } = await client
+      .from("lead_followups")
+      .select("lead_id,due_at,channel")
+      .in("lead_id", leadIds)
+      .eq("status", "pending")
+      .eq("channel", "call");
+    if (!existingError) {
+      for (const row of existing ?? []) {
+        existingKeys.add(`${row.lead_id}|${row.due_at}|${row.channel}`);
+      }
+    }
+  }
+
+  for (const lead of leadRows) {
     const dueAt = lead.next_followup_at as string;
+    const dedupeKey = `${lead.id}|${dueAt}|call`;
+    if (existingKeys.has(dedupeKey)) {
+      skipped += 1;
+      continue;
+    }
+
     const { error } = await client.from("lead_followups").insert({
       lead_id: lead.id,
       branch_id: lead.branch_id,
@@ -55,6 +81,7 @@ Deno.serve(async (req) => {
       notes: `Automatic follow-up for ${lead.full_name}`,
     });
     if (!error) {
+      existingKeys.add(dedupeKey);
       enqueued += 1;
       continue;
     }

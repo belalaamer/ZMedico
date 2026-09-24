@@ -55,6 +55,7 @@ export function moduleKeyForPath(path: string): ClinicModuleKey | null {
   if (path.startsWith("/hr")) return "hr";
   if (path.startsWith("/leads")) return "marketing";
   if (path.startsWith("/settings/communication")) return "communication";
+  if (/^\\/patients\\/[^/]+\\/dental(?:\\/|$)/.test(path)) return "dental";
   if (path.startsWith("/patients")) return "patients";
   if (path.startsWith("/calendar") || path.startsWith("/queue") || path.startsWith("/appointments") || path.startsWith("/reminders")) return "appointments";
   if (path.startsWith("/invoices") || path.startsWith("/payments") || path.startsWith("/treasury") || path.startsWith("/expenses") || path.startsWith("/coupons")) return "invoices";

@@ -169,10 +169,17 @@ WITH CHECK (
 --    already remain in force as RESTRICTIVE policies where present.
 -- ---------------------------------------------------------------------------
 
--- The private patient-docs Storage bucket previously had no storage.objects
--- policies at all, so browser upload/download could never succeed. Scope each
--- object to the patient UUID prefix used by PatientDocumentsTab:
---   <patient_id>/<timestamp>-<safe_filename>
+-- Secure the private patient-docs bucket for browser upload/download.
+-- Object names use: <patient_uuid>/<timestamp>-<safe_filename>
+UPDATE storage.buckets
+SET public = false,
+    file_size_limit = 20971520,
+    allowed_mime_types = ARRAY[
+      'image/jpeg','image/png','image/webp','image/gif',
+      'application/pdf','application/dicom'
+    ]::text[]
+WHERE id = 'patient-docs';
+
 DROP POLICY IF EXISTS patient_docs_storage_select ON storage.objects;
 DROP POLICY IF EXISTS patient_docs_storage_insert ON storage.objects;
 DROP POLICY IF EXISTS patient_docs_storage_update ON storage.objects;
@@ -189,7 +196,11 @@ USING (
   AND EXISTS (
     SELECT 1
     FROM public.patients p
-    WHERE storage.objects.name LIKE p.id::text || '/%'
+    WHERE p.id = CASE
+      WHEN split_part(storage.objects.name, '/', 1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        THEN split_part(storage.objects.name, '/', 1)::uuid
+      ELSE NULL
+    END
       AND p.deleted_at IS NULL
       AND (
         public.has_role((SELECT auth.uid()), 'system_owner'::public.app_role)
@@ -209,7 +220,11 @@ WITH CHECK (
   AND EXISTS (
     SELECT 1
     FROM public.patients p
-    WHERE storage.objects.name LIKE p.id::text || '/%'
+    WHERE p.id = CASE
+      WHEN split_part(storage.objects.name, '/', 1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        THEN split_part(storage.objects.name, '/', 1)::uuid
+      ELSE NULL
+    END
       AND p.deleted_at IS NULL
       AND (
         public.has_role((SELECT auth.uid()), 'system_owner'::public.app_role)
@@ -226,6 +241,20 @@ USING (
     public.has_role((SELECT auth.uid()), 'system_owner'::public.app_role)
     OR public.has_permission((SELECT auth.uid()), 'medical_records.edit')
   )
+  AND EXISTS (
+    SELECT 1
+    FROM public.patients p
+    WHERE p.id = CASE
+      WHEN split_part(storage.objects.name, '/', 1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        THEN split_part(storage.objects.name, '/', 1)::uuid
+      ELSE NULL
+    END
+      AND p.deleted_at IS NULL
+      AND (
+        public.has_role((SELECT auth.uid()), 'system_owner'::public.app_role)
+        OR public.user_has_branch_access(p.branch_id)
+      )
+  )
 )
 WITH CHECK (
   bucket_id = 'patient-docs'
@@ -236,7 +265,11 @@ WITH CHECK (
   AND EXISTS (
     SELECT 1
     FROM public.patients p
-    WHERE storage.objects.name LIKE p.id::text || '/%'
+    WHERE p.id = CASE
+      WHEN split_part(storage.objects.name, '/', 1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        THEN split_part(storage.objects.name, '/', 1)::uuid
+      ELSE NULL
+    END
       AND p.deleted_at IS NULL
       AND (
         public.has_role((SELECT auth.uid()), 'system_owner'::public.app_role)
@@ -256,7 +289,11 @@ USING (
   AND EXISTS (
     SELECT 1
     FROM public.patients p
-    WHERE storage.objects.name LIKE p.id::text || '/%'
+    WHERE p.id = CASE
+      WHEN split_part(storage.objects.name, '/', 1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        THEN split_part(storage.objects.name, '/', 1)::uuid
+      ELSE NULL
+    END
       AND p.deleted_at IS NULL
       AND (
         public.has_role((SELECT auth.uid()), 'system_owner'::public.app_role)

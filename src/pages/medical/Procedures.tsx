@@ -16,6 +16,7 @@ import { formatMoney } from "@/lib/format";
 import { RowActions } from "@/components/RowActions";
 import { ConsumablesEditor } from "@/components/ConsumablesEditor";
 import { useBranch } from "@/contexts/BranchContext";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 
 type SpecialtyRow = { id: string; name_en: string | null; name_ar: string | null; is_active: boolean };
 type ProcedureRow = {
@@ -48,6 +49,8 @@ const emptyProcedureForm = (): ProcedureForm => ({ specialty_id: "", code: "", n
 export default function Procedures() {
   const { t, lang } = useI18n();
   const { subscription } = useBranch();
+  const { authz } = useAuthorization("Procedures");
+  const canManageCatalog = authz.can("settings.catalog.update");
   const [items, setItems] = useState<ProcedureRow[]>([]);
   const [specs, setSpecs] = useState<SpecialtyRow[]>([]);
   const [q, setQ] = useState("");
@@ -79,8 +82,12 @@ export default function Procedures() {
     return true;
   }), [items, q, specFilter]);
 
-  const openNew = () => { setEdit(null); setForm(emptyProcedureForm()); setOpen(true); };
-  const openEdit = (p: ProcedureRow) => { setEdit(p); setForm({ specialty_id: p.specialty_id ?? "", code: p.code ?? "", name: p.name_en || p.name_ar || "", description: p.description_en || p.description_ar || "", default_duration: p.default_duration ?? 30, default_price: Number(p.default_price ?? 0), doctor_commission_percent: Number(p.doctor_commission_percent ?? 0), is_active: p.is_active }); setOpen(true); };
+  const openNew = () => {
+    if (!canManageCatalog) return;
+    setEdit(null); setForm(emptyProcedureForm()); setOpen(true); };
+  const openEdit = (p: ProcedureRow) => {
+    if (!canManageCatalog) return;
+    setEdit(p); setForm({ specialty_id: p.specialty_id ?? "", code: p.code ?? "", name: p.name_en || p.name_ar || "", description: p.description_en || p.description_ar || "", default_duration: p.default_duration ?? 30, default_price: Number(p.default_price ?? 0), doctor_commission_percent: Number(p.doctor_commission_percent ?? 0), is_active: p.is_active }); setOpen(true); };
 
   const save = async () => {
     const name = form.name.trim();
@@ -122,6 +129,7 @@ export default function Procedures() {
               {specs.map((s) => <SelectItem key={s.id} value={s.id}>{lang === "ar" ? s.name_ar : s.name_en}</SelectItem>)}
             </SelectContent>
           </Select>
+          {canManageCatalog ? (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground" onClick={openNew}><Plus className="me-2 size-4" />{t("addProcedureCat")}</Button></DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -145,11 +153,12 @@ export default function Procedures() {
                 <div className="flex items-center justify-between border border-border rounded-lg px-3 py-2 col-span-2"><Label>{t("active")}</Label><Switch checked={form.is_active} onCheckedChange={(v) => setForm({ ...form, is_active: v })} /></div>
               </div>
               <div className="mt-3">
-                <ConsumablesEditor parentType="procedure" parentId={edit?.id ?? null} />
+                {canManageCatalog ? <ConsumablesEditor parentType="procedure" parentId={edit?.id ?? null} /> : null}
               </div>
               <DialogFooter><Button variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button><Button className="gradient-primary text-primary-foreground" onClick={save}>{t("save")}</Button></DialogFooter>
             </DialogContent>
           </Dialog>
+          ) : null}
         </div>
       </div>
       <Card className="shadow-card overflow-hidden">
@@ -165,7 +174,7 @@ export default function Procedures() {
                 </div>
                 <div className="text-end font-semibold tabular-nums text-primary">{formatMoney(p.default_price ?? 0, lang)}</div>
                 {!p.is_active && <Badge variant="outline" className="status-departed">{t("inactive")}</Badge>}
-                <RowActions onEdit={() => openEdit(p)} onDelete={() => remove(p)} />
+                {canManageCatalog ? <RowActions onEdit={() => openEdit(p)} onDelete={() => remove(p)} /> : null}
               </div>
             );
           })}

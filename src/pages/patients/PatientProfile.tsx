@@ -41,10 +41,14 @@ export default function PatientProfile() {
   // R2: canonical authorization entry point.
   const { authz } = useAuthorization("PatientProfile");
   const { isModuleEnabled } = useBranch();
-  const canUseDental = authz.can("medical_records.view") && isModuleEnabled("dental");
-  const canUsePhysio = authz.can("medical_records.view") && isModuleEnabled("physio");
+  const canViewMedical = authz.can("medical_records.view");
+  const canUseDental = canViewMedical && isModuleEnabled("dental");
+  const canUsePhysio = canViewMedical && isModuleEnabled("physio");
   const [searchParams, setSearchParams] = useSearchParams();
-  const tabParam = searchParams.get("tab") ?? "overview";
+  const requestedTab = searchParams.get("tab") ?? "overview";
+  const tabParam = !canViewMedical && ["timeline", "clinical", "documents", "physio"].includes(requestedTab)
+    ? "overview"
+    : requestedTab;
   const uploadFlag = searchParams.get("upload") === "1";
   const [patient, setPatient] = useState<any>(null);
   const [insurer, setInsurer] = useState<any>(null);
@@ -233,7 +237,7 @@ export default function PatientProfile() {
         </div>
       </Card>
 
-      <PatientSummaryStrip patientId={patient.id} patient={patient} insurer={insurer} />
+      <PatientSummaryStrip patientId={patient.id} patient={patient} insurer={insurer} canViewClinical={canViewMedical} />
 
       <PatientQuickActions
         onBook={() => navigate("/calendar")}
@@ -264,19 +268,19 @@ export default function PatientProfile() {
       <Tabs value={tabParam} onValueChange={setTab}>
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="overview">{t("overview")}</TabsTrigger>
-          <TabsTrigger value="timeline">{t("timelineTab")}</TabsTrigger>
-          <TabsTrigger value="clinical">{lang === "ar" ? "السريري" : "Clinical"}</TabsTrigger>
+          {canViewMedical ? <TabsTrigger value="timeline">{t("timelineTab")}</TabsTrigger> : null}
+          {canViewMedical ? <TabsTrigger value="clinical">{lang === "ar" ? "السريري" : "Clinical"}</TabsTrigger> : null}
           {canUsePhysio && (
             <TabsTrigger value="physio">{lang === "ar" ? "العلاج الطبيعي" : "Physiotherapy"}</TabsTrigger>
           )}
           {authz.can("invoices.view") && (
             <TabsTrigger value="financial">{lang === "ar" ? "المالي" : "Financial"}</TabsTrigger>
           )}
-          <TabsTrigger value="documents">{lang === "ar" ? "المستندات" : "Documents"}</TabsTrigger>
+          {canViewMedical ? <TabsTrigger value="documents">{lang === "ar" ? "المستندات" : "Documents"}</TabsTrigger> : null}
         </TabsList>
 
         <TabsContent value="overview" className="mt-4">
-          <PatientOverviewSnapshot
+          {canViewMedical ? <PatientOverviewSnapshot
             patientId={patient.id}
             invoices={invoices}
             payments={payments}
@@ -292,7 +296,7 @@ export default function PatientProfile() {
               p.set("tab", "documents"); p.set("upload", "1");
               setSearchParams(p, { replace: true });
             }}
-          />
+          /> : null}
           <Card className="p-6 shadow-card mt-4">
             <div className="grid sm:grid-cols-2 gap-4 text-sm">
               <div><div className="text-muted-foreground text-xs">{t("gender")}</div><div>{patient.gender ? t(patient.gender as any) : "—"}</div></div>
@@ -324,10 +328,13 @@ export default function PatientProfile() {
           )}
         </TabsContent>
 
+        {canViewMedical ? (
         <TabsContent value="timeline" className="mt-4">
           <PatientTimeline patientId={patient.id} />
         </TabsContent>
+        ) : null}
 
+        {canViewMedical ? (
         <TabsContent value="clinical" className="mt-4 space-y-4">
           <div className="flex flex-wrap items-center gap-2">
             <div className="inline-flex rounded-md border border-border bg-muted/30 p-1">
@@ -364,6 +371,7 @@ export default function PatientProfile() {
             </Can>
           )}
         </TabsContent>
+        ) : null}
 
         {canUsePhysio && (
         <TabsContent value="physio" className="mt-4">
@@ -527,9 +535,11 @@ export default function PatientProfile() {
           </Can>
         </TabsContent>
 
+        {canViewMedical ? (
         <TabsContent value="documents" className="mt-4">
           <PatientDocumentsTab patientId={patient.id} autoOpenUpload={uploadFlag} />
         </TabsContent>
+        ) : null}
       </Tabs>
 
       <CreateInvoiceDialog

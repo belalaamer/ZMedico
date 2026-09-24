@@ -14,12 +14,17 @@ BEGIN
   LIMIT 1;
 
   IF v_tenant_id IS NULL THEN
-    RAISE EXCEPTION 'Cannot link branches: no tenant exists';
+    -- A clean local test database may legitimately have no tenant and no
+    -- branches yet. Preserve the integrity failure only when orphan branches
+    -- actually exist.
+    IF EXISTS (SELECT 1 FROM public.branches WHERE tenant_id IS NULL) THEN
+      RAISE EXCEPTION 'Cannot link branches: no tenant exists';
+    END IF;
+  ELSE
+    UPDATE public.branches
+    SET tenant_id = v_tenant_id
+    WHERE tenant_id IS NULL;
   END IF;
-
-  UPDATE public.branches
-  SET tenant_id = v_tenant_id
-  WHERE tenant_id IS NULL;
 END $$;
 
 DO $$

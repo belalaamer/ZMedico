@@ -52,7 +52,7 @@ export default function PatientQuickActions({
       icon: Upload,
       label: lang === "ar" ? "رفع مستند" : "Upload document",
       onClick: onUploadDocument,
-      show: authz.can("medical_records.create") || authz.can("patients.edit"),
+      show: authz.can("medical_records.create"),
     },
   ];
 

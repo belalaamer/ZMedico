@@ -53,8 +53,10 @@ async function login(page: Page, role: Role) {
   const c = CREDS[role];
   test.skip(!c.pass, `Missing QA password for ${role}`);
   await page.goto(`${BASE}/auth`);
-  await page.getByLabel(/email/i).fill(c.email!);
-  await page.getByLabel(/password/i).first().fill(c.pass!);
+  // Staff login accepts email OR username, so the field is intentionally
+  // type=text rather than type=email. Use the stable input names.
+  await page.locator('input[name="identifier"]').first().fill(c.email!);
+  await page.locator('input[name="password"]').first().fill(c.pass!);
   await page.getByRole("button", { name: /sign in|log in|تسجيل/i }).click();
   await page.waitForURL(u => !u.toString().includes("/auth"), { timeout: 15_000 });
 }
@@ -67,21 +69,35 @@ async function expectAccessDenied(page: Page, path: string) {
 }
 
 async function expectRouteOk(page: Page, path: string) {
-  await page.goto(`${BASE}${path}`);
+  await page.goto(`${BASE}${path}`, { waitUntil: "domcontentloaded" });
+  const main = page.locator("main").first();
+  await expect(main).toBeVisible({ timeout: 20_000 });
+
+  // PermissionRoute can briefly render its loading state before the real
+  // decision. Wait for that transient gate state before asserting allow.
+  const gateStatus = main.locator('[role="status"]').first();
+  if (await gateStatus.isVisible({ timeout: 500 }).catch(() => false)) {
+    await gateStatus.waitFor({ state: "hidden", timeout: 20_000 }).catch(() => {});
+  }
+
   await expect(
-    page.getByText(/access denied|لا تملك صلاحية الوصول/i)
+    main.getByText(/access denied|لا تملك صلاحية الوصول/i)
   ).toHaveCount(0);
 }
 
 // ---------- ADMIN ----------
 test.describe("admin", () => {
-  test("sees admin-only routes", async ({ page }) => {
+  test("sees clinic-admin routes but not platform-owner tools", async ({ page }) => {
     await login(page, "admin");
     for (const p of [
       "/settings/users", "/settings/roles", "/settings/backup",
       "/settings/audit", "/system/self-audit", "/queue/self-audit",
       "/expenses/self-audit",
     ]) await expectRouteOk(page, p);
+
+    for (const p of ["/settings/qa", "/settings/ai"]) {
+      await expectAccessDenied(page, p);
+    }
   });
 });
 
@@ -95,12 +111,19 @@ test.describe("manager (strict scope)", () => {
       "/system/self-audit",
     ]) await expectAccessDenied(page, p);
   });
-  test("settings & hr are view-only (no delete buttons)", async ({ page }) => {
+  test("settings are admin-only; HR oversight is view-only", async ({ page }) => {
     await login(page, "manager");
-    await expectRouteOk(page, "/settings");
+    await expectAccessDenied(page, "/settings");
     await expectRouteOk(page, "/hr/staff");
-    // No destructive action should be exposed
+    // No destructive action should be exposed.
     await expect(page.getByRole("button", { name: /^delete$|حذف/i })).toHaveCount(0);
+  });
+
+  test("blocked from individual clinical content", async ({ page }) => {
+    await login(page, "manager");
+    for (const p of ["/medical/records", "/medical/prescriptions", "/reports/medical"]) {
+      await expectAccessDenied(page, p);
+    }
   });
   test("only assigned branch is visible in picker", async ({ page }) => {
     await login(page, "manager");

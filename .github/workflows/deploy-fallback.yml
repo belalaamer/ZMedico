@@ -46,12 +46,12 @@ jobs:
 
       - name: Authenticated Admin E2E smoke (when configured)
         env:
-          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
-          ADMIN_PASS: ${{ secrets.ADMIN_PASS }}
+          ADMIN_EMAIL: qa.admin@qa.local
+          ADMIN_PASS: ${{ secrets.TEST_ADMIN_PASSWORD }}
         run: |
           set -euo pipefail
           if [ -z "${ADMIN_EMAIL:-}" ] || [ -z "${ADMIN_PASS:-}" ]; then
-            echo "::warning title=Authenticated E2E not active::Fallback deploy is not exercising authenticated routes because ADMIN_EMAIL / ADMIN_PASS are missing."
+            echo "::warning title=Authenticated E2E not active::Fallback deploy is not exercising authenticated routes because TEST_ADMIN_PASSWORD is missing."
             exit 0
           fi
 

@@ -475,6 +475,28 @@ USING (
 -- grant. Remove the redundant role-specific policy to avoid OR-policy drift.
 DROP POLICY IF EXISTS coupons_select_reception ON public.coupons;
 
+-- Coupon redemption rows are an append-only audit/usage ledger. The former
+-- ALL policy let billing roles UPDATE/DELETE a redemption after the INSERT
+-- trigger had incremented coupons.usage_count, corrupting the audit trail.
+DROP POLICY IF EXISTS "Coupon redemptions by privileged roles" ON public.coupon_redemptions;
+
+CREATE POLICY coupon_redemptions_select_billing ON public.coupon_redemptions
+FOR SELECT TO authenticated
+USING (
+  public.has_permission((SELECT auth.uid()), 'invoices.view')
+  AND public.user_has_branch_access(branch_id)
+);
+
+CREATE POLICY coupon_redemptions_insert_apply ON public.coupon_redemptions
+FOR INSERT TO authenticated
+WITH CHECK (
+  public.has_permission((SELECT auth.uid()), 'invoices.coupon.apply')
+  AND public.user_has_branch_access(branch_id)
+);
+
+-- Intentionally no authenticated UPDATE/DELETE policy. Parent-row FK actions
+-- and system-owner force-delete maintenance continue to run server-side.
+
 -- HR may create/edit payroll rows, but canonical hr.delete is Admin-only.
 DROP POLICY IF EXISTS hr_payroll_delete ON public.payroll;
 

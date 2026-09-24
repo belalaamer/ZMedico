@@ -50,7 +50,7 @@ export default function Procedures() {
   const { t, lang } = useI18n();
   const { subscription } = useBranch();
   const { authz } = useAuthorization("Procedures");
-  const canManageCatalog = authz.can("settings.catalog.update");
+  const canManageCatalog = authz.holdsAnyRole("system_owner") || authz.can("settings.catalog.update");
   const [items, setItems] = useState<ProcedureRow[]>([]);
   const [specs, setSpecs] = useState<SpecialtyRow[]>([]);
   const [q, setQ] = useState("");

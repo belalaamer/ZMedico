@@ -1,12 +1,6 @@
--- Rate-limit anonymous public bookings and close direct RPC bypass.
---
--- DEPLOYMENT ORDER (important):
---   1. Deploy the public-booking-submit Edge Function.
---   2. Deploy the frontend that calls that Edge Function.
---   3. Apply this migration to revoke anonymous access to the raw booking RPC.
---
--- Do not apply step 3 before steps 1-2 or anonymous public booking will be
--- temporarily unavailable.
+-- Add rate-limit infrastructure for anonymous public bookings.
+-- This migration is intentionally additive: it does NOT revoke the legacy
+-- raw booking RPC. Apply it before switching the frontend to the Edge gateway.
 
 CREATE TABLE IF NOT EXISTS public.public_booking_rate_limits (
   key_hash text PRIMARY KEY,
@@ -72,25 +66,6 @@ REVOKE ALL ON FUNCTION public.consume_public_booking_rate_limit(text, integer, i
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.consume_public_booking_rate_limit(text, integer, integer)
   TO service_role;
-
--- The Edge Function calls these with service_role. Browsers must no longer be
--- able to bypass the gateway and its throttles through PostgREST directly.
-REVOKE EXECUTE ON FUNCTION public.public_create_booking(
-  uuid, uuid, timestamptz, text, text, uuid, text, text, text, jsonb
-) FROM PUBLIC, anon, authenticated;
-
-REVOKE EXECUTE ON FUNCTION public.public_create_booking_for_tenant(
-  uuid, uuid, uuid, timestamptz, text, text, uuid, text, text, text, jsonb
-) FROM PUBLIC, anon, authenticated;
-
-GRANT EXECUTE ON FUNCTION public.public_create_booking(
-  uuid, uuid, timestamptz, text, text, uuid, text, text, text, jsonb
-) TO service_role;
-
-GRANT EXECUTE ON FUNCTION public.public_create_booking_for_tenant(
-  uuid, uuid, uuid, timestamptz, text, text, uuid, text, text, text, jsonb
-) TO service_role;
-
 
 -- The limiter keyspace is attacker-controlled (unique IP/phone combinations),
 -- so expired rows must not accumulate forever. The longest accepted limiter

@@ -14,6 +14,7 @@ import { formatDate } from "@/lib/format";
 import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
 import { Link } from "react-router-dom";
 import { useDataSync } from "@/lib/dataSync";
+import { Can } from "@/components/Can";
 
 export default function DocumentsCenter() {
   const { t, lang } = useI18n();
@@ -93,7 +94,11 @@ export default function DocumentsCenter() {
         .replace(/_{2,}/g, "_")
         .slice(0, 100) || "file";
       const path = `${uploadPatient}/${Date.now()}-${safeName}`;
-      const { error: upErr } = await supabase.storage.from("patient-docs").upload(path, file);
+      const uploadContentType =
+        /\.(dcm|dicom)$/i.test(file.name) ? "application/dicom" : (file.type || undefined);
+      const { error: upErr } = await supabase.storage
+        .from("patient-docs")
+        .upload(path, file, { contentType: uploadContentType });
       if (upErr) { toast.error(upErr.message); continue; }
       await supabase.from("patient_documents").insert({
         patient_id: uploadPatient, document_type: uploadType as any,
@@ -140,10 +145,12 @@ export default function DocumentsCenter() {
             </Select>
           </div>
           <div className="space-y-1.5"><Label>&nbsp;</Label>
-            <label className="cursor-pointer flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-dashed border-border hover:bg-muted/40 text-sm">
-              <Upload className="size-4"/>{uploading ? t("uploading") : t("uploadFile")}
-              <input type="file" multiple className="hidden" onChange={(e) => upload(e.target.files)} disabled={uploading || !uploadPatient}/>
-            </label>
+            <Can permission="medical_records.create">
+              <label className="cursor-pointer flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-dashed border-border hover:bg-muted/40 text-sm">
+                <Upload className="size-4"/>{uploading ? t("uploading") : t("uploadFile")}
+                <input type="file" multiple className="hidden" onChange={(e) => upload(e.target.files)} disabled={uploading || !uploadPatient}/>
+              </label>
+            </Can>
           </div>
         </div>
       </Card>
@@ -183,7 +190,9 @@ export default function DocumentsCenter() {
                   <button onClick={() => open(d.file_url)} className="text-sm font-medium truncate text-start hover:underline block w-full">{lang === "ar" ? d.title_ar : d.title_en}</button>
                   <Link to={`/patients/${d.patient_id}`} className="text-xs text-muted-foreground truncate hover:underline block"><span dir={patientDisplayDirection(p, lang)}>{name}</span> · {formatDate(d.created_at, lang)}</Link>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => remove(d)}><Trash2 className="size-4 text-destructive"/></Button>
+                <Can permission="medical_records.delete">
+                  <Button variant="ghost" size="icon" onClick={() => remove(d)}><Trash2 className="size-4 text-destructive"/></Button>
+                </Can>
               </Card>
             );
           })}

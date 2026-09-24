@@ -275,9 +275,11 @@ export default function TargetBonusesPage() {
                     <Badge variant={achieved ? "default" : "outline"} className={achieved ? "bg-emerald-600" : ""}>
                       {achieved ? (lang === "ar" ? "محقق" : "Achieved") : `${pct}%`}
                     </Badge>
-                    <Button variant="ghost" size="icon" className="text-destructive size-8" onClick={() => setConfirmDel(t)}>
-                      <Trash2 className="size-4" />
-                    </Button>
+                    {canDelete ? (
+                      <Button variant="ghost" size="icon" className="text-destructive size-8" onClick={() => setConfirmDel(t)}>
+                        <Trash2 className="size-4" />
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
                 <div className="text-xs text-muted-foreground flex items-center gap-2">
@@ -303,9 +305,11 @@ export default function TargetBonusesPage() {
         </div>
       )}
 
-      <Fab ariaLabel={lang === "ar" ? "هدف جديد" : "New target"} onClick={() => setOpen(true)}>
-        <Plus className="size-6" />
-      </Fab>
+      {canCreate ? (
+        <Fab ariaLabel={lang === "ar" ? "هدف جديد" : "New target"} onClick={() => setOpen(true)}>
+          <Plus className="size-6" />
+        </Fab>
+      ) : null}
 
       <AlertDialog open={!!confirmDel} onOpenChange={(o) => !o && setConfirmDel(null)}>
         <AlertDialogContent>

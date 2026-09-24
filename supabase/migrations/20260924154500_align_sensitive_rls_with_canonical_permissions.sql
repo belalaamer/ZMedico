@@ -197,7 +197,7 @@ USING (
     SELECT 1
     FROM public.patients p
     WHERE p.id = CASE
-      WHEN split_part(storage.objects.name, '/', 1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+      WHEN split_part(storage.objects.name, '/', 1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
         THEN split_part(storage.objects.name, '/', 1)::uuid
       ELSE NULL
     END
@@ -221,7 +221,7 @@ WITH CHECK (
     SELECT 1
     FROM public.patients p
     WHERE p.id = CASE
-      WHEN split_part(storage.objects.name, '/', 1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+      WHEN split_part(storage.objects.name, '/', 1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
         THEN split_part(storage.objects.name, '/', 1)::uuid
       ELSE NULL
     END
@@ -245,7 +245,7 @@ USING (
     SELECT 1
     FROM public.patients p
     WHERE p.id = CASE
-      WHEN split_part(storage.objects.name, '/', 1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+      WHEN split_part(storage.objects.name, '/', 1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
         THEN split_part(storage.objects.name, '/', 1)::uuid
       ELSE NULL
     END
@@ -266,7 +266,7 @@ WITH CHECK (
     SELECT 1
     FROM public.patients p
     WHERE p.id = CASE
-      WHEN split_part(storage.objects.name, '/', 1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+      WHEN split_part(storage.objects.name, '/', 1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
         THEN split_part(storage.objects.name, '/', 1)::uuid
       ELSE NULL
     END
@@ -290,7 +290,7 @@ USING (
     SELECT 1
     FROM public.patients p
     WHERE p.id = CASE
-      WHEN split_part(storage.objects.name, '/', 1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+      WHEN split_part(storage.objects.name, '/', 1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
         THEN split_part(storage.objects.name, '/', 1)::uuid
       ELSE NULL
     END

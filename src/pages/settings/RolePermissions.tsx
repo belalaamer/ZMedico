@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
 import SettingsLayout from "./SettingsLayout";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -42,11 +41,11 @@ function emptyMatrix(): Matrix {
 
 export default function RolePermissions() {
   const { t, lang } = useI18n();
-  // R2: this page is the admin CRUD editor for the role_permissions
-  // table itself; DEFAULT_PERMISSIONS is data (seed), not a decision.
-  // The admin gate below is routed through the canonical service.
-  const { authz, loading: roleLoading } = useAuthorization("RolePermissions");
-  const canEditMatrix = authz.isSuperAdmin();
+  // Production authorization is canonical. This page edits only the legacy
+  // fallback matrix, and the database RPC deliberately allows that write to
+  // the System Owner only.
+  const { authz } = useAuthorization("RolePermissions");
+  const canEditMatrix = authz.holdsAnyRole("system_owner");
   const [matrix, setMatrix] = useState<Matrix>(() => JSON.parse(JSON.stringify(DEFAULT)));
   const [original, setOriginal] = useState<Matrix>(() => JSON.parse(JSON.stringify(DEFAULT)));
   const [loading, setLoading] = useState(true);
@@ -110,7 +109,6 @@ export default function RolePermissions() {
     setMatrix(JSON.parse(JSON.stringify(DEFAULT)));
   };
 
-  if (!roleLoading && !canEditMatrix) return <Navigate to="/settings/general" replace />;
 
   return (
     <SettingsLayout>
@@ -145,8 +143,8 @@ export default function RolePermissions() {
           <Info className="size-4 mt-0.5 text-primary shrink-0" />
           <p className="text-foreground/80">
             {lang === "ar"
-              ? "هذه المصفوفة توثّق صلاحيات كل دور. التطبيق الفعلي للصلاحيات يتم على مستوى قاعدة البيانات عبر سياسات RLS وجدول user_roles. لتغيير دور مستخدم استخدم إدارة المستخدمين."
-              : "This matrix documents the intended access for each role. Effective access is enforced server-side via RLS policies and the user_roles table. To change a user's role, use User Management."}
+              ? "هذه مصفوفة الصلاحيات الاحتياطية القديمة (Legacy fallback). صلاحيات Production الفعلية تأتي من نظام Canonical Authorization وسياسات RLS. يمكن لـ System Owner فقط تعديل هذه المصفوفة، وتعديلها لا يغيّر صلاحيات Canonical الحالية."
+              : "This is the legacy fallback permission matrix. Production access is decided by Canonical Authorization and RLS. Only the System Owner may edit this fallback matrix, and changing it does not change the current canonical grants."}
           </p>
         </div>
         <Card className="p-0 shadow-card overflow-hidden">
@@ -167,9 +165,9 @@ export default function RolePermissions() {
               </Select>
             </div>
             <div className="text-xs text-muted-foreground md:text-end">
-              {lang === "ar"
-                ? "اختر دورًا ثم فعّل/عطّل الأذونات لكل وحدة."
-                : "Pick a role, then toggle permissions per module."}
+              {canEditMatrix
+                ? (lang === "ar" ? "اختر دورًا ثم عدّل صلاحيات الـLegacy fallback." : "Pick a role, then edit the legacy fallback permissions.")
+                : (lang === "ar" ? "عرض فقط — التعديل متاح لـ System Owner." : "Read-only — editing is restricted to the System Owner.")}
             </div>
           </div>
 

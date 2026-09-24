@@ -23,7 +23,7 @@ import PatientQuickActions from "./PatientQuickActions";
 import PatientDocumentsTab from "./PatientDocumentsTab";
 import PatientPortalCard from "./PatientPortalCard";
 import { RecordPaymentDialog } from "../payments/RecordPaymentDialog";
-import { useAuthorization } from "@/lib/authz/useAuthorization";
+import { useAuthorization } from "@/lib/authz/useAuthorization";\nimport { useBranch } from "@/contexts/BranchContext";
 import PatientOverviewSnapshot from "./PatientOverviewSnapshot";
 import { logPhiAccess } from "@/lib/observability/phiAudit";
 import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
@@ -38,7 +38,7 @@ export default function PatientProfile() {
   const navigate = useNavigate();
   const { t, lang } = useI18n();
   // R2: canonical authorization entry point.
-  const { authz } = useAuthorization("PatientProfile");
+  const { authz } = useAuthorization("PatientProfile");\n  const { isModuleEnabled } = useBranch();\n  const canUseDental = authz.can("medical_records.view") && isModuleEnabled("dental");
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab") ?? "overview";
   const uploadFlag = searchParams.get("upload") === "1";
@@ -159,7 +159,7 @@ export default function PatientProfile() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <Button asChild variant="ghost" size="sm"><Link to="/patients"><ArrowLeft className="me-2 size-4" />{t("patients")}</Link></Button>
         <div className="flex w-full sm:w-auto flex-wrap items-center justify-end gap-2">
-          <Button asChild variant="outline" size="sm"><Link to={`/patients/${patient.id}/dental`}><Stethoscope className="me-2 size-4"/>{t("dentalChart")}</Link></Button>
+          {canUseDental && (\n            <Button asChild variant="outline" size="sm"><Link to={`/patients/${patient.id}/dental`}><Stethoscope className="me-2 size-4"/>{t("dentalChart")}</Link></Button>\n          )}
           <Can permission="patients.edit">
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
               <Pencil className="me-2 size-4" />{t("edit")}
@@ -342,11 +342,13 @@ export default function PatientProfile() {
                 </button>
               )}
             </div>
-            <Button asChild variant="ghost" size="sm" className="ms-auto">
-              <Link to={`/patients/${patient.id}/dental`}>
-                <Stethoscope className="me-2 size-4" />{t("dentalChart")}
-              </Link>
-            </Button>
+            {canUseDental && (
+              <Button asChild variant="ghost" size="sm" className="ms-auto">
+                <Link to={`/patients/${patient.id}/dental`}>
+                  <Stethoscope className="me-2 size-4" />{t("dentalChart")}
+                </Link>
+              </Button>
+            )}
           </div>
           {clinicalView === "medical" ? (
             <PatientMedicalTab patientId={patient.id} />

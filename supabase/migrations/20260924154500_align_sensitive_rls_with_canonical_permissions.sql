@@ -169,6 +169,31 @@ WITH CHECK (
 --    already remain in force as RESTRICTIVE policies where present.
 -- ---------------------------------------------------------------------------
 
+DROP POLICY IF EXISTS doc_select_scoped ON public.patient_documents;
+DROP POLICY IF EXISTS doc_insert_staff ON public.patient_documents;
+DROP POLICY IF EXISTS doc_update_staff ON public.patient_documents;
+DROP POLICY IF EXISTS doc_delete ON public.patient_documents;
+
+CREATE POLICY doc_select_scoped ON public.patient_documents
+FOR SELECT TO authenticated
+USING (public.has_permission((SELECT auth.uid()), 'medical_records.view'));
+
+CREATE POLICY doc_insert_staff ON public.patient_documents
+FOR INSERT TO authenticated
+WITH CHECK (
+  public.has_permission((SELECT auth.uid()), 'medical_records.create')
+  AND uploaded_by = (SELECT auth.uid())
+);
+
+CREATE POLICY doc_update_staff ON public.patient_documents
+FOR UPDATE TO authenticated
+USING (public.has_permission((SELECT auth.uid()), 'medical_records.edit'))
+WITH CHECK (public.has_permission((SELECT auth.uid()), 'medical_records.edit'));
+
+CREATE POLICY doc_delete ON public.patient_documents
+FOR DELETE TO authenticated
+USING (public.has_permission((SELECT auth.uid()), 'medical_records.delete'));
+
 DROP POLICY IF EXISTS hist_select_clinical ON public.medical_history;
 DROP POLICY IF EXISTS hist_insert_clinical ON public.medical_history;
 DROP POLICY IF EXISTS nurse_history_insert ON public.medical_history;

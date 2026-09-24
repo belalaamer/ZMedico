@@ -54,6 +54,7 @@ describe("role-based permission matrix", () => {
   it("maps every sensitive route family to the intended permission module", () => {
     const cases: Array<[string, string]> = [
       ["/patients", "patients"],
+      ["/patients/11111111-1111-1111-1111-111111111111/dental", "medical_records"],
       ["/calendar", "appointments"],
       ["/queue", "appointments"],
       ["/medical/records", "medical_records"],

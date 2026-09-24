@@ -497,6 +497,103 @@ WITH CHECK (
 -- Intentionally no authenticated UPDATE/DELETE policy. Parent-row FK actions
 -- and system-owner force-delete maintenance continue to run server-side.
 
+-- Salary adjustments are subordinate edits to a payroll. HR can edit them,
+-- but hard delete remains tied to hr.delete (Admin-only in canonical grants).
+DROP POLICY IF EXISTS sa_admin ON public.salary_adjustments;
+DROP POLICY IF EXISTS sa_select_self_or_admin ON public.salary_adjustments;
+
+CREATE POLICY sa_select_hr_or_self ON public.salary_adjustments
+FOR SELECT TO authenticated
+USING (
+  public.has_role((SELECT auth.uid()), 'system_owner'::public.app_role)
+  OR public.has_permission((SELECT auth.uid()), 'hr.view')
+  OR EXISTS (
+    SELECT 1
+    FROM public.payroll p
+    JOIN public.staff_profiles sp ON sp.id = p.staff_id
+    WHERE p.id = salary_adjustments.payroll_id
+      AND sp.linked_user_id = (SELECT auth.uid())
+  )
+);
+
+CREATE POLICY sa_insert_hr_edit ON public.salary_adjustments
+FOR INSERT TO authenticated
+WITH CHECK (
+  public.has_role((SELECT auth.uid()), 'system_owner'::public.app_role)
+  OR public.has_permission((SELECT auth.uid()), 'hr.edit')
+);
+
+CREATE POLICY sa_update_hr_edit ON public.salary_adjustments
+FOR UPDATE TO authenticated
+USING (
+  public.has_role((SELECT auth.uid()), 'system_owner'::public.app_role)
+  OR public.has_permission((SELECT auth.uid()), 'hr.edit')
+)
+WITH CHECK (
+  public.has_role((SELECT auth.uid()), 'system_owner'::public.app_role)
+  OR public.has_permission((SELECT auth.uid()), 'hr.edit')
+);
+
+CREATE POLICY sa_delete_hr_delete ON public.salary_adjustments
+FOR DELETE TO authenticated
+USING (
+  public.has_role((SELECT auth.uid()), 'system_owner'::public.app_role)
+  OR public.has_permission((SELECT auth.uid()), 'hr.delete')
+);
+
+-- Commission rows are financial/HR records. Preserve doctor self-view and
+-- manager HR-view, but stop hr from getting implicit hard-delete via ALL.
+DROP POLICY IF EXISTS "Manage commissions" ON public.doctor_commissions;
+DROP POLICY IF EXISTS "View commissions" ON public.doctor_commissions;
+
+CREATE POLICY "View commissions" ON public.doctor_commissions
+FOR SELECT TO authenticated
+USING (
+  public.user_has_branch_access(branch_id)
+  AND (
+    doctor_id = (SELECT auth.uid())
+    OR public.has_role((SELECT auth.uid()), 'system_owner'::public.app_role)
+    OR public.has_permission((SELECT auth.uid()), 'hr.view')
+  )
+);
+
+CREATE POLICY commissions_insert_hr_edit ON public.doctor_commissions
+FOR INSERT TO authenticated
+WITH CHECK (
+  public.user_has_branch_access(branch_id)
+  AND (
+    public.has_role((SELECT auth.uid()), 'system_owner'::public.app_role)
+    OR public.has_permission((SELECT auth.uid()), 'hr.edit')
+  )
+);
+
+CREATE POLICY commissions_update_hr_edit ON public.doctor_commissions
+FOR UPDATE TO authenticated
+USING (
+  public.user_has_branch_access(branch_id)
+  AND (
+    public.has_role((SELECT auth.uid()), 'system_owner'::public.app_role)
+    OR public.has_permission((SELECT auth.uid()), 'hr.edit')
+  )
+)
+WITH CHECK (
+  public.user_has_branch_access(branch_id)
+  AND (
+    public.has_role((SELECT auth.uid()), 'system_owner'::public.app_role)
+    OR public.has_permission((SELECT auth.uid()), 'hr.edit')
+  )
+);
+
+CREATE POLICY commissions_delete_hr_delete ON public.doctor_commissions
+FOR DELETE TO authenticated
+USING (
+  public.user_has_branch_access(branch_id)
+  AND (
+    public.has_role((SELECT auth.uid()), 'system_owner'::public.app_role)
+    OR public.has_permission((SELECT auth.uid()), 'hr.delete')
+  )
+);
+
 -- HR may create/edit payroll rows, but canonical hr.delete is Admin-only.
 DROP POLICY IF EXISTS hr_payroll_delete ON public.payroll;
 

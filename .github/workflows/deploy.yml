@@ -41,12 +41,12 @@ jobs:
 
       - name: Authenticated Admin E2E smoke
         env:
-          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
-          ADMIN_PASS: ${{ secrets.ADMIN_PASS }}
+          ADMIN_EMAIL: qa.admin@qa.local
+          ADMIN_PASS: ${{ secrets.TEST_ADMIN_PASSWORD }}
         run: |
           set -euo pipefail
           if [ -z "${ADMIN_EMAIL:-}" ] || [ -z "${ADMIN_PASS:-}" ]; then
-            echo "::notice title=Authenticated E2E skipped::Set repository secrets ADMIN_EMAIL and ADMIN_PASS to enable the admin desktop/mobile gate."
+            echo "::notice title=Authenticated E2E skipped::Set repository secret TEST_ADMIN_PASSWORD to enable the admin desktop/mobile gate."
             exit 0
           fi
 

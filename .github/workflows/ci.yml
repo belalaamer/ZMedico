@@ -56,51 +56,43 @@ jobs:
           --project="public-mobile:iphone-14"
           --project="public-mobile:iphone-15-pro-max"
 
-      - name: Authenticated Admin E2E (when configured)
+      - name: Authenticated Admin + RBAC/RLS E2E (when configured)
         env:
-          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
-          ADMIN_PASS: ${{ secrets.ADMIN_PASS }}
+          ADMIN_EMAIL: qa.admin@qa.local
+          ADMIN_PASS: ${{ secrets.TEST_ADMIN_PASSWORD }}
+          TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD }}
+          TEST_MANAGER_PASSWORD: ${{ secrets.TEST_MANAGER_PASSWORD }}
+          TEST_DOCTOR_PASSWORD: ${{ secrets.TEST_DOCTOR_PASSWORD }}
+          TEST_NURSE_PASSWORD: ${{ secrets.TEST_NURSE_PASSWORD }}
+          TEST_RECEPTIONIST_PASSWORD: ${{ secrets.TEST_RECEPTIONIST_PASSWORD }}
+          TEST_ACCOUNTANT_PASSWORD: ${{ secrets.TEST_ACCOUNTANT_PASSWORD }}
+          TEST_HR_PASSWORD: ${{ secrets.TEST_HR_PASSWORD }}
         run: |
           set -euo pipefail
-          if [ -z "${ADMIN_EMAIL:-}" ] || [ -z "${ADMIN_PASS:-}" ]; then
-            echo "::warning title=Authenticated E2E not active::Add repository secrets ADMIN_EMAIL and ADMIN_PASS so PRs are blocked when authenticated core routes regress."
-            exit 0
-          fi
-
-          BASE_URL=http://127.0.0.1:8080 bunx playwright test \
-            --project=admin-desktop \
-            --project=admin-mobile
-
-      - name: Deep RBAC / RLS E2E (when configured)
-        env:
-          BASE_SUPABASE_URL: ${{ secrets.QA_SUPABASE_URL }}
-          BASE_SUPABASE_ANON_KEY: ${{ secrets.QA_SUPABASE_PUBLISHABLE_KEY }}
-          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
-          ADMIN_PASS: ${{ secrets.ADMIN_PASS }}
-          MANAGER_EMAIL: ${{ secrets.MANAGER_EMAIL }}
-          MANAGER_PASS: ${{ secrets.MANAGER_PASS }}
-          DOCTOR_EMAIL: ${{ secrets.DOCTOR_EMAIL }}
-          DOCTOR_PASS: ${{ secrets.DOCTOR_PASS }}
-          NURSE_EMAIL: ${{ secrets.NURSE_EMAIL }}
-          NURSE_PASS: ${{ secrets.NURSE_PASS }}
-          RECEPTIONIST_EMAIL: ${{ secrets.RECEPTIONIST_EMAIL }}
-          RECEPTIONIST_PASS: ${{ secrets.RECEPTIONIST_PASS }}
-          ACCOUNTANT_EMAIL: ${{ secrets.ACCOUNTANT_EMAIL }}
-          ACCOUNTANT_PASS: ${{ secrets.ACCOUNTANT_PASS }}
-          HR_EMAIL: ${{ secrets.HR_EMAIL }}
-          HR_PASS: ${{ secrets.HR_PASS }}
-        run: |
-          set -euo pipefail
-          required=(BASE_SUPABASE_URL BASE_SUPABASE_ANON_KEY ADMIN_EMAIL ADMIN_PASS MANAGER_EMAIL MANAGER_PASS DOCTOR_EMAIL DOCTOR_PASS NURSE_EMAIL NURSE_PASS RECEPTIONIST_EMAIL RECEPTIONIST_PASS ACCOUNTANT_EMAIL ACCOUNTANT_PASS HR_EMAIL HR_PASS)
+          required=(TEST_ADMIN_PASSWORD TEST_MANAGER_PASSWORD TEST_DOCTOR_PASSWORD TEST_NURSE_PASSWORD TEST_RECEPTIONIST_PASSWORD TEST_ACCOUNTANT_PASSWORD TEST_HR_PASSWORD)
           missing=()
           for key in "${required[@]}"; do
             if [ -z "${!key:-}" ]; then missing+=("$key"); fi
           done
           if [ "${#missing[@]}" -gt 0 ]; then
-            echo "::warning title=Deep RBAC E2E not active::Missing QA secrets: ${missing[*]}"
+            echo "::warning title=Authenticated RBAC E2E not active::Missing QA password secrets: ${missing[*]}"
             exit 0
           fi
-          bunx playwright test --project=rbac-deep
+
+          # Supabase URL + publishable key are public client configuration,
+          # so reuse the committed Vite environment instead of duplicating
+          # them as GitHub secrets.
+          set -a
+          source .env
+          set +a
+          export BASE_SUPABASE_URL="${VITE_SUPABASE_URL:-}"
+          export BASE_SUPABASE_ANON_KEY="${VITE_SUPABASE_PUBLISHABLE_KEY:-${VITE_SUPABASE_ANON_KEY:-}}"
+
+          BASE_URL=http://127.0.0.1:8080 bunx playwright test \
+            --project=admin-desktop \
+            --project=admin-mobile \
+            --project=rbac-ui \
+            --project=rbac-deep
 
       - name: Upload Playwright failure artifacts
         if: failure()

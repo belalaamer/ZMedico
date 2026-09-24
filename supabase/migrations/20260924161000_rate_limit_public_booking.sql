@@ -19,6 +19,11 @@ ALTER TABLE public.public_booking_rate_limits ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.public_booking_rate_limits FROM PUBLIC, anon, authenticated;
 GRANT ALL ON TABLE public.public_booking_rate_limits TO service_role;
 
+-- Keep cleanup efficient even if an abusive client rotates IPs/phones and
+-- creates many distinct limiter keys.
+CREATE INDEX IF NOT EXISTS public_booking_rate_limits_updated_at_idx
+  ON public.public_booking_rate_limits (updated_at);
+
 CREATE OR REPLACE FUNCTION public.consume_public_booking_rate_limit(
   p_key text,
   p_limit integer,
@@ -85,3 +90,22 @@ GRANT EXECUTE ON FUNCTION public.public_create_booking(
 GRANT EXECUTE ON FUNCTION public.public_create_booking_for_tenant(
   uuid, uuid, uuid, timestamptz, text, text, uuid, text, text, text, jsonb
 ) TO service_role;
+
+
+-- The limiter keyspace is attacker-controlled (unique IP/phone combinations),
+-- so expired rows must not accumulate forever. The longest accepted limiter
+-- window is 24h; keeping 48h leaves ample margin while bounding table growth.
+DO $$
+BEGIN
+  PERFORM cron.unschedule('cleanup-public-booking-rate-limits');
+EXCEPTION WHEN OTHERS THEN
+  NULL;
+END
+$$;
+
+SELECT cron.schedule(
+  'cleanup-public-booking-rate-limits',
+  '17 3 * * *',
+  $cron$DELETE FROM public.public_booking_rate_limits
+        WHERE updated_at < now() - interval '48 hours'$cron$
+);

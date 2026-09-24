@@ -6,14 +6,13 @@
  *
  *   npx playwright install chromium
  *   BASE_URL=https://<your-preview-host> \
- *   ADMIN_EMAIL=... ADMIN_PASS=... \
- *   MANAGER_EMAIL=... MANAGER_PASS=... \
- *   DOCTOR_EMAIL=... DOCTOR_PASS=... \
- *   NURSE_EMAIL=... NURSE_PASS=... \
- *   RECEPTIONIST_EMAIL=... RECEPTIONIST_PASS=... \
- *   ACCOUNTANT_EMAIL=... ACCOUNTANT_PASS=... \
- *   HR_EMAIL=... HR_PASS=... \
- *   STAFF_EMAIL=... STAFF_PASS=... \
+ *   TEST_ADMIN_PASSWORD=... \
+ *   TEST_MANAGER_PASSWORD=... \
+ *   TEST_DOCTOR_PASSWORD=... \
+ *   TEST_NURSE_PASSWORD=... \
+ *   TEST_RECEPTIONIST_PASSWORD=... \
+ *   TEST_ACCOUNTANT_PASSWORD=... \
+ *   TEST_HR_PASSWORD=... \
  *   npx playwright test tests/playwright/rbac.spec.ts
  *
  * Required seed data (create once via Admin > Users & manual ops):
@@ -41,18 +40,18 @@ type Role =
   | "receptionist" | "accountant" | "hr";
 
 const CREDS: Record<Role, { email?: string; pass?: string }> = {
-  admin:        { email: process.env.ADMIN_EMAIL,        pass: process.env.ADMIN_PASS },
-  manager:      { email: process.env.MANAGER_EMAIL,      pass: process.env.MANAGER_PASS },
-  doctor:       { email: process.env.DOCTOR_EMAIL,       pass: process.env.DOCTOR_PASS },
-  nurse:        { email: process.env.NURSE_EMAIL,        pass: process.env.NURSE_PASS },
-  receptionist: { email: process.env.RECEPTIONIST_EMAIL, pass: process.env.RECEPTIONIST_PASS },
-  accountant:   { email: process.env.ACCOUNTANT_EMAIL,   pass: process.env.ACCOUNTANT_PASS },
-  hr:           { email: process.env.HR_EMAIL,           pass: process.env.HR_PASS },
+  admin:        { email: process.env.ADMIN_EMAIL ?? "qa.admin@qa.local",               pass: process.env.TEST_ADMIN_PASSWORD ?? process.env.ADMIN_PASS },
+  manager:      { email: process.env.MANAGER_EMAIL ?? "qa.manager@qa.local",           pass: process.env.TEST_MANAGER_PASSWORD ?? process.env.MANAGER_PASS },
+  doctor:       { email: process.env.DOCTOR_EMAIL ?? "qa.doctor@qa.local",             pass: process.env.TEST_DOCTOR_PASSWORD ?? process.env.DOCTOR_PASS },
+  nurse:        { email: process.env.NURSE_EMAIL ?? "qa.nurse@qa.local",               pass: process.env.TEST_NURSE_PASSWORD ?? process.env.NURSE_PASS },
+  receptionist: { email: process.env.RECEPTIONIST_EMAIL ?? "qa.receptionist@qa.local", pass: process.env.TEST_RECEPTIONIST_PASSWORD ?? process.env.RECEPTIONIST_PASS },
+  accountant:   { email: process.env.ACCOUNTANT_EMAIL ?? "qa.accountant@qa.local",     pass: process.env.TEST_ACCOUNTANT_PASSWORD ?? process.env.ACCOUNTANT_PASS },
+  hr:           { email: process.env.HR_EMAIL ?? "qa.hr@qa.local",                     pass: process.env.TEST_HR_PASSWORD ?? process.env.HR_PASS },
 };
 
 async function login(page: Page, role: Role) {
   const c = CREDS[role];
-  test.skip(!c.email || !c.pass, `Missing credentials for ${role}`);
+  test.skip(!c.pass, `Missing QA password for ${role}`);
   await page.goto(`${BASE}/auth`);
   await page.getByLabel(/email/i).fill(c.email!);
   await page.getByLabel(/password/i).first().fill(c.pass!);

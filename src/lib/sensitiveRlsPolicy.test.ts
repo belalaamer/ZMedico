@@ -53,6 +53,9 @@ describe("sensitive RLS alignment migration", () => {
     expect(migration).toContain("sa_delete_hr_delete");
     expect(migration).toContain("commissions_update_hr_edit");
     expect(migration).toContain("commissions_delete_hr_delete");
+    expect(migration).toContain("patient_docs_storage_select");
+    expect(migration).toContain("patient_docs_storage_insert");
+    expect(migration).toContain("patient_docs_storage_delete");
   });
 
   it("requires canonical integration permission for tenant integration writes", () => {

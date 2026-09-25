@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 describe("clinical catalog write hardening", () => {
   const migration = readFileSync(
-    resolve(process.cwd(), "supabase/migrations/20260925170000_harden_clinical_catalog_writes.sql"),
+    resolve(process.cwd(), "supabase/migrations/20260925111804_harden_clinical_catalog_writes.sql"),
     "utf8",
   );
 

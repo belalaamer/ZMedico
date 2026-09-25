@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/contexts/AuthContext";
+import { COMPLETED_SLICES } from "./slices/completedSlices";
 
 /**
  * Shared factory for authorization Shadow Probes.
@@ -10,8 +11,13 @@ import { useAuth } from "@/contexts/AuthContext";
  * Every vertical slice (settings/patients/medical_records/hr/invoices)
  * previously duplicated the same ~110-line probe. This factory extracts
  * the common logic; per-slice files now just declare their slice name
- * and key→legacy map. Behaviour is byte-identical to the pre-refactor
- * probes:
+ * and key→legacy map.
+ *
+ * Completed slices no longer need production shadow traffic. For those,
+ * the factory returns a stable no-op hook: canonical authorization remains
+ * active, historical shadow evidence remains intact, and the database stops
+ * accumulating redundant comparison rows. Shadow slices keep the original
+ * behaviour:
  *   - Fires once per (user, path) in-memory
  *   - Reads new-model decisions from `authz_has_permissions`
  *   - Fire-and-forgets `authz_record_shadow_decision` per key
@@ -38,12 +44,28 @@ export interface ShadowProbe {
   keys: readonly string[];
 }
 
+export function isShadowProbeEnabled(slice: string): boolean {
+  return !COMPLETED_SLICES.some(
+    (entry) => entry.slice === slice && entry.status === "complete",
+  );
+}
+
 export function createShadowProbe(config: ShadowProbeConfig): ShadowProbe {
   const { slice, keyLegacyMap, probeName } = config;
   const requestSource = config.requestSource ?? "UI";
   const keys = Object.freeze(Object.keys(keyLegacyMap));
   const FIRED = new Set<string>();
   const logTag = `[shadow:${slice}]`;
+
+  if (!isShadowProbeEnabled(slice)) {
+    // Completed slices keep their exported hook API for call-site stability,
+    // but they no longer load legacy permissions or write shadow telemetry.
+    return {
+      useProbe: () => {},
+      resetForTests: () => FIRED.clear(),
+      keys,
+    };
+  }
 
   function useProbe(pathHint?: string) {
     const { user } = useAuth();

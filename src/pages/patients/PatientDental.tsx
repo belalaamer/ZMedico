@@ -68,7 +68,7 @@ export default function PatientDental() {
     if (p?.id) {
       if (!phiLogged.current) {
         phiLogged.current = true;
-        logPhiAccess("dental_chart", p.id, { patientId: p.id });
+        logPhiAccess("dental_chart", null, { patientId: p.id });
       }
     }
   };

@@ -229,6 +229,7 @@ export default function Payroll() {
   };
 
   const addAdjustment = async () => {
+    if (!canEdit) { toast.error(notPermittedMsg); return; }
     if (!openAdj || !adj.amount) return;
     const amount = Number(adj.amount);
     const { error: adjErr } = await supabase.from("salary_adjustments").insert({ payroll_id: openAdj, type: adj.type as any, amount, reason_en: adj.reason_en || null, created_by: user?.id });
@@ -386,9 +387,11 @@ export default function Payroll() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-56">
-                        <DropdownMenuItem onClick={() => setOpenAdj(p.id)}>
-                          <PlusCircle className="me-2 size-4" />{t("addAdjustment")}
-                        </DropdownMenuItem>
+                        {canEdit ? (
+                          <DropdownMenuItem onClick={() => setOpenAdj(p.id)}>
+                            <PlusCircle className="me-2 size-4" />{t("addAdjustment")}
+                          </DropdownMenuItem>
+                        ) : null}
                         <DropdownMenuItem onClick={() => openCommissionDetails(p)}>
                           <ListChecks className="me-2 size-4" />
                           {lang === "ar" ? "تفاصيل العمولات" : "Commission details"}

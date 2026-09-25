@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useI18n } from "@/contexts/I18nContext";
+import { useBranch } from "@/contexts/BranchContext";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { RowActions } from "@/components/RowActions";
@@ -18,6 +20,10 @@ const FORMS = ["tablet", "capsule", "syrup", "drops", "cream", "ointment", "inha
 
 export default function Medications() {
   const { t, lang } = useI18n();
+  const { subscription } = useBranch();
+  const { authz } = useAuthorization("Medications");
+  const isSystemOwner = authz.holdsAnyRole("system_owner");
+  const canManageCatalog = isSystemOwner || authz.can("settings.catalog.update");
   const [items, setItems] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [q, setQ] = useState("");
@@ -46,8 +52,11 @@ export default function Medications() {
     !q || `${i.name_en} ${i.name_ar} ${i.generic_name ?? ""}`.toLowerCase().includes(q.toLowerCase())
   ), [items, q]);
 
-  const openNew = () => { setEdit(null); setForm({ name: "", generic_name: "", dosage_form: "tablet", strength: "", unit: "piece", instructions: "", product_id: "", is_active: true }); setOpen(true); };
+  const openNew = () => {
+    if (!canManageCatalog || !subscription?.tenant_id) return;
+    setEdit(null); setForm({ name: "", generic_name: "", dosage_form: "tablet", strength: "", unit: "piece", instructions: "", product_id: "", is_active: true }); setOpen(true); };
   const openEdit = (m: any) => {
+    if (!(isSystemOwner || (canManageCatalog && m.tenant_id === subscription?.tenant_id))) return;
     setEdit(m);
     setForm({
       name: m.name_en || m.name_ar || "", generic_name: m.generic_name ?? "",
@@ -65,6 +74,7 @@ export default function Medications() {
     // "Cannot delete" message above in this same file.
     if (!name) return toast.error(lang === "ar" ? "الاسم مطلوب" : "Name required");
     const payload = {
+      ...(!edit ? { tenant_id: subscription?.tenant_id } : {}),
       name_en: name, name_ar: name,
       generic_name: form.generic_name || null,
       dosage_form: form.dosage_form, strength: form.strength || null, unit: form.unit,
@@ -87,6 +97,7 @@ export default function Medications() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <div className="relative w-56"><Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" /><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("search")} className="ps-9" /></div>
+          {canManageCatalog && subscription?.tenant_id ? (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground" onClick={openNew}><Plus className="me-2 size-4" />{t("addMedicationCat")}</Button></DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -117,6 +128,7 @@ export default function Medications() {
               <DialogFooter><Button variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button><Button className="gradient-primary text-primary-foreground" onClick={save}>{t("save")}</Button></DialogFooter>
             </DialogContent>
           </Dialog>
+          ) : null}
         </div>
       </div>
       <Card className="shadow-card overflow-hidden">
@@ -129,7 +141,9 @@ export default function Medications() {
                 <div className="text-xs text-muted-foreground truncate">{m.generic_name} · {m.dosage_form}</div>
               </div>
               {!m.is_active && <Badge variant="outline" className="status-departed">{t("inactive")}</Badge>}
-              <RowActions onEdit={() => openEdit(m)} onDelete={() => remove(m)} />
+              {(isSystemOwner || (canManageCatalog && m.tenant_id === subscription?.tenant_id)) ? (
+                <RowActions onEdit={() => openEdit(m)} onDelete={() => remove(m)} />
+              ) : null}
             </div>
           ))}
         </div>

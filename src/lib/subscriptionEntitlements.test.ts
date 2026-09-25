@@ -96,6 +96,7 @@ describe("module route entitlement mapping", () => {
     ["/leads", "marketing"],
     ["/settings/communication", "communication"],
     ["/medical/records", "medical"],
+    ["/patients/11111111-1111-1111-1111-111111111111/dental", "dental"],
     ["/patients", "patients"],
     ["/calendar", "appointments"],
     ["/queue", "appointments"],

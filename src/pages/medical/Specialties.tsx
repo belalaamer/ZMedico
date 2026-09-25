@@ -9,13 +9,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useI18n } from "@/contexts/I18nContext";
+import { useBranch } from "@/contexts/BranchContext";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-type Spec = { id: string; name_en: string; name_ar: string; description: string | null; icon: string | null; is_active: boolean };
+type Spec = { id: string; tenant_id: string | null; name_en: string; name_ar: string; description: string | null; icon: string | null; is_active: boolean };
 
 export default function Specialties() {
   const { t, lang } = useI18n();
+  const { subscription } = useBranch();
+  const { authz } = useAuthorization("Specialties");
+  const isSystemOwner = authz.holdsAnyRole("system_owner");
+  const canManageCatalog = isSystemOwner || authz.can("settings.catalog.update");
   const [items, setItems] = useState<Spec[]>([]);
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<Spec | null>(null);
@@ -27,8 +33,12 @@ export default function Specialties() {
   };
   useEffect(() => { load(); }, []);
 
-  const openNew = () => { setEdit(null); setForm({ name: "", description: "", icon: "🩺", is_active: true }); setOpen(true); };
-  const openEdit = (s: Spec) => { setEdit(s); setForm({ name: s.name_en || s.name_ar || "", description: s.description ?? "", icon: s.icon ?? "🩺", is_active: s.is_active }); setOpen(true); };
+  const openNew = () => {
+    if (!canManageCatalog || !subscription?.tenant_id) return;
+    setEdit(null); setForm({ name: "", description: "", icon: "🩺", is_active: true }); setOpen(true); };
+  const openEdit = (s: Spec) => {
+    if (!(isSystemOwner || (canManageCatalog && s.tenant_id === subscription?.tenant_id))) return;
+    setEdit(s); setForm({ name: s.name_en || s.name_ar || "", description: s.description ?? "", icon: s.icon ?? "🩺", is_active: s.is_active }); setOpen(true); };
 
   const save = async () => {
     const name = form.name.trim();
@@ -36,6 +46,7 @@ export default function Specialties() {
     // otherwise fully supports both languages.
     if (!name) { toast.error(lang === "ar" ? "الاسم مطلوب" : "Name required"); return; }
     const payload = {
+      ...(!edit ? { tenant_id: subscription?.tenant_id } : {}),
       name_en: name, name_ar: name,
       description: form.description || null,
       icon: form.icon || null,
@@ -55,6 +66,7 @@ export default function Specialties() {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("specialties")}</h1>
           <p className="text-sm text-muted-foreground mt-1">{items.length}</p>
         </div>
+        {canManageCatalog && subscription?.tenant_id ? (
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button className="gradient-primary text-primary-foreground" onClick={openNew}><Plus className="me-2 size-4" />{t("addSpecialty")}</Button>
@@ -72,6 +84,7 @@ export default function Specialties() {
             <DialogFooter><Button variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button><Button className="gradient-primary text-primary-foreground" onClick={save}>{t("save")}</Button></DialogFooter>
           </DialogContent>
         </Dialog>
+        ) : null}
       </div>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -85,7 +98,9 @@ export default function Specialties() {
               </div>
               <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{s.description || "—"}</div>
             </div>
-            <Button variant="ghost" size="icon" onClick={() => openEdit(s)}><Edit3 className="size-4" /></Button>
+            {(isSystemOwner || (canManageCatalog && s.tenant_id === subscription?.tenant_id)) ? (
+              <Button variant="ghost" size="icon" onClick={() => openEdit(s)}><Edit3 className="size-4" /></Button>
+            ) : null}
           </Card>
         ))}
       </div>

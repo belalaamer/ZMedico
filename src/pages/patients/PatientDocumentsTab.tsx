@@ -36,7 +36,7 @@ export default function PatientDocumentsTab({ patientId, autoOpenUpload }: Props
     if (data !== null) {
       if (!phiLogged.current) {
         phiLogged.current = true;
-        logPhiAccess("document", patientId, { patientId });
+        logPhiAccess("document", null, { patientId });
       }
     }
   };
@@ -62,7 +62,11 @@ export default function PatientDocumentsTab({ patientId, autoOpenUpload }: Props
       if (!mimeOk && !extOk) { toast.error(`${file.name}: unsupported`); continue; }
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").replace(/_{2,}/g, "_").slice(0, 100) || "file";
       const path = `${patientId}/${Date.now()}-${safeName}`;
-      const { error: upErr } = await supabase.storage.from("patient-docs").upload(path, file);
+      const uploadContentType =
+        /\.(dcm|dicom)$/i.test(file.name) ? "application/dicom" : (file.type || undefined);
+      const { error: upErr } = await supabase.storage
+        .from("patient-docs")
+        .upload(path, file, { contentType: uploadContentType });
       if (upErr) { toast.error(upErr.message); continue; }
       await supabase.from("patient_documents").insert({
         patient_id: patientId, document_type: uploadType as any,

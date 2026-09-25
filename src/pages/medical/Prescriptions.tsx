@@ -12,11 +12,15 @@ import { RowActions } from "@/components/RowActions";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { patientDisplayName, patientDisplayDirection } from "@/lib/patientName";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 
 export default function Prescriptions() {
   const { t, lang } = useI18n();
   const { currentBranchId } = useBranch();
   const navigate = useNavigate();
+  const { authz } = useAuthorization("Prescriptions");
+  const canEdit = authz.can("medical_records.edit");
+  const canDelete = authz.can("medical_records.delete");
   const [items, setItems] = useState<any[]>([]);
   const [search, setSearch] = useState("");
 
@@ -76,7 +80,14 @@ export default function Prescriptions() {
                   </div>
                   <Badge variant="outline" className={rx.status === "active" ? "status-progress" : rx.status === "completed" ? "status-completed" : "status-cancelled"}>{rx.status === "active" ? t("activeRx") : rx.status === "completed" ? t("completed") : t("discontinued")}</Badge>
                   </Link>
-                  <RowActions onEdit={() => navigate(`/medical/prescriptions/${rx.id}`)} onDelete={() => softDelete(rx)} />
+                  {(canEdit || canDelete) ? (
+                    <RowActions
+                      onEdit={() => navigate(`/medical/prescriptions/${rx.id}`)}
+                      onDelete={() => softDelete(rx)}
+                      canEdit={canEdit}
+                      canDelete={canDelete}
+                    />
+                  ) : null}
                 </div>
               );
             })}

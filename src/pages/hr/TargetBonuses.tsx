@@ -15,6 +15,7 @@ import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Fab } from "@/components/ui/fab";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 
 type StaffOpt = { id: string; full_name: string | null; email: string | null };
 type Target = {
@@ -42,6 +43,9 @@ const METRICS = [
 export default function TargetBonusesPage() {
   const { lang } = useI18n();
   const { currentBranchId } = useBranch();
+  const { authz } = useAuthorization("TargetBonuses");
+  const canCreate = authz.can("hr.create");
+  const canDelete = authz.can("hr.delete");
   const [items, setItems] = useState<Target[]>([]);
   const [staff, setStaff] = useState<StaffOpt[]>([]);
   const [actuals, setActuals] = useState<Record<string, number>>({});
@@ -169,6 +173,7 @@ export default function TargetBonusesPage() {
             {lang === "ar" ? "ضع أهدافًا للموظفين وتتبع المكافآت التلقائية" : "Set staff performance targets and auto-track bonuses"}
           </p>
         </div>
+        {canCreate ? (
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button className="gradient-primary text-primary-foreground hidden sm:inline-flex">
@@ -233,6 +238,7 @@ export default function TargetBonusesPage() {
             </form>
           </DialogContent>
         </Dialog>
+        ) : null}
       </div>
 
       {loading ? (
@@ -269,9 +275,11 @@ export default function TargetBonusesPage() {
                     <Badge variant={achieved ? "default" : "outline"} className={achieved ? "bg-emerald-600" : ""}>
                       {achieved ? (lang === "ar" ? "محقق" : "Achieved") : `${pct}%`}
                     </Badge>
-                    <Button variant="ghost" size="icon" className="text-destructive size-8" onClick={() => setConfirmDel(t)}>
-                      <Trash2 className="size-4" />
-                    </Button>
+                    {canDelete ? (
+                      <Button variant="ghost" size="icon" className="text-destructive size-8" onClick={() => setConfirmDel(t)}>
+                        <Trash2 className="size-4" />
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
                 <div className="text-xs text-muted-foreground flex items-center gap-2">
@@ -297,9 +305,11 @@ export default function TargetBonusesPage() {
         </div>
       )}
 
-      <Fab ariaLabel={lang === "ar" ? "هدف جديد" : "New target"} onClick={() => setOpen(true)}>
-        <Plus className="size-6" />
-      </Fab>
+      {canCreate ? (
+        <Fab ariaLabel={lang === "ar" ? "هدف جديد" : "New target"} onClick={() => setOpen(true)}>
+          <Plus className="size-6" />
+        </Fab>
+      ) : null}
 
       <AlertDialog open={!!confirmDel} onOpenChange={(o) => !o && setConfirmDel(null)}>
         <AlertDialogContent>

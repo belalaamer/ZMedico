@@ -7,9 +7,9 @@ import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate, formatDateTime } from "@/lib/format";
 
-type Props = { patientId: string; patient: any; insurer?: any };
+type Props = { patientId: string; patient: any; insurer?: any; canViewClinical: boolean; canViewAppointments: boolean };
 
-export default function PatientSummaryStrip({ patientId, patient, insurer }: Props) {
+export default function PatientSummaryStrip({ patientId, patient, insurer, canViewClinical, canViewAppointments }: Props) {
   const { lang } = useI18n();
   const [next, setNext] = useState<any>(null);
   const [last, setLast] = useState<any>(null);
@@ -22,29 +22,41 @@ export default function PatientSummaryStrip({ patientId, patient, insurer }: Pro
     setLast(null);
     setHistory(null);
     const nowIso = new Date().toISOString();
+    const lastVisitQuery = canViewClinical
+      ? supabase
+          .from("medical_records")
+          .select("id,visit_date,chief_complaint_en,chief_complaint_ar")
+          .eq("patient_id", patientId)
+          .order("visit_date", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null });
+
+    const historyQuery = canViewClinical
+      ? supabase
+          .from("medical_history")
+          .select("has_allergies,allergies_en,allergies_ar,has_diabetes,has_hypertension,has_heart_disease,has_bleeding_disorder")
+          .eq("patient_id", patientId)
+          .maybeSingle()
+      : Promise.resolve({ data: null });
+
+    const appointmentQuery = canViewAppointments
+      ? supabase
+          .from("appointments")
+          .select("id,scheduled_at,procedure,status")
+          .eq("patient_id", patientId)
+          .is("deleted_at", null)
+          .gte("scheduled_at", nowIso)
+          .in("status", ["scheduled", "confirmed", "in_progress"])
+          .order("scheduled_at", { ascending: true })
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null });
+
     Promise.all([
-      supabase
-        .from("appointments")
-        .select("id,scheduled_at,procedure,status")
-        .eq("patient_id", patientId)
-        .is("deleted_at", null)
-        .gte("scheduled_at", nowIso)
-        .in("status", ["scheduled", "confirmed", "in_progress"])
-        .order("scheduled_at", { ascending: true })
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from("medical_records")
-        .select("id,visit_date,chief_complaint_en,chief_complaint_ar")
-        .eq("patient_id", patientId)
-        .order("visit_date", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from("medical_history")
-        .select("has_allergies,allergies_en,allergies_ar,has_diabetes,has_hypertension,has_heart_disease,has_bleeding_disorder")
-        .eq("patient_id", patientId)
-        .maybeSingle(),
+      appointmentQuery,
+      lastVisitQuery,
+      historyQuery,
     ]).then(([a, m, h]) => {
       if (!active) return;
       setNext(a.data ?? null);
@@ -52,7 +64,7 @@ export default function PatientSummaryStrip({ patientId, patient, insurer }: Pro
       setHistory(h.data ?? null);
     });
     return () => { active = false; };
-  }, [patientId]);
+  }, [patientId, canViewClinical, canViewAppointments]);
 
   const chronicCount = history ? [
     history.has_diabetes, history.has_hypertension,
@@ -67,33 +79,39 @@ export default function PatientSummaryStrip({ patientId, patient, insurer }: Pro
   return (
     <Card className="p-3 shadow-card">
       <div className="flex flex-wrap items-stretch gap-2">
-        <Chip
-          icon={<Calendar className="size-4" />}
-          label={lang === "ar" ? "الموعد القادم" : "Next visit"}
-          value={next ? formatDateTime(next.scheduled_at, lang) : (lang === "ar" ? "لا يوجد" : "None scheduled")}
-          tone={next ? "primary" : "muted"}
-          to="/calendar"
-        />
-        <Chip
-          icon={<Activity className="size-4" />}
-          label={lang === "ar" ? "آخر زيارة" : "Last visit"}
-          value={last ? formatDate(last.visit_date, lang) : (lang === "ar" ? "—" : "—")}
-          tone="muted"
-          to={last ? `/medical/records/${last.id}` : undefined}
-        />
-        <Chip
-          icon={<AlertTriangle className="size-4" />}
-          label={lang === "ar" ? "تنبيهات سريرية" : "Clinical alerts"}
-          value={
-            hasAllergies || chronicCount > 0
-              ? [
-                  hasAllergies ? (lang === "ar" ? "حساسية" : "Allergies") : null,
-                  chronicCount > 0 ? `${chronicCount} ${lang === "ar" ? "حالة مزمنة" : "chronic"}` : null,
-                ].filter(Boolean).join(" · ")
-              : (lang === "ar" ? "لا يوجد" : "None")
-          }
-          tone={hasAllergies ? "destructive" : chronicCount > 0 ? "warning" : "muted"}
-        />
+        {canViewAppointments ? (
+          <Chip
+            icon={<Calendar className="size-4" />}
+            label={lang === "ar" ? "الموعد القادم" : "Next visit"}
+            value={next ? formatDateTime(next.scheduled_at, lang) : (lang === "ar" ? "لا يوجد" : "None scheduled")}
+            tone={next ? "primary" : "muted"}
+            to="/calendar"
+          />
+        ) : null}
+        {canViewClinical ? (
+          <>
+            <Chip
+              icon={<Activity className="size-4" />}
+              label={lang === "ar" ? "آخر زيارة" : "Last visit"}
+              value={last ? formatDate(last.visit_date, lang) : "—"}
+              tone="muted"
+              to={last ? `/medical/records/${last.id}` : undefined}
+            />
+            <Chip
+              icon={<AlertTriangle className="size-4" />}
+              label={lang === "ar" ? "تنبيهات سريرية" : "Clinical alerts"}
+              value={
+                hasAllergies || chronicCount > 0
+                  ? [
+                      hasAllergies ? (lang === "ar" ? "حساسية" : "Allergies") : null,
+                      chronicCount > 0 ? `${chronicCount} ${lang === "ar" ? "حالة مزمنة" : "chronic"}` : null,
+                    ].filter(Boolean).join(" · ")
+                  : (lang === "ar" ? "لا يوجد" : "None")
+              }
+              tone={hasAllergies ? "destructive" : chronicCount > 0 ? "warning" : "muted"}
+            />
+          </>
+        ) : null}
         <Chip
           icon={<Shield className="size-4" />}
           label={lang === "ar" ? "التأمين" : "Insurance"}

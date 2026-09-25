@@ -13,11 +13,15 @@ import { generatePrescriptionPdf } from "@/lib/prescriptionPdf";
 import { openWhatsApp, prescriptionWhatsAppMessage } from "@/lib/whatsapp";
 import { logPhiAccess } from "@/lib/observability/phiAudit";
 import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 
 export default function PrescriptionDetail() {
   const { id } = useParams();
   const { t, lang } = useI18n();
   const { user } = useAuth();
+  const { authz } = useAuthorization("PrescriptionDetail");
+  const canCreate = authz.can("medical_records.create");
+  const canEdit = authz.can("medical_records.edit");
   const [rx, setRx] = useState<any>(null);
   const [items, setItems] = useState<any[]>([]);
   const [patient, setPatient] = useState<any>(null);
@@ -98,8 +102,8 @@ export default function PrescriptionDetail() {
         <Button asChild variant="ghost" size="sm"><Link to="/medical/prescriptions"><ArrowLeft className="me-2 size-4"/>{t("prescriptions")}</Link></Button>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className={rx.status === "active" ? "status-progress" : rx.status === "completed" ? "status-completed" : "status-cancelled"}>{rx.status === "active" ? t("activeRx") : rx.status === "completed" ? t("completed") : t("discontinued")}</Badge>
-          <Button size="sm" variant="outline" onClick={clone}><Copy className="me-2 size-4"/>{t("cloneRefill")}</Button>
-          {rx.status === "active" && <Button size="sm" variant="outline" onClick={markCompleted}><Check className="me-2 size-4"/>{t("markCompletedRx")}</Button>}
+          {canCreate ? <Button size="sm" variant="outline" onClick={clone}><Copy className="me-2 size-4"/>{t("cloneRefill")}</Button> : null}
+          {canEdit && rx.status === "active" ? <Button size="sm" variant="outline" onClick={markCompleted}><Check className="me-2 size-4"/>{t("markCompletedRx")}</Button> : null}
           <Button size="sm" variant="outline" onClick={sendWhatsApp} className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200 dark:bg-green-950/30 dark:hover:bg-green-900/40 dark:text-green-300 dark:border-green-900">
             <MessageCircle className="me-2 size-4"/>WhatsApp
           </Button>

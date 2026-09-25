@@ -231,42 +231,48 @@ export default function Dashboard() {
         canBookings ? branchEq(supabase.from("appointments").select("id", { count: "exact", head: true }).eq("booking_request_status", "pending").is("deleted_at", null)) : emptyResult(),
       ]);
 
-      // Treasury (mirrors Treasury page: filter by treasury_id for this branch,
-      // sum transaction_type income vs expense, exclude reversed expense pairs).
-      const lastCloseRes = await branchEq(
-        (supabase as any).from("treasury_daily_closes")
-          .select("business_date,counted_cash,variance,branch_id")
-          .order("business_date", { ascending: false })
-          .limit(1)
-      );
-      const lc = (lastCloseRes?.data ?? [])[0] as any;
-      setLastClose(lc ? { business_date: lc.business_date, counted_cash: Number(lc.counted_cash || 0), variance: Number(lc.variance || 0) } : null);
-
-      const trQ = (supabase as any).from("treasury").select("id").eq("branch_id", currentBranchId).is("deleted_at", null);
-      const { data: trRows } = await trQ;
-      const trIds = ((trRows ?? []) as any[]).map((r) => r.id);
-      let tIn = 0, tOut = 0;
-      if (trIds.length) {
-        const { data: tt } = await (supabase as any).from("treasury_transactions")
-          .select("transaction_type,amount,reference_type,reference_id,created_at")
-          .in("treasury_id", trIds)
-          .gte("created_at", start.toISOString())
-          .lte("created_at", end.toISOString());
-        const reversed = new Set(
-          ((tt ?? []) as any[])
-            .filter((r) => r.reference_type === "expense_reversal" && r.reference_id)
-            .map((r) => r.reference_id as string)
+      // Treasury is permission-gated at the query layer as well as the UI.
+      if (canTreasury) {
+        const lastCloseRes = await branchEq(
+          (supabase as any).from("treasury_daily_closes")
+            .select("business_date,counted_cash,variance,branch_id")
+            .order("business_date", { ascending: false })
+            .limit(1)
         );
-        const visible = ((tt ?? []) as any[]).filter((r) => {
-          if (r.reference_type === "expense_reversal") return false;
-          if (r.reference_type === "expense" && r.reference_id && reversed.has(r.reference_id)) return false;
-          return true;
-        });
-        tIn  = visible.filter((r) => r.transaction_type === "income").reduce((s, r) => s + Number(r.amount || 0), 0);
-        tOut = visible.filter((r) => r.transaction_type === "expense").reduce((s, r) => s + Number(r.amount || 0), 0);
+        const lc = (lastCloseRes?.data ?? [])[0] as any;
+        setLastClose(lc ? { business_date: lc.business_date, counted_cash: Number(lc.counted_cash || 0), variance: Number(lc.variance || 0) } : null);
+
+        const trQ = (supabase as any).from("treasury").select("id").eq("branch_id", currentBranchId).is("deleted_at", null);
+        const { data: trRows } = await trQ;
+        const trIds = ((trRows ?? []) as any[]).map((row) => row.id);
+        let tIn = 0;
+        let tOut = 0;
+        if (trIds.length) {
+          const { data: tt } = await (supabase as any).from("treasury_transactions")
+            .select("transaction_type,amount,reference_type,reference_id,created_at")
+            .in("treasury_id", trIds)
+            .gte("created_at", start.toISOString())
+            .lte("created_at", end.toISOString());
+          const reversed = new Set(
+            ((tt ?? []) as any[])
+              .filter((row) => row.reference_type === "expense_reversal" && row.reference_id)
+              .map((row) => row.reference_id as string)
+          );
+          const visible = ((tt ?? []) as any[]).filter((row) => {
+            if (row.reference_type === "expense_reversal") return false;
+            if (row.reference_type === "expense" && row.reference_id && reversed.has(row.reference_id)) return false;
+            return true;
+          });
+          tIn = visible.filter((row) => row.transaction_type === "income").reduce((sum, row) => sum + Number(row.amount || 0), 0);
+          tOut = visible.filter((row) => row.transaction_type === "expense").reduce((sum, row) => sum + Number(row.amount || 0), 0);
+        }
+        setTodayTreasuryIn(tIn);
+        setTodayTreasuryOut(tOut);
+      } else {
+        setLastClose(null);
+        setTodayTreasuryIn(0);
+        setTodayTreasuryOut(0);
       }
-      setTodayTreasuryIn(tIn);
-      setTodayTreasuryOut(tOut);
 
       const apptRows = (apptsTodayRes.data ?? []) as { status: string; doctor_id: string | null }[];
       setTodayAppts(apptRows.length);
@@ -386,7 +392,7 @@ export default function Dashboard() {
         .sort((a, b) => b.count - a.count).slice(0, 8));
 
       setLoading(false);
-  }, [branchSelectionReady, currentBranchId, rangeStart, rangeEnd, lang, user?.id]);
+  }, [branchSelectionReady, currentBranchId, rangeStart, rangeEnd, lang, user?.id, canBookings, canPatients, canInvoices, canClinical, canHR, canTreasury]);
 
   // Initial load + refetch on branch change
   useEffect(() => { run(); }, [run]);

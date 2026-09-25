@@ -21,7 +21,7 @@ const MEDICAL_RECORDS_SLICE_KEYS = [
 const EXPECTED: Record<string, Record<string, boolean>> = {
   admin:        { view: true,  create: true,  edit: true,  delete: true,  export: true  },
   doctor:       { view: true,  create: true,  edit: true,  delete: false, export: false },
-  manager:      { view: true,  create: false, edit: false, delete: false, export: false },
+  manager:      { view: false, create: false, edit: false, delete: false, export: false },
   nurse:        { view: true,  create: false, edit: false, delete: false, export: false },
   receptionist: { view: false, create: false, edit: false, delete: false, export: false },
   accountant:   { view: false, create: false, edit: false, delete: false, export: false },
@@ -37,7 +37,7 @@ function legacyCanForRole(role: string) {
 
 describe("Medical Records slice — shadow-mode parity baseline", () => {
   it.each(Object.keys(EXPECTED))(
-    "role %s matches the frozen legacy medical_records baseline",
+    "role %s matches the production-aligned medical_records baseline",
     (role) => {
       const svc = createAuthorizationServiceFromLegacy({
         can: legacyCanForRole(role),

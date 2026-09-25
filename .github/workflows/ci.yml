@@ -56,6 +56,44 @@ jobs:
           --project="public-mobile:iphone-14"
           --project="public-mobile:iphone-15-pro-max"
 
+      - name: Authenticated Admin + RBAC/RLS E2E
+        env:
+          ADMIN_EMAIL: qa.admin@qa.local
+          ADMIN_PASS: ${{ secrets.TEST_ADMIN_PASSWORD }}
+          TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD }}
+          TEST_MANAGER_PASSWORD: ${{ secrets.TEST_MANAGER_PASSWORD }}
+          TEST_DOCTOR_PASSWORD: ${{ secrets.TEST_DOCTOR_PASSWORD }}
+          TEST_NURSE_PASSWORD: ${{ secrets.TEST_NURSE_PASSWORD }}
+          TEST_RECEPTIONIST_PASSWORD: ${{ secrets.TEST_RECEPTIONIST_PASSWORD }}
+          TEST_ACCOUNTANT_PASSWORD: ${{ secrets.TEST_ACCOUNTANT_PASSWORD }}
+          TEST_HR_PASSWORD: ${{ secrets.TEST_HR_PASSWORD }}
+        run: |
+          set -euo pipefail
+          required=(TEST_ADMIN_PASSWORD TEST_MANAGER_PASSWORD TEST_DOCTOR_PASSWORD TEST_NURSE_PASSWORD TEST_RECEPTIONIST_PASSWORD TEST_ACCOUNTANT_PASSWORD TEST_HR_PASSWORD)
+          missing=()
+          for key in "${required[@]}"; do
+            if [ -z "${!key:-}" ]; then missing+=("$key"); fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error title=Authenticated RBAC E2E required::Missing QA password secrets: ${missing[*]}"
+            exit 1
+          fi
+
+          # Supabase URL + publishable key are public client configuration,
+          # so reuse the committed Vite environment instead of duplicating
+          # them as GitHub secrets.
+          set -a
+          source .env
+          set +a
+          export BASE_SUPABASE_URL="${VITE_SUPABASE_URL:-}"
+          export BASE_SUPABASE_ANON_KEY="${VITE_SUPABASE_PUBLISHABLE_KEY:-${VITE_SUPABASE_ANON_KEY:-}}"
+
+          BASE_URL=http://127.0.0.1:8080 bunx playwright test \
+            --project=admin-desktop \
+            --project=admin-mobile \
+            --project=rbac-ui \
+            --project=rbac-deep
+
       - name: Upload Playwright failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4

@@ -96,6 +96,19 @@ export default defineConfig({
     viewport: { width: 1280, height: 800 },
   },
   projects: [
+    // Backend/RLS least-privilege suite. This project is intentionally
+    // credential-driven and can run without the browser UI.
+    {
+      name: "rbac-deep",
+      testMatch: /rbac\.deep\.spec\.ts/,
+      use: { baseURL: BASE_URL },
+    },
+    // Full UI authorization walk. Each test signs in with its own QA role.
+    {
+      name: "rbac-ui",
+      testMatch: /rbac\.spec\.ts/,
+      use: { ...devices["Desktop Chrome"], baseURL: BASE_URL },
+    },
     // Read-only cross-tenant RLS checks. The tests skip safely until two
     // dedicated QA identities and fixture marker IDs are configured.
     {

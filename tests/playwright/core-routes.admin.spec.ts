@@ -13,25 +13,46 @@
 import { test, expect, type Page } from "@playwright/test";
 
 const CORE_ROUTES = [
-  { path: "/workspace", area: "dashboard" },
-  { path: "/patients", area: "patients" },
-  { path: "/calendar", area: "calendar" },
-  { path: "/queue", area: "queue" },
-  { path: "/invoices", area: "invoices" },
-  { path: "/treasury", area: "treasury" },
-  { path: "/physio", area: "physio" },
-  { path: "/inventory/products", area: "inventory products" },
-  { path: "/inventory/purchase-orders", area: "inventory purchase orders" },
-  { path: "/hr/staff", area: "hr staff" },
-  { path: "/hr/departments", area: "hr departments" },
-  { path: "/hr/positions", area: "hr positions" },
-  { path: "/settings", area: "settings" },
+  // Core / always-on operational surfaces: Access Denied is a regression.
+  { path: "/workspace", area: "dashboard", requireAccess: true },
+  { path: "/patients", area: "patients", requireAccess: true },
+  { path: "/calendar", area: "calendar", requireAccess: true },
+  { path: "/queue", area: "queue", requireAccess: true },
+  { path: "/reminders", area: "reminders", requireAccess: true },
+  { path: "/invoices", area: "invoices", requireAccess: true },
+  { path: "/payments", area: "payments", requireAccess: true },
+  { path: "/treasury", area: "treasury", requireAccess: true },
+  { path: "/expenses", area: "expenses", requireAccess: true },
+  { path: "/coupons", area: "coupons", requireAccess: true },
+  { path: "/medical/records", area: "medical records", requireAccess: true },
+  { path: "/medical/quick-consult", area: "quick consult", requireAccess: true },
+  { path: "/medical/prescriptions", area: "prescriptions", requireAccess: true },
+  { path: "/medical/documents", area: "medical documents", requireAccess: true },
+  { path: "/settings", area: "settings", requireAccess: true },
+  { path: "/settings/appointments", area: "appointment settings", requireAccess: true },
+  { path: "/settings/invoices", area: "invoice settings", requireAccess: true },
+  { path: "/settings/services", area: "services settings", requireAccess: true },
+  { path: "/settings/roles", area: "role permissions", requireAccess: true },
+  { path: "/settings/users", area: "user management", requireAccess: true },
+  { path: "/settings/audit", area: "audit logs", requireAccess: true },
+
+  // Optional subscription modules: still load the route/chunk and reject
+  // crashes/blank pages; an explicit entitlement denial is acceptable.
+  { path: "/leads", area: "leads", requireAccess: false },
+  { path: "/physio", area: "physio", requireAccess: false },
+  { path: "/inventory/products", area: "inventory products", requireAccess: false },
+  { path: "/inventory/purchase-orders", area: "inventory purchase orders", requireAccess: false },
+  { path: "/hr/staff", area: "hr staff", requireAccess: false },
+  { path: "/reports/financial", area: "financial reports", requireAccess: false },
+  { path: "/reports/operational", area: "operational reports", requireAccess: false },
 ] as const;
 
 const FATAL_TEXT =
   /Something went wrong|The app hit an unexpected error|تعذّر تحميل الصفحة|حدث خطأ غير متوقع/i;
+const ACCESS_DENIED_TEXT =
+  /Access denied|You do not have permission|لا تملك صلاحية الوصول|ليس لديك صلاحية|تم رفض الوصول/i;
 
-async function openCoreRoute(page: Page, path: string) {
+async function openCoreRoute(page: Page, path: string, requireAccess: boolean) {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => {
     pageErrors.push(String(error).slice(0, 500));
@@ -60,6 +81,13 @@ async function openCoreRoute(page: Page, path: string) {
     page.locator("body"),
     `Fatal error UI rendered on ${path}`,
   ).not.toContainText(FATAL_TEXT);
+
+  if (requireAccess) {
+    await expect(
+      page.locator("body"),
+      `Admin unexpectedly received Access Denied on core route ${path}`,
+    ).not.toContainText(ACCESS_DENIED_TEXT);
+  }
 
   // A route can be technically mounted while still being blank because of
   // a rendering/data-state regression. Require meaningful visible content,
@@ -103,11 +131,11 @@ async function openCoreRoute(page: Page, path: string) {
 }
 
 test.describe("ZMedico authenticated core routes @admin", () => {
-  for (const { path, area } of CORE_ROUTES) {
+  for (const { path, area, requireAccess } of CORE_ROUTES) {
     test(`${area} renders without blank/error state: ${path}`, async ({
       page,
     }) => {
-      await openCoreRoute(page, path);
+      await openCoreRoute(page, path, requireAccess);
     });
   }
 });

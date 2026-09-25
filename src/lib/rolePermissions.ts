@@ -40,21 +40,21 @@ const ALL = [...ACTIONS] as string[];
 // See docs/RBAC_MATRIX.md for the authoritative matrix.
 export const DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
   admin: Object.fromEntries(MODULES.map(m => [m, [...ALL]])),
-  // Manager: branch operations oversight. Clinical data is view-only;
-  // managers may not create, edit, or delete medical records.
+  // Manager: branch operations oversight. Individual clinical content is
+  // intentionally excluded; managers use aggregate operational/financial reports.
   manager: {
     leads: ["view","create","edit","export"],
     patients: ["view","create","edit","export"],
     appointments: ["view","create","edit","export"],
-    medical_records: ["view"],
-    vitals: ["view"],
-    treatment_plans: ["view"],
+    medical_records: [],
+    vitals: [],
+    treatment_plans: [],
     invoices: ["view","export"],
     treasury: ["view","export"],
     inventory: ["view","create","edit","export"],
     reports: ["view","export"],
     reports_finance: ["view","export"],
-    reports_medical: ["view","export"],
+    reports_medical: [],
     reports_operational: ["view","export"],
     reports_hr: [],
     reports_inventory: ["view","export"],
@@ -115,9 +115,9 @@ export const DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
     reports_medical: [],
     reports_hr: [],
     coupons: ["view","create","edit","export"],
-    // Coarse-grained prerequisite so PermissionRoute admits accountant
-    // into /settings/* to reach settings.pricing.update. Matches the
-    // canonical bundle.role.accountant grant of settings.view.
+    // Read-only settings/catalog metadata prerequisite. The actual /settings/*
+    // pages remain admin-gated because they contain write-capable controls.
+    // Matches the canonical accountant grant of settings.view.
     settings: ["view"],
   },
   // HR: people only.
@@ -140,6 +140,7 @@ export function moduleForPath(path: string): string | null {
   if (path.startsWith("/queue")) return "appointments";
   if (path.startsWith("/appointments")) return "appointments";
   if (path.startsWith("/physio")) return "medical_records";
+  if (path.startsWith("/patients/") && path.split("/")[3] === "dental") return "medical_records";
   if (path.startsWith("/patients")) return "patients";
   if (path.startsWith("/invoices") || path.startsWith("/payments")) return "invoices";
   if (path.startsWith("/treasury") || path.startsWith("/expenses")) return "treasury";

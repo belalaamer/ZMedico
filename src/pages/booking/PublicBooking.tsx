@@ -522,11 +522,13 @@ export default function PublicBooking() {
         </header>
 
         {optionsError ? (
-          <Card className="mb-6 border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive">
-            {optionsError}
+          <Card className="mx-auto max-w-xl border-destructive/30 bg-destructive/5 p-6 text-center">
+            <h2 className="text-lg font-bold text-foreground">{isArabic ? "رابط الحجز غير مكتمل" : "This booking link is incomplete"}</h2>
+            <p className="mt-2 text-sm leading-6 text-destructive">{optionsError}</p>
+            <p className="mt-3 text-sm text-muted-foreground">{isArabic ? "افتح رابط العيادة الصحيح أو تواصل مع العيادة للحصول على رابط الحجز." : "Open your clinic's booking link or contact the clinic for the correct link."}</p>
+            <Button asChild className="mt-5"><a href="/">{isArabic ? "العودة إلى ZMedico" : "Back to ZMedico"}</a></Button>
           </Card>
-        ) : null}
-
+        ) : (
         <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
           <Card className="overflow-hidden border-primary/10 shadow-lg">
             <div className="flex items-center gap-2 border-b bg-background/80 px-5 py-4 text-sm font-semibold">
@@ -686,6 +688,7 @@ export default function PublicBooking() {
             </Card>
           </aside>
         </div>
+        )}
         <footer className="mt-8 text-center text-xs text-muted-foreground">{isArabic ? `${tenantName} · حجز المواعيد` : `${tenantName} · Appointment booking`}</footer>
       </div>
     </main>

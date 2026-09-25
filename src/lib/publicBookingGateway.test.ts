@@ -19,6 +19,10 @@ describe("public booking gateway hardening", () => {
     resolve(process.cwd(), "supabase/migrations/20260924162000_revoke_raw_public_booking_rpc.sql"),
     "utf8",
   );
+  const directRpcMigration = readFileSync(
+    resolve(process.cwd(), "supabase/migrations/20260925160000_rate_limit_direct_public_booking_rpc.sql"),
+    "utf8",
+  );
   const config = readFileSync(
     resolve(process.cwd(), "supabase/config.toml"),
     "utf8",
@@ -44,6 +48,16 @@ describe("public booking gateway hardening", () => {
     expect(migration).toContain("consume_public_booking_rate_limit");
     expect(migration).not.toContain("REVOKE EXECUTE ON FUNCTION public.public_create_booking_for_tenant");
     expect(revokeMigration).toContain("SAFE RELEASE ORDER");
+  });
+
+  it("protects the still-deployed direct RPC before frontend cutover", () => {
+    expect(directRpcMigration).toContain("request.jwt.claims");
+    expect(directRpcMigration).toContain("request.headers");
+    expect(directRpcMigration).toContain("consume_public_booking_rate_limit(v_ip_key, 20, 3600)");
+    expect(directRpcMigration).toContain("consume_public_booking_rate_limit(v_phone_ip_key, 6, 21600)");
+    expect(directRpcMigration).toContain("v_jwt_role IN ('anon', 'authenticated')");
+    expect(directRpcMigration).toContain("octet_length(COALESCE(p_metadata");
+    expect(directRpcMigration).toContain("TO anon, service_role");
   });
 
   it("bounds limiter storage growth with indexed TTL cleanup", () => {

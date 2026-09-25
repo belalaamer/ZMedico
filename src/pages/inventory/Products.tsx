@@ -78,8 +78,16 @@ export default function Products() {
       toast.error(lang === "ar" ? "امتداد الملف لا يطابق نوع صورة مسموح به" : "File extension does not match an allowed image type");
       return;
     }
+    if (!tenantId) {
+      toast.error(t("selectBranch"));
+      return;
+    }
+
     setUploading(true);
-    const path = `${crypto.randomUUID()}.${ext}`;
+    // Keep product assets tenant-scoped at the Storage path level so the
+    // storage.objects policy can authorize the upload without trusting the
+    // client-side product payload.
+    const path = `${tenantId}/${crypto.randomUUID()}.${ext}`;
     const { error } = await supabase.storage.from("product-images").upload(path, file, { upsert: false, contentType: file.type });
     if (error) { setUploading(false); toast.error(error.message); return; }
     const { data: pub } = supabase.storage.from("product-images").getPublicUrl(path);

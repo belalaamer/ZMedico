@@ -23,6 +23,7 @@ import { patientDisplayName } from "@/lib/patientName";
 import { doctorDisplayName } from "@/lib/doctorName";
 import { buildStatusPatch, type ApptStatus } from "@/lib/appointmentStatus";
 import { logQueueAudit } from "@/lib/queueAudit";
+import { getOrCreateAppointmentMedicalRecord } from "@/lib/medicalRecordEncounter";
 import type { DictKey } from "@/lib/i18n";
 import { getQueueSettings, fetchQueueSettings, type QueueSettings } from "@/lib/queueSettings";
 import { listOpenAlerts, effectiveState, type QueueAlert } from "@/lib/queueAlerts";
@@ -517,34 +518,31 @@ export default function QueuePage() {
         return;
       }
     }
-    // Look for an existing encounter (most-recent draft preferred).
-    const { data: existing } = await supabase
-      .from("medical_records")
-      .select("id,status,created_at")
-      .eq("appointment_id", r.id)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(1);
-    let recordId = existing?.[0]?.id as string | undefined;
-    if (!recordId && canMutate) {
-      const { data: created, error: insErr } = await supabase
-        .from("medical_records")
-        .insert({
-          patient_id: r.patient_id,
-          branch_id: r.branch_id ?? currentBranchId ?? null,
-          doctor_id: r.doctor_id ?? user?.id ?? null,
-          appointment_id: r.id,
-          visit_type: "consultation",
-          status: "draft",
-        } as never)
-        .select("id")
-        .single();
-      if (insErr) {
-        // No encounter and no permission/ability to create — fall back gracefully.
+    let recordId: string | undefined;
+    if (canMutate) {
+      try {
+        const encounter = await getOrCreateAppointmentMedicalRecord({
+          appointmentId: r.id,
+          patientId: r.patient_id,
+          branchId: r.branch_id ?? currentBranchId ?? null,
+          doctorId: r.doctor_id ?? user?.id ?? null,
+          createdBy: user?.id ?? null,
+        });
+        recordId = encounter.id;
+      } catch (error: any) {
+        toast.error(error?.message ?? (lang === "ar" ? "تعذر فتح الاستشارة" : "Could not open consultation"));
         navigate(`/patients/${r.patient_id}?tab=clinical`);
         return;
       }
-      recordId = created?.id;
+    } else {
+      const { data: existing } = await supabase
+        .from("medical_records")
+        .select("id")
+        .eq("appointment_id", r.id)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      recordId = existing?.[0]?.id as string | undefined;
     }
     if (recordId) navigate(`/medical/consultation/${recordId}`);
     else navigate(`/patients/${r.patient_id}?tab=clinical`);

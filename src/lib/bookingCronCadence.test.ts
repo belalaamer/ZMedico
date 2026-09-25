@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 describe("public booking cron cadence", () => {
   const migration = readFileSync(
-    resolve(process.cwd(), "supabase/migrations/20260925173000_reduce_booking_cron_overhead.sql"),
+    resolve(process.cwd(), "supabase/migrations/20260925112224_reduce_booking_cron_overhead.sql"),
     "utf8",
   );
 

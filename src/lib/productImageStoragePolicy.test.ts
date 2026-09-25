@@ -11,6 +11,10 @@ describe("product image storage hardening", () => {
     resolve(process.cwd(), "supabase/migrations/20260925140500_harden_product_image_storage.sql"),
     "utf8",
   );
+  const legacyCompat = readFileSync(
+    resolve(process.cwd(), "supabase/migrations/20260925163000_product_image_legacy_owner_compat.sql"),
+    "utf8",
+  );
 
   it("stores uploads under the current tenant prefix", () => {
     expect(page).toContain('const path = `${tenantId}/${crypto.randomUUID()}.${ext}`;');
@@ -30,6 +34,15 @@ describe("product image storage hardening", () => {
     expect(migration).toContain("'inventory.delete'");
     expect(migration).toContain("user_has_tenant_access");
     expect(migration).toContain("split_part(name, '/', 1)");
+  });
+
+  it("keeps the deployed root uploader owner-scoped until frontend cutover", () => {
+    expect(legacyCompat).toContain("position('/' in name) = 0");
+    expect(legacyCompat).toContain("owner_id = (SELECT auth.uid()::text)");
+    expect(legacyCompat).toContain("'inventory.create'");
+    expect(legacyCompat).toContain("'inventory.delete'");
+    expect(legacyCompat).not.toContain("FOR SELECT");
+    expect(legacyCompat).not.toContain("TO anon");
   });
 
   it("does not grant object listing or anonymous upload access", () => {

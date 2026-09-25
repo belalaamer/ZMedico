@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 describe("finance / HR RLS canonical alignment", () => {
   const migration = readFileSync(
-    resolve(process.cwd(), "supabase/migrations/20260925160000_align_finance_hr_rls.sql"),
+    resolve(process.cwd(), "supabase/migrations/20260925111232_align_finance_hr_rls.sql"),
     "utf8",
   );
 

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 describe("clinical child RLS canonical alignment", () => {
   const migration = readFileSync(
-    resolve(process.cwd(), "supabase/migrations/20260925153500_align_clinical_child_rls.sql"),
+    resolve(process.cwd(), "supabase/migrations/20260925111017_align_clinical_child_rls.sql"),
     "utf8",
   );
 

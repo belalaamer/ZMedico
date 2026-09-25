@@ -16,6 +16,7 @@ import { CreateInvoiceDialog } from "@/pages/invoices/CreateInvoiceDialog";
 import { Can } from "@/components/Can";
 import { doctorDisplayName } from "@/lib/doctorName";
 import { appointmentWhatsAppMessage, openWhatsApp } from "@/lib/whatsapp";
+import { getOrCreateAppointmentMedicalRecord } from "@/lib/medicalRecordEncounter";
 
 const SAFE_KEYS = ["status", "doctor_id", "room", "priority", "is_walk_in", "checked_in_at", "started_at"];
 const QUEUE_ACTIONS = [
@@ -207,22 +208,14 @@ export default function AppointmentDetailPage() {
                 onClick={async () => {
                   setStarting(true);
                   try {
-                    const { data, error } = await supabase
-                      .from("medical_records")
-                      .insert({
-                        patient_id: appt.patient_id,
-                        appointment_id: appt.id,
-                        branch_id: appt.branch_id,
-                        doctor_id: appt.doctor_id ?? user?.id ?? null,
-                        visit_date: new Date().toISOString().slice(0, 10),
-                        visit_type: "consultation",
-                        status: "draft",
-                        created_by: user?.id ?? null,
-                      } as any)
-                      .select("id")
-                      .single();
-                    if (error) throw error;
-                    nav(`/medical/records/${data.id}`);
+                    const encounter = await getOrCreateAppointmentMedicalRecord({
+                      appointmentId: appt.id,
+                      patientId: appt.patient_id,
+                      branchId: appt.branch_id,
+                      doctorId: appt.doctor_id ?? user?.id ?? null,
+                      createdBy: user?.id ?? null,
+                    });
+                    nav(`/medical/records/${encounter.id}`);
                   } catch (e: any) {
                     toast.error(e?.message ?? (lang === "ar" ? "تعذر بدء الاستشارة" : "Could not start consultation"));
                   } finally {

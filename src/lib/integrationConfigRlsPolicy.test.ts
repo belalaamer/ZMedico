@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 describe("integration configuration write hardening", () => {
   const migration = readFileSync(
-    resolve(process.cwd(), "supabase/migrations/20260925163000_harden_integration_config_writes.sql"),
+    resolve(process.cwd(), "supabase/migrations/20260925111527_harden_integration_config_writes.sql"),
     "utf8",
   );
 

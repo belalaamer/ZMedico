@@ -16,9 +16,11 @@ describe("public booking tenant locator", () => {
     });
   });
 
-  it("returns a safe missing state when a worker link has no tenant", () => {
+  it("requires a tenant identifier on platform-owned hosts", () => {
     expect(getPublicBookingLocator("localhost", "")).toEqual({ mode: "missing-tenant" });
     expect(getPublicBookingLocator("127.0.0.1", "?tenant=%20")).toEqual({ mode: "missing-tenant" });
+    expect(getPublicBookingLocator("zmedico.com", "")).toEqual({ mode: "missing-tenant" });
+    expect(getPublicBookingLocator("www.zmedico.com", "?tenant=%20")).toEqual({ mode: "missing-tenant" });
   });
 
   it("normalizes custom hostnames without changing the tenant identifier", () => {

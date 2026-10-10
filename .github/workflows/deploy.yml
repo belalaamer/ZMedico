@@ -46,8 +46,8 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${ADMIN_EMAIL:-}" ] || [ -z "${ADMIN_PASS:-}" ]; then
-            echo "::notice title=Authenticated E2E skipped::Set repository secrets ADMIN_EMAIL and ADMIN_PASS to enable the admin desktop/mobile gate."
-            exit 0
+            echo "::error title=Authenticated E2E required::Set repository secrets ADMIN_EMAIL and ADMIN_PASS before deploying."
+            exit 1
           fi
 
           bun run preview --host 127.0.0.1 --port 8080 >/tmp/zmedico-auth-preview.log 2>&1 &

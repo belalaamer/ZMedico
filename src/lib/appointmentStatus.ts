@@ -25,8 +25,8 @@ export function buildStatusPatch(
   next: ApptStatus,
   current: StatusStampInput,
   now: string = new Date().toISOString()
-): Record<string, any> {
-  const patch: Record<string, any> = { status: next };
+): StatusStampInput & { status: ApptStatus } {
+  const patch: StatusStampInput & { status: ApptStatus } = { status: next };
   switch (next) {
     case "confirmed":
       patch.checked_in_at = current.checked_in_at ?? now;

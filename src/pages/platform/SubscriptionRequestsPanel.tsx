@@ -194,11 +194,11 @@ export default function SubscriptionRequestsPanel({ onChanged }: Props) {
       },
       modules: Array.from(selectedModules),
     };
-    const result = await supabase.rpc("platform_provision_approved_subscription_request" as never, {
+    const result = await supabase.rpc("platform_provision_approved_subscription_request", {
       p_request_id: provisionRequest.id,
       p_payload: payload,
       p_notes: null,
-    } as never);
+    });
     setProvisioning(false);
     if (result.error || !result.data) {
       toast({ title: result.error?.message ?? (isAr ? "تعذر إنشاء الـWorkspace" : "Unable to create the workspace"), variant: "destructive" });

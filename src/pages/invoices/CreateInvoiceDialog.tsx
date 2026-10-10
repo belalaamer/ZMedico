@@ -16,7 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
-import { useDataSync } from "@/lib/dataSync";
+import { useDataSync, notifyDataChange } from "@/lib/dataSync";
 import { fetchActiveContract, resolveAllLines, distributeClaim, type LineForCoverage } from "@/lib/insuranceContracts";
 import { Badge } from "@/components/ui/badge";
 import { patientDisplayName } from "@/lib/patientName";

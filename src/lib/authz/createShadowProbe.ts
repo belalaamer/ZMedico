@@ -10,8 +10,8 @@ import { useAuth } from "@/contexts/AuthContext";
  * Every vertical slice (settings/patients/medical_records/hr/invoices)
  * previously duplicated the same ~110-line probe. This factory extracts
  * the common logic; per-slice files now just declare their slice name
- * and key→legacy map. Behaviour is byte-identical to the pre-refactor
- * probes:
+ * and key→legacy map. Authorization remains independent of the probes;
+ * failures are diagnosed without exposing raw error details:
  *   - Fires once per (user, path) in-memory
  *   - Reads new-model decisions from `authz_has_permissions`
  *   - Fire-and-forgets `authz_record_shadow_decision` per key
@@ -36,6 +36,12 @@ export interface ShadowProbe {
   useProbe: (pathHint?: string) => void;
   resetForTests: () => void;
   keys: readonly string[];
+}
+
+function diagnosticCode(err: unknown): string {
+  return typeof err === "object" && err !== null && "code" in err
+    && typeof err.code === "string" && /^[A-Z0-9_]{1,32}$/.test(err.code)
+    ? err.code : "TRANSPORT_ERROR";
 }
 
 export function createShadowProbe(config: ShadowProbeConfig): ShadowProbe {
@@ -74,7 +80,7 @@ export function createShadowProbe(config: ShadowProbeConfig): ShadowProbe {
             newDecisions[row.permission_key] = !!row.allowed;
           }
         } catch (err) {
-          console.debug(`${logTag} batch resolver failed`, err);
+          console.debug(`${logTag} batch resolver failed`, { code: diagnosticCode(err) });
           return;
         }
 
@@ -89,7 +95,7 @@ export function createShadowProbe(config: ShadowProbeConfig): ShadowProbe {
           const legacyMap = keyLegacyMap[key];
           const legacy = can(legacyMap.module, legacyMap.action);
           const nu = newDecisions[key] ?? false;
-          (supabase as any)
+          Promise.resolve().then(() => (supabase as any)
             .rpc("authz_record_shadow_decision", {
               _slice: slice,
               _permission_key: key,
@@ -98,10 +104,12 @@ export function createShadowProbe(config: ShadowProbeConfig): ShadowProbe {
               _app_version: APP_VERSION,
               _request_source: requestSource,
               _context: context,
+            }))
+            .then(({ error }) => {
+              if (error) throw error;
             })
-            .then(() => {})
             .catch((err: unknown) => {
-              console.debug(`${logTag} record failed`, { key, err });
+              console.debug(`${logTag} record failed`, { key, code: diagnosticCode(err) });
             });
         }
 

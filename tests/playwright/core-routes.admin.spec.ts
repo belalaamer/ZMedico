@@ -6,7 +6,8 @@
  *   - admin-desktop
  *   - admin-mobile
  *
- * The suite is read-only. It verifies that the main operational surfaces
+ * The suite performs no explicit business-data mutations. App-mounted
+ * authorization shadow probes may still emit telemetry. It verifies that the main operational surfaces
  * actually render for the seeded QA Admin instead of silently passing with
  * an empty page, an auth redirect, or an ErrorBoundary crash.
  */
@@ -55,6 +56,17 @@ async function openCoreRoute(page: Page, path: string) {
     page,
     `Authenticated QA session was redirected to login from ${path}`,
   ).not.toHaveURL(/\/auth(?:[/?#]|$)/);
+
+  await expect(page, `Unexpected redirect away from ${path}`).toHaveURL(
+    url => url.pathname.replace(/\/$/, "") === path,
+  );
+  await expect(main).not.toContainText(
+    /Access denied|لا تملك صلاحية الوصول|Choose a clinic from Platform Administration|اختر عيادة من إدارة المنصة/,
+  );
+  await expect(main).not.toContainText(
+    /Checking permissions…|جارٍ التحقق من الصلاحيات…/,
+    { timeout: 30_000 },
+  );
 
   await expect(
     page.locator("body"),

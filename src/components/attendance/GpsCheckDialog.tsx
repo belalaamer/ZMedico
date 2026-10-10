@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, MapPin, CheckCircle2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -36,25 +36,30 @@ export default function GpsCheckDialog({ open, mode, branch, onClose, onConfirm 
   const [loading, setLoading] = useState(false);
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const submissionLock = useRef(false);
+  const locationRequest = useRef(0);
 
   const radius = branch?.allowed_radius ?? 100;
-  const branchHasLocation = !!(branch?.allowed_latitude && branch?.allowed_longitude);
+  const branchHasLocation = branch?.allowed_latitude != null && branch?.allowed_longitude != null;
 
   const distance = coords && branchHasLocation
-    ? Math.round(distanceMeters(coords.lat, coords.lon, branch!.allowed_latitude!, branch!.allowed_longitude!))
+    ? distanceMeters(coords.lat, coords.lon, branch!.allowed_latitude!, branch!.allowed_longitude!)
     : null;
   const within = distance !== null ? distance <= radius : false;
 
   const fetchLocation = async () => {
+    const requestId = ++locationRequest.current;
     setLoading(true);
     setError(null);
     try {
       const c = await getCurrentLocation();
+      if (requestId !== locationRequest.current) return;
       setCoords(c);
     } catch (e: any) {
+      if (requestId !== locationRequest.current) return;
       setError(e.message || "Failed to get location");
     } finally {
-      setLoading(false);
+      if (requestId === locationRequest.current) setLoading(false);
     }
   };
 
@@ -63,17 +68,22 @@ export default function GpsCheckDialog({ open, mode, branch, onClose, onConfirm 
       setCoords(null); setError(null); setReason(""); setSubmitting(false);
       fetchLocation();
     }
+    return () => { locationRequest.current += 1; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, branch?.id, mode]);
 
   const handleConfirm = async () => {
-    if (!coords) return;
+    if (!coords || submissionLock.current) return;
     if (!within && branchHasLocation && !reason.trim()) return;
+    submissionLock.current = true;
     setSubmitting(true);
     try {
       await onConfirm({ coords, within: branchHasLocation ? within : true, reason: reason.trim() || undefined });
       onClose();
+    } catch {
+      setError(lang === "ar" ? "تعذر تأكيد الحفظ. راجع سجل الحضور قبل إعادة المحاولة." : "Could not confirm the save. Check attendance before retrying.");
     } finally {
+      submissionLock.current = false;
       setSubmitting(false);
     }
   };
@@ -81,7 +91,7 @@ export default function GpsCheckDialog({ open, mode, branch, onClose, onConfirm 
   const branchName = branch ? (lang === "ar" ? branch.name_ar : branch.name_en) : "";
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v && !submissionLock.current) onClose(); }}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -123,7 +133,7 @@ export default function GpsCheckDialog({ open, mode, branch, onClose, onConfirm 
                     </Badge>
                   )}
                   <div className="text-xs text-muted-foreground">
-                    {(t("distance") ?? "Distance")}: {distance} m · {(t("accuracy") ?? "Accuracy")}: ±{coords.accuracy ?? "?"} m
+                    {(t("distance") ?? "Distance")}: {distance === null ? "—" : Math.round(distance)} m · {(t("accuracy") ?? "Accuracy")}: ±{coords.accuracy ?? "?"} m
                   </div>
                 </div>
                 {!within && (

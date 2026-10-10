@@ -200,7 +200,7 @@ export default function Leads() {
     if (!canEdit || lead.stage_id === stageId) return;
     const nextStage = stages.find((stage) => stage.id === stageId);
     if (!nextStage) return;
-    const patch: Record<string, unknown> = { stage_id: stageId, last_activity_at: new Date().toISOString() };
+    const patch: import("@/integrations/supabase/types").TablesUpdate<"leads"> = { stage_id: stageId, last_activity_at: new Date().toISOString() };
     if (nextStage.slug === "lost-lead") {
       toast.message(isArabic ? "اختر سبب الخسارة من صفحة العميل المحتمل" : "Choose a lost reason on the lead details page");
       navigate(`/leads/${lead.id}`);
@@ -244,13 +244,13 @@ export default function Leads() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-        {[
+        {([
           [UsersRound, isArabic ? "جديد اليوم" : "New today", stats.newToday, "text-primary"],
           [Clock3, isArabic ? "متابعات اليوم" : "Today's follow-ups", stats.followupsToday, "text-blue-600"],
           [XCircle, isArabic ? "متأخرة" : "Overdue", stats.overdue, "text-destructive"],
           [UserRound, isArabic ? "غير مسند" : "Unassigned", stats.unassigned, "text-amber-600"],
           [CalendarPlus, isArabic ? "حجوزات" : "Booked", stats.booked, "text-emerald-600"],
-        ].map(([Icon, label, value, color]) => {
+        ] as const).map(([Icon, label, value, color]) => {
           const StatIcon = Icon as typeof Target;
           return <Card key={String(label)} className="border-border/70 p-4 shadow-sm"><div className="flex items-center justify-between gap-2"><span className="text-xs text-muted-foreground">{label}</span><StatIcon className={cn("size-4", String(color))} /></div><p className="mt-2 text-2xl font-bold">{value}</p></Card>;
         })}

@@ -339,7 +339,7 @@ export function Topbar() {
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel className="truncate">{user?.email}</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={signOut}>
+          <DropdownMenuItem onClick={() => { void signOut(); }}>
             <LogOut className="me-2 size-4" /> {t("signOut")}
           </DropdownMenuItem>
         </DropdownMenuContent>

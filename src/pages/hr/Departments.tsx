@@ -13,17 +13,22 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { RowActions } from "@/components/RowActions";
 import { Can } from "@/components/Can";
+import { useAuth } from "@/contexts/AuthContext";
+import { useConfirmedRowMutation } from "@/hooks/useConfirmedRowMutation";
 
 type Dept = any;
 
 export default function Departments() {
   const { t, lang } = useI18n();
   const { branches, currentBranchId } = useBranch();
+  const { user } = useAuth();
+  const mutation = useConfirmedRowMutation(user ? `${user.id}:${currentBranchId ?? "all"}` : null, lang, t("saved"));
   const [items, setItems] = useState<Dept[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [open, setOpen] = useState(false);
   const [edit, setE] = useState<Dept | null>(null);
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: "", description: "", branch_id: "", manager_id: "" });
 
   const load = async () => {
@@ -34,12 +39,14 @@ export default function Departments() {
     // into one list with merged counts.
     let qd = supabase.from("departments").select("*").is("deleted_at", null).order("name_en");
     if (currentBranchId) qd = qd.eq("branch_id", currentBranchId);
-    const { data } = await qd;
+    const { data, error: departmentError } = await qd;
+    if (departmentError) throw departmentError;
     setItems(data ?? []);
 
     let qs = supabase.from("staff_profiles").select("id,department_id");
     if (currentBranchId) qs = qs.eq("branch_id", currentBranchId);
-    const { data: staff } = await qs;
+    const { data: staff, error: staffError } = await qs;
+    if (staffError) throw staffError;
     const c: Record<string, number> = {};
     (staff ?? []).forEach((s: any) => { if (s.department_id) c[s.department_id] = (c[s.department_id] ?? 0) + 1; });
     setCounts(c);
@@ -51,17 +58,20 @@ export default function Departments() {
     (staff ?? []).forEach((s: any) => { if (s.id) idSet.add(s.id); });
     (data ?? []).forEach((d: any) => { if (d.manager_id) idSet.add(d.manager_id); });
     if (idSet.size) {
-      const { data: profs } = await supabase.from("profiles").select("id,full_name,email").in("id", Array.from(idSet));
+      const { data: profs, error: profileError } = await supabase.from("profiles").select("id,full_name,email").in("id", Array.from(idSet));
+      if (profileError) throw profileError;
       setProfiles(profs ?? []);
     } else {
       setProfiles([]);
     }
   };
-  useEffect(() => { load(); }, [currentBranchId]);
+  const refresh = () => { void load().catch(() => toast.error(lang === "ar" ? "تعذر تحميل الأقسام. أعد المحاولة." : "Unable to load departments. Try again.")); };
+  useEffect(() => { refresh(); }, [currentBranchId]);
 
   const openNew = () => { setE(null); setForm({ name: "", description: "", branch_id: "", manager_id: "" }); setOpen(true); };
   const openEdit = (d: Dept) => { setE(d); setForm({ name: d.name_en || d.name_ar || "", description: d.description ?? "", branch_id: d.branch_id ?? "", manager_id: d.manager_id ?? "" }); setOpen(true); };
   const save = async () => {
+    if (saving) return;
     const name = form.name.trim();
     if (!name) { toast.error(t("nameRequired")); return; }
     const effectiveBranchId = form.branch_id || currentBranchId;
@@ -69,20 +79,32 @@ export default function Departments() {
       toast.error(t("errSelectBranchFirst"));
       return;
     }
+    setSaving(true);
     const payload: any = { name_en: name, name_ar: name, description: form.description || null, branch_id: effectiveBranchId, manager_id: form.manager_id || null };
     const { error } = edit
       ? await supabase.from("departments").update(payload).eq("id", edit.id)
       : await supabase.from("departments").insert(payload);
-    if (error) return toast.error(error.message);
-    toast.success(t("save")); setOpen(false); load();
+    if (error) { setSaving(false); return toast.error(error.message); }
+    toast.success(t("save")); setOpen(false); setSaving(false); refresh();
   };
-  const toggle = async (d: Dept) => { await supabase.from("departments").update({ is_active: !d.is_active }).eq("id", d.id); load(); };
+  const toggle = (d: Dept) => {
+    if (currentBranchId && d.branch_id !== currentBranchId) {
+      toast.error(lang === "ar" ? "القسم لا يتبع الفرع الحالي. حدّث القائمة." : "The department is outside the current branch. Refresh the list.");
+      return;
+    }
+    return mutation.run(d.id, () => {
+      let request = supabase.from("departments").update({ is_active: !d.is_active })
+        .eq("id", d.id).eq("is_active", d.is_active);
+      if (d.branch_id) request = request.eq("branch_id", d.branch_id);
+      return request.select("id").maybeSingle();
+    }, load);
+  };
 
   const softDelete = async (d: Dept) => {
     if ((counts[d.id] ?? 0) > 0) { toast.error(t("departmentHasStaff")); return; }
     const { error } = await supabase.from("departments").update({ deleted_at: new Date().toISOString() } as any).eq("id", d.id);
     if (error) { toast.error(error.message); return; }
-    toast.success(t("delete")); load();
+    toast.success(t("delete")); refresh();
   };
 
   const branchName = (id: string | null) => branches.find((b) => b.id === id) ? (lang === "ar" ? branches.find((b) => b.id === id)!.name_ar : branches.find((b) => b.id === id)!.name_en) : "—";
@@ -120,7 +142,7 @@ export default function Departments() {
               </div>
               <DialogFooter>
                 <Button variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button>
-                <Button className="gradient-primary text-primary-foreground" onClick={save}>{t("save")}</Button>
+                <Button className="gradient-primary text-primary-foreground" onClick={save} disabled={saving}>{saving ? "…" : t("save")}</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -145,7 +167,7 @@ export default function Departments() {
                 <Badge variant="outline">{counts[d.id] ?? 0} {t("staffCount")}</Badge>
                 <Can permission="hr.edit">
                   <Button variant="ghost" size="icon" onClick={() => openEdit(d)}><Edit3 className="size-4" /></Button>
-                  <Button variant="ghost" size="icon" onClick={() => toggle(d)}><Power className="size-4" /></Button>
+                  <Button variant="ghost" size="icon" disabled={mutation.isPending(d.id)} aria-label={lang === "ar" ? "تغيير حالة القسم" : "Toggle department status"} onClick={() => toggle(d)}><Power className="size-4" /></Button>
                 </Can>
                 <Can permission="hr.delete">
                   <RowActions onEdit={() => openEdit(d)} onDelete={() => softDelete(d)} />

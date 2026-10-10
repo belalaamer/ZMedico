@@ -267,7 +267,11 @@ export default {
     if (isHtmlRequest) {
       url.searchParams.set("__zmedico_build", "whitelabel-20260825");
     }
-    const assetRequest = isHtmlRequest ? new Request(url, request) : request;
+    // Only HTML GET requests use the synthetic asset URL. Copy their
+    // required fields without a potentially cross-realm AbortSignal.
+    const assetRequest = isHtmlRequest
+      ? new Request(url, { method: request.method, headers: request.headers, redirect: request.redirect })
+      : request;
     const response = await env.ASSETS.fetch(assetRequest);
     const contentType = response.headers.get("content-type") ?? "";
     const isJavaScriptRequest = /\.(?:m?js)$/.test(pathname);

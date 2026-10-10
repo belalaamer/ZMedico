@@ -49,7 +49,7 @@ export default function AppShell() {
     if (rolesLoading) return;
     if (roles.length > 0) { setPatientPortalCheck({ done: true, active: false }); return; }
     let active = true;
-    supabase.rpc("patient_portal_password_state").then(({ data, error }) => {
+    Promise.resolve(supabase.rpc("patient_portal_password_state")).then(({ data, error }) => {
       if (!active) return;
       setPatientPortalCheck({ done: true, active: !error && Boolean((data as { active?: boolean } | null)?.active) });
     }).catch(() => {

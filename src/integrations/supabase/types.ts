@@ -10,10 +10,218 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
+      ai_config_audit_log: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          provider: string | null
+          scope: string
+          success: boolean
+          tenant_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          provider?: string | null
+          scope: string
+          success: boolean
+          tenant_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          provider?: string | null
+          scope?: string
+          success?: boolean
+          tenant_id?: string | null
+        }
+        Relationships: []
+      }
+      ai_provider_config: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          last_test_error: string | null
+          last_test_status: string | null
+          last_tested_at: string | null
+          model: string | null
+          provider: string
+          scope: string
+          secret_id: string | null
+          temperature: number | null
+          tenant_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_test_error?: string | null
+          last_test_status?: string | null
+          last_tested_at?: string | null
+          model?: string | null
+          provider?: string
+          scope: string
+          secret_id?: string | null
+          temperature?: number | null
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_test_error?: string | null
+          last_test_status?: string | null
+          last_tested_at?: string | null
+          model?: string | null
+          provider?: string
+          scope?: string
+          secret_id?: string | null
+          temperature?: number | null
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_provider_config_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_tenant_settings: {
+        Row: {
+          ai_enabled: boolean
+          booking_enabled: boolean
+          business_hours_behavior: string
+          cancellation_enabled: boolean
+          created_at: string
+          custom_instructions: string | null
+          extra_settings: Json
+          greeting_ar: string | null
+          greeting_en: string | null
+          human_handoff_enabled: boolean
+          id: string
+          language: string
+          rescheduling_enabled: boolean
+          tenant_id: string
+          tone: string | null
+          updated_at: string
+        }
+        Insert: {
+          ai_enabled?: boolean
+          booking_enabled?: boolean
+          business_hours_behavior?: string
+          cancellation_enabled?: boolean
+          created_at?: string
+          custom_instructions?: string | null
+          extra_settings?: Json
+          greeting_ar?: string | null
+          greeting_en?: string | null
+          human_handoff_enabled?: boolean
+          id?: string
+          language?: string
+          rescheduling_enabled?: boolean
+          tenant_id: string
+          tone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ai_enabled?: boolean
+          booking_enabled?: boolean
+          business_hours_behavior?: string
+          cancellation_enabled?: boolean
+          created_at?: string
+          custom_instructions?: string | null
+          extra_settings?: Json
+          greeting_ar?: string | null
+          greeting_en?: string | null
+          human_handoff_enabled?: boolean
+          id?: string
+          language?: string
+          rescheduling_enabled?: boolean
+          tenant_id?: string
+          tone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_tenant_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_tool_audit_log: {
+        Row: {
+          arguments: Json
+          conversation_id: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          result: Json | null
+          success: boolean
+          tenant_id: string
+          tool_name: string
+        }
+        Insert: {
+          arguments?: Json
+          conversation_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          result?: Json | null
+          success: boolean
+          tenant_id: string
+          tool_name: string
+        }
+        Update: {
+          arguments?: Json
+          conversation_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          result?: Json | null
+          success?: boolean
+          tenant_id?: string
+          tool_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_tool_audit_log_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_tool_audit_log_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       allowed_signup_emails: {
         Row: {
           branch_id: string | null
@@ -56,6 +264,7 @@ export type Database = {
         Row: {
           allow_online_booking: boolean
           auto_confirm_after_minutes: number | null
+          booking_request_hold_minutes: number
           branch_id: string | null
           buffer_minutes: number
           cancellation_deadline_hours: number
@@ -72,6 +281,7 @@ export type Database = {
         Insert: {
           allow_online_booking?: boolean
           auto_confirm_after_minutes?: number | null
+          booking_request_hold_minutes?: number
           branch_id?: string | null
           buffer_minutes?: number
           cancellation_deadline_hours?: number
@@ -88,6 +298,7 @@ export type Database = {
         Update: {
           allow_online_booking?: boolean
           auto_confirm_after_minutes?: number | null
+          booking_request_hold_minutes?: number
           branch_id?: string | null
           buffer_minutes?: number
           cancellation_deadline_hours?: number
@@ -113,6 +324,14 @@ export type Database = {
       }
       appointments: {
         Row: {
+          booking_confirmed_at: string | null
+          booking_confirmed_by: string | null
+          booking_expiry_alert_sent_at: string | null
+          booking_rejected_at: string | null
+          booking_rejected_by: string | null
+          booking_rejection_reason: string | null
+          booking_request_expires_at: string | null
+          booking_request_status: string
           booking_source: string | null
           branch_id: string
           check_in_method: string | null
@@ -140,6 +359,14 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          booking_confirmed_at?: string | null
+          booking_confirmed_by?: string | null
+          booking_expiry_alert_sent_at?: string | null
+          booking_rejected_at?: string | null
+          booking_rejected_by?: string | null
+          booking_rejection_reason?: string | null
+          booking_request_expires_at?: string | null
+          booking_request_status?: string
           booking_source?: string | null
           branch_id: string
           check_in_method?: string | null
@@ -167,6 +394,14 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          booking_confirmed_at?: string | null
+          booking_confirmed_by?: string | null
+          booking_expiry_alert_sent_at?: string | null
+          booking_rejected_at?: string | null
+          booking_rejected_by?: string | null
+          booking_rejection_reason?: string | null
+          booking_request_expires_at?: string | null
+          booking_request_status?: string
           booking_source?: string | null
           branch_id?: string
           check_in_method?: string | null
@@ -696,6 +931,7 @@ export type Database = {
       authz_shadow_slice_gate: {
         Row: {
           created_at: string
+          is_active: boolean
           notes: string | null
           required_denied_roles: Database["public"]["Enums"]["app_role"][]
           required_denying_bundles: string[]
@@ -707,6 +943,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          is_active?: boolean
           notes?: string | null
           required_denied_roles?: Database["public"]["Enums"]["app_role"][]
           required_denying_bundles?: string[]
@@ -718,6 +955,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          is_active?: boolean
           notes?: string | null
           required_denied_roles?: Database["public"]["Enums"]["app_role"][]
           required_denying_bundles?: string[]
@@ -920,6 +1158,60 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "branches_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      channel_accounts: {
+        Row: {
+          branch_id: string | null
+          channel: string
+          created_at: string
+          display_name: string | null
+          external_account_id: string
+          id: string
+          is_active: boolean
+          metadata: Json
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          branch_id?: string | null
+          channel: string
+          created_at?: string
+          display_name?: string | null
+          external_account_id: string
+          id?: string
+          is_active?: boolean
+          metadata?: Json
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string | null
+          channel?: string
+          created_at?: string
+          display_name?: string | null
+          external_account_id?: string
+          id?: string
+          is_active?: boolean
+          metadata?: Json
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_accounts_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "channel_accounts_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -1181,6 +1473,96 @@ export type Database = {
             columns: ["branch_id"]
             isOneToOne: false
             referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversations: {
+        Row: {
+          assigned_staff_id: string | null
+          branch_id: string | null
+          channel: string
+          channel_account_id: string
+          created_at: string
+          external_contact_id: string
+          handoff_at: string | null
+          handoff_reason: string | null
+          id: string
+          last_message_at: string | null
+          patient_id: string | null
+          state: Json
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_staff_id?: string | null
+          branch_id?: string | null
+          channel: string
+          channel_account_id: string
+          created_at?: string
+          external_contact_id: string
+          handoff_at?: string | null
+          handoff_reason?: string | null
+          id?: string
+          last_message_at?: string | null
+          patient_id?: string | null
+          state?: Json
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_staff_id?: string | null
+          branch_id?: string | null
+          channel?: string
+          channel_account_id?: string
+          created_at?: string
+          external_contact_id?: string
+          handoff_at?: string | null
+          handoff_reason?: string | null
+          id?: string
+          last_message_at?: string | null
+          patient_id?: string | null
+          state?: Json
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_assigned_staff_id_fkey"
+            columns: ["assigned_staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_channel_account_id_fkey"
+            columns: ["channel_account_id"]
+            isOneToOne: false
+            referencedRelation: "channel_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -1448,6 +1830,7 @@ export type Database = {
           id: string
           name_ar: string
           name_en: string
+          tenant_id: string | null
         }
         Insert: {
           category?: string | null
@@ -1459,6 +1842,7 @@ export type Database = {
           id?: string
           name_ar: string
           name_en: string
+          tenant_id?: string | null
         }
         Update: {
           category?: string | null
@@ -1470,8 +1854,17 @@ export type Database = {
           id?: string
           name_ar?: string
           name_en?: string
+          tenant_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "diagnoses_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       doctor_commissions: {
         Row: {
@@ -1583,6 +1976,58 @@ export type Database = {
             columns: ["record_procedure_id"]
             isOneToOne: true
             referencedRelation: "record_procedures"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      doctor_service_assignments: {
+        Row: {
+          branch_id: string
+          created_at: string
+          doctor_id: string
+          id: string
+          service_id: string
+          service_kind: string
+          tenant_id: string
+        }
+        Insert: {
+          branch_id: string
+          created_at?: string
+          doctor_id: string
+          id?: string
+          service_id: string
+          service_kind?: string
+          tenant_id: string
+        }
+        Update: {
+          branch_id?: string
+          created_at?: string
+          doctor_id?: string
+          id?: string
+          service_id?: string
+          service_kind?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "doctor_service_assignments_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "doctor_service_assignments_doctor_id_fkey"
+            columns: ["doctor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "doctor_service_assignments_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -2714,6 +3159,7 @@ export type Database = {
           lost_notes: string | null
           lost_reason_id: string | null
           medical_notes: string | null
+          meta_lead_id: string | null
           next_followup_at: string | null
           number_of_calls: number
           number_of_whatsapp_messages: number
@@ -2759,6 +3205,7 @@ export type Database = {
           lost_notes?: string | null
           lost_reason_id?: string | null
           medical_notes?: string | null
+          meta_lead_id?: string | null
           next_followup_at?: string | null
           number_of_calls?: number
           number_of_whatsapp_messages?: number
@@ -2804,6 +3251,7 @@ export type Database = {
           lost_notes?: string | null
           lost_reason_id?: string | null
           medical_notes?: string | null
+          meta_lead_id?: string | null
           next_followup_at?: string | null
           number_of_calls?: number
           number_of_whatsapp_messages?: number
@@ -2973,6 +3421,30 @@ export type Database = {
           name_ar?: string
           name_en?: string
           requires_approval?: boolean
+        }
+        Relationships: []
+      }
+      login_rate_limits: {
+        Row: {
+          attempts: number
+          blocked_until: string | null
+          bucket_key: string
+          updated_at: string
+          window_started_at: string
+        }
+        Insert: {
+          attempts?: number
+          blocked_until?: string | null
+          bucket_key: string
+          updated_at?: string
+          window_started_at?: string
+        }
+        Update: {
+          attempts?: number
+          blocked_until?: string | null
+          bucket_key?: string
+          updated_at?: string
+          window_started_at?: string
         }
         Relationships: []
       }
@@ -3202,6 +3674,7 @@ export type Database = {
           is_active: boolean
           name_ar: string
           name_en: string
+          tenant_id: string | null
         }
         Insert: {
           created_at?: string
@@ -3212,6 +3685,7 @@ export type Database = {
           is_active?: boolean
           name_ar: string
           name_en: string
+          tenant_id?: string | null
         }
         Update: {
           created_at?: string
@@ -3222,8 +3696,17 @@ export type Database = {
           is_active?: boolean
           name_ar?: string
           name_en?: string
+          tenant_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "medical_specialties_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       medications: {
         Row: {
@@ -3239,6 +3722,7 @@ export type Database = {
           name_en: string
           product_id: string | null
           strength: string | null
+          tenant_id: string | null
           unit: string
         }
         Insert: {
@@ -3254,6 +3738,7 @@ export type Database = {
           name_en: string
           product_id?: string | null
           strength?: string | null
+          tenant_id?: string | null
           unit?: string
         }
         Update: {
@@ -3269,6 +3754,7 @@ export type Database = {
           name_en?: string
           product_id?: string | null
           strength?: string | null
+          tenant_id?: string | null
           unit?: string
         }
         Relationships: [
@@ -3277,6 +3763,76 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medications_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          ai_generated: boolean
+          content: string | null
+          conversation_id: string
+          created_at: string
+          delivery_status: string | null
+          direction: string
+          external_message_id: string | null
+          id: string
+          media_url: string | null
+          message_type: string
+          raw_payload: Json | null
+          sender_type: string
+          tenant_id: string
+        }
+        Insert: {
+          ai_generated?: boolean
+          content?: string | null
+          conversation_id: string
+          created_at?: string
+          delivery_status?: string | null
+          direction: string
+          external_message_id?: string | null
+          id?: string
+          media_url?: string | null
+          message_type?: string
+          raw_payload?: Json | null
+          sender_type: string
+          tenant_id: string
+        }
+        Update: {
+          ai_generated?: boolean
+          content?: string | null
+          conversation_id?: string
+          created_at?: string
+          delivery_status?: string | null
+          direction?: string
+          external_message_id?: string | null
+          id?: string
+          media_url?: string | null
+          message_type?: string
+          raw_payload?: Json | null
+          sender_type?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -3437,6 +3993,9 @@ export type Database = {
           birthday_discount_percentage: number
           branch_id: string | null
           created_at: string
+          email_enabled: boolean
+          email_provider: string
+          email_reply_to: string | null
           email_sender_address: string | null
           email_sender_name: string | null
           follow_up_days_after: number
@@ -3477,6 +4036,9 @@ export type Database = {
           birthday_discount_percentage?: number
           branch_id?: string | null
           created_at?: string
+          email_enabled?: boolean
+          email_provider?: string
+          email_reply_to?: string | null
           email_sender_address?: string | null
           email_sender_name?: string | null
           follow_up_days_after?: number
@@ -3517,6 +4079,9 @@ export type Database = {
           birthday_discount_percentage?: number
           branch_id?: string | null
           created_at?: string
+          email_enabled?: boolean
+          email_provider?: string
+          email_reply_to?: string | null
           email_sender_address?: string | null
           email_sender_name?: string | null
           follow_up_days_after?: number
@@ -3565,6 +4130,7 @@ export type Database = {
       }
       notifications: {
         Row: {
+          branch_id: string | null
           created_at: string
           id: string
           is_read: boolean
@@ -3581,6 +4147,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          branch_id?: string | null
           created_at?: string
           id?: string
           is_read?: boolean
@@ -3597,6 +4164,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          branch_id?: string | null
           created_at?: string
           id?: string
           is_read?: boolean
@@ -3612,7 +4180,15 @@ export type Database = {
           type?: Database["public"]["Enums"]["notification_type"]
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "notifications_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       patient_documents: {
         Row: {
@@ -3680,6 +4256,181 @@ export type Database = {
             columns: ["uploaded_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      patient_portal_accounts: {
+        Row: {
+          activated_at: string | null
+          auth_user_id: string
+          branch_id: string
+          created_at: string
+          id: string
+          invited_at: string | null
+          last_seen_at: string | null
+          must_change_password: boolean
+          patient_id: string
+          portal_enabled: boolean
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          activated_at?: string | null
+          auth_user_id: string
+          branch_id: string
+          created_at?: string
+          id?: string
+          invited_at?: string | null
+          last_seen_at?: string | null
+          must_change_password?: boolean
+          patient_id: string
+          portal_enabled?: boolean
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          activated_at?: string | null
+          auth_user_id?: string
+          branch_id?: string
+          created_at?: string
+          id?: string
+          invited_at?: string | null
+          last_seen_at?: string | null
+          must_change_password?: boolean
+          patient_id?: string
+          portal_enabled?: boolean
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patient_portal_accounts_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_portal_accounts_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: true
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_portal_accounts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      patient_portal_delivery_events: {
+        Row: {
+          branch_id: string
+          channel: string
+          created_at: string
+          error_message: string | null
+          id: string
+          patient_id: string
+          provider_message_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          branch_id: string
+          channel: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          patient_id: string
+          provider_message_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string
+          channel?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          patient_id?: string
+          provider_message_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patient_portal_delivery_events_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_portal_delivery_events_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      patient_portal_settings: {
+        Row: {
+          branch_id: string
+          complaint_instructions_ar: string | null
+          complaint_instructions_en: string | null
+          created_at: string
+          id: string
+          portal_enabled: boolean
+          support_email: string | null
+          support_phone: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          branch_id: string
+          complaint_instructions_ar?: string | null
+          complaint_instructions_en?: string | null
+          created_at?: string
+          id?: string
+          portal_enabled?: boolean
+          support_email?: string | null
+          support_phone?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string
+          complaint_instructions_ar?: string | null
+          complaint_instructions_en?: string | null
+          created_at?: string
+          id?: string
+          portal_enabled?: boolean
+          support_email?: string | null
+          support_phone?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patient_portal_settings_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: true
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_portal_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -4971,6 +5722,7 @@ export type Database = {
           id: string
           preferred_lang: string | null
           updated_at: string
+          username: string | null
         }
         Insert: {
           avatar_url?: string | null
@@ -4983,6 +5735,7 @@ export type Database = {
           id: string
           preferred_lang?: string | null
           updated_at?: string
+          username?: string | null
         }
         Update: {
           avatar_url?: string | null
@@ -4995,6 +5748,7 @@ export type Database = {
           id?: string
           preferred_lang?: string | null
           updated_at?: string
+          username?: string | null
         }
         Relationships: [
           {
@@ -5005,6 +5759,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      public_booking_rate_limits: {
+        Row: {
+          attempt_count: number
+          key_hash: string
+          updated_at: string
+          window_started_at: string
+        }
+        Insert: {
+          attempt_count?: number
+          key_hash: string
+          updated_at?: string
+          window_started_at?: string
+        }
+        Update: {
+          attempt_count?: number
+          key_hash?: string
+          updated_at?: string
+          window_started_at?: string
+        }
+        Relationships: []
       }
       purchase_order_items: {
         Row: {
@@ -6188,6 +6963,7 @@ export type Database = {
           id: string
           linked_user_id: string | null
           national_id: string | null
+          phone: string | null
           position_id: string | null
           profile_image_url: string | null
           salary: number
@@ -6219,6 +6995,7 @@ export type Database = {
           id: string
           linked_user_id?: string | null
           national_id?: string | null
+          phone?: string | null
           position_id?: string | null
           profile_image_url?: string | null
           salary?: number
@@ -6250,6 +7027,7 @@ export type Database = {
           id?: string
           linked_user_id?: string | null
           national_id?: string | null
+          phone?: string | null
           position_id?: string | null
           profile_image_url?: string | null
           salary?: number
@@ -6646,6 +7424,30 @@ export type Database = {
         }
         Relationships: []
       }
+      subscription_request_rate_limits: {
+        Row: {
+          attempts: number
+          blocked_until: string | null
+          bucket_key: string
+          updated_at: string
+          window_started_at: string
+        }
+        Insert: {
+          attempts?: number
+          blocked_until?: string | null
+          bucket_key: string
+          updated_at?: string
+          window_started_at?: string
+        }
+        Update: {
+          attempts?: number
+          blocked_until?: string | null
+          bucket_key?: string
+          updated_at?: string
+          window_started_at?: string
+        }
+        Relationships: []
+      }
       subscription_requests: {
         Row: {
           clinic_name: string
@@ -6657,6 +7459,9 @@ export type Database = {
           owner_name: string
           phone: string | null
           plan_id: string | null
+          provisioned_at: string | null
+          provisioned_branch_id: string | null
+          provisioned_tenant_id: string | null
           reviewed_at: string | null
           reviewed_by: string | null
           source: string
@@ -6673,6 +7478,9 @@ export type Database = {
           owner_name: string
           phone?: string | null
           plan_id?: string | null
+          provisioned_at?: string | null
+          provisioned_branch_id?: string | null
+          provisioned_tenant_id?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           source?: string
@@ -6689,6 +7497,9 @@ export type Database = {
           owner_name?: string
           phone?: string | null
           plan_id?: string | null
+          provisioned_at?: string | null
+          provisioned_branch_id?: string | null
+          provisioned_tenant_id?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           source?: string
@@ -6701,6 +7512,20 @@ export type Database = {
             columns: ["plan_id"]
             isOneToOne: false
             referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_requests_provisioned_branch_id_fkey"
+            columns: ["provisioned_branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_requests_provisioned_tenant_id_fkey"
+            columns: ["provisioned_tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -7201,6 +8026,8 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          name_ar: string | null
+          name_en: string | null
           owner_id: string | null
           plan_id: string | null
           slug: string
@@ -7220,6 +8047,8 @@ export type Database = {
           id?: string
           is_active?: boolean
           name: string
+          name_ar?: string | null
+          name_en?: string | null
           owner_id?: string | null
           plan_id?: string | null
           slug: string
@@ -7239,6 +8068,8 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
+          name_ar?: string | null
+          name_en?: string | null
           owner_id?: string | null
           plan_id?: string | null
           slug?: string
@@ -7771,6 +8602,8 @@ export type Database = {
           created_at: string
           id: string
           is_active: boolean
+          meta_template_language: string
+          meta_template_name: string | null
           name_ar: string
           name_en: string
           template_key: string
@@ -7782,6 +8615,8 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          meta_template_language?: string
+          meta_template_name?: string | null
           name_ar: string
           name_en: string
           template_key: string
@@ -7793,6 +8628,8 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          meta_template_language?: string
+          meta_template_name?: string | null
           name_ar?: string
           name_en?: string
           template_key?: string
@@ -7916,6 +8753,9 @@ export type Database = {
           birthday_discount_percentage: number | null
           branch_id: string | null
           created_at: string | null
+          email_enabled: boolean | null
+          email_provider: string | null
+          email_reply_to: string | null
           email_sender_address: string | null
           email_sender_name: string | null
           follow_up_days_after: number | null
@@ -7954,6 +8794,9 @@ export type Database = {
           birthday_discount_percentage?: number | null
           branch_id?: string | null
           created_at?: string | null
+          email_enabled?: boolean | null
+          email_provider?: string | null
+          email_reply_to?: string | null
           email_sender_address?: string | null
           email_sender_name?: string | null
           follow_up_days_after?: number | null
@@ -7992,6 +8835,9 @@ export type Database = {
           birthday_discount_percentage?: number | null
           branch_id?: string | null
           created_at?: string | null
+          email_enabled?: boolean | null
+          email_provider?: string | null
+          email_reply_to?: string | null
           email_sender_address?: string | null
           email_sender_name?: string | null
           follow_up_days_after?: number | null
@@ -8358,6 +9204,41 @@ export type Database = {
       }
     }
     Functions: {
+      // ZMED-204 local proposal: backend migration must precede Languages UI.
+      create_system_language: {
+        Args: { _code: string; _name_en: string; _name_ar: string; _is_rtl: boolean; _is_default: boolean }
+        Returns: string
+      }
+      set_default_system_language: {
+        Args: { _language_id: string }
+        Returns: string
+      }
+      // ZMED-179 local proposal: deploy this RPC before the queue client.
+      open_queue_consultation: {
+        Args: {
+          _appointment_id: string
+          _branch_id: string
+          _expected_status: Database["public"]["Enums"]["appointment_status"]
+          _doctor_id?: string | null
+          _expected_snapshot?: Json
+        }
+        Returns: string
+      }
+      // Local migration contracts only; not present in Production as of 2026-10-06.
+      hr_set_staff_user_link: {
+        Args: { p_new_user_id?: string | null; p_staff_id: string }
+        Returns: Json
+      }
+      transfer_treasury_funds: {
+        Args: {
+          p_amount: number
+          p_from_treasury_id: string
+          p_note?: string | null
+          p_reference_id: string
+          p_to_treasury_id: string
+        }
+        Returns: Json
+      }
       _audit_write: {
         Args: {
           p_action: string
@@ -8369,6 +9250,20 @@ export type Database = {
           p_old: Json
         }
         Returns: undefined
+      }
+      _create_booking_for_patient: {
+        Args: {
+          p_branch_id: string
+          p_complaint?: string
+          p_doctor_id?: string
+          p_metadata?: Json
+          p_patient_id: string
+          p_service_id: string
+          p_slot_start: string
+          p_source?: string
+          p_tenant_id: string
+        }
+        Returns: Json
       }
       _get_cron_secret: { Args: never; Returns: string }
       _set_cron_secret: { Args: { p_secret: string }; Returns: undefined }
@@ -8426,10 +9321,30 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      apply_coupon_code: {
-        Args: { _branch_id: string; _code: string; _subtotal: number }
+      ai_cancel_appointment_for_contact: {
+        Args: {
+          p_appointment_id: string
+          p_expected_phone: string
+          p_reason?: string
+          p_tenant_id: string
+        }
         Returns: Json
       }
+      ai_reschedule_appointment_for_contact: {
+        Args: {
+          p_appointment_id: string
+          p_expected_phone: string
+          p_new_slot_start: string
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
+      apply_coupon_code:
+        | { Args: { _code: string; _subtotal: number }; Returns: Json }
+        | {
+            Args: { _branch_id: string; _code: string; _subtotal: number }
+            Returns: Json
+          }
       apply_inventory_tx: {
         Args: {
           _batch: string
@@ -8460,6 +9375,8 @@ export type Database = {
         }
         Returns: string
       }
+      archive_product: { Args: { p_product_id: string }; Returns: undefined }
+      archive_supplier: { Args: { p_supplier_id: string }; Returns: undefined }
       authz_current_state: { Args: never; Returns: Json }
       authz_current_version: {
         Args: { _artifact_type: string }
@@ -8518,25 +9435,56 @@ export type Database = {
         }
         Returns: boolean
       }
-      archive_product: { Args: { p_product_id: string }; Returns: undefined }
-      archive_supplier: { Args: { p_supplier_id: string }; Returns: undefined }
       branch_invoice_code: { Args: { _branch: string }; Returns: string }
-      check_expiry_alerts: { Args: never; Returns: number }
-      resolve_stock_alert: {
-        Args: { p_alert_id: string }
+      can_access_realtime_topic: { Args: { _topic: string }; Returns: boolean }
+      cancel_purchase_order: {
+        Args: { p_purchase_order_id: string }
         Returns: undefined
       }
+      check_expiry_alerts: { Args: never; Returns: number }
       communication_event_enabled: {
         Args: { p_branch_id: string; p_event_type: string }
+        Returns: boolean
+      }
+      confirm_public_booking: {
+        Args: { p_appointment_id: string }
+        Returns: Json
+      }
+      consume_custom_domain_rate_limit: {
+        Args: { _action: string; _actor_id: string; _limit?: number }
         Returns: boolean
       }
       consume_invoice_products: {
         Args: { p_invoice_id: string }
         Returns: undefined
       }
-      consume_custom_domain_rate_limit: {
-        Args: { _action: string; _actor_id: string; _limit?: number }
+      consume_login_rate_limit: {
+        Args: { p_key: string; p_limit?: number; p_window_seconds?: number }
         Returns: boolean
+      }
+      consume_public_booking_rate_limit: {
+        Args: { p_key: string; p_limit: number; p_window_seconds: number }
+        Returns: boolean
+      }
+      consume_subscription_request_rate_limit: {
+        Args: { p_key: string; p_limit?: number; p_window_seconds?: number }
+        Returns: boolean
+      }
+      create_purchase_order: {
+        Args: {
+          p_branch_id: string
+          p_expected_date: string
+          p_items: Json
+          p_notes: string
+          p_order_date: string
+          p_status: Database["public"]["Enums"]["po_status"]
+          p_supplier_id: string
+          p_tax_pct: number
+        }
+        Returns: {
+          purchase_order_id: string
+          purchase_order_number: string
+        }[]
       }
       create_self_checkin_link: {
         Args: { p_appointment_id: string; p_ttl_minutes?: number }
@@ -8546,14 +9494,28 @@ export type Database = {
           token: string
         }[]
       }
+      cron_expire_public_booking_requests: { Args: never; Returns: number }
       current_user_branch_id: { Args: never; Returns: string }
+      default_treasury_for_branch: {
+        Args: { _branch_id: string }
+        Returns: string
+      }
       delete_product_category: {
         Args: { p_category_id: string }
         Returns: undefined
       }
-      default_treasury_for_branch: {
-        Args: { _branch_id: string }
-        Returns: string
+      delete_purchase_order_draft: {
+        Args: { p_purchase_order_id: string }
+        Returns: undefined
+      }
+      doctor_service_assignment_allowed: {
+        Args: {
+          p_branch_id: string
+          p_doctor_id: string
+          p_service_id: string
+          p_service_kind?: string
+        }
+        Returns: boolean
       }
       enqueue_appointment_event: {
         Args: {
@@ -8575,6 +9537,10 @@ export type Database = {
         Args: { p_payment_id: string }
         Returns: undefined
       }
+      ensure_appointment_reminders: {
+        Args: { p_appointment_id: string }
+        Returns: undefined
+      }
       expense_treasury_self_audit: {
         Args: { _branch_id?: string }
         Returns: {
@@ -8586,6 +9552,10 @@ export type Database = {
           status: string
           title: string
         }[]
+      }
+      expire_public_booking_requests: {
+        Args: { p_branch_id: string }
+        Returns: number
       }
       fn_consume_for_invoice: {
         Args: { _invoice_id: string }
@@ -8620,6 +9590,11 @@ export type Database = {
       generate_po_number: { Args: never; Returns: string }
       generate_product_sku: { Args: never; Returns: string }
       generate_saas_invoice_number: { Args: never; Returns: string }
+      get_ai_provider_secret: { Args: { p_secret_id: string }; Returns: string }
+      get_campaign_roi: {
+        Args: { p_branch_id: string; p_end: string; p_start: string }
+        Returns: Json
+      }
       get_clinic_logo: { Args: { _branch_id: string }; Returns: string }
       get_lead_analytics: {
         Args: { p_branch_id?: string; p_end_at?: string; p_start_at?: string }
@@ -8660,6 +9635,8 @@ export type Database = {
           secondary_color: string
           show_powered_by: boolean
           tenant_id: string
+          tenant_name_ar: string
+          tenant_name_en: string
         }[]
       }
       has_permission: {
@@ -8672,6 +9649,27 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      inventory_tx_core: {
+        Args: {
+          p_actor: string
+          p_batch: string
+          p_branch_id: string
+          p_expiry: string
+          p_notes_ar: string
+          p_notes_en: string
+          p_product_id: string
+          p_ref_id: string
+          p_ref_type: string
+          p_signed_qty: number
+          p_type: Database["public"]["Enums"]["inventory_tx_type"]
+          p_unit_cost: number
+        }
+        Returns: string
+      }
+      invoice_product_consumption_core: {
+        Args: { p_actor: string; p_invoice_id: string }
+        Returns: undefined
       }
       invoke_reminder_function: {
         Args: { _body?: Json; _fn: string }
@@ -8690,6 +9688,19 @@ export type Database = {
       }
       list_doctors_for_branch: {
         Args: { _branch_id: string }
+        Returns: {
+          full_name: string
+          full_name_ar: string
+          full_name_en: string
+          id: string
+        }[]
+      }
+      list_doctors_for_service: {
+        Args: {
+          p_branch_id: string
+          p_service_id: string
+          p_service_kind?: string
+        }
         Returns: {
           full_name: string
           full_name_ar: string
@@ -8721,9 +9732,50 @@ export type Database = {
         Returns: undefined
       }
       meta_ads_admin_access: { Args: { _branch_id: string }; Returns: boolean }
+      normalize_phone_digits: { Args: { p_phone: string }; Returns: string }
+      notify_pending_booking_expiry_soon: { Args: never; Returns: undefined }
+      patient_portal_booking_context: { Args: never; Returns: Json }
+      patient_portal_complete_password_change: { Args: never; Returns: boolean }
+      patient_portal_create_booking: {
+        Args: {
+          p_complaint?: string
+          p_doctor_id?: string
+          p_metadata?: Json
+          p_service_id: string
+          p_slot_start: string
+        }
+        Returns: Json
+      }
+      patient_portal_password_state: { Args: never; Returns: Json }
+      patient_portal_send_context: {
+        Args: { p_patient_id: string }
+        Returns: Json
+      }
+      patient_portal_set_password_ready: { Args: never; Returns: boolean }
+      patient_portal_set_username: {
+        Args: { p_username: string }
+        Returns: Json
+      }
+      patient_portal_snapshot: { Args: never; Returns: Json }
+      platform_approve_subscription_request: {
+        Args: { p_notes?: string; p_request_id: string }
+        Returns: Json
+      }
+      platform_archive_tenant: {
+        Args: { p_reason?: string; p_tenant_id: string }
+        Returns: Json
+      }
+      platform_close_subscription_request: {
+        Args: { p_request_id: string }
+        Returns: boolean
+      }
       platform_create_tenant_onboarding: {
         Args: { payload: Json }
         Returns: Json
+      }
+      platform_delete_subscription_request: {
+        Args: { p_request_id: string }
+        Returns: boolean
       }
       platform_list_subscription_requests: {
         Args: { p_status?: string }
@@ -8739,11 +9791,18 @@ export type Database = {
           plan_id: string
           plan_name_ar: string
           plan_name_en: string
+          provisioned_at: string
+          provisioned_branch_id: string
+          provisioned_tenant_id: string
           status: string
           updated_at: string
         }[]
       }
       platform_log_change: { Args: { payload: Json }; Returns: string }
+      platform_provision_approved_subscription_request: {
+        Args: { p_notes?: string; p_payload?: Json; p_request_id: string }
+        Returns: Json
+      }
       platform_save_tenant_branding: {
         Args: {
           p_accent_color: string
@@ -8789,6 +9848,10 @@ export type Database = {
       platform_update_subscription_request: {
         Args: { p_notes?: string; p_request_id: string; p_status: string }
         Returns: boolean
+      }
+      platform_update_tenant_names: {
+        Args: { p_name_ar?: string; p_name_en?: string; p_tenant_id: string }
+        Returns: Json
       }
       platform_update_tenant_subscription: {
         Args: { payload: Json }
@@ -8836,6 +9899,14 @@ export type Database = {
           tenant_slug: string
         }[]
       }
+      public_cancel_appointment_for_tenant: {
+        Args: {
+          p_appointment_id: string
+          p_reason?: string
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
       public_create_booking: {
         Args: {
           p_branch_id: string
@@ -8869,6 +9940,18 @@ export type Database = {
       }
       public_create_subscription_request: {
         Args: { p_payload: Json }
+        Returns: Json
+      }
+      public_find_patient_by_phone_for_tenant: {
+        Args: { p_branch_id: string; p_phone: string; p_tenant_id: string }
+        Returns: Json
+      }
+      public_reschedule_appointment_for_tenant: {
+        Args: {
+          p_appointment_id: string
+          p_new_slot_start: string
+          p_tenant_id: string
+        }
         Returns: Json
       }
       public_self_checkin: {
@@ -8909,119 +9992,7 @@ export type Database = {
         Args: { _invoice_id: string }
         Returns: undefined
       }
-      cancel_purchase_order: {
-        Args: { p_purchase_order_id: string }
-        Returns: undefined
-      }
-      create_purchase_order: {
-        Args: {
-          p_branch_id: string
-          p_expected_date: string | null
-          p_items: Json
-          p_notes: string | null
-          p_order_date: string
-          p_status: Database["public"]["Enums"]["po_status"]
-          p_supplier_id: string
-          p_tax_pct: number
-        }
-        Returns: {
-          purchase_order_id: string
-          purchase_order_number: string
-        }[]
-      }
-      delete_purchase_order_draft: {
-        Args: { p_purchase_order_id: string }
-        Returns: undefined
-      }
-      search_products_page: {
-        Args: {
-          p_active?: boolean | null
-          p_branch_id?: string | null
-          p_category_id?: string | null
-          p_limit?: number
-          p_offset?: number
-          p_search?: string | null
-          p_tenant_id: string
-        }
-        Returns: {
-          barcode: string | null
-          category_id: string | null
-          cost_price: number
-          created_at: string
-          description_ar: string | null
-          description_en: string | null
-          expiry_tracking: boolean
-          id: string
-          image_url: string | null
-          is_active: boolean
-          max_stock_level: number | null
-          min_stock_level: number
-          name_ar: string
-          name_en: string
-          selling_price: number
-          sku: string
-          stock_quantity: number
-          supplier_id: string | null
-          tenant_id: string | null
-          total_count: number
-          unit: string
-          updated_at: string
-        }[]
-      }
-      search_purchase_orders_page: {
-        Args: {
-          p_branch_id?: string | null
-          p_limit?: number
-          p_offset?: number
-          p_search?: string | null
-          p_status?: Database["public"]["Enums"]["po_status"] | null
-          p_supplier_id?: string | null
-        }
-        Returns: {
-          created_at: string
-          expected_date: string | null
-          id: string
-          order_date: string
-          po_number: string
-          status: Database["public"]["Enums"]["po_status"]
-          subtotal: number
-          supplier_id: string
-          supplier_name_ar: string | null
-          supplier_name_en: string
-          tax: number
-          total: number
-          total_count: number
-        }[]
-      }
-      submit_purchase_order: {
-        Args: { p_purchase_order_id: string }
-        Returns: undefined
-      }
-      update_purchase_order_draft: {
-        Args: {
-          p_expected_date: string | null
-          p_items: Json
-          p_notes: string | null
-          p_order_date: string
-          p_purchase_order_id: string
-          p_submit?: boolean
-          p_supplier_id: string
-          p_tax_pct: number
-        }
-        Returns: {
-          purchase_order_id: string
-          purchase_order_number: string
-          purchase_order_status: Database["public"]["Enums"]["po_status"]
-        }[]
-      }
       recalc_po_subtotal: { Args: { _po_id: string }; Returns: undefined }
-      receive_purchase_order_items: {
-        Args: {
-          p_items: Json
-          p_purchase_order_id: string
-        }
-        Returns: undefined
-      }
       receive_po_item: {
         Args: {
           _batch: string
@@ -9031,6 +10002,14 @@ export type Database = {
           _qty: number
         }
         Returns: undefined
+      }
+      receive_purchase_order_items: {
+        Args: { p_items: Json; p_purchase_order_id: string }
+        Returns: undefined
+      }
+      reject_public_booking: {
+        Args: { p_appointment_id: string; p_reason: string }
+        Returns: Json
       }
       render_template: {
         Args: { body: string; payload: Json }
@@ -9044,6 +10023,7 @@ export type Database = {
           tenant_id: string
         }[]
       }
+      resolve_stock_alert: { Args: { p_alert_id: string }; Returns: undefined }
       run_financial_regression_tests: {
         Args: never
         Returns: {
@@ -9051,6 +10031,104 @@ export type Database = {
           result: string
           test: string
         }[]
+      }
+      search_invoices_page: {
+        Args: {
+          p_branch_id: string
+          p_limit?: number
+          p_offset?: number
+          p_search?: string
+          p_status?: Database["public"]["Enums"]["invoice_status"]
+        }
+        Returns: {
+          first_name_ar: string
+          first_name_en: string
+          id: string
+          invoice_date: string
+          invoice_number: string
+          last_name_ar: string
+          last_name_en: string
+          name_language: string
+          paid_amount: number
+          patient_code: number
+          patient_id: string
+          status: Database["public"]["Enums"]["invoice_status"]
+          total: number
+          total_count: number
+        }[]
+      }
+      search_products_page: {
+        Args: {
+          p_active?: boolean
+          p_branch_id?: string
+          p_category_id?: string
+          p_limit?: number
+          p_offset?: number
+          p_search?: string
+          p_tenant_id: string
+        }
+        Returns: {
+          barcode: string
+          category_id: string
+          cost_price: number
+          created_at: string
+          description_ar: string
+          description_en: string
+          expiry_tracking: boolean
+          id: string
+          image_url: string
+          is_active: boolean
+          max_stock_level: number
+          min_stock_level: number
+          name_ar: string
+          name_en: string
+          selling_price: number
+          sku: string
+          stock_quantity: number
+          supplier_id: string
+          tenant_id: string
+          total_count: number
+          unit: string
+          updated_at: string
+        }[]
+      }
+      search_purchase_orders_page: {
+        Args: {
+          p_branch_id?: string
+          p_limit?: number
+          p_offset?: number
+          p_search?: string
+          p_status?: Database["public"]["Enums"]["po_status"]
+          p_supplier_id?: string
+        }
+        Returns: {
+          created_at: string
+          expected_date: string
+          id: string
+          order_date: string
+          po_number: string
+          status: Database["public"]["Enums"]["po_status"]
+          subtotal: number
+          supplier_id: string
+          supplier_name_ar: string
+          supplier_name_en: string
+          tax: number
+          total: number
+          total_count: number
+        }[]
+      }
+      set_ai_provider_secret: {
+        Args: { p_name?: string; p_new_value: string; p_secret_id: string }
+        Returns: string
+      }
+      set_doctor_service_assignments: {
+        Args: {
+          p_branch_id: string
+          p_doctor_id: string
+          p_service_ids: string[]
+          p_service_kind?: string
+        }
+        Returns: undefined
       }
       settings_assign_user_role: {
         Args: {
@@ -9069,19 +10147,13 @@ export type Database = {
         Args: { _name: string }
         Returns: boolean
       }
+      submit_purchase_order: {
+        Args: { p_purchase_order_id: string }
+        Returns: undefined
+      }
       tenant_has_active_subscription: {
         Args: { _tenant_id: string }
         Returns: boolean
-      }
-      transfer_inventory_stock: {
-        Args: {
-          p_from_branch_id: string
-          p_notes?: string | null
-          p_product_id: string
-          p_quantity: number
-          p_to_branch_id: string
-        }
-        Returns: string
       }
       tenant_subscription_for_branch: {
         Args: { _branch_id: string }
@@ -9090,6 +10162,33 @@ export type Database = {
       tenant_subscription_snapshot: {
         Args: { _tenant_id: string }
         Returns: Json
+      }
+      transfer_inventory_stock: {
+        Args: {
+          p_from_branch_id: string
+          p_notes?: string
+          p_product_id: string
+          p_quantity: number
+          p_to_branch_id: string
+        }
+        Returns: string
+      }
+      update_purchase_order_draft: {
+        Args: {
+          p_expected_date: string
+          p_items: Json
+          p_notes: string
+          p_order_date: string
+          p_purchase_order_id: string
+          p_submit?: boolean
+          p_supplier_id: string
+          p_tax_pct: number
+        }
+        Returns: {
+          purchase_order_id: string
+          purchase_order_number: string
+          purchase_order_status: Database["public"]["Enums"]["po_status"]
+        }[]
       }
       upsert_notification_settings: {
         Args: { p_branch_id: string; p_settings: Json }
@@ -9278,12 +10377,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -9307,11 +10406,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -9332,11 +10431,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -9357,11 +10456,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -9374,11 +10473,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

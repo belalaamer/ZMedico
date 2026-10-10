@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./AuthContext";
@@ -64,6 +64,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   const [subscription, setSubscription] = useState<TenantSubscriptionSnapshot | null>(null);
   const [subscriptionLoading, setSubscriptionLoading] = useState(() => Boolean(currentBranchId));
   const [domainTenantId, setDomainTenantId] = useState<string | null>(null);
+  const branchLoadVersion = useRef(0);
   const requestedBranchId = new URLSearchParams(location.search).get("branch");
   const requestedBranchKnown = !requestedBranchId || branches.length === 0 || branches.some((branch) => branch.id === requestedBranchId);
   const routeBranchPending = requestedBranchKnown && Boolean(requestedBranchId) && requestedBranchId !== currentBranchId;
@@ -92,6 +93,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   }, [user?.id]);
 
   const loadBranches = async () => {
+    const requestVersion = ++branchLoadVersion.current;
     if (!user) { setBranches([]); setBranchSelectionReady(false); return; }
     setBranchSelectionReady(false);
     let tenantScopeId = domainTenantId;
@@ -111,6 +113,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
         .select("tenant_id")
         .eq("id", handoffBranchId)
         .maybeSingle();
+      if (requestVersion !== branchLoadVersion.current) return;
       tenantScopeId = (handoffBranch as { tenant_id?: string | null } | null)?.tenant_id ?? "__no_workspace__";
     }
     let branchQuery = supabase.from("branches").select("id,name_en,name_ar").order("name_en");
@@ -119,10 +122,11 @@ export function BranchProvider({ children }: { children: ReactNode }) {
       branchQuery,
       {
         ms: 8000,
-        fallback: { data: [], error: null, count: null, status: 200, statusText: "timeout-fallback" },
+        fallback: { data: [], error: null, count: null, status: 200, statusText: "timeout-fallback", success: true },
         label: "branches.bootstrap",
       }
     ).then(({ data }) => {
+      if (requestVersion !== branchLoadVersion.current) return;
       const list = (data ?? []) as Branch[];
       setBranches(list);
       if (roleLoading) {
@@ -165,6 +169,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
       });
       setBranchSelectionReady(true);
     }).catch(() => {
+      if (requestVersion !== branchLoadVersion.current) return;
       setBranches([]);
       setBranchSelectionReady(false);
     });
@@ -172,8 +177,9 @@ export function BranchProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void loadBranches();
+    return () => { branchLoadVersion.current += 1; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, isSystemOwner, roleLoading, domainTenantId, location.search]);
+  }, [user?.id, isSystemOwner, roleLoading, domainTenantId, location.search, platformRoute]);
 
   useEffect(() => {
     let active = true;
@@ -228,7 +234,8 @@ export function BranchProvider({ children }: { children: ReactNode }) {
         const planFeatures = subscription?.plan_features ?? {};
         const configured = (data ?? [])
           .map((row) => String((row as { module_key: string }).module_key))
-          .filter((key): key is ClinicModuleKey => DEFAULT_ENABLED_MODULES.includes(key as ClinicModuleKey) && planAllowsModule(key, planFeatures));
+          .filter((key): key is ClinicModuleKey => DEFAULT_ENABLED_MODULES.includes(key as ClinicModuleKey))
+          .filter((key) => planAllowsModule(key, planFeatures));
         const fallback = filterModulesByPlan(DEFAULT_ENABLED_MODULES, planFeatures);
         setEnabledModules(configured.length > 0 ? configured : fallback);
       } finally {
@@ -249,7 +256,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     const unsub = subscribeDataSync(["branches"], () => loadBranches());
     return unsub;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, isSystemOwner, domainTenantId]);
+  }, [user, isSystemOwner, roleLoading, domainTenantId, platformRoute, requestedBranchId]);
 
   const setCurrentBranchId = (id: string) => {
     setCurrentBranchIdState(id);

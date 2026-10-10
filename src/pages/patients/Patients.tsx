@@ -288,6 +288,8 @@ export default function PatientsPage() {
       return;
     }
     const payload = {
+      // The enabled BEFORE INSERT trigger allocates zero under an advisory lock.
+      patient_code: 0,
       first_name_en: d.name_en?.trim() || d.name_ar?.trim() || "",
       last_name_en: null,
       first_name_ar: d.name_ar?.trim() || d.name_en?.trim() || "",

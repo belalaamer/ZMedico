@@ -90,7 +90,7 @@ export default function Treasury() {
   useDataSync(["treasury_transactions", "payments", "expenses"], () => { void load(); });
 
   const softDeleteTreasury = async (tr: any): Promise<void> => {
-    if (!branchSelectionReady || !currentBranchId || tr.branch_id !== currentBranchId) { toast.error(t("chooseBranch")); return; }
+    if (!branchSelectionReady || !currentBranchId || tr.branch_id !== currentBranchId) { toast.error(t("selectBranch")); return; }
     const { count } = await supabase.from("treasury_transactions").select("id", { count: "exact", head: true }).eq("treasury_id", tr.id);
     if ((count ?? 0) > 0) { toast.error(t("transactionsExist")); return; }
     const { error } = await supabase.from("treasury").update({ deleted_at: new Date().toISOString() } as any).eq("id", tr.id).eq("branch_id", currentBranchId);
@@ -103,7 +103,7 @@ export default function Treasury() {
   const totalBalance = totalCashBalance + totalNonCashBalance;
 
   const submitAdj = async () => {
-    if (!branchSelectionReady || !currentBranchId) { toast.error(t("chooseBranch")); return; }
+    if (!branchSelectionReady || !currentBranchId) { toast.error(t("selectBranch")); return; }
     if (!adj.treasury_id || !adj.amount || !adj.desc_en) { toast.error(t("fillAllFields")); return; }
     const { error } = await supabase.rpc("add_treasury_tx", {
       _treasury_id: adj.treasury_id,

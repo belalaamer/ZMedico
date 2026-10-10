@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import SettingsLayout from "./SettingsLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -77,6 +77,9 @@ export default function Services() {
   const [sf, setSF] = useState<ServiceForm>(emptyServiceForm());
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState<string>("all");
+  const [savingCat, setSavingCat] = useState(false);
+  const [savingSv, setSavingSv] = useState(false);
+  const pendingCatalogRows = useRef(new Set<string>());
 
   const load = async () => {
     const { data: c } = await supabase.from("service_categories").select("*").is("deleted_at", null).order("display_order");
@@ -86,18 +89,22 @@ export default function Services() {
   useEffect(() => { load(); }, []);
 
   const saveCat = async () => {
+    if (savingCat) return;
     const name = (cf.name || "").trim();
     if (!name) return toast.error(t("nameRequired"));
+    setSavingCat(true);
     const payload = { name_en: name, name_ar: name, icon: cf.icon || null, color: cf.color || null, display_order: cf.display_order, is_active: cf.is_active };
     const { error } = editC ? await supabase.from("service_categories").update(payload).eq("id", editC.id) : await supabase.from("service_categories").insert(payload);
-    if (error) return toast.error(error.message);
-    toast.success(t("saved")); setOC(false); load();
+    if (error) { setSavingCat(false); return toast.error(error.message); }
+    toast.success(t("saved")); setOC(false); setSavingCat(false); load();
   };
   const saveSv = async () => {
+    if (savingSv) return;
     const nameEn = (sf.name_en || "").trim();
     const nameAr = (sf.name_ar || "").trim();
     if (!nameEn && !nameAr) return toast.error(t("nameRequired"));
     if (!editS && !subscription?.tenant_id) return toast.error(lang === "ar" ? "لم يتم تحديد العيادة الحالية" : "No active clinic is selected");
+    setSavingSv(true);
     const { name_en: _nameEn, name_ar: _nameAr, ...rest } = sf;
     const payload = {
       ...rest,
@@ -107,14 +114,42 @@ export default function Services() {
       name_en: nameEn || nameAr,
       name_ar: nameAr || nameEn,
       category_id: sf.category_id || null,
-      cost_price: sf.cost_price === "" ? null : sf.cost_price,
+      cost_price: sf.cost_price,
     };
     const { error } = editS ? await supabase.from("services").update(payload).eq("id", editS.id) : await supabase.from("services").insert(payload);
-    if (error) return toast.error(error.message);
-    toast.success(t("saved")); setOS(false); load();
+    if (error) { setSavingSv(false); return toast.error(error.message); }
+    toast.success(t("saved")); setOS(false); setSavingSv(false); load();
   };
-  const toggleSv = async (s: ServiceRow) => { await supabase.from("services").update({ is_active: !s.is_active }).eq("id", s.id); load(); };
-  const toggleCat = async (c: ServiceCategoryRow) => { await supabase.from("service_categories").update({ is_active: !c.is_active }).eq("id", c.id); load(); };
+  const toggleCatalogRow = async (table: "services" | "service_categories", id: string, active: boolean) => {
+    const key = `${table}:${id}`;
+    if (pendingCatalogRows.current.has(key)) return;
+    pendingCatalogRows.current.add(key);
+    try {
+      const { data, error } = await supabase.from(table)
+        .update({ is_active: !active }).eq("id", id).select("id").maybeSingle();
+      if (error) throw error;
+      // RLS can filter a write to zero rows without returning an error.
+      if (!data || data.id !== id) throw new Error("Catalog update not confirmed");
+      toast.success(t("saved"));
+      try {
+        await load();
+      } catch {
+        // The write is confirmed even if refreshing the screen fails.
+        toast.error(lang === "ar"
+          ? "تم حفظ التغيير، لكن تعذر تحديث القائمة. حدّث الصفحة."
+          : "The change was saved, but the list could not be refreshed. Refresh the page.");
+      }
+    } catch (error) {
+      const denied = typeof error === "object" && error !== null && "code" in error && error.code === "42501";
+      toast.error(denied
+        ? (lang === "ar" ? "ليس لديك صلاحية تعديل هذا السجل." : "You do not have permission to change this record.")
+        : (lang === "ar" ? "تعذر تأكيد التغيير. حدّث القائمة قبل إعادة المحاولة." : "The change could not be confirmed. Refresh the list before retrying."));
+    } finally {
+      pendingCatalogRows.current.delete(key);
+    }
+  };
+  const toggleSv = (s: ServiceRow) => toggleCatalogRow("services", s.id, s.is_active);
+  const toggleCat = (c: ServiceCategoryRow) => toggleCatalogRow("service_categories", c.id, c.is_active);
 
   const delCat = async (c: ServiceCategoryRow): Promise<void> => {
     if (services.some(s => s.category_id === c.id)) { toast.error(t("servicesHaveItems")); return; }
@@ -168,7 +203,7 @@ export default function Services() {
                     <div><Label>{t("color")}</Label><Input type="color" value={cf.color ?? "#7c3aed"} onChange={e => setCF({ ...cf, color: e.target.value })} /></div>
                     <div><Label>{t("displayOrder")}</Label><Input type="number" value={cf.display_order} onChange={e => setCF({ ...cf, display_order: +e.target.value })} /></div>
                   </div>
-                  <DialogFooter><Button variant="ghost" onClick={() => setOC(false)}>{t("cancel")}</Button><Button className="gradient-primary text-primary-foreground" onClick={saveCat}>{t("save")}</Button></DialogFooter>
+                  <DialogFooter><Button variant="ghost" onClick={() => setOC(false)} disabled={savingCat}>{t("cancel")}</Button><Button className="gradient-primary text-primary-foreground" onClick={saveCat} disabled={savingCat}>{savingCat ? "…" : t("save")}</Button></DialogFooter>
                 </DialogContent>
               </Dialog>
             </div>
@@ -261,7 +296,7 @@ export default function Services() {
                   <div className="mt-3">
                     <ConsumablesEditor parentType="service" parentId={editS?.id ?? null} />
                   </div>
-                  <DialogFooter><Button variant="ghost" onClick={() => setOS(false)}>{t("cancel")}</Button><Button className="gradient-primary text-primary-foreground" onClick={saveSv}>{t("save")}</Button></DialogFooter>
+                  <DialogFooter><Button variant="ghost" onClick={() => setOS(false)} disabled={savingSv}>{t("cancel")}</Button><Button className="gradient-primary text-primary-foreground" onClick={saveSv} disabled={savingSv}>{savingSv ? "…" : t("save")}</Button></DialogFooter>
                 </DialogContent>
               </Dialog>
             </div>

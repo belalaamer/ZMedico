@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import SettingsLayout from "./SettingsLayout";
 import { Card } from "@/components/ui/card";
@@ -31,10 +31,26 @@ export default function InsuranceContracts() {
   const [sp, setSp] = useSearchParams();
 
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [companyId, setCompanyId] = useState<string>(sp.get("company") || "");
-  const [contracts, setContracts] = useState<Contract[]>([]);
-  const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
-  const [rules, setRules] = useState<Rule[]>([]);
+  const companyId = sp.get("company") || "";
+  const setCompanyId = (value: string) => {
+    setSp((current) => {
+      const next = new URLSearchParams(current);
+      if (value) next.set("company", value); else next.delete("company");
+      return next;
+    }, { replace: true });
+  };
+  const [contractsData, setContracts] = useState<Contract[]>([]);
+  const [selectedContractData, setSelectedContract] = useState<Contract | null>(null);
+  const [rulesData, setRules] = useState<Rule[]>([]);
+  const contracts = contractsData.filter((c) => c.insurance_company_id === companyId);
+  const selectedContract = selectedContractData?.insurance_company_id === companyId ? selectedContractData : null;
+  const rules = rulesData.filter((r) => r.contract_id === selectedContract?.id);
+  const companyScope = useRef(companyId);
+  const contractScope = useRef<string | undefined>(selectedContract?.id);
+  const contractRequest = useRef(0);
+  const ruleRequest = useRef(0);
+  companyScope.current = companyId;
+  contractScope.current = selectedContract?.id;
 
   const [contractDialog, setContractDialog] = useState<{ open: boolean; row: Contract | null }>({ open: false, row: null });
   const [ruleDialog, setRuleDialog] = useState<{ open: boolean; row: Rule | null }>({ open: false, row: null });
@@ -52,28 +68,41 @@ export default function InsuranceContracts() {
   }, []);
 
   const loadContracts = async (cid: string) => {
+    if (companyScope.current !== cid) return;
+    const version = ++contractRequest.current;
     if (!cid) { setContracts([]); setSelectedContract(null); setRules([]); return; }
     const { data } = await (supabase as any).from("insurance_contracts")
       .select("*").eq("insurance_company_id", cid).order("created_at", { ascending: false });
+    if (version !== contractRequest.current || companyScope.current !== cid) return;
     const list = (data as any) ?? [];
     setContracts(list);
     setSelectedContract((cur) => list.find((c: any) => c.id === cur?.id) ?? list[0] ?? null);
   };
 
   useEffect(() => {
-    if (companyId) sp.set("company", companyId); else sp.delete("company");
-    setSp(sp, { replace: true });
+    setContractDialog({ open: false, row: null });
+    setRuleDialog({ open: false, row: null });
     void loadContracts(companyId);
+    return () => { contractRequest.current++; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId]);
 
+  const loadRules = async (contractId: string | undefined) => {
+    if (contractScope.current !== contractId) return;
+    const version = ++ruleRequest.current;
+    if (!contractId) { setRules([]); return; }
+    const { data } = await (supabase as any).from("insurance_contract_rules")
+      .select("*").eq("contract_id", contractId).order("priority").order("created_at");
+    if (version !== ruleRequest.current || contractScope.current !== contractId) return;
+    setRules((data as any) ?? []);
+  };
+
   useEffect(() => {
-    if (!selectedContract?.id) { setRules([]); return; }
-    (async () => {
-      const { data } = await (supabase as any).from("insurance_contract_rules")
-        .select("*").eq("contract_id", selectedContract.id).order("priority").order("created_at");
-      setRules((data as any) ?? []);
-    })();
+    setRuleDialog({ open: false, row: null });
+    void loadRules(selectedContract?.id);
+    return () => { ruleRequest.current++; };
+    // Scope changes invalidate both initial and post-save rule refreshes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedContract?.id]);
 
   const saveContract = async (form: any) => {
@@ -91,6 +120,7 @@ export default function InsuranceContracts() {
     const { error } = contractDialog.row
       ? await (supabase as any).from("insurance_contracts").update(payload).eq("id", contractDialog.row.id)
       : await (supabase as any).from("insurance_contracts").insert(payload);
+    if (companyScope.current !== companyId) return;
     if (error) { toast.error(error.message); return; }
     setContractDialog({ open: false, row: null });
     toast.success(T("Saved", "تم الحفظ"));
@@ -100,6 +130,7 @@ export default function InsuranceContracts() {
   const removeContract = async (id: string) => {
     if (!confirm(T("Delete this contract and all its rules?", "حذف العقد وكل قواعده؟"))) return;
     const { error } = await (supabase as any).from("insurance_contracts").delete().eq("id", id);
+    if (companyScope.current !== companyId) return;
     if (error) { toast.error(error.message); return; }
     if (selectedContract?.id === id) setSelectedContract(null);
     await loadContracts(companyId);
@@ -127,12 +158,11 @@ export default function InsuranceContracts() {
     const { error } = ruleDialog.row
       ? await (supabase as any).from("insurance_contract_rules").update(payload).eq("id", ruleDialog.row.id)
       : await (supabase as any).from("insurance_contract_rules").insert(payload);
+    if (contractScope.current !== selectedContract.id) return;
     if (error) { toast.error(error.message); return; }
     setRuleDialog({ open: false, row: null });
     toast.success(T("Saved", "تم الحفظ"));
-    const { data } = await (supabase as any).from("insurance_contract_rules")
-      .select("*").eq("contract_id", selectedContract.id).order("priority").order("created_at");
-    setRules((data as any) ?? []);
+    await loadRules(selectedContract.id);
   };
 
   const removeRule = async (id: string) => {

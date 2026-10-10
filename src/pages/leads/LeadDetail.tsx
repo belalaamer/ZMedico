@@ -79,7 +79,7 @@ export default function LeadDetail() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { void load(); }, [id]);
 
-  const patchLead = async (patch: Record<string, unknown>) => {
+  const patchLead = async (patch: import("@/integrations/supabase/types").TablesUpdate<"leads">) => {
     if (!lead || !canEdit) return false;
     setSaving(true);
     const { data, error } = await supabase.from("leads").update(patch).eq("id", lead.id).select("*").single();
@@ -118,7 +118,7 @@ export default function LeadDetail() {
   const scheduleFollowup = async () => {
     if (!lead || !followupAt || !canEdit) return;
     const due = new Date(followupAt).toISOString();
-    const { error } = await supabase.from("lead_followups").insert({ lead_id: lead.id, branch_id: lead.branch_id, assigned_to: lead.assigned_to ?? user?.id ?? null, due_at: due, channel: followupChannel, status: "pending", source_rule: "manual", created_by: user?.id ?? null });
+    const { error } = await supabase.from("lead_followups").insert({ lead_id: lead.id, branch_id: lead.branch_id, assigned_to: lead.assigned_to ?? user?.id ?? null, due_at: due, channel: followupChannel, status: "pending", source_rule: "manual" });
     if (error) { toast.error(error.message); return; }
     await patchLead({ next_followup_at: due, last_activity_at: new Date().toISOString() });
     await supabase.from("lead_activities").insert({ lead_id: lead.id, branch_id: lead.branch_id, activity_type: "followup_scheduled", channel: followupChannel, body: due, created_by: user?.id ?? null });

@@ -468,7 +468,7 @@ export default function QueuePage() {
     // Reuses the same appointments row shape so it flows through every existing
     // queue/calendar/permissions path without a parallel system.
     const patch = buildStatusPatch("confirmed", { checked_in_at: nowIso, started_at: null }, nowIso);
-    const payload: Record<string, unknown> = {
+    const payload: import("@/integrations/supabase/types").TablesInsert<"appointments"> = {
       patient_id: walkInPatient,
       doctor_id: walkInDoctor || null,
       branch_id: currentBranchId ?? null,

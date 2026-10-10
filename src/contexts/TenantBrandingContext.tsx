@@ -61,7 +61,7 @@ export function TenantBrandingProvider({ children }: { children: ReactNode }) {
     }
 
     setLoading(true);
-    void supabase.rpc("get_public_tenant_branding" as never, { _hostname: hostname } as never)
+    void Promise.resolve(supabase.rpc("get_public_tenant_branding", { _hostname: hostname }))
       .then(({ data, error }) => {
         if (!active) return;
         const row = Array.isArray(data) ? data[0] : data;

@@ -12,6 +12,9 @@ import { Plus, Edit3, Power } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { useBranch } from "@/contexts/BranchContext";
+import { useConfirmedRowMutation } from "@/hooks/useConfirmedRowMutation";
 
 const TYPES = ["cash", "card", "bank_transfer", "wallet", "insurance", "other"] as const;
 const PAYMENT_TYPE_KEYS = {
@@ -25,28 +28,37 @@ const PAYMENT_TYPE_KEYS = {
 
 export default function PaymentMethods() {
   const { t, lang } = useI18n();
+  const { user } = useAuth();
+  const { currentBranchId } = useBranch();
+  const mutation = useConfirmedRowMutation(user ? `${user.id}:${currentBranchId ?? "all"}` : null, lang, t("saved"));
   const [items, setItems] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
   const [edit, setE] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
   const [f, setF] = useState<any>({ name: "", code: "", type: "cash", requires_reference: false, processing_fee_percentage: 0, processing_fee_fixed: 0, display_order: 0, is_active: true });
 
   const load = async () => {
-    const { data } = await supabase.from("payment_methods").select("*").order("display_order");
+    const { data, error } = await supabase.from("payment_methods").select("*").order("display_order");
+    if (error) throw error;
     setItems(data ?? []);
   };
-  useEffect(() => { load(); }, []);
+  const refresh = () => { void load().catch(() => toast.error(lang === "ar" ? "تعذر تحميل طرق الدفع. أعد المحاولة." : "Unable to load payment methods. Try again.")); };
+  useEffect(() => { refresh(); }, []);
 
   const openNew = () => { setE(null); setF({ name: "", code: "", type: "cash", requires_reference: false, processing_fee_percentage: 0, processing_fee_fixed: 0, display_order: items.length, is_active: true }); setOpen(true); };
   const openEdit = (m: any) => { setE(m); setF({ ...m, name: m.name_en || m.name_ar || "" }); setOpen(true); };
   const save = async () => {
+    if (saving) return;
     const name = (f.name || "").trim();
     if (!name || !f.code) return toast.error(t("requiredFields"));
+    setSaving(true);
     const payload = { name_en: name, name_ar: name, code: f.code, type: f.type, requires_reference: f.requires_reference, processing_fee_percentage: f.processing_fee_percentage, processing_fee_fixed: f.processing_fee_fixed, display_order: f.display_order, is_active: f.is_active };
     const { error } = edit ? await supabase.from("payment_methods").update(payload).eq("id", edit.id) : await supabase.from("payment_methods").insert(payload);
-    if (error) return toast.error(error.message);
-    toast.success(t("saved")); setOpen(false); load();
+    if (error) { setSaving(false); return toast.error(error.message); }
+    toast.success(t("saved")); setOpen(false); setSaving(false); refresh();
   };
-  const toggle = async (m: any) => { await supabase.from("payment_methods").update({ is_active: !m.is_active }).eq("id", m.id); load(); };
+  const toggle = (m: any) => mutation.run(m.id, () => supabase.from("payment_methods")
+    .update({ is_active: !m.is_active }).eq("id", m.id).eq("is_active", m.is_active).select("id").maybeSingle(), load);
 
   return (
     <SettingsLayout>
@@ -71,7 +83,7 @@ export default function PaymentMethods() {
                 <div><Label>{t("displayOrder")}</Label><Input type="number" value={f.display_order} onChange={e => setF({ ...f, display_order: +e.target.value })} /></div>
                 <div className="flex items-center justify-between rounded-lg border p-3"><Label>{t("requiresReference")}</Label><Switch checked={!!f.requires_reference} onCheckedChange={v => setF({ ...f, requires_reference: v })} /></div>
               </div>
-              <DialogFooter><Button variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button><Button className="gradient-primary text-primary-foreground" onClick={save}>{t("save")}</Button></DialogFooter>
+              <DialogFooter><Button variant="ghost" onClick={() => setOpen(false)} disabled={saving}>{t("cancel")}</Button><Button className="gradient-primary text-primary-foreground" onClick={save} disabled={saving}>{saving ? "…" : t("save")}</Button></DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
@@ -89,7 +101,7 @@ export default function PaymentMethods() {
                   <div className="text-xs text-muted-foreground">{t("processingFeePct")}: {m.processing_fee_percentage}% · {t("processingFeeFixed")}: {m.processing_fee_fixed}</div>
                 </div>
                 <Button variant="ghost" size="icon" onClick={() => openEdit(m)}><Edit3 className="size-4" /></Button>
-                <Button variant="ghost" size="icon" onClick={() => toggle(m)}><Power className="size-4" /></Button>
+                <Button variant="ghost" size="icon" disabled={mutation.isPending(m.id)} aria-label={lang === "ar" ? "تغيير حالة طريقة الدفع" : "Toggle payment method status"} onClick={() => toggle(m)}><Power className="size-4" /></Button>
               </div>
             ))}
             {items.length === 0 && <div className="p-8 text-center text-muted-foreground">{t("noData")}</div>}

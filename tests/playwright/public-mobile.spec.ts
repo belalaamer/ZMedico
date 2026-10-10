@@ -9,6 +9,21 @@ const PUBLIC_ROUTES = [
   "/book",
 ] as const;
 
+// Smoke only: never allow a page side effect to write to a connected backend.
+// Read-only RPCs also use POST and are intentionally blocked in this suite;
+// authenticated/API integration is a separate, isolated-fixture requirement.
+test.beforeEach(async ({ page }) => {
+  await page.route("**/*", async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (url.hostname.endsWith(".supabase.co") && !["GET", "HEAD", "OPTIONS"].includes(request.method())) {
+      await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "External mutations disabled in public QA" }) });
+      return;
+    }
+    await route.continue();
+  });
+});
+
 async function openPublicPage(page: Page, path: string) {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(String(error).slice(0, 300)));
@@ -31,6 +46,16 @@ async function assertNoHorizontalOverflow(page: Page, path: string) {
 }
 
 test.describe("public unauthenticated mobile smoke", () => {
+  for (const route of ["/patients", "/queue"]) {
+    test(`protected direct URL stays behind login after refresh: ${route}`, async ({ page }) => {
+      const errors = await openPublicPage(page, route);
+      await expect(page).toHaveURL(/\/auth(?:[?#].*)?$/);
+      await page.reload({ waitUntil: "domcontentloaded" });
+      await expect(page).toHaveURL(/\/auth(?:[?#].*)?$/);
+      await assertNoHorizontalOverflow(page, route);
+      expect(errors).toEqual([]);
+    });
+  }
   test("landing menu exposes staff sign-in and remains tappable", async ({ page, viewport }) => {
     test.skip(!viewport || viewport.width >= 600, "Tablet/desktop uses the full header actions");
     const errors = await openPublicPage(page, "/");

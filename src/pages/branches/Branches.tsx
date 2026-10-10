@@ -295,7 +295,7 @@ export default function Branches() {
   const archiveBranch = async () => {
     if (!delId) return;
     setDeleteBusy(true);
-    const { error } = await supabase.rpc("admin_archive_branch" as never, { _branch_id: delId });
+    const { error } = await supabase.rpc("admin_archive_branch", { _branch_id: delId });
     setDeleteBusy(false);
     if (error) { toast({ title: error.message, variant: "destructive" }); return; }
     toast({ title: lang === "ar" ? "تمت الأرشفة" : "Branch archived" });
@@ -305,7 +305,7 @@ export default function Branches() {
   const forceDeleteBranch = async () => {
     if (!delId) return;
     setDeleteBusy(true);
-    const { error } = await supabase.rpc("admin_force_delete_branch" as never, { _branch_id: delId });
+    const { error } = await supabase.rpc("admin_force_delete_branch", { _branch_id: delId });
     setDeleteBusy(false);
     if (error) { toast({ title: error.message, variant: "destructive" }); return; }
     toast({ title: lang === "ar" ? "تم الحذف نهائيًا" : "Branch and all linked data deleted" });

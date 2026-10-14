@@ -1,10 +1,15 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 import { corsPreflight, jsonResponse } from "../_shared/cors.ts";
+import { requireActiveSession } from "../_shared/active-session.ts";
+const MAX_BODY_BYTES = 8 * 1024;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return corsPreflight();
   }
+  if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+  const declaredLength = Number(req.headers.get("content-length") ?? "0");
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) return jsonResponse({ error: "Request body is too large" }, 413);
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -22,6 +27,8 @@ Deno.serve(async (req) => {
     if (userErr || !userData?.user) {
       return jsonResponse({ error: "Unauthorized" }, 401);
     }
+    const sessionFailure = await requireActiveSession(userClient);
+    if (sessionFailure) return sessionFailure;
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     const { data: isAdmin } = await admin.rpc("has_role", {
@@ -32,7 +39,12 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Forbidden: admin only" }, 403);
     }
 
-    const body = await req.json().catch(() => ({}));
+    const raw = await req.text();
+    if (new TextEncoder().encode(raw).byteLength > MAX_BODY_BYTES) return jsonResponse({ error: "Request body is too large" }, 413);
+    let parsed: unknown;
+    try { parsed = JSON.parse(raw || "{}"); } catch { return jsonResponse({ error: "Invalid request" }, 400); }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return jsonResponse({ error: "Invalid request" }, 400);
+    const body = parsed as Record<string, unknown>;
     const target_user_id = String(body.user_id ?? "").trim();
     const reason = body.reason ? String(body.reason).slice(0, 500) : null;
     const branchId = body.branch_id ? String(body.branch_id) : null;
@@ -108,7 +120,7 @@ Deno.serve(async (req) => {
 
     // Pre-deletion audit record. Written BEFORE the destructive cascade so
     // the trail exists even if the delete partially fails downstream.
-    await admin.from("audit_logs").insert({
+    const { error: auditError } = await admin.from("audit_logs").insert({
       user_id: userData.user.id,
       branch_id: branchId,
       action: "admin_delete_user",
@@ -120,22 +132,21 @@ Deno.serve(async (req) => {
         requested_at: new Date().toISOString(),
       },
     });
+    if (auditError) return jsonResponse({ error: "Unable to record deletion audit; deletion aborted" }, 500);
 
-    // Clean dependent rows first (best-effort)
-    await admin.from("user_roles").delete().eq("user_id", target_user_id);
-    await admin.from("staff_profiles").delete().eq("id", target_user_id);
-    await admin.from("profiles").delete().eq("id", target_user_id);
+    // Clean dependent rows first and fail closed if any cleanup step errors.
+    for (const [table, column] of [["user_roles", "user_id"], ["staff_profiles", "id"], ["profiles", "id"]] as const) {
+      const { error } = await admin.from(table).delete().eq(column, target_user_id);
+      if (error) return jsonResponse({ error: `Unable to clean ${table}; auth deletion aborted` }, 500);
+    }
 
     const { error: delErr } = await admin.auth.admin.deleteUser(target_user_id);
     if (delErr) {
-      return jsonResponse({ error: delErr.message }, 400);
+      return jsonResponse({ error: "Unable to delete user" }, 400);
     }
 
     return jsonResponse({ ok: true });
-  } catch (e) {
-    return jsonResponse(
-      { error: (e as Error).message ?? "Unknown error" },
-      500,
-    );
+  } catch {
+    return jsonResponse({ error: "Unable to delete user" }, 500);
   }
 });

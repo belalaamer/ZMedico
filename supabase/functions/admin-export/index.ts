@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsHeaders, corsPreflight, jsonResponse } from "../_shared/cors.ts";
+import { requireActiveSession } from "../_shared/active-session.ts";
 
 const ALLOWED_TABLES = new Set([
   "patients",
@@ -9,9 +10,13 @@ const ALLOWED_TABLES = new Set([
   "products",
   "medical_records",
 ]);
+const MAX_BODY_BYTES = 8 * 1024;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return corsPreflight();
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  const declaredLength = Number(req.headers.get("content-length") ?? "0");
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) return json({ error: "Request body is too large" }, 413);
 
   try {
     const authHeader = req.headers.get("Authorization") ?? "";
@@ -31,22 +36,28 @@ Deno.serve(async (req) => {
     if (userErr || !userData?.user) {
       return json({ error: "Unauthorized" }, 401);
     }
+    const sessionFailure = await requireActiveSession(userClient);
+    if (sessionFailure) return sessionFailure;
 
     // Verify admin role server-side
     const admin = createClient(supabaseUrl, serviceKey);
-    const { data: roleRow, error: roleErr } = await admin
+    const { data: roleRows, error: roleErr } = await admin
       .from("user_roles")
       .select("role")
       .eq("user_id", userData.user.id)
-      .in("role", ["admin", "system_owner"])
-      .maybeSingle();
+      .in("role", ["admin", "system_owner"]);
 
-    if (roleErr || !roleRow) {
+    if (roleErr || !roleRows?.length) {
       return json({ error: "Forbidden: administrator access required" }, 403);
     }
-    const isSystemOwner = roleRow.role === "system_owner";
+    const isSystemOwner = roleRows.some((row) => row.role === "system_owner");
 
-    const body = await req.json().catch(() => ({}));
+    const raw = await req.text();
+    if (new TextEncoder().encode(raw).byteLength > MAX_BODY_BYTES) return json({ error: "Request body is too large" }, 413);
+    let parsed: unknown;
+    try { parsed = JSON.parse(raw || "{}"); } catch { return json({ error: "Invalid request" }, 400); }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return json({ error: "Invalid request" }, 400);
+    const body = parsed as Record<string, unknown>;
     const mode = body?.mode === "all" ? "all" : "table";
     const requested: string[] =
       mode === "all"
@@ -88,7 +99,7 @@ Deno.serve(async (req) => {
     // cannot exfiltrate data without leaving a trail. Row counts are
     // filled into new_values after each table read.
     const rowCounts: Record<string, number> = {};
-    await admin.from("audit_logs").insert({
+    const { error: startAuditError } = await admin.from("audit_logs").insert({
       user_id: userData.user.id,
       branch_id: branchId,
       action: "admin_export",
@@ -102,6 +113,7 @@ Deno.serve(async (req) => {
         row_counts: rowCounts,
       },
     });
+    if (startAuditError) return json({ error: "Unable to record export audit; export aborted" }, 500);
 
     const out: Record<string, unknown[]> = {};
     let branchProductIds: string[] | null = null;
@@ -141,7 +153,7 @@ Deno.serve(async (req) => {
 
     // Post-export audit update: capture final row counts + completion time.
     // Best-effort — a failure here does not affect the caller's response.
-    await admin.from("audit_logs").insert({
+    const { error: completeAuditError } = await admin.from("audit_logs").insert({
       user_id: userData.user.id,
       branch_id: branchId,
       action: "admin_export_complete",
@@ -155,6 +167,7 @@ Deno.serve(async (req) => {
         completed_at: new Date().toISOString(),
       },
     });
+    if (completeAuditError) return json({ error: "Export completed but completion audit could not be recorded" }, 500);
 
     return json({ data: out });
   } catch (_e) {

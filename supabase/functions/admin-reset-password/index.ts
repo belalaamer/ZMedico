@@ -1,5 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 import { corsPreflight, jsonResponse } from "../_shared/cors.ts";
+import { requireActiveSession } from "../_shared/active-session.ts";
+const MAX_BODY_BYTES = 8 * 1024;
 
 function genTemporaryPassword(len = 32) {
   const chars =
@@ -15,6 +17,9 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return corsPreflight();
   }
+  if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+  const declaredLength = Number(req.headers.get("content-length") ?? "0");
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) return jsonResponse({ error: "Request body is too large" }, 413);
 
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -33,6 +38,8 @@ Deno.serve(async (req) => {
     if (userErr || !userData?.user) {
       return jsonResponse({ error: "Unauthorized" }, 401);
     }
+    const sessionFailure = await requireActiveSession(userClient);
+    if (sessionFailure) return sessionFailure;
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     const { data: isAdmin, error: roleErr } = await admin.rpc("has_role", {
@@ -43,7 +50,12 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Forbidden: admin only" }, 403);
     }
 
-    const body = await req.json().catch(() => ({}));
+    const raw = await req.text();
+    if (new TextEncoder().encode(raw).byteLength > MAX_BODY_BYTES) return jsonResponse({ error: "Request body is too large" }, 413);
+    let parsed: unknown;
+    try { parsed = JSON.parse(raw || "{}"); } catch { return jsonResponse({ error: "Invalid request" }, 400); }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return jsonResponse({ error: "Invalid request" }, 400);
+    const body = parsed as Record<string, unknown>;
     const user_id = String(body.user_id ?? "").trim();
     if (!user_id) {
       return jsonResponse({ error: "user_id required" }, 400);
@@ -105,10 +117,7 @@ Deno.serve(async (req) => {
     const { data: target, error: getErr } =
       await admin.auth.admin.getUserById(user_id);
     if (getErr || !target?.user?.email) {
-      return jsonResponse(
-        { error: getErr?.message ?? "User not found" },
-        404,
-      );
+      return jsonResponse({ error: "User not found" }, 404);
     }
 
     const { error: updateErr } = await admin.auth.admin.updateUserById(user_id, {
@@ -116,7 +125,7 @@ Deno.serve(async (req) => {
       email_confirm: true,
     });
     if (updateErr) {
-      return jsonResponse({ error: updateErr.message }, 400);
+      return jsonResponse({ error: "Unable to reset password" }, 400);
     }
 
     return jsonResponse({
@@ -126,10 +135,7 @@ Deno.serve(async (req) => {
       password: nextPassword,
       password_was_generated: !suppliedPassword,
     });
-  } catch (e) {
-    return jsonResponse(
-      { error: (e as Error).message ?? "Unknown error" },
-      500,
-    );
+  } catch {
+    return jsonResponse({ error: "Unable to reset password" }, 500);
   }
 });

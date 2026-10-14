@@ -1,4 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
+import { allocateEmployeeId } from "../_shared/employee-id.ts";
+import { requireActiveSession } from "../_shared/active-session.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
@@ -8,6 +10,7 @@ function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 function corsPreflight() { return new Response("ok", { headers: corsHeaders }); }
+const MAX_BODY_BYTES = 8 * 1024;
 
 // Generates a cryptographically strong temporary password. It is only returned
 // once in the admin response so the admin can hand it to the new staff member.
@@ -25,6 +28,9 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return corsPreflight();
   }
+  if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+  const declaredLength = Number(req.headers.get("content-length") ?? "0");
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) return jsonResponse({ error: "Request body is too large" }, 413);
 
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -44,6 +50,8 @@ Deno.serve(async (req) => {
     if (userErr || !userData?.user) {
       return jsonResponse({ error: "Unauthorized" }, 401);
     }
+    const sessionFailure = await requireActiveSession(userClient);
+    if (sessionFailure) return sessionFailure;
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     const { data: isAdmin, error: roleErr } = await admin.rpc("has_role", {
@@ -54,7 +62,12 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Forbidden: admin only" }, 403);
     }
 
-    const body = await req.json().catch(() => ({}));
+    const raw = await req.text();
+    if (new TextEncoder().encode(raw).byteLength > MAX_BODY_BYTES) return jsonResponse({ error: "Request body is too large" }, 413);
+    let parsed: unknown;
+    try { parsed = JSON.parse(raw || "{}"); } catch { return jsonResponse({ error: "Invalid request" }, 400); }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return jsonResponse({ error: "Invalid request" }, 400);
+    const body = parsed as Record<string, unknown>;
     const email = String(body.email ?? "").trim().toLowerCase();
     const username = body.username ? String(body.username).trim().toLowerCase() : null;
     const full_name = body.full_name ? String(body.full_name).trim() : null;
@@ -119,10 +132,11 @@ Deno.serve(async (req) => {
 
     // Pre-authorize email so handle_new_user trigger accepts the signup
     // and assigns the chosen role + name automatically.
-    await admin.from("allowed_signup_emails").upsert(
+    const { error: allowlistError } = await admin.from("allowed_signup_emails").upsert(
       { email, role, full_name, branch_id, created_by: userData.user.id },
       { onConflict: "email" },
     );
+    if (allowlistError) return jsonResponse({ error: "Unable to prepare signup authorization" }, 500);
 
     // Create the auth user with email pre-confirmed and a real password.
     const { data: created, error: createErr } =
@@ -141,14 +155,14 @@ Deno.serve(async (req) => {
       // Roll back the allowlist row so it does not linger.
       await admin.from("allowed_signup_emails").delete().eq("email", email);
       return jsonResponse(
-        { error: createErr?.message ?? "Create user failed" },
+        { error: "Unable to create user" },
         400,
       );
     }
 
     // Make sure profile + role exist (handle_new_user usually does this,
     // but if it didn't run we ensure consistency).
-    await admin.from("profiles").upsert(
+    const { error: profileErr } = await admin.from("profiles").upsert(
       {
         id: created.user.id,
         email,
@@ -159,10 +173,20 @@ Deno.serve(async (req) => {
       },
       { onConflict: "id" },
     );
-    await admin.from("user_roles").upsert(
+    if (profileErr) {
+      await admin.auth.admin.deleteUser(created.user.id).catch(() => {});
+      await admin.from("allowed_signup_emails").delete().eq("email", email);
+      return jsonResponse({ error: "Profile provisioning failed" }, 500);
+    }
+    const { error: roleProvisionError } = await admin.from("user_roles").upsert(
       { user_id: created.user.id, role },
       { onConflict: "user_id,role" },
     );
+    if (roleProvisionError) {
+      await admin.auth.admin.deleteUser(created.user.id).catch(() => {});
+      await admin.from("allowed_signup_emails").delete().eq("email", email);
+      return jsonResponse({ error: "Role provisioning failed" }, 500);
+    }
     // Non-admin roles are operational identities and MUST own an active,
     // linked staff_profiles row (see docs/QA_IDENTITY_PROVISIONING.md and
     // usePermissions.linked gate). Admin bypasses by design. If staff
@@ -171,7 +195,7 @@ Deno.serve(async (req) => {
     const requiresStaffProfile = role !== "admin";
     if (requiresStaffProfile || branch_id) {
       // staff_profiles.employee_id is NOT NULL with no default. Generate one
-      // using the employee_id_counter so the upsert does not violate the
+      // using the database's atomic allocator so the upsert does not violate the
       // constraint for newly created users.
       const { data: existing } = await admin
         .from("staff_profiles")
@@ -181,16 +205,13 @@ Deno.serve(async (req) => {
 
       let employeeId = existing?.employee_id as string | undefined;
       if (!employeeId) {
-        const { data: counter } = await admin
-          .from("employee_id_counter")
-          .select("id, last_value")
-          .eq("id", 1)
-          .maybeSingle();
-        const next = ((counter?.last_value as number) ?? 0) + 1;
-        await admin
-          .from("employee_id_counter")
-          .upsert({ id: 1, last_value: next });
-        employeeId = `EMP-${String(next).padStart(4, "0")}`;
+        try {
+          employeeId = await allocateEmployeeId(admin);
+        } catch {
+          await admin.auth.admin.deleteUser(created.user.id).catch(() => {});
+          await admin.from("allowed_signup_emails").delete().eq("email", email);
+          return jsonResponse({ error: "Employee ID allocation failed" }, 500);
+        }
       }
 
       const { error: spErr } = await admin.from("staff_profiles").upsert(
@@ -211,7 +232,7 @@ Deno.serve(async (req) => {
         await admin.auth.admin.deleteUser(created.user.id).catch(() => {});
         await admin.from("allowed_signup_emails").delete().eq("email", email);
         return jsonResponse(
-          { error: `Staff profile provisioning failed: ${spErr.message}` },
+          { error: "Staff profile provisioning failed" },
           500,
         );
       }
@@ -227,10 +248,7 @@ Deno.serve(async (req) => {
       password: initialPassword,
       password_was_generated: !suppliedPassword,
     });
-  } catch (e) {
-    return jsonResponse(
-      { error: (e as Error).message ?? "Unknown error" },
-      500,
-    );
+  } catch {
+    return jsonResponse({ error: "Unable to create user" }, 500);
   }
 });

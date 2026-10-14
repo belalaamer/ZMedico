@@ -41,12 +41,12 @@ jobs:
 
       - name: Authenticated Admin E2E smoke
         env:
-          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
-          ADMIN_PASS: ${{ secrets.ADMIN_PASS }}
+          ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL || secrets.ADMIN_EMAIL }}
+          ADMIN_PASS: ${{ secrets.TEST_ADMIN_PASSWORD || secrets.ADMIN_PASS }}
         run: |
           set -euo pipefail
           if [ -z "${ADMIN_EMAIL:-}" ] || [ -z "${ADMIN_PASS:-}" ]; then
-            echo "::error title=Authenticated E2E required::Set repository secrets ADMIN_EMAIL and ADMIN_PASS before deploying."
+            echo "::error title=Authenticated E2E required::Set repository secrets TEST_ADMIN_EMAIL and TEST_ADMIN_PASSWORD (or ADMIN_EMAIL and ADMIN_PASS) before deploying."
             exit 1
           fi
 

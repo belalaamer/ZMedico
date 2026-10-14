@@ -29,8 +29,8 @@ jobs:
       - name: Build
         run: bun run build
 
-      - name: Install Chromium for public E2E smoke
-        run: bunx playwright install --with-deps chromium
+      - name: Install Chromium and WebKit for E2E smoke
+        run: bunx playwright install --with-deps chromium webkit
 
       - name: Public E2E smoke
         run: |

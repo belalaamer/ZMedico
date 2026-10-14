@@ -55,11 +55,12 @@ const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 function clearLocalAppState() {
   try {
     localStorage.removeItem("zmedico.branch");
-    // Best-effort: drop any cached supabase auth tokens if signOut failed.
-    clearPersistedAuthSessions();
   } catch {
     /* ignore */
   }
+  // Independent best-effort cleanup: a blocked branch preference must not
+  // prevent clearing the matching sessionStorage fallback after signout.
+  clearPersistedAuthSessions();
 }
 
 function notifySessionInvalid() {

@@ -15,11 +15,13 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_Vu3oi0N4hmxPzTsScwrwFA_Wt3-CUyU
 const PROVIDER_SUBDOMAIN_SUFFIXES = ["belalaamer.com", "zmedico.com"];
 const DOMAIN_GATEWAY_PATH = "/api/domains";
 const PATIENT_PORTAL_EMAIL_PATH = "/api/patient-portal-email";
+const MAX_PORTAL_EMAIL_BODY_BYTES = 16 * 1024;
 const SUPABASE_AUTH_USER_URL = "https://rqcmnfzfytyyicelvifk.supabase.co/auth/v1/user";
 const SUPABASE_PATIENT_CONTEXT_URL = "https://rqcmnfzfytyyicelvifk.supabase.co/rest/v1/rpc/patient_portal_send_context";
 const SUPABASE_EMAIL_TEMPLATE_URL = "https://rqcmnfzfytyyicelvifk.supabase.co/rest/v1/email_templates";
 const PROVIDER_SUBDOMAIN_HEALTH_PATH = "/_zmedico/provisioning-check";
 const MAX_GATEWAY_BODY_BYTES = 32 * 1024;
+const UPSTREAM_TIMEOUT_MS = 10_000;
 const DEFAULT_ORIGIN = "https://zmedico2.belalaamer.workers.dev";
 // Both platform-owned marketing domains. zmedico.com/www were registered as
 // Workers Custom Domains alongside belalaamer.com/www -- without listing them
@@ -111,6 +113,15 @@ function jsonResponse(body: unknown, status: number, request: Request): Response
   return new Response(JSON.stringify(body), { status, headers: { ...Object.fromEntries(gatewayHeaders(request)), "Content-Type": "application/json" } });
 }
 
+function applyBrowserSecurityHeaders(headers: Headers): Headers {
+  headers.set("X-Content-Type-Options", "nosniff");
+  headers.set("X-Frame-Options", "SAMEORIGIN");
+  headers.set("Content-Security-Policy", "frame-ancestors 'self'");
+  headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(self)");
+  return headers;
+}
+
 function renderTemplate(template: string, values: Record<string, string>): string {
   return template.replace(/{{\s*([a-z0-9_]+)\s*}}/gi, (_, key: string) => values[key] ?? "");
 }
@@ -122,21 +133,35 @@ function validEmail(value: string | null | undefined): value is string {
   return !!value && /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(value) && !/[\r\n]/.test(value);
 }
 function escapeHtml(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;");
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-async function fetchJson<T>(url: string, token: string, init?: RequestInit): Promise<{ response: Response; data: T | null }> {
-  const response = await fetch(url, {
-    ...init,
-    headers: {
-      apikey: SUPABASE_PUBLISHABLE_KEY,
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
-  const data = await response.json().catch(() => null) as T | null;
-  return { response, data };
+async function fetchWithTimeout(input: string, init?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function fetchJson<T>(url: string, token: string, init?: RequestInit): Promise<{ response: Response | null; data: T | null }> {
+  try {
+    const response = await fetchWithTimeout(url, {
+      ...init,
+      headers: {
+        apikey: SUPABASE_PUBLISHABLE_KEY,
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+    });
+    const data = await response.json().catch(() => null) as T | null;
+    return { response, data };
+  } catch {
+    return { response: null, data: null };
+  }
 }
 
 async function sendPatientPortalEmail(request: Request, env: Env): Promise<Response> {
@@ -147,24 +172,40 @@ async function sendPatientPortalEmail(request: Request, env: Env): Promise<Respo
   const token = authorization.slice("Bearer ".length).trim();
   if (!token) return jsonResponse({ error: "Unauthorized" }, 401, request);
 
+  const contentLength = Number(request.headers.get("Content-Length") ?? "0");
+  if (contentLength > MAX_PORTAL_EMAIL_BODY_BYTES) return jsonResponse({ error: "Request body is too large" }, 413, request);
   let body: PortalEmailInput;
-  try { body = await request.json() as PortalEmailInput; } catch { return jsonResponse({ error: "Invalid JSON" }, 400, request); }
+  try {
+    const rawBody = await request.text();
+    if (new TextEncoder().encode(rawBody).byteLength > MAX_PORTAL_EMAIL_BODY_BYTES) {
+      return jsonResponse({ error: "Request body is too large" }, 413, request);
+    }
+    const parsed: unknown = JSON.parse(rawBody);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return jsonResponse({ error: "Invalid portal email request" }, 400, request);
+    }
+    body = parsed as PortalEmailInput;
+  } catch { return jsonResponse({ error: "Invalid JSON" }, 400, request); }
   const patientId = typeof body.patient_id === "string" ? body.patient_id : "";
   const temporaryPassword = typeof body.temporary_password === "string" ? body.temporary_password : "";
   const username = typeof body.username === "string" ? body.username : "";
   const language = body.language === "en" ? "en" : "ar";
-  if (!/^[0-9a-f-]{36}$/i.test(patientId) || !username || temporaryPassword.length < 8 || temporaryPassword.length > 256) {
+  if (!/^[0-9a-f-]{36}$/i.test(patientId) || !username || username.length > 120 || temporaryPassword.length < 8 || temporaryPassword.length > 256) {
     return jsonResponse({ error: "Invalid portal email request" }, 400, request);
   }
 
   const userResult = await fetchJson<{ id?: string }>(SUPABASE_AUTH_USER_URL, token);
+  if (!userResult.response) return jsonResponse({ error: "Authentication service is unavailable" }, 502, request);
+  if (userResult.response.status >= 500) return jsonResponse({ error: "Authentication service is unavailable" }, 502, request);
   if (!userResult.response.ok || !userResult.data?.id) return jsonResponse({ error: "Unauthorized" }, 401, request);
   const contextResult = await fetchJson<PortalSendContext>(SUPABASE_PATIENT_CONTEXT_URL, token, { method: "POST", body: JSON.stringify({ p_patient_id: patientId }) });
+  if (!contextResult.response || contextResult.response.status >= 500) return jsonResponse({ error: "Patient service is unavailable" }, 502, request);
   if (!contextResult.response.ok || !contextResult.data?.allowed || !contextResult.data.email) return jsonResponse({ error: "Forbidden" }, 403, request);
   if (contextResult.data.email_enabled !== true) return jsonResponse({ error: "Email delivery is disabled for this workspace" }, 400, request);
 
   const templateUrl = `${SUPABASE_EMAIL_TEMPLATE_URL}?template_key=eq.patient_portal_credentials&is_active=eq.true&select=subject_en,subject_ar,body_en,body_ar&limit=1`;
   const templateResult = await fetchJson<PortalEmailTemplate[]>(templateUrl, token);
+  if (!templateResult.response || !templateResult.response.ok) return jsonResponse({ error: "Email template service is unavailable" }, 503, request);
   const template = templateResult.data?.[0];
   if (!template) return jsonResponse({ error: "Patient portal email template is not configured" }, 503, request);
 
@@ -190,7 +231,7 @@ async function sendPatientPortalEmail(request: Request, env: Env): Promise<Respo
   try {
     if (provider === "resend") {
       if (!env.RESEND_API_KEY) return jsonResponse({ error: "Resend is not configured on the Worker" }, 503, request);
-      const resendResponse = await fetch("https://api.resend.com/emails", {
+      const resendResponse = await fetchWithTimeout("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({ from, to: [contextResult.data.email], subject, text, html, ...(replyTo ? { reply_to: replyTo } : {}) }),
@@ -226,7 +267,12 @@ async function proxyDomainRequest(request: Request): Promise<Response> {
     if (value) forwardedHeaders.set(name, value);
   }
 
-  const upstream = await fetch(DOMAIN_FUNCTION_URL, { method: "POST", headers: forwardedHeaders, body });
+  let upstream: Response;
+  try {
+    upstream = await fetchWithTimeout(DOMAIN_FUNCTION_URL, { method: "POST", headers: forwardedHeaders, body });
+  } catch {
+    return jsonResponse({ error: "Domain service is unavailable" }, 502, request);
+  }
   const responseHeaders = gatewayHeaders(request);
   responseHeaders.set("Content-Type", upstream.headers.get("Content-Type") ?? "application/json");
   return new Response(upstream.body, { status: upstream.status, statusText: upstream.statusText, headers: responseHeaders });
@@ -267,8 +313,10 @@ export default {
     if (isHtmlRequest) {
       url.searchParams.set("__zmedico_build", "whitelabel-20260825");
     }
-    // Only HTML GET requests use the synthetic asset URL. Copy their
-    // required fields without a potentially cross-realm AbortSignal.
+    // Rebuild the synthetic HTML request without copying `request.signal`.
+    // Node/Vitest can provide a cross-realm AbortSignal that undici rejects,
+    // while Cloudflare's runtime does not need the original signal for this
+    // asset fetch.
     const assetRequest = isHtmlRequest
       ? new Request(url, { method: request.method, headers: request.headers, redirect: request.redirect })
       : request;
@@ -299,12 +347,13 @@ export default {
         headers.set("content-type", "text/javascript; charset=UTF-8");
       }
       headers.set("cache-control", "public, max-age=31536000, immutable");
-      headers.set("x-content-type-options", "nosniff");
+      applyBrowserSecurityHeaders(headers);
       return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
     }
 
     if (isHtmlRequest || (isJavaScriptRequest && !contentType)) {
       const headers = new Headers(response.headers);
+      applyBrowserSecurityHeaders(headers);
       if (isHtmlRequest) {
         headers.set("cache-control", "no-store, max-age=0");
       } else {

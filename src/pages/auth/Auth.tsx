@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Stethoscope, Globe } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,6 +16,7 @@ import { hasPersistedAuthSession, persistAuthSessionForPreview } from "@/lib/aut
 import { resolvePostAuthDestination } from "@/lib/authRedirect";
 import { useTenantBranding } from "@/contexts/TenantBrandingContext";
 import { signInWithIdentifier } from "@/lib/signInWithIdentifier";
+import { reportAuthFailure } from "@/lib/authFailureTelemetry";
 
 function authDebug(message: string, details?: Record<string, unknown>) {
   if (import.meta.env.DEV) console.info("[auth-debug]", message, details ?? {});
@@ -75,6 +76,9 @@ export default function AuthPage() {
   const [resetOpen, setResetOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
+  const resetBusy = useRef(false);
+  const mounted = useRef(false);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
   useEffect(() => {
     authDebug( "auth page mounted", {
@@ -103,6 +107,7 @@ export default function AuthPage() {
 
   const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (resetBusy.current) return;
 
     const form = e.currentTarget;
     const formData = new FormData(form);
@@ -168,18 +173,33 @@ export default function AuthPage() {
 
   const handleSendReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!resetEmail || !resetEmail.includes("@")) {
+    e.stopPropagation();
+    if (resetBusy.current) return;
+    const email = resetEmail.trim().toLowerCase();
+    if (!isValidEmailAddress(email)) {
       toast.error(lang === "ar" ? "أدخل بريداً صالحاً" : "Enter a valid email");
       return;
     }
+    resetBusy.current = true;
     setResetLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    setResetLoading(false);
-    if (error) { toast.error(error.message); return; }
-    toast.success(t("resetLinkSent"));
-    setResetOpen(false);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (!mounted.current) return;
+      if (error) { reportAuthFailure("send-recovery-link", "rejected", error); toast.error(lang === "ar" ? "تعذر إرسال رابط الاستعادة. تحقق من الاتصال وحاول لاحقًا." : "Unable to send the recovery link. Check your connection and try again later."); return; }
+      // Same response for registered/unregistered email addresses; do not enumerate accounts.
+      toast.success(t("resetLinkSent"));
+      setResetOpen(false);
+    } catch {
+      if (mounted.current) {
+        reportAuthFailure("send-recovery-link", "transport");
+        toast.error(lang === "ar" ? "لم يتأكد إرسال الرابط. تحقق من بريدك قبل إعادة المحاولة." : "Sending the link could not be confirmed. Check your inbox before trying again.");
+      }
+    } finally {
+      resetBusy.current = false;
+      if (mounted.current) setResetLoading(false);
+    }
   };
 
   return (
@@ -236,13 +256,14 @@ export default function AuthPage() {
                     <Label htmlFor="password">{t("password")}</Label>
                     <Input id="password" name="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
                   </div>
-                  <Button type="submit" className="w-full gradient-primary text-primary-foreground hover:opacity-95" disabled={loading}>
+                  <Button type="submit" className="w-full gradient-primary text-primary-foreground hover:opacity-95" disabled={loading || resetLoading}>
                     {t("signIn")}
                   </Button>
+              </form>
                   <div className="text-end">
-                    <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+                    <Dialog open={resetOpen} onOpenChange={(open) => { if (!resetBusy.current) setResetOpen(open); }}>
                       <DialogTrigger asChild>
-                        <button type="button" className="text-xs text-primary hover:underline">
+                        <button type="button" disabled={loading} className="text-xs text-primary hover:underline">
                           {t("forgotPassword")}
                         </button>
                       </DialogTrigger>
@@ -251,10 +272,10 @@ export default function AuthPage() {
                         <form onSubmit={handleSendReset} className="space-y-4">
                           <div className="space-y-2">
                             <Label htmlFor="rsemail">{t("email")}</Label>
-                            <Input id="rsemail" type="email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} required />
+                            <Input id="rsemail" type="email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} disabled={resetLoading} required />
                           </div>
                           <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => setResetOpen(false)}>{t("cancel")}</Button>
+                            <Button type="button" variant="outline" disabled={resetLoading} onClick={() => setResetOpen(false)}>{t("cancel")}</Button>
                             <Button type="submit" className="gradient-primary text-primary-foreground" disabled={resetLoading}>
                               {t("sendResetLink")}
                             </Button>
@@ -263,7 +284,6 @@ export default function AuthPage() {
                       </DialogContent>
                     </Dialog>
                   </div>
-                </form>
               {!isBrandedTenantHost ? <div className="mt-5 border-t pt-4 text-center">
                 <p className="text-xs text-muted-foreground">
                   {lang === "ar" ? "ليس لديك حساب؟ اطلب تجربة لعيادتك وسيتواصل معك فريق ZMedico." : "New clinic? Request a trial and the ZMedico team will contact you."}

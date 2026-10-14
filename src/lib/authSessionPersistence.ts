@@ -42,25 +42,22 @@ export function getCanonicalAuthStorageKey() {
 export function listAuthStorageKeys() {
   if (typeof window === "undefined") return [];
   const canonical = getCanonicalAuthStorageKey();
-  const keys = new Set<string>();
-  if (canonical) keys.add(canonical);
-  Object.keys(window.localStorage).forEach((key) => {
-    if (key.startsWith("sb-") && key.endsWith(AUTH_STORAGE_SUFFIX)) keys.add(key);
-  });
-  return Array.from(keys);
+  return canonical ? [canonical] : [];
+}
+
+function readStoredSession(storageName: "localStorage" | "sessionStorage", key: string) {
+  try {
+    return safeParseSession(window[storageName].getItem(key));
+  } catch {
+    return null;
+  }
 }
 
 export function readPersistedAuthSession() {
   if (typeof window === "undefined") return null;
   const canonical = getCanonicalAuthStorageKey();
-  const canonicalSession = canonical ? safeParseSession(window.localStorage.getItem(canonical)) : null;
-  if (canonicalSession) return canonicalSession;
-
-  for (const key of listAuthStorageKeys()) {
-    const session = safeParseSession(window.localStorage.getItem(key));
-    if (session) return session;
-  }
-  return null;
+  if (!canonical) return null;
+  return readStoredSession("localStorage", canonical) ?? readStoredSession("sessionStorage", canonical);
 }
 
 export function hasPersistedAuthSession() {
@@ -81,7 +78,7 @@ export function getAuthStorageSnapshot() {
   }
 
   const canonicalStorageKey = getCanonicalAuthStorageKey();
-  const canonicalSession = canonicalStorageKey ? safeParseSession(window.localStorage.getItem(canonicalStorageKey)) : null;
+  const canonicalSession = canonicalStorageKey ? readStoredSession("localStorage", canonicalStorageKey) : null;
   const session = canonicalSession ?? readPersistedAuthSession();
 
   return {
@@ -100,8 +97,12 @@ export function persistAuthSessionForPreview(session: Session | null, source: st
   const serialized = JSON.stringify(session);
   const keys = listAuthStorageKeys();
   keys.forEach((key) => {
-    if (window.localStorage.getItem(key) !== serialized) {
-      window.localStorage.setItem(key, serialized);
+    try {
+      if (window.localStorage.getItem(key) !== serialized) {
+        window.localStorage.setItem(key, serialized);
+      }
+    } catch {
+      /* Browser storage is optional; the SDK session remains authoritative. */
     }
     try {
       window.sessionStorage.setItem(key, serialized);
@@ -110,18 +111,22 @@ export function persistAuthSessionForPreview(session: Session | null, source: st
     }
   });
 
-  const snapshot = getAuthStorageSnapshot();
-  console.info(AUTH_DEBUG_PREFIX, "auth session persisted for preview", {
-    path: window.location.pathname + window.location.search,
-    source,
-    ...snapshot,
-  });
+  if (import.meta.env.DEV) {
+    console.info(AUTH_DEBUG_PREFIX, "auth session persistence attempted", {
+      source,
+      hasPersistedSession: hasPersistedAuthSession(),
+    });
+  }
 }
 
 export function clearPersistedAuthSessions() {
   if (typeof window === "undefined") return;
   listAuthStorageKeys().forEach((key) => {
-    window.localStorage.removeItem(key);
+    try {
+      window.localStorage.removeItem(key);
+    } catch {
+      /* Still attempt the independent sessionStorage cleanup below. */
+    }
     try {
       window.sessionStorage.removeItem(key);
     } catch {

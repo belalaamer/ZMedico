@@ -8,6 +8,15 @@ function testEnv(assets: Env["ASSETS"] = {} as Env["ASSETS"]): Env {
 afterEach(() => vi.restoreAllMocks());
 
 describe("custom domain gateway", () => {
+  it.each(["null", "[]", '"text"', "42", "true"])("rejects non-object portal payload %s", async (body) => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await worker.fetch(new Request("https://zmedico2.belalaamer.workers.dev/api/patient-portal-email", {
+      method: "POST", headers: { Authorization: "Bearer test-jwt" }, body,
+    }), testEnv());
+    expect(response.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
   it("rejects methods other than POST without contacting Supabase", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
@@ -16,6 +25,19 @@ describe("custom domain gateway", () => {
 
     expect(response.status).toBe(405);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("returns a controlled gateway error when the domain service is unavailable", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network unavailable")));
+
+    const response = await worker.fetch(new Request("https://zmedico2.belalaamer.workers.dev/api/domains", {
+      method: "POST",
+      headers: { Authorization: "Bearer test-jwt", "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "list", tenant_id: "tenant-1" }),
+    }), testEnv());
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: "Domain service is unavailable" });
   });
 
   it("rejects oversized bodies at the Worker edge", async () => {
@@ -77,6 +99,61 @@ describe("custom domain gateway", () => {
     expect(response.status).toBe(200);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(assetsFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("adds browser security headers to the HTML shell", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const assetsFetch = vi.fn().mockResolvedValue(new Response("app shell", {
+      status: 200,
+      headers: { "Content-Type": "text/html" },
+    }));
+
+    const response = await worker.fetch(new Request("https://belalaamer.com/"), testEnv({ fetch: assetsFetch } as unknown as Env["ASSETS"]));
+
+    expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    expect(response.headers.get("X-Frame-Options")).toBe("SAMEORIGIN");
+    expect(response.headers.get("Content-Security-Policy")).toBe("frame-ancestors 'self'");
+    expect(response.headers.get("Referrer-Policy")).toBe("strict-origin-when-cross-origin");
+    expect(response.headers.get("Permissions-Policy")).toBe("camera=(), microphone=(), geolocation=(self)");
+  });
+
+  it("rejects oversized patient portal email bodies before Supabase calls", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await worker.fetch(new Request("https://zmedico2.belalaamer.workers.dev/api/patient-portal-email", {
+      method: "POST",
+      headers: { Authorization: "Bearer test-jwt", "Content-Type": "application/json" },
+      body: JSON.stringify({ patient_id: "00000000-0000-0000-0000-000000000000", username: "u", temporary_password: "password", padding: "x".repeat(17_000) }),
+    }), testEnv());
+
+    expect(response.status).toBe(413);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects an overlong portal username before authentication lookup", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await worker.fetch(new Request("https://zmedico2.belalaamer.workers.dev/api/patient-portal-email", {
+      method: "POST",
+      headers: { Authorization: "Bearer test-jwt", "Content-Type": "application/json" },
+      body: JSON.stringify({ patient_id: "00000000-0000-0000-0000-000000000000", username: "u".repeat(121), temporary_password: "password" }),
+    }), testEnv());
+
+    expect(response.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("distinguishes an unavailable authentication service from invalid credentials", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network unavailable")));
+
+    const response = await worker.fetch(new Request("https://zmedico2.belalaamer.workers.dev/api/patient-portal-email", {
+      method: "POST",
+      headers: { Authorization: "Bearer test-jwt", "Content-Type": "application/json" },
+      body: JSON.stringify({ patient_id: "00000000-0000-0000-0000-000000000000", username: "patient", temporary_password: "password" }),
+    }), testEnv());
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: "Authentication service is unavailable" });
   });
 
   it("forwards the authenticated request to the Supabase function", async () => {

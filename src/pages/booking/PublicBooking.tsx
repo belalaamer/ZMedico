@@ -12,6 +12,7 @@ import { getPublicBookingLocator } from "@/lib/publicBookingTenant";
 import { toast } from "sonner";
 import { localizedTenantName } from "@/lib/tenantName";
 import { captureAdAttribution, getStoredAdAttribution } from "@/lib/adAttribution";
+import { nearestBookingDay } from "@/lib/nearestBookingDay";
 
  type Lang = "ar" | "en";
 
@@ -175,6 +176,17 @@ export default function PublicBooking() {
   const [date, setDate] = useState("");
   const [slots, setSlots] = useState<Slot[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotsError, setSlotsError] = useState(false);
+  const [slotsRetry, setSlotsRetry] = useState(0);
+  const [nearestLoading, setNearestLoading] = useState(false);
+  const nearestBusy = useRef(false);
+  const searchGeneration = useRef(0);
+  useEffect(() => {
+    searchGeneration.current += 1;
+    nearestBusy.current = false;
+    setNearestLoading(false);
+    return () => { searchGeneration.current += 1; };
+  }, [tenantId, branchId, serviceId, doctorId, date, slotsRetry]);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [submitting, setSubmitting] = useState(false);
@@ -308,8 +320,10 @@ export default function PublicBooking() {
   useEffect(() => {
     let cancelled = false;
     const loadSlots = async () => {
+      setSlotsError(false);
       if (!branchId || !serviceId || !date) {
         setSlots([]);
+        setSlotsLoading(false);
         return;
       }
       if (!tenantId) {
@@ -319,25 +333,29 @@ export default function PublicBooking() {
       }
       setSlotsLoading(true);
       setSelectedSlot(null);
-      const { data, error } = await publicRpc<Slot[]>("public_booking_slots_for_tenant", {
+      try {
+        const { data, error } = await publicRpc<Slot[]>("public_booking_slots_for_tenant", {
         p_tenant_id: tenantId,
         p_branch_id: branchId,
         p_service_id: serviceId,
         p_date: date,
         p_doctor_id: doctorId || null,
       });
-      if (cancelled) return;
-      if (error) {
-        setSlots([]);
-        toast.error(error.message || (isArabicRef.current ? "تعذر تحميل المواعيد المتاحة" : "Unable to load available times"));
-      } else {
+        if (cancelled) return;
+        if (error) throw new Error("availability");
         setSlots((data ?? []).filter((slot) => slot.available));
+      } catch {
+        if (cancelled) return;
+        setSlots([]);
+        setSlotsError(true);
+        console.warn("[PublicBooking] Availability request failed; retry is available.");
+      } finally {
+        if (!cancelled) setSlotsLoading(false);
       }
-      setSlotsLoading(false);
     };
     void loadSlots();
     return () => { cancelled = true; };
-  }, [tenantId, branchId, serviceId, doctorId, date]);
+  }, [tenantId, branchId, serviceId, doctorId, date, slotsRetry]);
 
   // A slot is ephemeral; if it disappears while the user is on the details
   // step, return to the time picker instead of rendering a null slot.
@@ -355,6 +373,47 @@ export default function PublicBooking() {
     max.setDate(max.getDate() + days);
     return localDateInputValue(max);
   }, [branch]);
+
+  const findNearest = async () => {
+    if (nearestBusy.current || slotsLoading || !tenantId || !branchId || !serviceId) return;
+    nearestBusy.current = true;
+    const generation = ++searchGeneration.current;
+    setNearestLoading(true);
+    try {
+      // Bound the search to 14 days and the branch's booking horizon.
+      // Eligibility and advance-notice rules remain exclusively server enforced.
+      const cairoToday = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+      const horizon = new Date(`${cairoToday}T12:00:00Z`);
+      horizon.setUTCDate(horizon.getUTCDate() + (branch?.max_future_booking_days ?? 30));
+      const found = await nearestBookingDay<Slot>(cairoToday, horizon.toISOString().slice(0, 10), branch?.working_days ?? null, async day => {
+        const response = await publicRpc<Slot[]>("public_booking_slots_for_tenant", {
+          p_tenant_id: tenantId, p_branch_id: branchId, p_service_id: serviceId,
+          p_date: day, p_doctor_id: doctorId || null,
+        });
+        if (response.error) throw new Error("availability");
+        return response.data ?? [];
+      }, () => searchGeneration.current === generation);
+      if (searchGeneration.current !== generation) return;
+      if (found) {
+          // Reload the date's current availability; never reserve a stale result.
+          setDate(found.day);
+          setSlotsError(false);
+          setSlots(found.slots);
+          setSelectedSlot(null);
+          setStep(2);
+          toast.success(isArabicRef.current ? "تم العثور على أقرب يوم متاح؛ اختر الوقت للتأكيد." : "Earliest available day found. Select a time to continue.");
+          return;
+      }
+      toast.info(isArabicRef.current ? "لا توجد مواعيد متاحة خلال فترة البحث (حتى ١٤ يومًا). جرّب تاريخًا آخر." : "No availability in the search window (up to 14 days). Try another date.");
+    } catch {
+      if (searchGeneration.current === generation) toast.error(isArabicRef.current ? "تعذر البحث عن المواعيد. حاول مجددًا." : "Unable to search availability. Please retry.");
+    } finally {
+      if (searchGeneration.current === generation) {
+        nearestBusy.current = false;
+        setNearestLoading(false);
+      }
+    }
+  };
 
   const dateHelp = useMemo(() => {
     if (!date) return "";
@@ -621,12 +680,14 @@ export default function PublicBooking() {
                         </select>
                         {doctors.length > 0 ? <p className="text-xs text-muted-foreground">{isArabic ? `تم العثور على ${doctors.length} طبيب مؤهل لهذه الخدمة.` : `${doctors.length} eligible doctor${doctors.length === 1 ? "" : "s"} found for this service.`}</p> : <p className="text-xs text-muted-foreground">{isArabic ? "لا يوجد تخصيص محدد لطبيب؛ سيبحث النظام عن طبيب متاح." : "No specific doctor assignment is configured; the system will find an available doctor."}</p>}
                       </div>
+                      <Button type="button" variant="outline" disabled={nearestLoading || slotsLoading} onClick={() => void findNearest()}>{nearestLoading ? (isArabic ? "جارٍ البحث…" : "Searching…") : (isArabic ? "أقرب موعد متاح خلال ١٤ يومًا" : "Find earliest availability within 14 days")}</Button>
                       {slotsLoading ? <div className="py-10 text-center text-sm text-muted-foreground">{isArabic ? "جارٍ البحث عن المواعيد…" : "Finding available times…"}</div> : null}
-                      {!slotsLoading && !slots.length ? <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">{isArabic ? "لا توجد مواعيد متاحة لهذا اليوم. اختر تاريخًا آخر." : "No available times for this day. Please choose another date."}</div> : null}
+                      {!slotsLoading && slotsError ? <div role="alert" className="rounded-2xl border border-destructive/40 p-5 space-y-3 text-sm"><p>{isArabic ? "تعذر تحميل المواعيد. تحقق من الاتصال وحاول مجددًا." : "Unable to load availability. Check your connection and retry."}</p><Button type="button" variant="outline" onClick={() => setSlotsRetry(value => value + 1)}>{isArabic ? "إعادة المحاولة" : "Retry"}</Button></div> : null}
+                      {!slotsLoading && !slotsError && !slots.length ? <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">{isArabic ? "لا توجد مواعيد متاحة لهذا اليوم. اختر تاريخًا آخر." : "No available times for this day. Please choose another date."}</div> : null}
                       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                         {slots.map((slot) => <button type="button" key={slot.slot_start} onClick={() => setSelectedSlot(slot)} className={cn("rounded-xl border px-3 py-3 text-sm font-semibold transition-colors", selectedSlot?.slot_start === slot.slot_start ? "border-primary bg-primary text-primary-foreground shadow-md" : "bg-background hover:border-primary hover:bg-primary/5")}>{formatSlot(slot.slot_start, lang)}</button>)}
                       </div>
-                      <Button className="w-full" onClick={continueToDetails} disabled={!selectedSlot}>{isArabic ? "متابعة البيانات" : "Continue with details"}</Button>
+                      <Button className="w-full" onClick={continueToDetails} disabled={!selectedSlot || nearestLoading || slotsLoading}>{isArabic ? "متابعة البيانات" : "Continue with details"}</Button>
                     </section>
                   ) : null}
 

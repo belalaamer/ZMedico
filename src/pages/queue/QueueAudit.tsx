@@ -15,16 +15,9 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { patientDisplayName } from "@/lib/patientName";
 
-const QUEUE_ACTIONS = [
-  "status_change",
-  "doctor_reassigned",
-  "room_assigned",
-  "walk_in_created",
-  "consultation_opened",
-] as const;
+import { QUEUE_AUDIT_ACTIONS as QUEUE_ACTIONS, QUEUE_AUDIT_SAFE_KEYS as SAFE_KEYS } from "@/lib/queueAuditActions";
 type QAction = typeof QUEUE_ACTIONS[number];
 
-const SAFE_KEYS = ["status", "doctor_id", "room", "priority", "is_walk_in", "checked_in_at", "started_at"];
 
 // --- Audit filter presets (Phase 9) -------------------------------------------
 // Now persisted server-side in public.audit_export_presets, scoped per branch

@@ -22,12 +22,13 @@ import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { patientDisplayName } from "@/lib/patientName";
 import { doctorDisplayName } from "@/lib/doctorName";
 import { buildStatusPatch, type ApptStatus } from "@/lib/appointmentStatus";
-import { logQueueAudit } from "@/lib/queueAudit";
-import { getOrCreateAppointmentMedicalRecord } from "@/lib/medicalRecordEncounter";
+import { updateQueueAppointment } from "@/lib/queueMutation";
+import { openQueueConsultation, queueConsultationErrorCode, queueConsultationErrorMessage } from "@/lib/queueConsultation";
 import type { DictKey } from "@/lib/i18n";
 import { getQueueSettings, fetchQueueSettings, type QueueSettings } from "@/lib/queueSettings";
 import { listOpenAlerts, effectiveState, type QueueAlert } from "@/lib/queueAlerts";
 import { Switch } from "@/components/ui/switch";
+import { useOperationScope } from "@/hooks/useOperationScope";
 
 type PatientOption = {
   id: string;
@@ -53,6 +54,7 @@ type QueueRow = {
   branch_id: string | null;
   room: string | null;
   scheduled_at: string;
+  updated_at: string;
   status: ApptStatus;
   procedure: string | null;
   priority: number | null;
@@ -130,6 +132,10 @@ export default function QueuePage() {
   // AuthorizationService's own short-circuit, which is why the bug went
   // unnoticed for admin testing.
   const canMutate = authz.can("appointments.edit");
+  const canStartConsultation = canMutate && authz.can("medical_records.create");
+  const beginConsultationScope = useOperationScope(user?.id && currentBranchId
+    ? `${user.id}:${currentBranchId}:${canStartConsultation ? "write" : "read"}` : null);
+  const consultationPendingRef = useRef(new Set<string>());
   const [rows, setRows] = useState<QueueRow[]>([]);
   const loadRequestRef = useRef(0);
   const [doctors, setDoctors] = useState<QueueDoctor[]>([]);
@@ -148,6 +154,7 @@ export default function QueuePage() {
   const [walkInRoom, setWalkInRoom] = useState("");
   const [walkInProcedure, setWalkInProcedure] = useState("");
   const [walkInSaving, setWalkInSaving] = useState(false);
+  const walkInSubmittingRef = useRef(false);
   const [selfCheckinRow, setSelfCheckinRow] = useState<QueueRow | null>(null);
   const [selfCheckinUrl, setSelfCheckinUrl] = useState<string | null>(null);
   const [selfCheckinExpiresAt, setSelfCheckinExpiresAt] = useState<string | null>(null);
@@ -223,7 +230,7 @@ export default function QueuePage() {
     const to = endOfDay(new Date()).toISOString();
     let q = supabase
       .from("appointments")
-      .select("id,patient_id,doctor_id,branch_id,room,scheduled_at,status,procedure,priority,checked_in_at,started_at,is_walk_in,patients!inner(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code,deleted_at)")
+      .select("id,patient_id,doctor_id,branch_id,room,scheduled_at,updated_at,status,procedure,priority,checked_in_at,started_at,is_walk_in,patients!inner(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code,deleted_at)")
       .is("deleted_at", null)
       .is("patients.deleted_at", null)
       .gte("scheduled_at", from)
@@ -354,24 +361,30 @@ export default function QueuePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered, tick]);
 
-  const updateRow = async (id: string, patch: Record<string, unknown>) => {
-    if (!canMutate) { toast.error(lang === "ar" ? "غير مسموح" : "Not allowed"); return; }
-    const { error } = await supabase.from("appointments").update(patch as never).eq("id", id);
-    if (error) { toast.error(error.message); return; }
+  const updateRow = async (id: string, patch: Record<string, unknown>, expectedStatus: ApptStatus, expectedPriority?: number | null): Promise<boolean> => {
+    if (!canMutate) { toast.error(lang === "ar" ? "غير مسموح" : "Not allowed"); return false; }
+    if (!currentBranchId) { toast.error(t("selectBranch")); return false; }
+    let updated = false;
+    try {
+      updated = await updateQueueAppointment({ appointmentId: id, branchId: currentBranchId, patch, expectedStatus, expectedPriority });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Queue update failed");
+      void load();
+      return false;
+    }
+    if (!updated) {
+      toast.error(lang === "ar" ? "تم تحديث الموعد بواسطة مستخدم آخر؛ أعد تحميل الطابور." : "This appointment was updated by another user. Refresh the queue and try again.");
+      await load();
+      return false;
+    }
     toast.success(t("saved"));
     load();
+    return true;
   };
 
   const transition = async (r: QueueRow, next: ApptStatus) => {
     const patch = buildStatusPatch(next, { checked_in_at: r.checked_in_at, started_at: r.started_at });
-    await updateRow(r.id, patch);
-    void logQueueAudit({
-      action: "status_change",
-      appointmentId: r.id,
-      branchId: r.branch_id,
-      oldValues: { status: r.status, checked_in_at: r.checked_in_at, started_at: r.started_at },
-      newValues: { status: next, ...patch },
-    });
+    if (!await updateRow(r.id, patch, r.status)) return;
   };
 
   const doCheckIn  = (r: QueueRow) => transition(r, "confirmed");
@@ -418,7 +431,7 @@ export default function QueuePage() {
   };
 
   // priority is binary today (0 / 1); column kept numeric for future tiers.
-  const togglePriority = (r: QueueRow) => updateRow(r.id, { priority: (r.priority ?? 0) > 0 ? 0 : 1 });
+  const togglePriority = (r: QueueRow) => updateRow(r.id, { priority: (r.priority ?? 0) > 0 ? 0 : 1 }, r.status, r.priority);
 
   const rowWaitingMs = (r: QueueRow) => {
     if (r.status !== "confirmed" || !r.checked_in_at) return 0;
@@ -460,9 +473,13 @@ export default function QueuePage() {
   // ---- Walk-in creation
   const submitWalkIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (walkInSubmittingRef.current) return;
     if (!canMutate) { toast.error(lang === "ar" ? "غير مسموح" : "Not allowed"); return; }
     if (!walkInPatient) { toast.error(t("selectPatient")); return; }
+    if (!branchSelectionReady || !currentBranchId) { toast.error(t("selectBranch")); return; }
+    walkInSubmittingRef.current = true;
     setWalkInSaving(true);
+    try {
     const nowIso = new Date().toISOString();
     // Walk-in = a brand-new appointment scheduled "now", immediately checked-in.
     // Reuses the same appointments row shape so it flows through every existing
@@ -471,7 +488,7 @@ export default function QueuePage() {
     const payload: import("@/integrations/supabase/types").TablesInsert<"appointments"> = {
       patient_id: walkInPatient,
       doctor_id: walkInDoctor || null,
-      branch_id: currentBranchId ?? null,
+      branch_id: currentBranchId,
       scheduled_at: nowIso,
       duration_minutes: 30,
       room: walkInRoom || null,
@@ -479,87 +496,74 @@ export default function QueuePage() {
       is_walk_in: true,
       ...patch,
     };
-    const { data: ins, error } = await supabase.from("appointments").insert(payload).select("id").single();
-    setWalkInSaving(false);
+    const { error } = await supabase.from("appointments").insert(payload).select("id").single();
     if (error) { toast.error(error.message); return; }
     toast.success(t("walkInCreated"));
-    if (ins?.id) {
-      void logQueueAudit({
-        action: "walk_in_created",
-        appointmentId: ins.id,
-        branchId: currentBranchId ?? null,
-        newValues: {
-          status: payload.status,
-          doctor_id: payload.doctor_id,
-          room: payload.room,
-          is_walk_in: true,
-          checked_in_at: payload.checked_in_at,
-        },
-      });
-    }
     setWalkInOpen(false);
     setWalkInPatient(""); setWalkInDoctor(""); setWalkInRoom(""); setWalkInProcedure("");
     load();
+    } catch (error) {
+      console.error("[Queue] walk-in outcome needs review", error);
+      toast.error(lang === "ar"
+        ? "تعذر تأكيد تسجيل الزيارة. راجع الطابور قبل إعادة المحاولة."
+        : "Walk-in outcome could not be confirmed. Check the queue before retrying.");
+    } finally {
+      walkInSubmittingRef.current = false;
+      setWalkInSaving(false);
+    }
   };
 
-  // Real consultation handoff:
-  //   1. Stamp in_progress on the appointment (preserves existing started_at).
-  //   2. Reuse an existing medical_records row tied to this appointment if any,
-  //      otherwise create a draft one so the chart/encounter screen has a target.
-  //   3. Navigate to the consultation editor; on failure, fall back to the
-  //      patient profile's clinical tab so the action is never a dead end.
+  // State and encounter creation commit together inside the caller-scoped RPC.
   const openConsultation = async (r: QueueRow) => {
-    if (canMutate && r.status !== "in_progress" && r.status !== "completed") {
-      const patch = buildStatusPatch("in_progress", { checked_in_at: r.checked_in_at, started_at: r.started_at });
-      const { error } = await supabase.from("appointments").update(patch as never).eq("id", r.id);
-      if (error) {
-        toast.error(error.message);
-        navigate(`/patients/${r.patient_id}?tab=clinical`);
-        return;
-      }
+    if (!currentBranchId || r.branch_id !== currentBranchId) {
+      toast.error(t("selectBranch"));
+      return;
     }
-    let recordId: string | undefined;
-    if (canMutate) {
-      try {
-        const encounter = await getOrCreateAppointmentMedicalRecord({
+    if (consultationPendingRef.current.has(r.id)) return;
+    consultationPendingRef.current.add(r.id);
+    const canStart = canStartConsultation;
+    const stillCurrent = beginConsultationScope();
+    try {
+      let recordId: string | undefined;
+      if (canStart) {
+        recordId = await openQueueConsultation({
           appointmentId: r.id,
-          patientId: r.patient_id,
-          branchId: r.branch_id ?? currentBranchId ?? null,
+          branchId: currentBranchId,
+          expectedStatus: r.status,
           doctorId: r.doctor_id ?? user?.id ?? null,
-          createdBy: user?.id ?? null,
+          expectedSnapshot: {patient_id: r.patient_id, doctor_id: r.doctor_id, updated_at: r.updated_at},
         });
-        recordId = encounter.id;
-      } catch (error: any) {
-        toast.error(error?.message ?? (lang === "ar" ? "تعذر فتح الاستشارة" : "Could not open consultation"));
-        navigate(`/patients/${r.patient_id}?tab=clinical`);
-        return;
-      }
-    } else {
-      const { data: existing } = await supabase
+      } else {
+        const { data: existing, error } = await supabase
         .from("medical_records")
         .select("id")
         .eq("appointment_id", r.id)
+        .eq("branch_id", currentBranchId)
         .is("deleted_at", null)
         .order("created_at", { ascending: false })
         .limit(1);
-      recordId = existing?.[0]?.id as string | undefined;
+        if (error) throw error;
+        recordId = existing?.[0]?.id;
+      }
+      if (!stillCurrent()) return;
+      if (recordId) navigate(`/medical/consultation/${recordId}`);
+      else navigate(`/patients/${r.patient_id}?tab=clinical`);
+    } catch (error: unknown) {
+      if (!stillCurrent()) return;
+      console.warn("[Queue] consultation could not be confirmed", { code: queueConsultationErrorCode(error) });
+      toast.error(queueConsultationErrorMessage(error, lang));
+      if (queueConsultationErrorCode(error) === "PT409") await load();
+    } finally {
+      consultationPendingRef.current.delete(r.id);
     }
-    if (recordId) navigate(`/medical/consultation/${recordId}`);
-    else navigate(`/patients/${r.patient_id}?tab=clinical`);
-    void logQueueAudit({
-      action: "consultation_opened",
-      appointmentId: r.id,
-      branchId: r.branch_id,
-      newValues: { status: "in_progress" },
-    });
   };
 
   // No-show follow-up helpers
   const recallNoShow = (r: QueueRow) =>
     // Re-arrive the patient: clear stamps and stamp checked_in_at = now.
-    updateRow(r.id, buildStatusPatch("confirmed", { checked_in_at: null, started_at: null }));
+    updateRow(r.id, buildStatusPatch("confirmed", { checked_in_at: null, started_at: null }), r.status);
   const moveBackToWaiting = (r: QueueRow) =>
-    updateRow(r.id, buildStatusPatch("scheduled", { checked_in_at: r.checked_in_at, started_at: r.started_at }));
+    updateRow(r.id, buildStatusPatch("scheduled", { checked_in_at: r.checked_in_at, started_at: r.started_at }), r.status);
 
   // ---- Reassign doctor
   const openReassign = (r: QueueRow) => {
@@ -570,21 +574,30 @@ export default function QueuePage() {
     if (!reassignRow) return;
     if (!canMutate) { toast.error(lang === "ar" ? "غير مسموح" : "Not allowed"); return; }
     const r = reassignRow;
+    if (!currentBranchId || r.branch_id !== currentBranchId) { toast.error(t("selectBranch")); return; }
     const next = reassignDoctor || null;
     if (next === (r.doctor_id ?? null)) { setReassignRow(null); return; }
     setReassignSaving(true);
     // Status + timestamps intentionally untouched — only the assignee changes.
-    const { error } = await supabase.from("appointments").update({ doctor_id: next } as never).eq("id", r.id);
+    let reassignQuery = supabase
+      .from("appointments")
+      .update({ doctor_id: next } as never)
+      .eq("id", r.id)
+      .eq("branch_id", currentBranchId)
+      .eq("status", r.status);
+    reassignQuery = (r.doctor_id === null
+      ? reassignQuery.is("doctor_id", null)
+      : reassignQuery.eq("doctor_id", r.doctor_id)) as typeof reassignQuery;
+    const { data: reassigned, error } = await reassignQuery.select("id").maybeSingle();
     setReassignSaving(false);
     if (error) { toast.error(error.message); return; }
+    if (!reassigned) {
+      toast.error(lang === "ar" ? "تم تعديل الموعد بواسطة مستخدم آخر؛ أعد تحميل الطابور." : "This appointment was changed by another user. Refresh the queue and try again.");
+      setReassignRow(null);
+      await load();
+      return;
+    }
     toast.success(t("saved"));
-    void logQueueAudit({
-      action: "doctor_reassigned",
-      appointmentId: r.id,
-      branchId: r.branch_id,
-      oldValues: { doctor_id: r.doctor_id },
-      newValues: { doctor_id: next },
-    });
     setReassignRow(null);
     load();
   };
@@ -598,20 +611,22 @@ export default function QueuePage() {
     if (!roomRow) return;
     if (!canMutate) { toast.error(lang === "ar" ? "غير مسموح" : "Not allowed"); return; }
     const r = roomRow;
+    if (!currentBranchId || r.branch_id !== currentBranchId) { toast.error(t("selectBranch")); return; }
     const next = roomValue.trim() ? roomValue.trim() : null;
     if (next === (r.room ?? null)) { setRoomRow(null); return; }
     setRoomSaving(true);
-    const { error } = await supabase.from("appointments").update({ room: next } as never).eq("id", r.id);
+    let roomQuery = supabase
+      .from("appointments")
+      .update({ room: next } as never)
+      .eq("id", r.id)
+      .eq("branch_id", currentBranchId)
+      .eq("status", r.status);
+    roomQuery = r.room == null ? roomQuery.is("room", null) : roomQuery.eq("room", r.room);
+    const { data: updated, error } = await roomQuery.select("id").maybeSingle();
     setRoomSaving(false);
     if (error) { toast.error(error.message); return; }
+    if (!updated) { toast.error(lang === "ar" ? "تم تغيير الغرفة بواسطة مستخدم آخر؛ أعد تحميل الطابور." : "The room was changed by another user. Refresh the queue."); await load(); return; }
     toast.success(t("saved"));
-    void logQueueAudit({
-      action: "room_assigned",
-      appointmentId: r.id,
-      branchId: r.branch_id,
-      oldValues: { room: r.room },
-      newValues: { room: next },
-    });
     setRoomRow(null);
     load();
   };
@@ -1007,7 +1022,7 @@ export default function QueuePage() {
       </Dialog>
 
       {/* Walk-in dialog */}
-      <Dialog open={walkInOpen} onOpenChange={setWalkInOpen}>
+      <Dialog open={walkInOpen} onOpenChange={(nextOpen) => { if (!walkInSubmittingRef.current) setWalkInOpen(nextOpen); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{t("newWalkInTitle")}</DialogTitle>
@@ -1050,7 +1065,7 @@ export default function QueuePage() {
               </div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setWalkInOpen(false)}>{t("cancel")}</Button>
+              <Button type="button" variant="outline" onClick={() => setWalkInOpen(false)} disabled={walkInSaving}>{t("cancel")}</Button>
               <Button type="submit" disabled={walkInSaving || !walkInPatient}>{t("save")}</Button>
             </DialogFooter>
           </form>

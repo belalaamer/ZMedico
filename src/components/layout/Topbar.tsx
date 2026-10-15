@@ -18,6 +18,7 @@ import { SidebarContent } from "./Sidebar";
 import { supabase } from "@/integrations/supabase/client";
 import { subscribeResilient } from "@/lib/realtime";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
+import { ReceptionGuide } from "./ReceptionGuide";
 import { shouldShowPlatformReturnLink } from "@/lib/platformNavigation";
 import { clearPlatformWorkspaceBranch } from "@/lib/platformWorkspace";
 
@@ -212,6 +213,7 @@ export function Topbar() {
         </div>
       ) : null}
 
+      <ReceptionGuide />
       <div className="hidden sm:flex flex-1 max-w-xl">
         <GlobalSearch variant="desktop" />
       </div>

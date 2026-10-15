@@ -65,7 +65,8 @@ const localToday = localDateOnly;
 
 export default function Dashboard() {
   const { t, lang } = useI18n();
-  const { currentBranchId, branchSelectionReady } = useBranch();
+  const { currentBranchId, branchSelectionReady, isModuleEnabled } = useBranch();
+  const taskPath = (path: string) => currentBranchId ? `${path}?branch=${encodeURIComponent(currentBranchId)}` : path;
   const { user } = useAuth();
   // Role-aware composition (FINAL-03 UX audit): the Dashboard is reachable by
   // every authenticated role (see App.tsx route comment — no single
@@ -476,6 +477,16 @@ export default function Dashboard() {
   return (
     <PullToRefresh onRefresh={run}>
     <div className="space-y-7 pb-6">
+      {(canBookings || canTreasury || (authz.can("leads.view") && isModuleEnabled("marketing"))) && <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">{lang === "ar" ? "مهام اليوم — ابدأ من هنا" : "Today's tasks — start here"}</h2>
+        <div className="flex flex-wrap gap-2">
+          {canBookings && <Button asChild variant="outline"><Link to={taskPath("/calendar")}>{lang === "ar" ? "المواعيد" : "Appointments"}</Link></Button>}
+          {canBookings && <Button asChild variant="outline"><Link to={taskPath("/appointments/pending")}>{lang === "ar" ? "طلبات الحجز" : "Booking requests"}</Link></Button>}
+          {canBookings && <Button asChild variant="outline"><Link to={taskPath("/queue")}>{lang === "ar" ? "الطابور" : "Queue"}</Link></Button>}
+          {authz.can("leads.view") && isModuleEnabled("marketing") && <Button asChild variant="outline"><Link to={taskPath("/leads")}>{lang === "ar" ? "المتابعات والعملاء" : "Follow-ups and leads"}</Link></Button>}
+          {canTreasury && <Button asChild variant="outline"><Link to={taskPath("/treasury")}>{lang === "ar" ? "الخزينة" : "Treasury"}</Link></Button>}
+        </div>
+      </Card>}
       <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary to-primary/75 p-5 md:p-7 text-primary-foreground shadow-elegant">
         <div className="absolute -end-10 -top-16 size-56 rounded-full bg-white/10 blur-2xl" aria-hidden="true" />
         <div className="absolute -bottom-24 start-1/3 size-48 rounded-full bg-black/10 blur-3xl" aria-hidden="true" />

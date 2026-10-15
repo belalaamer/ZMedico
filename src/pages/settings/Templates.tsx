@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { templatePreview } from "@/lib/templatePreview";
 
 export default function Templates({ kind }: { kind: "email" | "sms" | "whatsapp" }) {
   const { t, lang } = useI18n();
@@ -16,6 +17,7 @@ export default function Templates({ kind }: { kind: "email" | "sms" | "whatsapp"
   const titleKey = kind === "email" ? "emailTemplates" : kind === "sms" ? "smsTemplates" : "whatsappTemplates";
   const [items, setItems] = useState<any[]>([]);
   const [sel, setSel] = useState<any>(null);
+  const preview = templatePreview((lang === "ar" ? sel?.body_ar : sel?.body_en) ?? "", lang === "ar" ? "ar" : "en");
 
   const load = async () => {
     const { data } = await (supabase as any).from(table).select("*").order("template_key");
@@ -68,6 +70,12 @@ export default function Templates({ kind }: { kind: "email" | "sms" | "whatsapp"
                   <div className="col-span-2"><Label>{t("body")} (EN)</Label><Textarea rows={5} value={sel.body_en ?? ""} onChange={e => setSel({ ...sel, body_en: e.target.value })} /></div>
                   <div className="col-span-2"><Label>{t("body")} (AR)</Label><Textarea dir="rtl" rows={5} value={sel.body_ar ?? ""} onChange={e => setSel({ ...sel, body_ar: e.target.value })} /></div>
                 </div>
+                {kind === "whatsapp" && <section className="rounded-lg border bg-muted/30 p-4 space-y-2" aria-label={lang === "ar" ? "معاينة الرسالة" : "Message preview"}>
+                  <h2 className="font-semibold">{lang === "ar" ? "معاينة الرسالة" : "Message preview"}</h2>
+                  <p className="text-xs text-muted-foreground">{lang === "ar" ? "بيانات تجريبية فقط. المعاينة والحفظ لا يرسلان أي رسالة، ولا يغيران إعدادات الإرسال التلقائي." : "Demo data only. Previewing and saving do not send a message or change automatic delivery settings."}</p>
+                  <p dir={lang === "ar" ? "rtl" : "ltr"} className="whitespace-pre-wrap break-words rounded-md bg-background p-3">{preview.text || (lang === "ar" ? "اكتب نص الرسالة لعرض المعاينة." : "Enter message text to preview it.")}</p>
+                  {preview.unknown.length > 0 && <p className="text-sm text-muted-foreground">{lang === "ar" ? "متغيرات تحتاج بيانات فعلية: " : "Variables requiring real data: "}{preview.unknown.join(", ")}</p>}
+                </section>}
                 <div className="flex justify-end gap-2"><Button className="gradient-primary text-primary-foreground" onClick={save}>{t("save")}</Button></div>
               </div>
             )}

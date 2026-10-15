@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { branchMutationFailure } from "@/lib/branchMutationErrors";
 import { useDataSync } from "@/lib/dataSync";
 import { Plus, Search, Pencil, Trash2, Building2, Star, MapPin, ListChecks, Users, ScrollText, CalendarDays, Clock, LayoutDashboard, Archive, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -62,6 +63,16 @@ export default function Branches() {
   const [editId, setEditId] = useState<string | null>(null);
   const [delId, setDelId] = useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const mutationBusy = useRef(false);
+  const mutationScope = useRef(0);
+  const loadVersion = useRef(0);
+  useEffect(() => {
+    mutationScope.current += 1;
+    loadVersion.current += 1;
+    setDelId(null);
+    setForceMode(false);
+    return () => { mutationScope.current += 1; loadVersion.current += 1; };
+  }, [currentBranchId, user?.id]);
   const [forceMode, setForceMode] = useState(false);
   const [locBranch, setLocBranch] = useState<Branch | null>(null);
   const [locCenter, setLocCenter] = useState<{ lat: number; lon: number } | null>(null);
@@ -114,6 +125,7 @@ export default function Branches() {
   };
 
   const load = useCallback(async () => {
+    const version = ++loadVersion.current;
     // A System Owner is global on the platform surface, but once a workspace
     // branch is selected this page must fail closed to that tenant only.
     if (isWorkspaceScoped && (!workspaceTenantId || subscriptionLoading)) {
@@ -123,6 +135,7 @@ export default function Branches() {
     let branchQuery = supabase.from("branches").select("*").order("created_at");
     if (isWorkspaceScoped && workspaceTenantId) branchQuery = branchQuery.eq("tenant_id", workspaceTenantId);
     const { data } = await branchQuery;
+    if (version !== loadVersion.current) return;
     const scopedBranches = (data ?? []) as Branch[];
     let staffQuery = supabase.from("profiles").select("id, full_name, email").order("full_name");
     if (isWorkspaceScoped) {
@@ -131,6 +144,7 @@ export default function Branches() {
         setItems([]); setStaff([]); setTenants([]); return;
       }
       const { data: assignments } = await supabase.from("staff_branches").select("user_id").in("branch_id", branchIds);
+      if (version !== loadVersion.current) return;
       const staffIds = Array.from(new Set((assignments ?? []).map((row) => String((row as { user_id: string }).user_id))));
       if (staffIds.length === 0) {
         setItems(scopedBranches); setStaff([]); setTenants([]); return;
@@ -138,17 +152,19 @@ export default function Branches() {
       staffQuery = staffQuery.in("id", staffIds);
     }
     const { data: staffData } = await staffQuery;
+    if (version !== loadVersion.current) return;
     setItems(scopedBranches);
     setStaff((staffData ?? []) as Staff[]);
     if (isSystemOwner) {
       let tenantQuery = supabase.from("tenants").select("id,name,slug").order("name");
       if (isWorkspaceScoped && workspaceTenantId) tenantQuery = tenantQuery.eq("id", workspaceTenantId);
       const { data: tenantData } = await tenantQuery;
+      if (version !== loadVersion.current) return;
       setTenants((tenantData ?? []) as TenantOption[]);
     } else {
       setTenants([]);
     }
-  }, [isSystemOwner, isWorkspaceScoped, subscriptionLoading, workspaceTenantId]);
+  }, [isSystemOwner, isWorkspaceScoped, subscriptionLoading, workspaceTenantId, user?.id]);
   useEffect(() => { void load(); }, [load]);
   useDataSync(["branches"], () => { load(); });
 
@@ -264,52 +280,64 @@ export default function Branches() {
   };
 
   const remove = async () => {
-    if (!delId) return;
+    if (!delId || mutationBusy.current) return;
+    mutationBusy.current = true;
+    const scope = mutationScope.current;
     setDeleteBusy(true);
     try {
       // First attempt: plain delete (works when no dependent data).
-      const { error } = await supabase.from("branches").delete().eq("id", delId);
+      const { data, error } = await supabase.from("branches").delete().eq("id", delId).select("id").maybeSingle();
+      if (scope !== mutationScope.current) return;
       if (!error) {
+        if (!data || data.id !== delId) {
+          toast(branchMutationFailure({ code: "P0002" }, lang, "delete"));
+          return;
+        }
         toast({ title: t("deleted") });
         setDelId(null); setForceMode(false); load();
         return;
       }
-      // FK violation → offer force-cascade (system_owner only) or archive.
-      const msg = (error.message || "").toLowerCase();
-      const isFk = msg.includes("foreign key") || msg.includes("violates") || (error as { code?: string }).code === "23503";
+      // Only an actual FK violation means linked records. Permission/check
+      // errors must not be mislabeled as a populated branch.
+      const isFk = error.code === "23503";
       if (isFk && !forceMode) {
         setForceMode(true);
         toast({
           title: lang === "ar" ? "لا يمكن الحذف — يوجد بيانات مرتبطة" : "Can't delete — this branch has linked data",
-          description: lang === "ar" ? "اختر الأرشفة أو الحذف الإجباري (لمالك النظام فقط)." : "Choose Archive or Force Delete (system owner only).",
+          description: lang === "ar" ? "استخدم الأرشفة لإخفاء الفرع مع الحفاظ على سجلاته." : "Archive the branch to hide it while preserving its records.",
           variant: "destructive",
         });
         return;
       }
-      toast({ title: error.message, variant: "destructive" });
+      toast(branchMutationFailure(error, lang, "delete"));
+    } catch (error) {
+      if (scope === mutationScope.current) toast(branchMutationFailure(error, lang, "delete"));
     } finally {
+      mutationBusy.current = false;
       setDeleteBusy(false);
     }
   };
 
   const archiveBranch = async () => {
-    if (!delId) return;
+    if (!delId || mutationBusy.current) return;
+    mutationBusy.current = true;
+    const scope = mutationScope.current;
     setDeleteBusy(true);
-    const { error } = await supabase.rpc("admin_archive_branch", { _branch_id: delId });
-    setDeleteBusy(false);
-    if (error) { toast({ title: error.message, variant: "destructive" }); return; }
-    toast({ title: lang === "ar" ? "تمت الأرشفة" : "Branch archived" });
-    setDelId(null); setForceMode(false); load();
-  };
-
-  const forceDeleteBranch = async () => {
-    if (!delId) return;
-    setDeleteBusy(true);
-    const { error } = await supabase.rpc("admin_force_delete_branch", { _branch_id: delId });
-    setDeleteBusy(false);
-    if (error) { toast({ title: error.message, variant: "destructive" }); return; }
-    toast({ title: lang === "ar" ? "تم الحذف نهائيًا" : "Branch and all linked data deleted" });
-    setDelId(null); setForceMode(false); load();
+    try {
+      const { data, error } = await supabase.rpc("admin_archive_branch", { _branch_id: delId });
+      if (scope !== mutationScope.current) return;
+      if (error) { toast(branchMutationFailure(error, lang, "archive")); return; }
+      if (!data || typeof data !== "object" || !("success" in data) || data.success !== true) {
+        toast(branchMutationFailure(null, lang, "archive")); return;
+      }
+      toast({ title: lang === "ar" ? "تمت الأرشفة" : "Branch archived" });
+      setDelId(null); setForceMode(false); void load();
+    } catch (error) {
+      if (scope === mutationScope.current) toast(branchMutationFailure(error, lang, "archive"));
+    } finally {
+      mutationBusy.current = false;
+      setDeleteBusy(false);
+    }
   };
 
   const openLocation = (b: Branch) => {
@@ -615,7 +643,7 @@ export default function Branches() {
                         <ListChecks className="size-4" />
                       </Button>
                       <Button size="icon" variant="ghost" onClick={() => openEdit(b)}><Pencil className="size-4" /></Button>
-                      <Button size="icon" variant="ghost" onClick={() => setDelId(b.id)}><Trash2 className="size-4 text-destructive" /></Button>
+                      <Button size="icon" variant="ghost" disabled={deleteBusy} aria-label={lang === "ar" ? `حذف الفرع ${b.name_ar || b.name_en}` : `Delete branch ${b.name_en || b.name_ar}`} onClick={() => setDelId(b.id)}><Trash2 className="size-4 text-destructive" /></Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -628,7 +656,7 @@ export default function Branches() {
         </CardContent>
       </Card>
 
-      <AlertDialog open={!!delId} onOpenChange={(o) => !o && setDelId(null)}>
+      <AlertDialog open={!!delId} onOpenChange={(o) => { if (!o && !mutationBusy.current) { setDelId(null); setForceMode(false); } }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
@@ -640,8 +668,8 @@ export default function Branches() {
             <AlertDialogDescription>
               {forceMode
                 ? (lang === "ar"
-                    ? "اختر الأرشفة لإخفاء الفرع مع الحفاظ على البيانات، أو الحذف الإجباري لإزالة الفرع وجميع البيانات المرتبطة به نهائيًا."
-                    : "Archive to hide this branch while keeping its data, or Force Delete to permanently remove the branch and every record linked to it.")
+                    ? "يحتوي الفرع على بيانات طبية أو مالية مرتبطة، لذلك لا يمكن حذفه نهائيًا. استخدم الأرشفة لإخفائه مع الحفاظ على السجلات."
+                    : "This branch has linked clinical or financial data, so permanent deletion is disabled. Archive it to hide the branch while preserving its records.")
                 : (t("actionIrreversible") ?? "This action cannot be undone.")}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -653,15 +681,9 @@ export default function Branches() {
                   <Archive className="size-4 me-1" />
                   {lang === "ar" ? "أرشفة" : "Archive"}
                 </Button>
-                {isSystemOwner && (
-                  <Button variant="destructive" onClick={forceDeleteBranch} disabled={deleteBusy}>
-                    {deleteBusy ? <Loader2 className="size-4 animate-spin me-1" /> : <Trash2 className="size-4 me-1" />}
-                    {lang === "ar" ? "حذف إجباري" : "Force Delete"}
-                  </Button>
-                )}
               </>
             ) : (
-              <AlertDialogAction onClick={remove} disabled={deleteBusy}>
+              <AlertDialogAction onClick={(event) => { event.preventDefault(); void remove(); }} disabled={deleteBusy}>
                 {deleteBusy ? <Loader2 className="size-4 animate-spin me-1" /> : null}
                 {t("delete")}
               </AlertDialogAction>

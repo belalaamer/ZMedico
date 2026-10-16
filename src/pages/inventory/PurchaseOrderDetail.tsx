@@ -18,6 +18,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney, formatDate } from "@/lib/format";
 import { Can } from "@/components/Can";
+import { useInventoryMutation } from './useInventoryMutation';
+import { useAuth } from '@/contexts/AuthContext';
 
 const statusClass: Record<string, string> = {
   draft: "status-cancelled", pending: "status-review", partial: "status-progress", received: "status-completed", cancelled: "status-departed",
@@ -28,6 +30,7 @@ type DraftLine = { product_id: string; quantity_ordered: number; unit_cost: numb
 export default function PurchaseOrderDetail() {
   const { id } = useParams();
   const { t, lang } = useI18n();
+  const { user } = useAuth();
   const [po, setPo] = useState<any>(null);
   const [items, setItems] = useState<any[]>([]);
   const [recvOpen, setRecvOpen] = useState(false);
@@ -41,7 +44,7 @@ export default function PurchaseOrderDetail() {
   const [editTaxPct, setEditTaxPct] = useState(0);
   const [editNotes, setEditNotes] = useState("");
   const [editLines, setEditLines] = useState<DraftLine[]>([]);
-  const [savingEdit, setSavingEdit] = useState(false);
+  const mutation = useInventoryMutation(lang, user?.id && id ? `${user.id}:${id}` : null);
 
   const load = async () => {
     if (!id) return;
@@ -71,21 +74,21 @@ export default function PurchaseOrderDetail() {
   const editTotal = +(editSubtotal + editTax).toFixed(2);
 
   const cancelPo = async () => {
-    const { error } = await supabase.rpc("cancel_purchase_order", {
+    await mutation.run(() => supabase.rpc("cancel_purchase_order", {
       p_purchase_order_id: po.id,
+    }), () => {
+      toast.success(t("statusCancelled"));
+      void load();
     });
-    if (error) { toast.error(error.message); return; }
-    toast.success(t("statusCancelled"));
-    void load();
   };
 
   const submitDraft = async () => {
-    const { error } = await supabase.rpc("submit_purchase_order", {
+    await mutation.run(() => supabase.rpc("submit_purchase_order", {
       p_purchase_order_id: po.id,
+    }), () => {
+      toast.success(t("statusPending"));
+      void load();
     });
-    if (error) { toast.error(error.message); return; }
-    toast.success(t("statusPending"));
-    void load();
   };
 
   const openEdit = () => {
@@ -103,12 +106,12 @@ export default function PurchaseOrderDetail() {
   };
 
   const saveDraftEdit = async (submit: boolean) => {
+    if (mutation.isPending()) return;
     if (!editSupplierId) { toast.error(t("selectSupplier")); return; }
     const valid = editLines.filter((line) => line.product_id && line.quantity_ordered > 0);
     if (!valid.length) { toast.error(t("addAtLeastOneItem")); return; }
 
-    setSavingEdit(true);
-    const { error } = await supabase.rpc("update_purchase_order_draft", {
+    await mutation.run(() => supabase.rpc("update_purchase_order_draft", {
       p_purchase_order_id: po.id,
       p_supplier_id: editSupplierId,
       p_order_date: editOrderDate,
@@ -121,13 +124,11 @@ export default function PurchaseOrderDetail() {
         unit_cost: Number(line.unit_cost),
       })),
       p_submit: submit,
+    }), () => {
+      toast.success(submit ? t("statusPending") : t("save"));
+      setEditOpen(false);
+      void load();
     });
-    setSavingEdit(false);
-
-    if (error) { toast.error(error.message); return; }
-    toast.success(submit ? t("statusPending") : t("save"));
-    setEditOpen(false);
-    void load();
   };
 
   const openReceive = () => {
@@ -141,12 +142,13 @@ export default function PurchaseOrderDetail() {
   };
 
   const submitReceive = async () => {
+    if (mutation.isPending()) return;
     const ops = items
       .map((it) => ({ it, d: recvData[it.id] }))
       .filter(({ d }) => d && d.qty > 0);
     if (!ops.length) { toast.error(t("enterQuantities")); return; }
 
-    const { error } = await supabase.rpc("receive_purchase_order_items", {
+    await mutation.run(() => supabase.rpc("receive_purchase_order_items", {
       p_purchase_order_id: po.id,
       p_items: ops.map(({ it, d }) => ({
         po_item_id: it.id,
@@ -154,11 +156,10 @@ export default function PurchaseOrderDetail() {
         expiry: d.expiry || null,
         batch: d.batch || null,
       })),
+    }), () => {
+      toast.success(t("received"));
+      setRecvOpen(false); void load();
     });
-    if (error) { toast.error(error.message); return; }
-
-    toast.success(t("received"));
-    setRecvOpen(false); load();
   };
 
   return (
@@ -168,17 +169,17 @@ export default function PurchaseOrderDetail() {
         <div className="flex gap-2 flex-wrap">
           {po.status === "draft" && (
             <Can permission="inventory.edit">
-              <Button variant="outline" onClick={openEdit}>
+              <Button variant="outline" onClick={openEdit} disabled={mutation.busy}>
                 <Pencil className="me-2 size-4" />{lang === "ar" ? "تعديل" : "Edit"}
               </Button>
-              <Button className="gradient-primary text-primary-foreground" onClick={submitDraft}>
+              <Button className="gradient-primary text-primary-foreground" onClick={submitDraft} disabled={mutation.busy}>
                 <Send className="me-2 size-4" />{t("submitOrder")}
               </Button>
             </Can>
           )}
           {canReceiveItems && (
             <Can permission="purchase_orders.receive">
-              <Button className="gradient-primary text-primary-foreground" onClick={openReceive}>
+              <Button className="gradient-primary text-primary-foreground" onClick={openReceive} disabled={mutation.busy}>
                 <PackageCheck className="me-2 size-4" />{t("receiveItems")}
               </Button>
             </Can>
@@ -186,7 +187,7 @@ export default function PurchaseOrderDetail() {
           {po.status !== "cancelled" && po.status !== "received" && (
             <Can permission="inventory.edit">
               <AlertDialog>
-                <AlertDialogTrigger asChild><Button variant="outline"><X className="me-2 size-4" />{t("cancel")}</Button></AlertDialogTrigger>
+                <AlertDialogTrigger asChild><Button variant="outline" disabled={mutation.busy}><X className="me-2 size-4" />{t("cancel")}</Button></AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>{t("cancel")}</AlertDialogTitle>
@@ -250,9 +251,10 @@ export default function PurchaseOrderDetail() {
         {po.notes && (<div className="mt-4 text-sm"><div className="text-xs text-muted-foreground mb-1">{t("notes")}</div><div className="whitespace-pre-wrap">{po.notes}</div></div>)}
       </Card>
 
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+      <Dialog open={editOpen} onOpenChange={(open) => { if (!mutation.isPending()) setEditOpen(open); }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{lang === "ar" ? "تعديل أمر الشراء" : "Edit Purchase Order"}</DialogTitle></DialogHeader>
+          <fieldset disabled={mutation.busy} className="min-w-0 space-y-4">
           <div className="grid sm:grid-cols-3 gap-3">
             <div className="space-y-2">
               <Label>{t("supplier")}</Label>
@@ -350,18 +352,19 @@ export default function PurchaseOrderDetail() {
             </div>
           </div>
 
+          </fieldset>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setEditOpen(false)} disabled={savingEdit}>{t("cancel")}</Button>
-            <Button variant="outline" onClick={() => saveDraftEdit(false)} disabled={savingEdit}>{t("saveDraft")}</Button>
-            <Button className="gradient-primary text-primary-foreground" onClick={() => saveDraftEdit(true)} disabled={savingEdit}>{t("submitOrder")}</Button>
+            <Button variant="ghost" onClick={() => setEditOpen(false)} disabled={mutation.busy}>{t("cancel")}</Button>
+            <Button variant="outline" onClick={() => saveDraftEdit(false)} disabled={mutation.busy}>{t("saveDraft")}</Button>
+            <Button className="gradient-primary text-primary-foreground" onClick={() => saveDraftEdit(true)} disabled={mutation.busy}>{t("submitOrder")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={recvOpen} onOpenChange={setRecvOpen}>
+      <Dialog open={recvOpen} onOpenChange={(open) => { if (!mutation.isPending()) setRecvOpen(open); }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{t("receiveItems")}</DialogTitle></DialogHeader>
-          <div className="space-y-3">
+          <fieldset disabled={mutation.busy} className="min-w-0 space-y-3">
             {items.map((it) => {
               const remaining = Math.max(0, Number(it.quantity_ordered) - Number(it.quantity_received));
               const d = recvData[it.id] ?? { qty: 0, expiry: "", batch: "" };
@@ -379,10 +382,10 @@ export default function PurchaseOrderDetail() {
                 </div>
               );
             })}
-          </div>
+          </fieldset>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setRecvOpen(false)}>{t("cancel")}</Button>
-            <Button className="gradient-primary text-primary-foreground" onClick={submitReceive}>{t("save")}</Button>
+            <Button variant="ghost" onClick={() => setRecvOpen(false)} disabled={mutation.busy}>{t("cancel")}</Button>
+            <Button className="gradient-primary text-primary-foreground" onClick={submitReceive} disabled={mutation.busy}>{t("save")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

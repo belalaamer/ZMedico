@@ -1,6 +1,8 @@
 -- ZMED-180 proposal: the browser cannot append protected audit rows. Capture
 -- actual writes in their own transaction, not client-asserted actor/diffs.
 -- Review/apply before removing the unsupported browser logger.
+set local lock_timeout = '2s';
+set local statement_timeout = '30s';
 create function public.tg_audit_queue_appointments()
 returns trigger
 language plpgsql

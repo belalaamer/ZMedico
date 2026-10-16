@@ -1,5 +1,7 @@
 -- ZMED-177 proposal. Review lock/index impact and apply individually only after
 -- approval. Do not guess or repair historical clinical associations.
+set local lock_timeout = '2s';
+set local statement_timeout = '30s';
 do $preflight$
 begin
   if not exists (

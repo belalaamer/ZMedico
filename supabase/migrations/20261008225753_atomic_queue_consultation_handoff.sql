@@ -1,5 +1,18 @@
 -- ZMED-179 proposed only. Deploy together with its client after independent
 -- review; no SECURITY DEFINER, RLS bypass, compensation or clinical deletion.
+set local lock_timeout = '2s';
+set local statement_timeout = '30s';
+do $session_preflight$
+begin
+  if to_regprocedure('public.assert_active_session()') is null then
+    raise exception 'Reviewed active-session assertion required';
+  end if;
+  if md5(pg_get_functiondef('public.assert_active_session()'::regprocedure))
+       is distinct from 'cd7553f3ade0585ecbe09631d1140bb2' then
+    raise exception 'Active-session assertion changed; review before applying';
+  end if;
+end;
+$session_preflight$;
 create function public.open_queue_consultation(
   _appointment_id uuid,
   _branch_id uuid,
@@ -18,6 +31,9 @@ declare
   v_record_id uuid;
   v_constraint text;
 begin
+  -- ZMED-254: role membership is not proof that the issued session is live.
+  -- Reject banned accounts and expired/revoked sessions before clinical reads.
+  perform public.assert_active_session();
   if v_user is null or _branch_id is null
      or not (public.has_role(v_user, 'admin'::public.app_role)
              or public.has_role(v_user, 'doctor'::public.app_role))

@@ -2,8 +2,9 @@
  * Phase B — Canonical permission reader.
  *
  * Loads the effective permission set for a user from
- * `v_authz_effective_permissions` (bundles → permissions → user via
- * roles) and reduces it into the same `Record<module, Set<action>>`
+ * caller-only RPC (bundles → permissions → current caller via roles),
+ * without reading owner-only management catalogs. Reduces it into the
+ * same `Record<module, Set<action>>`
  * shape produced by the legacy `role_permissions` reader in
  * `usePermissions`.
  *
@@ -39,11 +40,12 @@ export function reduceCanonicalRows(
 export async function fetchCanonicalPermissions(
   userId: string,
 ): Promise<PermMap> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
-    .from("v_authz_effective_permissions")
-    .select("permission_key")
-    .eq("user_id", userId);
+  if (!userId) throw new Error("Authenticated permission scope required");
+  // No caller-controlled identity parameter is sent to the privileged reader.
+  const { data, error } = await supabase.rpc("current_user_effective_permissions");
   if (error) throw error;
+  if (!Array.isArray(data) || data.some(row => row.user_id !== userId || typeof row.permission_key !== "string")) {
+    throw new Error("Unconfirmed permission response scope");
+  }
   return reduceCanonicalRows(data ?? []);
 }

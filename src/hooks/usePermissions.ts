@@ -62,11 +62,9 @@ export function usePermissions() {
     if (!roles.length) { setPerms({}); setLoading(false); return; }
     setLoading(true);
     // Phase B — Canonical runtime path. When the flag is on, source the
-    // effective permission set from `v_authz_effective_permissions`
-    // (authz_bundles → authz_permissions) instead of `role_permissions`
-    // + DEFAULT_PERMISSIONS. Return shape is identical. On any failure
-    // we transparently fall through to the legacy reader below so the
-    // user never loses access from a canonical outage.
+    // effective permission set from the caller-only RPC rather than the
+    // owner-only catalog view. A denied/missing/stale response must not fall
+    // back to a possibly more permissive legacy/default grant map.
     if (isCanonicalAuthzEnabled() && user?.id) {
       fetchCanonicalPermissions(user.id)
         .then((map) => {
@@ -78,11 +76,12 @@ export function usePermissions() {
           setLoading(false);
         })
         .catch((error) => {
-          console.warn("[auth-debug] canonical permissions failed; falling back to legacy", {
-            message: error instanceof Error ? error.message : String(error),
-          });
           if (!active) return;
-          loadLegacy();
+          console.warn("[auth-debug] canonical permissions unavailable; access remains denied", {
+            code: typeof error?.code === "string" ? error.code : "unconfirmed_permissions",
+          });
+          setPerms({});
+          setLoading(false);
         });
       return () => { active = false; };
     }

@@ -1,5 +1,19 @@
 # Clinical queue release candidate — not approved for Production
 
+## 2026-10-16 combined-source checkpoint (supersedes older pending claims below)
+
+Released main6ef3fc7/250/251/253 merged into isolated candidate. Distinct native receptionist/doctor browser handoff and authorized admin audit acceptance now19/19including cleanup: receptionist does not create a record/change status; doctor one atomic request/no direct legacy writes, one correct encounter/status and reload; protected audit still denied to doctor, both admin readers show authoritative events. No RLS weakened for test success. First browser run timed out without a clinical response; another wrongly expected privileged audit for doctor; failed runs retained, each cleanup verified. No unsupported root-cause attribution.
+
+New254baseline actually allowed banned doctor's old JWT to create a record/status200. Candidate now asserts existing live session before clinical handling;12/12native Auth/HTTP guard regression including cleanup verifies banned/expired/revoked/role-removed denial and valid doctor control.2source contracts added;31focused tests including original branch retry passed. Initial combined fullsuite760passed/1branch-timeout out of761failed; final complete regression/build still required, not replaced by focused retries. Application typecheck/scoped lint passed.
+
+All3migrations now bound lock wait2s/statement30s. Current SHA256 replaces historical list below:
+
+- relationship:d3c6d8fb9a644230aaf3c353de26ef3fda459f2501b92c5b6831588b0202bb44
+- handoff+254:94c2e21179fd09a59264d793b4999ea6ee10d18e76ef8a7a333bcb8314ad6860
+- audit:bd2815b4e4f891defece0b4bae9931e5773c115cf796a502b6002c847bf676c8
+
+Separate specific Production approval requested; none of these3migrations/client is deployed by this checkpoint. Individual preflight/postflight/rollback review remains mandatory. No financial/provider/portal or all-screen/lifecycle readiness claim.
+
 Scope: ZMED-177/178 appointment/patient/branch relationship, ZMED-179 atomic queue handoff and ZMED-180 server-authored audit. Based on main b4a5ba7334fb57fa0b74b989a0084bba16fac540. No portal/financial/settings or deployment configuration changes.
 
 The three existing migration proposals must be reviewed/applied **individually**, before activating the matching client. Never db push, broad migration replay or migration-history repair. Do not reapply already-released clinical role policy183.

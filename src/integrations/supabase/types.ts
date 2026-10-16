@@ -9204,6 +9204,10 @@ export type Database = {
       }
     }
     Functions: {
+      current_user_effective_permissions: {
+        Args: never
+        Returns: { user_id: string; permission_key: string }[]
+      }
       // ZMED-204 local proposal: backend migration must precede Languages UI.
       create_system_language: {
         Args: { _code: string; _name_en: string; _name_ar: string; _is_rtl: boolean; _is_default: boolean }

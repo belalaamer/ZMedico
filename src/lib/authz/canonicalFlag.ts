@@ -3,7 +3,7 @@
  *
  * Single switch that flips `usePermissions()` between:
  *   - legacy path — reads `role_permissions` + `DEFAULT_PERMISSIONS` fallback.
- *   - canonical path — reads `v_authz_effective_permissions`
+ *   - canonical path — reads the caller-only permission RPC
  *     (bundles → permissions), which is the V8 authorization stack.
  *
  * SOURCE OF TRUTH IN PRODUCTION: the build-time `VITE_AUTHZ_CANONICAL` variable,
@@ -31,8 +31,8 @@ const LS_KEY = "authz_canonical";
 
 function isDevBuild(): boolean {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (import.meta as any)?.env?.DEV === true;
+    // Keep Vite's statically recognized import.meta.env access intact.
+    return import.meta.env.DEV === true;
   } catch {
     return false;
   }
@@ -49,9 +49,7 @@ function readLocalStorage(): string | null {
 
 function readEnv(): string | undefined {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const env = (import.meta as any)?.env;
-    return env?.VITE_AUTHZ_CANONICAL;
+    return import.meta.env.VITE_AUTHZ_CANONICAL;
   } catch {
     return undefined;
   }

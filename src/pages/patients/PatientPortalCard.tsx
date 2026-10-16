@@ -1,97 +1,108 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Copy, KeyRound, RefreshCw, ShieldCheck } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 type PortalAccount = {
   id: string;
   status: string;
+  portal_enabled: boolean;
   must_change_password: boolean;
   auth_user_id: string;
   invited_at: string | null;
 };
 
 type Credentials = { username?: string | null; email: string; password: string };
+type Props = { patientId: string; patientEmail: string | null };
 
-// RBAC-10 fix: this card is the only place in the product where staff can
-// see whether a patient already has a portal login and manage it after the
-// one-time creation popup (in the Patients list "add patient" dialog)
-// closes. Before this existed, a successfully-created portal account
-// (patient-portal-invite already worked correctly) was permanently
-// invisible afterward -- there was no RLS policy allowing a client read of
-// patient_portal_accounts at all, and no UI anywhere on the patient profile
-// despite the creation toast claiming "you can retry from the patient
-// profile."
-export default function PatientPortalCard({ patientId, patientEmail }: { patientId: string; patientEmail: string | null }) {
+export default function PatientPortalCard(props: Props) {
+  const { user } = useAuth();
+  // Remount before rendering another patient's/staff member's credentials.
+  return <PortalAccountCard key={JSON.stringify([props.patientId, user?.id ?? null])} {...props} />;
+}
+
+function readCredentials(value: unknown): Credentials | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.password !== "string" || !record.password || typeof record.email !== "string" || !record.email) return null;
+  return { password: record.password, email: record.email, username: typeof record.username === "string" ? record.username : null };
+}
+
+function PortalAccountCard({ patientId, patientEmail }: Props) {
   const { lang } = useI18n();
   const [account, setAccount] = useState<PortalAccount | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [credentials, setCredentials] = useState<Credentials | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const alive = useRef(false);
+  const readSequence = useRef(0);
+  const submitting = useRef(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
+    const sequence = ++readSequence.current;
     setLoading(true);
-    const { data } = await (supabase as any)
-      .from("patient_portal_accounts")
-      .select("id,status,must_change_password,auth_user_id,invited_at")
-      .eq("patient_id", patientId)
-      .maybeSingle();
-    setAccount((data as PortalAccount | null) ?? null);
-    setLoading(false);
-  };
-  useEffect(() => { void load(); }, [patientId]);
+    setLoadFailed(false);
+    try {
+      const { data, error } = await supabase.from("patient_portal_accounts")
+        .select("id,status,portal_enabled,must_change_password,auth_user_id,invited_at")
+        .eq("patient_id", patientId).maybeSingle();
+      if (!alive.current || sequence !== readSequence.current) return;
+      if (error) throw error;
+      setAccount(data);
+    } catch {
+      if (!alive.current || sequence !== readSequence.current) return;
+      setAccount(null); setLoadFailed(true);
+    } finally {
+      if (alive.current && sequence === readSequence.current) setLoading(false);
+    }
+  }, [patientId]);
+  useEffect(() => {
+    alive.current = true;
+    void load();
+    return () => { alive.current = false; readSequence.current += 1; };
+  }, [load]);
 
-  const createLogin = async () => {
-    if (!patientEmail) {
+  const mutate = async (reset: boolean) => {
+    if (submitting.current || loading || loadFailed) return;
+    if (reset && (!account?.auth_user_id || !account.portal_enabled || account.status !== "active")) return;
+    if (!reset && !patientEmail) {
       toast.error(lang === "ar" ? "أضف بريدًا إلكترونيًا للمريض أولًا من زر تعديل." : "Add a patient email first via Edit.");
       return;
     }
-    setBusy(true);
-    const { data, error } = await supabase.functions.invoke("patient-portal-invite", {
-      body: { patient_id: patientId, auto_credentials: true },
-    });
-    setBusy(false);
-    if (error || (data as any)?.error) {
-      toast.error((data as any)?.error ?? error?.message ?? (lang === "ar" ? "تعذر إنشاء دخول البوابة" : "Could not create the portal login"));
-      return;
+    submitting.current = true; setBusy(true); setCredentials(null);
+    try {
+      const { data, error } = await supabase.functions.invoke(reset ? "patient-portal-reset-password" : "patient-portal-invite", {
+        body: reset ? { patient_id: patientId } : { patient_id: patientId, auto_credentials: true },
+      });
+      if (!alive.current) return;
+      if (error || data?.error || data?.success !== true) throw new Error("Unconfirmed portal operation");
+      const nextCredentials = readCredentials(data.credentials);
+      if (nextCredentials) {
+        setCredentials(nextCredentials);
+        toast.success(reset
+          ? (lang === "ar" ? "تم توليد كلمة مرور جديدة" : "New password generated")
+          : (lang === "ar" ? "تم إنشاء بيانات الدخول" : "Login credentials created"));
+      } else if (!reset && data.already_enabled === true) {
+        toast.success(lang === "ar" ? "حساب البوابة موجود بالفعل" : "Portal account already exists");
+      } else {
+        throw new Error("Missing credentials");
+      }
+      await load();
+    } catch {
+      if (alive.current) toast.error(lang === "ar"
+        ? "لم يتأكد إكمال العملية. حدّث حالة الحساب قبل إعادة المحاولة؛ ربما تغيرت كلمة المرور."
+        : "The operation could not be confirmed. Refresh the account status before retrying; the password may have changed.");
+    } finally {
+      submitting.current = false;
+      if (alive.current) setBusy(false);
     }
-    if ((data as any)?.credentials) {
-      const c = (data as any).credentials;
-      setCredentials({ username: c.username ?? null, email: c.email, password: c.password });
-      toast.success(lang === "ar" ? "تم إنشاء بيانات الدخول" : "Login credentials created");
-    } else {
-      toast.success(lang === "ar" ? "تم تفعيل البوابة" : "Portal enabled");
-    }
-    await load();
-  };
-
-  const resetPassword = async () => {
-    if (!account?.auth_user_id) return;
-    setBusy(true);
-    const { data, error } = await supabase.functions.invoke("patient-portal-reset-password", {
-      body: { patient_id: patientId },
-    });
-    setBusy(false);
-    if (error || (data as any)?.error) {
-      toast.error((data as any)?.error ?? error?.message ?? (lang === "ar" ? "تعذر إعادة تعيين كلمة المرور" : "Could not reset the password"));
-      return;
-    }
-    const creds = (data as any)?.credentials;
-    if (!creds?.password) {
-      toast.error(lang === "ar" ? "تعذر إنشاء بيانات الدخول الجديدة" : "Could not create new credentials");
-      return;
-    }
-    setCredentials({
-      username: creds.username ?? null,
-      email: creds.email ?? patientEmail ?? "",
-      password: creds.password,
-    });
-    toast.success(lang === "ar" ? "تم توليد كلمة مرور جديدة" : "New password generated");
   };
 
   return (
@@ -102,6 +113,11 @@ export default function PatientPortalCard({ patientId, patientEmail }: { patient
       </div>
       {loading ? (
         <p className="text-sm text-muted-foreground">{lang === "ar" ? "جارٍ التحميل…" : "Loading…"}</p>
+      ) : loadFailed ? (
+        <div role="alert" className="space-y-2">
+          <p className="text-sm">{lang === "ar" ? "تعذر تحميل حالة حساب البوابة." : "Could not load the portal account status."}</p>
+          <Button size="sm" variant="outline" onClick={() => void load()}>{lang === "ar" ? "إعادة المحاولة" : "Retry"}</Button>
+        </div>
       ) : account ? (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -111,14 +127,14 @@ export default function PatientPortalCard({ patientId, patientEmail }: { patient
               <Badge variant="outline">{lang === "ar" ? "يجب تغيير كلمة المرور عند أول دخول" : "Must change password on first login"}</Badge>
             )}
           </div>
-          <Button size="sm" variant="outline" onClick={() => void resetPassword()} disabled={busy}>
+          <Button size="sm" variant="outline" onClick={() => void mutate(true)} disabled={busy || !account.portal_enabled || account.status !== "active"}>
             <RefreshCw className="me-2 size-4" />{lang === "ar" ? "إعادة تعيين كلمة المرور" : "Reset password"}
           </Button>
         </div>
       ) : (
         <div className="space-y-2">
           <p className="text-sm text-muted-foreground">{lang === "ar" ? "لا يوجد حساب بوابة لهذا المريض بعد." : "This patient has no portal account yet."}</p>
-          <Button size="sm" onClick={() => void createLogin()} disabled={busy || !patientEmail}>
+          <Button size="sm" onClick={() => void mutate(false)} disabled={busy || !patientEmail}>
             <ShieldCheck className="me-2 size-4" />{lang === "ar" ? "إنشاء دخول البوابة" : "Create portal login"}
           </Button>
           {!patientEmail && (

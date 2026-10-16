@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { CalendarDays, CalendarPlus, Clock3, FileText, LogOut, Mail, Phone, ShieldCheck, Activity } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,8 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useOperationScope } from "@/hooks/useOperationScope";
+import { reportAuthFailure } from "@/lib/authFailureTelemetry";
 
 type PortalData = {
   patient: { id: string; patient_code: number | null; first_name_en: string; last_name_en: string | null; first_name_ar: string | null; last_name_ar: string | null; name_language: string | null; phone: string | null; email: string | null; dob: string | null; gender: string | null };
@@ -30,6 +32,23 @@ function labelStatus(value: string, lang: "ar" | "en") {
   return labels[value]?.[lang === "ar" ? 0 : 1] || value;
 }
 
+function PortalPasswordForm({ phase, saving, value, onChange, onSubmit, lang, label, compact = false }: {
+  phase: "edit" | "activate" | "uncertain";
+  saving: boolean;
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: (event: React.FormEvent) => void;
+  lang: "ar" | "en";
+  label: string;
+  compact?: boolean;
+}) {
+  if (phase === "uncertain") return <p role="alert" className="mt-4 text-sm">{lang === "ar" ? "لم يتأكد تغيير كلمة المرور. جرّب الدخول بالكلمة الجديدة أو اطلب رابط استعادة؛ لن نكرر الطلب." : "Password change could not be confirmed. Try signing in with the new password or request a recovery link; the request was not retried."}</p>;
+  return <form onSubmit={onSubmit} aria-busy={saving} className={compact ? "mt-3 flex flex-col gap-3 sm:flex-row" : "mt-6 space-y-3"}>
+    {phase === "edit" ? <input aria-label={lang === "ar" ? "كلمة مرور جديدة" : "New password"} type="password" value={value} onChange={event => onChange(event.target.value)} minLength={8} required disabled={saving} placeholder={lang === "ar" ? "كلمة مرور جديدة" : "New password"} className="h-10 min-h-10 flex-none sm:flex-1 rounded-md border bg-background px-3 text-sm" autoComplete="new-password" /> : <p role="status" className="text-sm">{lang === "ar" ? "تم تغيير كلمة المرور. أكمل تفعيل الحساب دون تغييرها مجددًا." : "Password changed. Complete account activation without changing it again."}</p>}
+    <Button type="submit" disabled={saving || (phase === "edit" && value.length < 8)}>{saving ? "…" : phase === "activate" ? (lang === "ar" ? "إعادة محاولة التفعيل" : "Retry activation") : label}</Button>
+  </form>;
+}
+
 // A real RPC-call error (as opposed to a normal {active:false} business
 // result) from these SECURITY DEFINER functions almost always means the
 // session's JWT was rejected outright -- expired/invalid access token
@@ -47,13 +66,26 @@ function isAuthSessionError(error: unknown): boolean {
 export default function PatientPortal() {
   const { lang, setLang } = useI18n();
   const { user, loading: authLoading, signOut } = useAuth();
+  const nav = useNavigate();
+  const userId = user?.id ?? null;
+  const captureActor = useOperationScope(userId);
+  const captureLifecycle = useOperationScope("patient-portal-mounted");
   const [data, setData] = useState<PortalData | null>(null);
+  const [loadedActor, setLoadedActor] = useState<string | null>(null);
+  const [dataActor, setDataActor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordPhase, setPasswordPhase] = useState<"edit" | "activate" | "uncertain">("edit");
+  const passwordBusy = useRef(false);
+  const passwordConfirmation = useRef<null | { actor: string; current: () => boolean }>(null);
   const [username, setUsername] = useState("");
   const [usernameSaving, setUsernameSaving] = useState(false);
+  useEffect(() => {
+    passwordConfirmation.current = null;
+    setPasswordPhase("edit"); setNewPassword("");
+  }, [userId]);
 
   // RBAC-12 fix: this route was never wrapped in an auth check at all --
   // visiting it with no session (or a session for a different account,
@@ -72,9 +104,12 @@ export default function PatientPortal() {
   useEffect(() => {
     if (authLoading || !user) return;
     let active = true;
+    setLoading(true);
+    setData(null);
     (async () => {
       const { data: state, error: stateError } = await supabase.rpc("patient_portal_password_state");
       if (!active) return;
+      const stateRecord = state && typeof state === "object" && !Array.isArray(state) ? state : null;
       // RBAC-12 follow-up: patient_portal_password_state() only ever returns
       // {active:false} through normal business logic (no matching account,
       // disabled, etc.) -- it does not error for that case, since it runs
@@ -88,18 +123,23 @@ export default function PatientPortal() {
       // and bounce to login, not told their account is unavailable.
       if (stateError && isAuthSessionError(stateError)) {
         await supabase.auth.signOut();
+        if (!active) return;
         window.location.assign("/patient-portal/login");
         return;
       }
-      if (stateError || !(state as any)?.active) {
+      if (stateError || stateRecord?.active !== true) {
         toast.error(lang === "ar" ? "لا يمكن الوصول إلى بوابة المريض بهذا الحساب" : "This account cannot access the patient portal");
+        setLoadedActor(user.id);
+        setData(null);
+        setMustChangePassword(false);
         setLoading(false);
         return;
       }
-      const forceChange = (state as any)?.must_change_password === true;
+      const forceChange = stateRecord?.must_change_password === true;
       setMustChangePassword(forceChange);
       if (forceChange) {
         setData(null);
+        setLoadedActor(user.id);
         setLoading(false);
         return;
       }
@@ -110,11 +150,14 @@ export default function PatientPortal() {
       if (!active) return;
       if (error && isAuthSessionError(error)) {
         await supabase.auth.signOut();
+        if (!active) return;
         window.location.assign("/patient-portal/login");
         return;
       }
-      if (error) { toast.error(lang === "ar" ? "لا يمكن الوصول إلى بوابة المريض بهذا الحساب" : "This account cannot access the patient portal"); setLoading(false); return; }
+      if (error) { toast.error(lang === "ar" ? "لا يمكن الوصول إلى بوابة المريض بهذا الحساب" : "This account cannot access the patient portal"); setLoadedActor(user.id); setData(null); setLoading(false); return; }
       setData(snapshot as unknown as PortalData);
+      setDataActor(user.id);
+      setLoadedActor(user.id);
       setUsername(profile?.username ?? "");
       setLoading(false);
     })();
@@ -129,29 +172,72 @@ export default function PatientPortal() {
     setUsernameSaving(true);
     const { data: result, error } = await supabase.rpc("patient_portal_set_username", { p_username: value });
     setUsernameSaving(false);
-    if (error || !(result as any)?.username) { toast.error(lang === "ar" ? "اسم المستخدم مستخدم بالفعل أو غير صالح" : "Username is already in use or invalid"); return; }
+    const resultRecord = result && typeof result === "object" && !Array.isArray(result) ? result : null;
+    if (error || typeof resultRecord?.username !== "string" || !resultRecord.username) { toast.error(lang === "ar" ? "اسم المستخدم مستخدم بالفعل أو غير صالح" : "Username is already in use or invalid"); return; }
     setUsername(value);
     toast.success(lang === "ar" ? "تم حفظ اسم المستخدم" : "Username saved");
   };
 
   const savePassword = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (newPassword.length < 8) { toast.error(lang === "ar" ? "كلمة المرور يجب ألا تقل عن 8 أحرف" : "Password must be at least 8 characters"); return; }
+    if (passwordBusy.current || !userId || passwordPhase === "uncertain") return;
+    if (passwordPhase === "edit" && newPassword.length < 8) { toast.error(lang === "ar" ? "كلمة المرور يجب ألا تقل عن 8 أحرف" : "Password must be at least 8 characters"); return; }
+    const current = captureActor();
+    const mounted = captureLifecycle();
+    if (!current()) return;
+    passwordBusy.current = true;
     setPasswordSaving(true);
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
-    if (error) { setPasswordSaving(false); toast.error(error.message); return; }
-    const { data: completed, error: completeError } = await supabase.rpc("patient_portal_complete_password_change");
-    setPasswordSaving(false);
-    if (completeError || completed !== true) { toast.error(lang === "ar" ? "تم تغيير كلمة المرور لكن تعذر تفعيل الحساب؛ أعد المحاولة." : "Password changed, but the account could not be activated. Please retry."); return; }
-    setNewPassword("");
-    setMustChangePassword(false);
-    toast.success(lang === "ar" ? "تم تغيير كلمة المرور وتفعيل الحساب" : "Password changed and account activated");
-    window.location.reload();
+    let stage: "password" | "activation" = passwordPhase === "activate" ? "activation" : "password";
+    try {
+      if (stage === "password") {
+        const { data: updated, error } = await supabase.auth.updateUser({ password: newPassword });
+        if (!current()) return;
+        if (error) {
+          reportAuthFailure("patient-portal-password", "rejected", error);
+          toast.error(lang === "ar" ? "تعذر تغيير كلمة المرور. تحقق من متطلبات كلمة المرور وحاول مجددًا." : "Unable to change password. Check the password requirements and try again.");
+          return;
+        }
+        if (updated.user?.id !== userId) {
+          reportAuthFailure("patient-portal-password", "identity-mismatch");
+          setPasswordPhase("uncertain"); setNewPassword(""); return;
+        }
+        passwordConfirmation.current = { actor: userId, current };
+        setPasswordPhase("activate"); setNewPassword(""); stage = "activation";
+      }
+      const confirmation = passwordConfirmation.current;
+      if (!current() || confirmation?.actor !== userId || !confirmation.current()) return;
+      const { data: completed, error: completeError } = await supabase.rpc("patient_portal_complete_password_change");
+      if (!current()) return;
+      if (completeError || completed !== true) {
+        reportAuthFailure("patient-portal-activation", "rejected", completeError);
+        toast.error(lang === "ar" ? "تم تغيير كلمة المرور، لكن لم يكتمل التفعيل. أعد محاولة التفعيل فقط." : "Password changed, but activation did not complete. Retry activation only.");
+        return;
+      }
+      passwordConfirmation.current = null; setPasswordPhase("edit");
+      setMustChangePassword(false);
+      toast.success(lang === "ar" ? "تم تغيير كلمة المرور وتفعيل الحساب" : "Password changed and account activated");
+      nav(0);
+    } catch {
+      if (!current()) return;
+      reportAuthFailure(stage === "password" ? "patient-portal-password" : "patient-portal-activation", "transport");
+      if (stage === "password") {
+        setPasswordPhase("uncertain"); setNewPassword("");
+        toast.error(lang === "ar" ? "لم يتأكد تغيير كلمة المرور. جرّب الدخول بالكلمة الجديدة أو اطلب رابط استعادة؛ لن نكرر الطلب." : "Password change could not be confirmed. Try signing in with the new password or request a recovery link; the request was not retried.");
+      } else toast.error(lang === "ar" ? "تم تغيير كلمة المرور، لكن لم يتأكد التفعيل. أعد محاولة التفعيل فقط." : "Password changed, but activation could not be confirmed. Retry activation only.");
+    } finally {
+      passwordBusy.current = false;
+      if (mounted()) setPasswordSaving(false);
+    }
   };
   if (authLoading || !user) return <main className="min-h-dvh grid place-items-center text-muted-foreground">…</main>;
-  if (loading) return <main className="min-h-dvh grid place-items-center text-muted-foreground">…</main>;
-  if (mustChangePassword) return <main className="min-h-dvh grid place-items-center bg-muted/30 p-6" dir={lang === "ar" ? "rtl" : "ltr"}><Card className="w-full max-w-md p-6"><div className="text-center"><ShieldCheck className="mx-auto size-10 text-primary" /><h1 className="mt-3 text-2xl font-black">{lang === "ar" ? "يجب تغيير كلمة المرور" : "Password change required"}</h1><p className="mt-2 text-sm text-muted-foreground">{lang === "ar" ? "لأمان حسابك، يجب تعيين كلمة مرور جديدة قبل عرض أي بيانات في بوابة المريض." : "For your security, set a new password before any Patient Portal data can be displayed."}</p></div><form onSubmit={savePassword} className="mt-6 space-y-3"><input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={8} required placeholder={lang === "ar" ? "كلمة مرور جديدة" : "New password"} className="h-10 w-full rounded-md border bg-background px-3 text-sm" autoComplete="new-password" /><Button type="submit" className="w-full" disabled={passwordSaving || newPassword.length < 8}>{passwordSaving ? "…" : (lang === "ar" ? "تغيير كلمة المرور والمتابعة" : "Change password and continue")}</Button></form><button type="button" className="mt-4 w-full text-center text-xs text-primary hover:underline" onClick={logout}>{lang === "ar" ? "تسجيل الخروج" : "Sign out"}</button></Card></main>;
-  if (!data) return <main className="min-h-dvh grid place-items-center p-6"><Card className="max-w-md p-6 text-center"><ShieldCheck className="mx-auto mb-3 size-8 text-primary" /><h1 className="text-xl font-bold">{lang === "ar" ? "بوابة المريض غير متاحة" : "Patient portal unavailable"}</h1><p className="mt-2 text-sm text-muted-foreground">{lang === "ar" ? "استخدم رابط الدعوة أو تواصل مع العيادة لتفعيل الوصول." : "Use your invitation link or contact the clinic to activate access."}</p></Card></main>;
+  if (loading || loadedActor !== userId) return <main className="min-h-dvh grid place-items-center text-muted-foreground">…</main>;
+  if (mustChangePassword) return <main className="min-h-dvh grid place-items-center bg-muted/30 p-6" dir={lang === "ar" ? "rtl" : "ltr"}>
+    <Card className="w-full max-w-md p-6"><div className="text-center"><ShieldCheck className="mx-auto size-10 text-primary" /><h1 className="mt-3 text-2xl font-black">{lang === "ar" ? "يجب تغيير كلمة المرور" : "Password change required"}</h1><p className="mt-2 text-sm text-muted-foreground">{lang === "ar" ? "لأمان حسابك، يجب تعيين كلمة مرور جديدة قبل عرض أي بيانات في بوابة المريض." : "For your security, set a new password before any Patient Portal data can be displayed."}</p></div>
+      <PortalPasswordForm phase={passwordPhase} saving={passwordSaving} value={newPassword} onChange={setNewPassword} onSubmit={savePassword} lang={lang} label={lang === "ar" ? "تغيير كلمة المرور والمتابعة" : "Change password and continue"} />
+      <button type="button" className="mt-4 w-full text-center text-xs text-primary hover:underline" onClick={logout}>{lang === "ar" ? "تسجيل الخروج" : "Sign out"}</button>
+    </Card>
+  </main>;
+  if (!data || dataActor !== userId) return <main className="min-h-dvh grid place-items-center p-6"><Card className="max-w-md p-6 text-center"><ShieldCheck className="mx-auto mb-3 size-8 text-primary" /><h1 className="text-xl font-bold">{lang === "ar" ? "بوابة المريض غير متاحة" : "Patient portal unavailable"}</h1><p className="mt-2 text-sm text-muted-foreground">{lang === "ar" ? "استخدم رابط الدعوة أو تواصل مع العيادة لتفعيل الوصول." : "Use your invitation link or contact the clinic to activate access."}</p></Card></main>;
 
   const upcoming = data.appointments.filter((item) => !["cancelled", "completed"].includes(item.status));
   const supportEmail = data.clinic.support_email;
@@ -203,12 +289,12 @@ export default function PatientPortal() {
       <Card className="border-primary/20 bg-background p-5">
         <h2 className="font-bold">{lang === "ar" ? "اسم المستخدم" : "Username"}</h2>
         <p className="mt-1 text-sm text-muted-foreground">{lang === "ar" ? "اختياري. يمكنك استخدامه بدل البريد الإلكتروني عند الدخول." : "Optional. You can use it instead of your email when signing in."}</p>
-        <form onSubmit={saveUsername} className="mt-3 flex flex-col gap-3 sm:flex-row"><input type="text" value={username} onChange={(event) => setUsername(event.target.value.replace(/\s/g, "").toLowerCase())} minLength={3} maxLength={32} pattern="[a-z0-9][a-z0-9._-]{2,31}" placeholder="patient.name" className="h-10 flex-1 rounded-md border bg-background px-3 text-sm" autoComplete="username" /><Button type="submit" disabled={usernameSaving}>{usernameSaving ? "…" : (lang === "ar" ? "حفظ الاسم" : "Save username")}</Button></form>
+        <form onSubmit={saveUsername} className="mt-3 flex flex-col gap-3 sm:flex-row"><input type="text" value={username} onChange={(event) => setUsername(event.target.value.replace(/\s/g, "").toLowerCase())} minLength={3} maxLength={32} pattern="[a-z0-9][a-z0-9._-]{2,31}" placeholder="patient.name" className="h-10 min-h-10 flex-none sm:flex-1 rounded-md border bg-background px-3 text-sm" autoComplete="username" /><Button type="submit" disabled={usernameSaving}>{usernameSaving ? "…" : (lang === "ar" ? "حفظ الاسم" : "Save username")}</Button></form>
       </Card>
       <Card className="border-primary/20 bg-background p-5">
         <h2 className="font-bold">{lang === "ar" ? "تأمين الحساب" : "Secure your account"}</h2>
         <p className="mt-1 text-sm text-muted-foreground">{lang === "ar" ? "بعد فتح رابط الدعوة، يمكنك تعيين كلمة مرور خاصة بك لاستخدام البريد الإلكتروني في الدخول لاحقًا." : "After opening your invitation link, set a personal password to sign in with your email next time."}</p>
-        <form onSubmit={savePassword} className="mt-3 flex flex-col gap-3 sm:flex-row"><input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={8} placeholder={lang === "ar" ? "كلمة مرور جديدة" : "New password"} className="h-10 flex-1 rounded-md border bg-background px-3 text-sm" autoComplete="new-password" /><Button type="submit" disabled={passwordSaving || newPassword.length < 8}>{passwordSaving ? "…" : (lang === "ar" ? "حفظ كلمة المرور" : "Save password")}</Button></form>
+        <PortalPasswordForm compact phase={passwordPhase} saving={passwordSaving} value={newPassword} onChange={setNewPassword} onSubmit={savePassword} lang={lang} label={lang === "ar" ? "حفظ كلمة المرور" : "Save password"} />
       </Card>
       <p className="text-center text-xs text-muted-foreground">{lang === "ar" ? "هذه البوابة تعرض بياناتك الصحية فقط ولا تحتوي على أدوات تعديل أو حذف للسجلات الطبية." : "This portal shows only your own health information. It does not provide tools to edit or delete medical records."}</p>
       <p className="text-center text-xs text-muted-foreground">{user?.email}</p>

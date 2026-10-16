@@ -16,6 +16,7 @@ import { subscribeResilient } from "@/lib/realtime";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
 import { Can } from "@/components/Can";
+import { useInventoryMutation } from './useInventoryMutation';
 
 type Row = { product: any; branch_id: string; quantity: number; reserved: number };
 
@@ -25,6 +26,8 @@ export default function StockOverview() {
   const { t, lang } = useI18n();
   const { currentBranchId, branchSelectionReady, subscription } = useBranch();
   const { user } = useAuth();
+  const mutation = useInventoryMutation(lang, user?.id && branchSelectionReady && currentBranchId && subscription?.tenant_id
+    ? `${user.id}:${subscription.tenant_id}:${currentBranchId}` : null);
   const [products, setProducts] = useState<any[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
   const [inv, setInv] = useState<any[]>([]);
@@ -101,6 +104,7 @@ export default function StockOverview() {
   const totalValue = rows.reduce((s, r) => s + r.quantity * Number(r.product.cost_price), 0);
 
   const submitAdj = async () => {
+    if (mutation.isPending()) return;
     // Bug fix: this previously always showed t("selectProduct") regardless
     // of which field was actually missing -- a copy-paste mismatch that told
     // the user to pick a product even when they'd already picked one and
@@ -110,7 +114,7 @@ export default function StockOverview() {
     if (adj.branch_id !== currentBranchId) { toast.error(t("selectBranch")); return; }
     if (!adj.product_id) { toast.error(t("selectProduct")); return; }
     if (!adj.branch_id) { toast.error(t("selectBranch")); return; }
-    if (!adj.qty) { toast.error(t("amount")); return; }
+    if (!Number.isFinite(adj.qty) || adj.qty <= 0) { toast.error(t("amount")); return; }
     let signed = 0;
     if (adj.type === "add") signed = adj.qty;
     else if (adj.type === "remove") signed = -adj.qty;
@@ -121,42 +125,42 @@ export default function StockOverview() {
     }
     if (signed === 0) { toast.error(lang === "ar" ? "لا يوجد تغيير" : "No change"); return; }
     const reasonLabel = t(("reason" + adj.reason.charAt(0).toUpperCase() + adj.reason.slice(1)) as any);
-    const { error } = await supabase.rpc("apply_inventory_tx", {
+    await mutation.run(() => supabase.rpc("apply_inventory_tx", {
       _product_id: adj.product_id, _branch_id: adj.branch_id,
       _type: "adjustment", _signed_qty: signed,
       _unit_cost: null, _ref_type: "manual", _ref_id: null,
       _notes_en: `${reasonLabel}${adj.notes ? " — " + adj.notes : ""}`,
       _notes_ar: `${reasonLabel}${adj.notes ? " — " + adj.notes : ""}`,
       _expiry: null, _batch: null, _by: user?.id ?? null,
-    } as any);
-    if (error) { toast.error(error.message); return; }
-    toast.success(t("save"));
-    setAdjOpen(false);
-    setAdj({ product_id: "", branch_id: "", type: "add", qty: 0, reason: "restock", notes: "" });
-    load();
+    } as any), () => {
+      toast.success(t("save"));
+      setAdjOpen(false);
+      setAdj({ product_id: "", branch_id: "", type: "add", qty: 0, reason: "restock", notes: "" });
+      void load();
+    });
   };
 
   const submitTransfer = async () => {
+    if (mutation.isPending()) return;
     if (!branchSelectionReady || !currentBranchId) { toast.error(t("selectBranch")); return; }
     if (!tr.product_id) { toast.error(t("selectProduct")); return; }
     if (!tr.from_branch || !tr.to_branch) { toast.error(t("selectBranch")); return; }
     if (tr.from_branch === tr.to_branch) { toast.error(t("transferSameBranchError")); return; }
     if (!branches.some((branch) => branch.id === tr.from_branch) || !branches.some((branch) => branch.id === tr.to_branch)) { toast.error(t("selectBranch")); return; }
-    if (!tr.qty || tr.qty <= 0) { toast.error(t("amount")); return; }
+    if (!Number.isFinite(tr.qty) || tr.qty <= 0) { toast.error(t("amount")); return; }
 
-    const { error } = await supabase.rpc("transfer_inventory_stock", {
+    await mutation.run(() => supabase.rpc("transfer_inventory_stock", {
       p_product_id: tr.product_id,
       p_from_branch_id: tr.from_branch,
       p_to_branch_id: tr.to_branch,
       p_quantity: Number(tr.qty),
       p_notes: tr.notes || null,
+    }), () => {
+      toast.success(t("save"));
+      setTrOpen(false);
+      setTr({ product_id: "", from_branch: "", to_branch: "", qty: 0, notes: "" });
+      void load();
     });
-    if (error) { toast.error(error.message); return; }
-
-    toast.success(t("save"));
-    setTrOpen(false);
-    setTr({ product_id: "", from_branch: "", to_branch: "", qty: 0, notes: "" });
-    void load();
   };
 
   return (
@@ -167,10 +171,10 @@ export default function StockOverview() {
         </div>
         <div className="flex gap-2">
           <Can permission="inventory.tx.write">
-            <Button variant="outline" onClick={() => setTrOpen(true)} disabled={branches.length < 2}>
+            <Button variant="outline" onClick={() => setTrOpen(true)} disabled={mutation.busy || branches.length < 2}>
               <ArrowLeftRight className="me-2 size-4" />{t("transferStock")}
             </Button>
-            <Button className="gradient-primary text-primary-foreground" onClick={() => setAdjOpen(true)}>
+            <Button className="gradient-primary text-primary-foreground" onClick={() => setAdjOpen(true)} disabled={mutation.busy}>
               <Plus className="me-2 size-4" />{t("adjustStock")}
             </Button>
           </Can>
@@ -260,10 +264,10 @@ export default function StockOverview() {
       </Card>
 
       {/* Adjust Stock Dialog */}
-      <Dialog open={adjOpen} onOpenChange={setAdjOpen}>
+      <Dialog open={adjOpen} onOpenChange={(open) => { if (!mutation.isPending()) setAdjOpen(open); }}>
         <DialogContent>
           <DialogHeader><DialogTitle>{t("adjustStock")}</DialogTitle></DialogHeader>
-          <div className="space-y-3">
+          <fieldset disabled={mutation.busy} className="min-w-0 space-y-3">
             <div className="space-y-2">
               <Label>{t("selectProduct")}</Label>
               <Select value={adj.product_id} onValueChange={(v) => setAdj({ ...adj, product_id: v })}>
@@ -312,19 +316,19 @@ export default function StockOverview() {
               </div>
             </div>
             <div className="space-y-2"><Label>{t("notes")}</Label><Textarea value={adj.notes} onChange={(e) => setAdj({ ...adj, notes: e.target.value })} maxLength={300} rows={2} /></div>
-          </div>
+          </fieldset>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setAdjOpen(false)}>{t("cancel")}</Button>
-            <Button className="gradient-primary text-primary-foreground" onClick={submitAdj}>{t("save")}</Button>
+            <Button variant="ghost" onClick={() => setAdjOpen(false)} disabled={mutation.busy}>{t("cancel")}</Button>
+            <Button className="gradient-primary text-primary-foreground" onClick={submitAdj} disabled={mutation.busy}>{t("save")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Transfer Dialog */}
-      <Dialog open={trOpen} onOpenChange={setTrOpen}>
+      <Dialog open={trOpen} onOpenChange={(open) => { if (!mutation.isPending()) setTrOpen(open); }}>
         <DialogContent>
           <DialogHeader><DialogTitle>{t("transferStock")}</DialogTitle></DialogHeader>
-          <div className="space-y-3">
+          <fieldset disabled={mutation.busy} className="min-w-0 space-y-3">
             <div className="space-y-2">
               <Label>{t("selectProduct")}</Label>
               <Select value={tr.product_id} onValueChange={(v) => setTr({ ...tr, product_id: v })}>
@@ -353,10 +357,10 @@ export default function StockOverview() {
             </div>
             <div className="space-y-2"><Label>{t("amount")}</Label><Input type="number" min={0.001} step="0.001" value={tr.qty} onChange={(e) => setTr({ ...tr, qty: Number(e.target.value) })} /></div>
             <div className="space-y-2"><Label>{t("notes")}</Label><Textarea value={tr.notes} onChange={(e) => setTr({ ...tr, notes: e.target.value })} maxLength={300} rows={2} /></div>
-          </div>
+          </fieldset>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setTrOpen(false)}>{t("cancel")}</Button>
-            <Button className="gradient-primary text-primary-foreground" onClick={submitTransfer}>{t("save")}</Button>
+            <Button variant="ghost" onClick={() => setTrOpen(false)} disabled={mutation.busy}>{t("cancel")}</Button>
+            <Button className="gradient-primary text-primary-foreground" onClick={submitTransfer} disabled={mutation.busy}>{t("save")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

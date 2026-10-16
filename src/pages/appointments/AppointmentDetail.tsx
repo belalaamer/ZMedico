@@ -18,10 +18,7 @@ import { doctorDisplayName } from "@/lib/doctorName";
 import { appointmentWhatsAppMessage, openWhatsApp } from "@/lib/whatsapp";
 import { getOrCreateAppointmentMedicalRecord } from "@/lib/medicalRecordEncounter";
 
-const SAFE_KEYS = ["status", "doctor_id", "room", "priority", "is_walk_in", "checked_in_at", "started_at"];
-const QUEUE_ACTIONS = [
-  "status_change", "doctor_reassigned", "room_assigned", "walk_in_created", "consultation_opened",
-];
+import { QUEUE_AUDIT_ACTIONS as QUEUE_ACTIONS, QUEUE_AUDIT_SAFE_KEYS as SAFE_KEYS } from "@/lib/queueAuditActions";
 
 function fmt(iso: string | null | undefined) {
   if (!iso) return "—";

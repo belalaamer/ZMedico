@@ -125,9 +125,27 @@ Deno.serve(async (req) => {
     // admin remains the only role that is deliberately cross-branch "by
     // design" per the comment below.
     const rolesRequiringBranch = ["manager", "doctor", "nurse", "receptionist", "accountant", "hr", "staff"];
-    // admin is a cross-branch identity and does not require a branch assignment.
+    // Administrators may be provisioned without a branch assignment. An
+    // explicitly supplied branch still requires the caller's own authority.
     if (rolesRequiringBranch.includes(role) && !branch_id) {
       return jsonResponse({ error: `Branch is required for role: ${role}` }, 400);
+    }
+
+    if (branch_id) {
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(branch_id)) {
+        return jsonResponse({ error: "Invalid branch" }, 400);
+      }
+      try {
+        // Use the real caller JWT, never the privileged provisioning client.
+        // The canonical helper retains explicit System Owner global access.
+        const { data: branchAllowed, error: branchError } = await userClient.rpc(
+          "user_has_branch_access", { _branch: branch_id },
+        );
+        if (branchError) return jsonResponse({ error: "Unable to verify branch access" }, 503);
+        if (branchAllowed !== true) return jsonResponse({ error: "Forbidden: branch is outside your scope" }, 403);
+      } catch {
+        return jsonResponse({ error: "Unable to verify branch access" }, 503);
+      }
     }
 
     // Pre-authorize email so handle_new_user trigger accepts the signup

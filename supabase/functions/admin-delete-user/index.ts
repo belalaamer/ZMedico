@@ -127,6 +127,7 @@ Deno.serve(async (req) => {
       entity_type: "auth_user",
       entity_id: target_user_id,
       new_values: {
+        actor_user_id: userData.user.id,
         target_user_id,
         reason,
         requested_at: new Date().toISOString(),
@@ -137,6 +138,9 @@ Deno.serve(async (req) => {
     // Clean dependent rows first and fail closed if any cleanup step errors.
     for (const [table, column] of [["user_roles", "user_id"], ["staff_profiles", "id"], ["profiles", "id"]] as const) {
       const { error } = await admin.from(table).delete().eq(column, target_user_id);
+      if (table === "user_roles" && error?.code === "PT409") {
+        return jsonResponse({ error: "The last System Owner cannot be deleted" }, 409);
+      }
       if (error) return jsonResponse({ error: `Unable to clean ${table}; auth deletion aborted` }, 500);
     }
 

@@ -1,0 +1,7 @@
+# ZMED-271 live actor data boundary
+
+Require a real unexpired native Auth session, available nonanonymous Auth user and active employment at the PostgREST pre-request boundary and restrictive RLS on146 public tables, storage.objects and realtime.messages. Existing permissive policies remain required. Explicit staff links take precedence over legacy id-only records. No production account or business data is corrected.
+
+Native isolated legacy/status precedence runfcc0b8a0 passed with original146 tables/metadata restoration and three declared recreated role-policy OIDs. Final clinical-financial compatibility run2621d2aa passed45 checks across independent roles: native registration/appointment/clinical operations and real browser partial payment/daily close; full original corpus restored, owned immutable financial/audit rows retained under retired zero scopes. This is not full browser clinical E2E or unreversed paid-day settlement. Final portal browser lost-activation-reply run880582c5 passed15 browser and23 overlapping native checks, cleanup verified. Local issuer binding alone was adapted to the isolated native Auth issuer.
+
+Realtime limitation remains open: cached private Broadcast channel authorization and Postgres DELETE old-ID events are not revoked by this policy. Do not claim full Realtime revocation; production publication was not changed. This migration closes current HTTP/RPC/Storage and RLS-filtered INSERT/UPDATE actor checks, with isolated healthy controls. Last usable owner protection273 is deployed first.

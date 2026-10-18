@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, User, Link2Off, Shield } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -24,18 +24,28 @@ import { Label } from "@/components/ui/label";
 import { useBranch } from "@/contexts/BranchContext";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 
+import {manageStaffAccount, staffAccountError, type StaffAccountSnapshot} from '@/lib/staffAccountLifecycle';
+import {useOperationScope} from '@/hooks/useOperationScope';
+import {useAuth} from '@/contexts/AuthContext';
+
 const DAYS = ["sun","mon","tue","wed","thu","fri","sat"] as const;
 
 export default function StaffDetail() {
   const { t, lang } = useI18n();
   const { id } = useParams();
+  const {user}=useAuth();
   const { currentBranchId } = useBranch();
   // R2: least-privilege UI mask routed through AuthorizationService.
   // Semantics unchanged: admin OR hr sees salary / bank / national_id /
   // DOB / commission %, even when a linked employee views their own profile.
   const { authz } = useAuthorization("StaffDetail");
   const canSeeSensitive = authz.hasRoleAny("hr");
+  const canManageLinks=authz.can('settings.edit');
   const MASK = "••••";
+  const captureScope=useOperationScope(user?.id&&id&&currentBranchId?`${user.id}|${id}|${currentBranchId}|${canManageLinks}`:null);
+  const mutation=useRef(false);
+  const unlinkSnapshot=useRef<StaffAccountSnapshot | null>(null);
+  const linkSnapshot=useRef<StaffAccountSnapshot | null>(null);
   const [staff, setStaff] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [position, setPosition] = useState<any>(null);
@@ -56,81 +66,57 @@ export default function StaffDetail() {
 
   const reload = async () => {
     if (!id) return;
-    const { data: s } = await supabase.from("staff_profiles").select("*").eq("id", id).maybeSingle();
-    setStaff(s);
-    const linkedUid = (s as any)?.linked_user_id ?? null;
-    if (linkedUid) {
-      const { data: lp } = await supabase.from("profiles").select("*").eq("id", linkedUid).maybeSingle();
-      setLinkedProfile(lp);
-      const { data: rs } = await (supabase as any).from("user_roles").select("role").eq("user_id", linkedUid);
-      setUserRoles((rs ?? []).map((r: any) => r.role));
-    } else {
-      setLinkedProfile(null);
-      setUserRoles([]);
-    }
+    const current=captureScope();
+    const [staffResult,profileResult,sch,att,lev,pay]=await Promise.all([
+      supabase.from('staff_profiles').select('*').eq('id',id).maybeSingle(),
+      supabase.from('profiles').select('*').eq('id',id).maybeSingle(),
+      supabase.from('work_schedules').select('*').eq('staff_id',id).order('day_of_week'),
+      supabase.from('attendance').select('*').eq('staff_id',id).order('date',{ascending:false}).limit(60),
+      supabase.from('leave_requests').select('*,leave_type:leave_types(name_en,name_ar)').eq('staff_id',id).order('start_date',{ascending:false}).limit(50),
+      supabase.from('payroll').select('*').eq('staff_id',id).order('period_year',{ascending:false}).order('period_month',{ascending:false}).limit(24),
+    ]);
+    if(!current())return;
+    const s=staffResult.data;
+    setStaff(s);setProfile(profileResult.data);setSchedule(sch.data ?? []);setAttendance(att.data ?? []);setLeaves(lev.data ?? []);setPayroll(pay.data ?? []);
+    setPosition(null);setDept(null);setLinkedProfile(null);setUserRoles([]);
+    const [pos,dep,lp,rs]=await Promise.all([
+      s?.position_id?supabase.from('staff_positions').select('*').eq('id',s.position_id).maybeSingle():Promise.resolve({data:null}),
+      s?.department_id?supabase.from('departments').select('*').eq('id',s.department_id).maybeSingle():Promise.resolve({data:null}),
+      s?.linked_user_id?supabase.from('profiles').select('*').eq('id',s.linked_user_id).maybeSingle():Promise.resolve({data:null}),
+      s?.linked_user_id?supabase.from('user_roles').select('role').eq('user_id',s.linked_user_id):Promise.resolve({data:[]}),
+    ]);
+    if(!current())return;
+    setPosition(pos.data);setDept(dep.data);setLinkedProfile(lp.data);setUserRoles((rs.data ?? []).map(r=>r.role));
   };
 
   useEffect(() => {
-    if (!id) return;
-    (async () => {
-      const { data: s } = await supabase.from("staff_profiles").select("*").eq("id", id).maybeSingle();
-      setStaff(s);
-      const { data: p } = await supabase.from("profiles").select("*").eq("id", id).maybeSingle();
-      setProfile(p);
-      if (s?.position_id) { const { data } = await supabase.from("staff_positions").select("*").eq("id", s.position_id).maybeSingle(); setPosition(data); }
-      if (s?.department_id) { const { data } = await supabase.from("departments").select("*").eq("id", s.department_id).maybeSingle(); setDept(data); }
-      const { data: sch } = await supabase.from("work_schedules").select("*").eq("staff_id", id).order("day_of_week");
-      setSchedule(sch ?? []);
-      const { data: at } = await supabase.from("attendance").select("*").eq("staff_id", id).order("date", { ascending: false }).limit(60);
-      setAttendance(at ?? []);
-      const { data: lv } = await supabase.from("leave_requests").select("*, leave_type:leave_types(name_en,name_ar)").eq("staff_id", id).order("start_date", { ascending: false }).limit(50);
-      setLeaves(lv ?? []);
-      const { data: pr } = await supabase.from("payroll").select("*").eq("staff_id", id).order("period_year", { ascending: false }).order("period_month", { ascending: false }).limit(24);
-      setPayroll(pr ?? []);
-      const linkedUid = (s as any)?.linked_user_id ?? null;
-      if (linkedUid) {
-        const { data: lp } = await supabase.from("profiles").select("*").eq("id", linkedUid).maybeSingle();
-        setLinkedProfile(lp);
-        const { data: rs } = await (supabase as any).from("user_roles").select("role").eq("user_id", linkedUid);
-        setUserRoles((rs ?? []).map((r: any) => r.role));
-      }
-    })();
-  }, [id]);
+    setStaff(null);setProfile(null);setLinkedProfile(null);setUserRoles([]);
+    setLinkOpen(false);setConfirmUnlink(false);linkSnapshot.current=null;setBusy(false);setLinking(false);
+    void reload();
+    // The operation scope fences all late reads and writes across identity/branch/record changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[id,currentBranchId,user?.id,canManageLinks]);
 
   const unlinkUser = async () => {
-    if (!id) return;
+    if (!id || !unlinkSnapshot.current || mutation.current) return;
+    mutation.current=true;
+    const current=captureScope();
+    const snapshot=unlinkSnapshot.current;
     setBusy(true);
-    const { data: me } = await supabase.auth.getUser();
-    const linkedUid = (staff as any)?.linked_user_id ?? null;
-    const { error: sErr } = await (supabase as any).from("staff_profiles")
-      .update({ linked_user_id: null }).eq("id", id);
-    if (sErr) { setBusy(false); toast.error(sErr.message); return; }
-    if (linkedUid) {
-      // Route role revocation through the canonical Settings RPC so
-      // user_roles is never mutated directly from client code.
-      const { error: rErr } = await (supabase as any).rpc("settings_assign_user_role", {
-        _target_user_id: linkedUid,
-        _new_role: null,
-        _branch_id: null,
-      });
-      if (rErr) { setBusy(false); toast.error(rErr.message); return; }
-    }
-    await (supabase as any).from("audit_logs").insert({
-      user_id: me.user?.id ?? null,
-      branch_id: staff?.branch_id ?? null,
-      action: "employee_unlinked",
-      entity_type: "user_employee_link",
-      entity_id: linkedUid ?? id,
-      old_values: { branch_id: staff?.branch_id ?? null, employee_id: staff?.employee_id ?? null, roles: userRoles },
-      new_values: null,
-    });
-    setBusy(false);
-    setConfirmUnlink(false);
-    toast.success(lang === "ar" ? "تم فك الربط" : "Unlinked");
-    reload();
+    try {
+      await manageStaffAccount(snapshot,null);
+      if (!current()) return;
+      setConfirmUnlink(false);
+      toast.success(lang === 'ar' ? 'تم فك الربط' : 'Unlinked');
+      await reload();
+    } catch (error: unknown) {
+      if(current())toast.error(staffAccountError(error,lang === 'ar' ? 'تعذر فك الربط' : 'Could not unlink user'));
+    } finally {mutation.current=false;if(current())setBusy(false);}
   };
 
   const openLinkPicker = async (mode: "link" | "replace") => {
+    const current=captureScope();
+    linkSnapshot.current=staff?{id:staff.id,linked_user_id:staff.linked_user_id ?? null,updated_at:staff.updated_at}:null;
     setLinkMode(mode);
     setPickedUserId("");
     // Load all user profiles, then exclude those already linked to another
@@ -141,54 +127,25 @@ export default function StaffDetail() {
     const takenIds = new Set((linkedRows ?? []).map((r: any) => r.linked_user_id));
     // Allow current linked user (for replace/current preview)
     if ((staff as any)?.linked_user_id) takenIds.delete((staff as any).linked_user_id);
+    if(!current())return;
     setCandidateUsers((ps ?? []).map((p: any) => ({ ...p, _taken: takenIds.has(p.id) })));
     setLinkOpen(true);
   };
 
   const confirmLink = async () => {
-    if (!id || !pickedUserId) return;
+    if (!id || !pickedUserId || !linkSnapshot.current || mutation.current) return;
     if (staff?.branch_id && currentBranchId && staff.branch_id !== currentBranchId) {
       toast.error(lang === "ar" ? "لا يمكن الربط عبر فرع مختلف" : "Cross-branch link is not allowed");
       return;
     }
-    setLinking(true);
+    const snapshot=linkSnapshot.current;
+    const current=captureScope();mutation.current=true;setLinking(true);
     try {
-      const prevLinkedUid = (staff as any)?.linked_user_id ?? null;
-      const { data: upd, error } = await (supabase as any).from("staff_profiles")
-        .update({ linked_user_id: pickedUserId })
-        .eq("id", id)
-        .select("id");
-      if (error) throw error;
-      if (!upd || upd.length === 0) throw new Error("Link failed");
-      // Revoke roles from previous linked user if replace
-      if (linkMode === "replace" && prevLinkedUid && prevLinkedUid !== pickedUserId) {
-        const { error: rErr } = await (supabase as any).rpc("settings_assign_user_role", {
-          _target_user_id: prevLinkedUid,
-          _new_role: null,
-          _branch_id: null,
-        });
-        if (rErr) throw rErr;
-      }
-      const { data: me } = await supabase.auth.getUser();
-      await (supabase as any).from("audit_logs").insert({
-        user_id: me.user?.id ?? null,
-        branch_id: staff?.branch_id ?? null,
-        action: linkMode === "replace" ? "employee_replaced" : "employee_linked",
-        entity_type: "user_employee_link",
-        entity_id: pickedUserId,
-        old_values: { staff_id: id, prev_linked_user_id: prevLinkedUid },
-        new_values: { staff_id: id, linked_user_id: pickedUserId, branch_id: staff?.branch_id ?? null },
-      });
-      toast.success(lang === "ar" ? "تم الربط" : "Linked");
-      setLinkOpen(false);
-      reload();
-    } catch (e: any) {
-      // UX fix: hardcoded English fallback regardless of `lang`, in a file
-      // where every other message is bilingual.
-      toast.error(e?.message ?? (lang === "ar" ? "فشل" : "Failed"));
-    } finally {
-      setLinking(false);
-    }
+      await manageStaffAccount(snapshot,pickedUserId);
+      if(!current())return;
+      toast.success(lang === 'ar' ? 'تم الربط' : 'Linked');setLinkOpen(false);await reload();
+    } catch(e:unknown){if(current())toast.error(staffAccountError(e,lang === 'ar' ? 'فشل' : 'Failed'));}
+    finally{mutation.current=false;if(current())setLinking(false);}
   };
 
   if (!staff) return <div className="p-10 text-center text-muted-foreground">…</div>;
@@ -242,7 +199,7 @@ export default function StaffDetail() {
                 {lang === "ar" ? "استبدال" : "Replace"}
               </Button>
               <Button variant="outline" size="sm" className="text-destructive"
-                onClick={() => setConfirmUnlink(true)}>
+                onClick={() => {unlinkSnapshot.current={id:staff.id,linked_user_id:staff.linked_user_id ?? null,updated_at:staff.updated_at};setConfirmUnlink(true);}}>
                 <Link2Off className="me-1 size-4" />
                 {lang === "ar" ? "فك الربط" : "Unlink"}
               </Button>

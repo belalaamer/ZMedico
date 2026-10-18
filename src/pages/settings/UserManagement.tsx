@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import SettingsLayout from "./SettingsLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,10 @@ import { toast } from "sonner";
 import { roleLabel } from "@/lib/roleLabels";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 
+import {manageStaffAccount, staffAccountError, indexStaffAccountRows, type StaffAccountSnapshot} from '@/lib/staffAccountLifecycle';
+import {useOperationScope} from '@/hooks/useOperationScope';
+import {useAuth} from '@/contexts/AuthContext';
+
 const ROLES = ["system_owner", "admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr"] as const;
 const ADMIN_PASSWORD_RESET_ENABLED = false;
 type Role = typeof ROLES[number];
@@ -61,7 +65,7 @@ type Role = typeof ROLES[number];
 // the corrected, properly-merged version.)
 const ROLES_REQUIRING_BRANCH: readonly Role[] = ["admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr"];
 
-type StaffLink = { branch_id: string | null; employee_id: string | null };
+type StaffLink = StaffAccountSnapshot & { branch_id: string | null; employee_id: string | null };
 
 // M2 Settings cutover: identity/role writes go through the
 // settings_assign_user_role SECURITY DEFINER RPC, which performs the
@@ -99,6 +103,12 @@ export default function UserManagement() {
   const visibleRoleOptions = authz.holdsAnyRole("system_owner")
     ? ROLES
     : ROLES.filter((role) => role !== "system_owner");
+  const canManageLinks=authz.can('settings.edit');
+  const {user}=useAuth();
+  const currentUserId=user?.id ?? null;
+  const pickerGeneration=useRef(0);
+  const captureScope=useOperationScope(currentUserId&&currentBranchId?`${currentUserId}|${currentBranchId}|${canManageLinks}`:null);
+  const mutation=useRef(false);
   const [users, setUsers] = useState<any[]>([]);
   const [roles, setRoles] = useState<Record<string, string[]>>({});
   const [q, setQ] = useState("");
@@ -125,6 +135,9 @@ export default function UserManagement() {
   const [creating, setCreating] = useState(false);
   const [createdInfo, setCreatedInfo] = useState<{ email: string; password: string } | null>(null);
   // Linked employee state (for create-user flow)
+  const linkableRequest=useRef(0);
+  const [linkableLoading,setLinkableLoading]=useState(false);
+  const createStaffSnapshot=useRef<StaffAccountSnapshot | null>(null);
   const [cLinkedStaffId, setCLinkedStaffId] = useState<string>("");
   const [linkableStaff, setLinkableStaff] = useState<any[]>([]);
 
@@ -159,70 +172,34 @@ export default function UserManagement() {
   const PAGE_SIZE = 10;
 
   const openLinkPicker = async (u: any, mode: "link" | "replace") => {
-    setLinkTarget(u);
+    const current=captureScope();
+    const generation=++pickerGeneration.current;
+    setLinkTarget({...u, observedStaff:staffLinks[u.id]});
     setLinkMode(mode);
     setPickedStaffId("");
     setPickedRole(((roles[u.id] ?? [])[0] as Role) ?? "receptionist");
     if (!currentBranchId) { setPickerStaff([]); return; }
     const { data: sps } = await (supabase as any)
       .from("staff_profiles")
-      .select("id,employee_id,branch_id,linked_user_id,staff_positions(title_en,title_ar),profiles(email,full_name)")
+      .select("id,employee_id,branch_id,linked_user_id,updated_at,staff_positions(title_en,title_ar),profiles(email,full_name)")
       .eq("branch_id", currentBranchId)
       .is("deleted_at", null);
-    setPickerStaff(sps ?? []);
+    if(current()&&generation===pickerGeneration.current)setPickerStaff(sps ?? []);
   };
 
   const confirmLink = async () => {
-    if (!linkTarget || !pickedStaffId) return;
-    const target = pickerStaff.find((s) => s.id === pickedStaffId);
-    if (!target) return;
-    if (target.linked_user_id) {
-      toast.error(lang === "ar" ? "هذا الموظف مربوط بالفعل" : "This employee is already linked");
-      return;
-    }
-    if (currentBranchId && target.branch_id && target.branch_id !== currentBranchId) {
-      toast.error(lang === "ar" ? "لا يمكن الربط عبر فرع مختلف" : "Cross-branch link is not allowed");
-      return;
-    }
-    setLinking(true);
-    try {
-      const prevStaffId = Object.entries(staffLinks).find(([, v]) => (v as any).linked_user_id === linkTarget.id)?.[0]
-        ?? (staffLinks[linkTarget.id]?.branch_id ? linkTarget.id : null);
-      // Replace: clear previous link atomically-ish
-      if (linkMode === "replace" && prevStaffId) {
-        const { error } = await (supabase as any).from("staff_profiles")
-          .update({ linked_user_id: null })
-          .eq("id", prevStaffId)
-          .eq("linked_user_id", linkTarget.id);
-        if (error) throw error;
-      }
-      // Guarded link: only succeeds if target is still unlinked
-      const { data: upd, error: upErr } = await (supabase as any).from("staff_profiles")
-        .update({ linked_user_id: linkTarget.id })
-        .eq("id", pickedStaffId)
-        .is("linked_user_id", null)
-        .select("id");
-      if (upErr) throw upErr;
-      if (!upd || upd.length === 0) {
-        // Rollback replace if we cleared previous
-        if (linkMode === "replace" && prevStaffId) {
-          await (supabase as any).from("staff_profiles")
-            .update({ linked_user_id: linkTarget.id })
-            .eq("id", prevStaffId);
-        }
-        throw new Error(lang === "ar" ? "الموظف مربوط بالفعل — أعد التحميل" : "Employee is already linked — refresh");
-      }
-      // Role assignment via the atomic Settings RPC (writes its own audit).
-      const r = await assignUserRole(linkTarget.id, pickedRole, null);
-      if (r.error) throw new Error(r.error.message);
-      toast.success(lang === "ar" ? "تم الربط" : "Linked");
-      setLinkTarget(null);
-      load();
-    } catch (e: any) {
-      toast.error(e?.message ?? "Failed");
-    } finally {
-      setLinking(false);
-    }
+    if (!linkTarget || !pickedStaffId || mutation.current) return;
+    const target=pickerStaff.find(s=>s.id===pickedStaffId);
+    if(!target || target.linked_user_id || target.branch_id!==currentBranchId)return;
+    const previous=linkMode==='replace'&&linkTarget.observedStaff?.linked_user_id===linkTarget.id
+      ? linkTarget.observedStaff as StaffAccountSnapshot : undefined;
+    const current=captureScope();mutation.current=true;setLinking(true);
+    try{
+      await manageStaffAccount(target,linkTarget.id,{previous,role:pickedRole});
+      if(!current())return;
+      toast.success(lang==='ar'?'تم الربط':'Linked');setLinkTarget(null);await load();
+    }catch(e:unknown){if(current())toast.error(staffAccountError(e,lang==='ar'?'تعذر الربط':'Could not link employee'));}
+    finally{mutation.current=false;if(current())setLinking(false);}
   };
 
   const openEdit = (u: any) => {
@@ -249,28 +226,21 @@ export default function UserManagement() {
   };
 
   const unlinkEmployee = async () => {
-    if (!unlinkTarget) return;
-    setUnlinking(true);
-    // Direct link clear stays under RLS (staff_profiles admin policy).
-    const { error: sErr } = await (supabase as any).from("staff_profiles")
-      .update({ linked_user_id: null })
-      .eq("linked_user_id", unlinkTarget.id);
-    if (sErr) { setUnlinking(false); toast.error(sErr.message); return; }
-    // Role clear + audit via the atomic RPC.
-    const r = await assignUserRole(unlinkTarget.id, null, null);
-    if (r.error) { setUnlinking(false); toast.error(r.error.message); return; }
-    setUnlinking(false);
-    toast.success(lang === "ar" ? "تم فك الربط" : "Unlinked");
-    setUnlinkTarget(null);
-    load();
+    if(!unlinkTarget || mutation.current)return;
+    const observed=unlinkTarget.observedStaff as StaffAccountSnapshot | undefined;
+    if(!observed || observed.linked_user_id!==unlinkTarget.id){toast.error(lang==='ar'?'أعد تحميل سجل الموظف':'Reload employee record');return;}
+    const current=captureScope();mutation.current=true;setUnlinking(true);
+    try{
+      await manageStaffAccount(observed,null);
+      if(!current())return;
+      toast.success(lang==='ar'?'تم فك الربط':'Unlinked');setUnlinkTarget(null);await load();
+    }catch(e:unknown){if(current())toast.error(staffAccountError(e,lang==='ar'?'تعذر فك الربط':'Could not unlink employee'));}
+    finally{mutation.current=false;if(current())setUnlinking(false);}
   };
 
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? null));
-  }, []);
 
   const load = async () => {
+    const current=captureScope();
     if (!branchSelectionReady || !currentBranchId) {
       setUsers([]); setRoles({}); setInvites([]); setBranches([]); setStaffLinks({}); setIsLoading(false);
       return;
@@ -282,6 +252,7 @@ export default function UserManagement() {
       .from("staff_branches")
       .select("user_id")
       .eq("branch_id", currentBranchId);
+    if(!current())return;
     const scopedUserIds = Array.from(new Set((memberships ?? []).map((m: any) => m.user_id).filter(Boolean))) as string[];
 
     let psQuery: any = supabase.from("profiles").select("id,full_name,email,username");
@@ -297,7 +268,7 @@ export default function UserManagement() {
       .order("name_en");
     let spQuery: any = (supabase as any)
       .from("staff_profiles")
-      .select("id,branch_id,employee_id,deleted_at,linked_user_id");
+      .select("id,branch_id,employee_id,deleted_at,linked_user_id,updated_at");
 
     {
       const ids = scopedUserIds;
@@ -318,49 +289,52 @@ export default function UserManagement() {
     const [{ data: ps }, { data: rs }, { data: inv }, { data: brs }, { data: sps }] = await Promise.all([
       psQuery, rsQuery, invQuery, brQuery, spQuery,
     ]);
+    if(!current())return;
     setUsers(ps ?? []);
     const m: Record<string, string[]> = {};
     (rs ?? []).forEach((r: any) => { (m[r.user_id] = m[r.user_id] || []).push(r.role); });
     setRoles(m);
     setInvites(inv ?? []);
     setBranches(brs ?? []);
-    const sb: Record<string, StaffLink> = {};
-    (sps ?? []).forEach((s: any) => {
-      if (s.deleted_at) return; // treat soft-deleted as unlinked
-      // Key by the user this staff row is linked to (falls back to id for
-      // legacy rows). This lets us render "linked" state on the user row.
-      const key = s.linked_user_id ?? s.id;
-      sb[key] = { branch_id: s.branch_id ?? null, employee_id: s.employee_id ?? null } as StaffLink;
-    });
-    setStaffLinks(sb);
+    setStaffLinks(indexStaffAccountRows(sps ?? []));
     setIsLoading(false);
   };
-  useEffect(() => { void load(); }, [branchSelectionReady, currentBranchId]);
-
-  // Load employees in the current branch that don't yet have any user role assigned.
-  // Loaded on branch/data change so the picker (and the "link" flow from any surface)
-  // always reflects the active branch — not only when the Create dialog opens.
   useEffect(() => {
-    if (!branchSelectionReady || !currentBranchId) { setLinkableStaff([]); return; }
-    (async () => {
-      const { data: sps } = await (supabase as any)
-        .from("staff_profiles")
-        .select("id,employee_id,branch_id,position_id,staff_positions(title_en,title_ar,group_key),profiles!inner(email,full_name,full_name_en,full_name_ar)")
-        .eq("branch_id", currentBranchId)
-        .is("deleted_at", null);
-      const { data: rs } = await (supabase as any).from("user_roles").select("user_id");
-      const withRoles = new Set((rs ?? []).map((r: any) => r.user_id));
-      setLinkableStaff((sps ?? []).filter((s: any) => !withRoles.has(s.id)));
-    })();
-  }, [branchSelectionReady, currentBranchId, users.length]);
+    setLinkTarget(null);setUnlinkTarget(null);setLinking(false);setUnlinking(false);setCreateOpen(false);setCLinkedStaffId('');createStaffSnapshot.current=null;pickerGeneration.current++;
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branchSelectionReady, currentBranchId,currentUserId,canManageLinks]);
+
+  const loadLinkableStaff = async () => {
+    const current=captureScope(),generation=++linkableRequest.current;
+    setLinkableStaff([]);setLinkableLoading(true);
+    if(!branchSelectionReady||!currentBranchId){setLinkableLoading(false);return;}
+    try{
+      const [staffResult,roleResult]=await Promise.all([
+        supabase.from('staff_profiles').select('id,employee_id,branch_id,position_id,linked_user_id,updated_at,staff_positions(title_en,title_ar,group_key),profiles!inner(email,full_name,full_name_en,full_name_ar)').eq('branch_id',currentBranchId).is('deleted_at',null),
+        supabase.from('user_roles').select('user_id'),
+      ]);
+      if(!current()||generation!==linkableRequest.current)return;
+      if(staffResult.error||roleResult.error)throw staffResult.error ?? roleResult.error;
+      const withRoles=new Set((roleResult.data ?? []).map(r=>r.user_id));
+      setLinkableStaff((staffResult.data ?? []).filter(s=>!withRoles.has(s.id)&&(!s.linked_user_id||s.linked_user_id===s.id)));
+    }catch(error:unknown){if(current()&&generation===linkableRequest.current)toast.error(staffAccountError(error,lang==='ar'?'تعذر تحميل الموظفين':'Could not load employees'));}
+    finally{if(current()&&generation===linkableRequest.current)setLinkableLoading(false);}
+  };
+  useEffect(()=>{
+    void loadLinkableStaff();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[branchSelectionReady,currentBranchId,currentUserId,canManageLinks]);
 
   const onPickLinkedStaff = (id: string) => {
     setCLinkedStaffId(id);
+    createStaffSnapshot.current=null;
     if (id === "none") {
       return;
     }
     const s = linkableStaff.find((x) => x.id === id);
     if (!s) return;
+    createStaffSnapshot.current={id:s.id,linked_user_id:s.linked_user_id ?? null,updated_at:s.updated_at};
     setCEmail(s.profiles?.email ?? "");
     setCName(s.profiles?.full_name ?? "");
     setCNameEn(s.profiles?.full_name_en ?? "");
@@ -412,16 +386,19 @@ export default function UserManagement() {
     // Linked-employee path: the auth user already exists (profile row is
     // present). Assign the role + branch instead of creating a new account.
     if (cLinkedStaffId && cLinkedStaffId !== "none") {
-      setCreating(true);
-      const staff = linkableStaff.find((x) => x.id === cLinkedStaffId);
-      if (!staff) { setCreating(false); toast.error("Staff not found"); return; }
-      const r = await assignUserRole(staff.id, cRole, cBranch || null);
-      if (r.error) { setCreating(false); toast.error(r.error.message); return; }
-      setCreating(false);
-      toast.success(lang === "ar" ? "تم ربط المستخدم بالموظف" : "User linked to employee");
-      setCEmail(""); setCUsername(""); setCName(""); setCNameEn(""); setCNameAr(""); setCRole("receptionist"); setCPassword(""); setCBranch(""); setCLinkedStaffId("");
-      setCreateOpen(false);
-      load();
+      if(mutation.current)return;
+      const staff=linkableStaff.find(x=>x.id===cLinkedStaffId);
+      const snapshot=createStaffSnapshot.current;
+      if(!staff||!snapshot||staff.branch_id!==currentBranchId||cBranch!==staff.branch_id){toast.error(lang==='ar'?'أعد اختيار الموظف من الفرع الحالي':'Select employee from the current branch again');return;}
+      const current=captureScope();mutation.current=true;setCreating(true);
+      try{
+        await manageStaffAccount(snapshot,staff.id,{role:cRole});
+        if(!current())return;
+        toast.success(lang==='ar'?'تم ربط المستخدم بالموظف':'User linked to employee');
+        setCEmail('');setCUsername('');setCName('');setCNameEn('');setCNameAr('');setCRole('receptionist');setCPassword('');setCBranch('');setCLinkedStaffId('');createStaffSnapshot.current=null;setCreateOpen(false);await load();
+      }catch(error:unknown){if(current())toast.error(staffAccountError(error,lang==='ar'?'تعذر ربط المستخدم':'Could not link user'));}
+      finally{mutation.current=false;if(current())setCreating(false);}
+
       return;
     }
     const email = cEmail.trim().toLowerCase();
@@ -551,7 +528,7 @@ export default function UserManagement() {
         if (!rs.includes(roleFilter)) return false;
       }
       if (linkFilter !== "all") {
-        const linked = !!staffLinks[u.id]?.branch_id;
+        const linked = staffLinks[u.id]?.linked_user_id === u.id;
         if (linkFilter === "linked" && !linked) return false;
         if (linkFilter === "unlinked" && linked) return false;
       }
@@ -574,7 +551,7 @@ export default function UserManagement() {
               <UserPlus className="me-2 size-4" />
               {lang === "ar" ? "دعوة مستخدم" : "Invite user"}
             </Button>
-            <Button onClick={() => setCreateOpen(true)} variant="outline">
+            <Button onClick={() => {setCreateOpen(true);void loadLinkableStaff();}} variant="outline">
               <KeyRound className="me-2 size-4" />
               {lang === "ar" ? "إنشاء مستخدم" : "Create user"}
             </Button>
@@ -640,7 +617,7 @@ export default function UserManagement() {
                   )}
                   {paged.map((u) => {
                     const userRoles = roles[u.id] ?? [];
-                    const linked = !!staffLinks[u.id]?.branch_id;
+                    const linked = staffLinks[u.id]?.linked_user_id === u.id;
                     const isSelf = currentUserId === u.id;
                     return (
                       <TableRow key={u.id} className="hover:bg-muted/30 transition-colors">
@@ -678,7 +655,7 @@ export default function UserManagement() {
                                 {lang === "ar" ? "غير مربوط" : "Unlinked"}
                               </Badge>
                             )}
-                            {userRoles.includes("manager") && !linked && (
+                            {userRoles.includes("manager") && !staffLinks[u.id]?.branch_id && (
                               <Badge variant="outline" className="gap-1 bg-warning/10 text-warning border-warning/30">
                                 <AlertTriangle className="size-3" />
                                 {lang === "ar" ? "بدون فرع" : "No branch"}
@@ -710,7 +687,7 @@ export default function UserManagement() {
                                     <Users className="me-2 size-4" />
                                     {lang === "ar" ? "استبدال الموظف" : "Replace employee"}
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => setUnlinkTarget(u)}>
+                                  <DropdownMenuItem onClick={() => setUnlinkTarget({...u,observedStaff:staffLinks[u.id]})}>
                                     <Link2Off className="me-2 size-4" />
                                     {lang === "ar" ? "فك الربط" : "Unlink"}
                                   </DropdownMenuItem>
@@ -875,7 +852,7 @@ export default function UserManagement() {
                   <Info className="size-4" />
                   {lang === "ar" ? "ربط بموظف موجود (اختياري)" : "Link to existing employee (optional)"}
                 </Label>
-                <Select value={cLinkedStaffId || "none"} onValueChange={onPickLinkedStaff}>
+                <Select value={cLinkedStaffId || "none"} onValueChange={onPickLinkedStaff} disabled={linkableLoading}>
                   <SelectTrigger className="bg-background">
                     <SelectValue placeholder={lang === "ar" ? "اختر موظفاً من هذا الفرع" : "Pick an employee from this branch"} />
                   </SelectTrigger>
@@ -891,7 +868,7 @@ export default function UserManagement() {
                 </Select>
                 <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                   <span>
-                    {linkableStaff.length === 0
+                    {linkableLoading ? (lang === 'ar' ? 'جارٍ تحميل الموظفين…' : 'Loading employees…') : linkableStaff.length === 0
                       ? (lang === "ar" ? "لا يوجد موظفون غير مربوطين في هذا الفرع." : "No unlinked employees in this branch.")
                       : (lang === "ar" ? "سيتم الاقتراح التلقائي للدور بناءً على المسمى الوظيفي." : "Role will be suggested from the employee's position.")}
                   </span>

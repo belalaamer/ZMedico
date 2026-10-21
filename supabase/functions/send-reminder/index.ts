@@ -72,6 +72,12 @@ type NotifySettings = {
   email_sender_name: string | null;
   whatsapp_enabled?: boolean;
   sms_enabled?: boolean;
+  send_appointment_reminders?: boolean;
+  send_appointment_confirmation?: boolean;
+  send_appointment_cancellation?: boolean;
+  send_invoice_notification?: boolean;
+  send_payment_receipt?: boolean;
+  winback_enabled?: boolean;
   whatsapp_provider?: "twilio" | "meta" | "custom" | null;
   sms_provider?: "twilio" | "messagebird" | "smsmisr" | "custom" | null;
   smsmisr_username?: string | null;
@@ -132,13 +138,39 @@ function sanitizeProviderError(text: string): string {
   return cleaned.length > 200 ? cleaned.slice(0, 200) + "…" : cleaned;
 }
 
+// Mirrors public.communication_event_enabled(branch, event_type) for every event that
+// can reach the dispatcher. Enqueue already gates on these flags, but a reminder can be
+// queued hours before it is due, and a branch that opts out in that window must not have
+// its patients messaged. An absent settings row keeps the SQL default (true), except
+// win_back which defaults to disabled. Rows with event_type "manual" are operator-initiated
+// and are never blocked here.
+const EVENT_CONSENT_FLAG: Record<string, keyof NotifySettings> = {
+  appointment_reminder: "send_appointment_reminders",
+  booking_confirmation: "send_appointment_confirmation",
+  appointment_rescheduled: "send_appointment_confirmation",
+  appointment_cancelled: "send_appointment_cancellation",
+  invoice_issued: "send_invoice_notification",
+  payment_receipt: "send_payment_receipt",
+  win_back: "winback_enabled",
+};
+
+function consentBlockReason(eventType: string, cfg: NotifySettings | null): string | null {
+  const flag = EVENT_CONSENT_FLAG[eventType];
+  if (!flag) return null;
+  if (cfg === null) return flag === "winback_enabled" ? "win_back is disabled until configured" : null;
+  return cfg[flag] === false ? `${eventType} disabled for this branch` : null;
+}
+
 async function sendOne(
   reminder: Reminder,
   patientPhone: string | null,
   patientEmail: string | null,
   cfg: NotifySettings | null,
-): Promise<{ ok: boolean; error?: string; provider_message_id?: string; provider_response?: Record<string, string> }> {
+): Promise<{ ok: boolean; error?: string; provider_message_id?: string; provider_response?: Record<string, string>; cancelled?: boolean }> {
   const message = reminder.message_en || reminder.message_ar;
+
+  const consent = consentBlockReason(reminder.event_type, cfg);
+  if (consent) return { ok: false, error: consent, cancelled: true };
 
   if (reminder.reminder_type === "whatsapp" || reminder.reminder_type === "sms") {
     if (!patientPhone) return { ok: false, error: "Patient has no phone" };
@@ -460,7 +492,7 @@ Deno.serve(async (req) => {
       if (!cfgCache.has(r.branch_id)) {
         const { data } = await supabase
           .from("notification_settings")
-          .select("whatsapp_api_key,whatsapp_api_url,whatsapp_business_number,sms_api_key,sms_api_url,sms_sender_id,email_sender_address,email_sender_name,whatsapp_enabled,sms_enabled,whatsapp_provider,sms_provider,meta_phone_number_id,twilio_account_sid,twilio_auth_token,twilio_from_whatsapp,twilio_from_sms,smsmisr_username,smsmisr_password,smsmisr_sender_token,smsmisr_environment,smsmisr_language")
+          .select("whatsapp_api_key,whatsapp_api_url,whatsapp_business_number,sms_api_key,sms_api_url,sms_sender_id,email_sender_address,email_sender_name,whatsapp_enabled,sms_enabled,send_appointment_reminders,send_appointment_confirmation,send_appointment_cancellation,send_invoice_notification,send_payment_receipt,winback_enabled,whatsapp_provider,sms_provider,meta_phone_number_id,twilio_account_sid,twilio_auth_token,twilio_from_whatsapp,twilio_from_sms,smsmisr_username,smsmisr_password,smsmisr_sender_token,smsmisr_environment,smsmisr_language")
           .eq("branch_id", r.branch_id)
           .maybeSingle();
         cfgCache.set(r.branch_id, (data as NotifySettings) ?? null);
@@ -508,6 +540,17 @@ Deno.serve(async (req) => {
           payload: res.provider_response
             ? { ...(r.payload ?? {}), provider_response: res.provider_response }
             : r.payload,
+        })
+        .eq("id", r.id);
+    } else if (res.cancelled) {
+      // No provider call was made and none is retried while the branch keeps this
+      // event disabled; the row records why it was withdrawn.
+      await supabase
+        .from("reminders")
+        .update({
+          status: "cancelled",
+          error_message: res.error ?? "disabled by branch settings",
+          destination_phone: phone,
         })
         .eq("id", r.id);
     } else {

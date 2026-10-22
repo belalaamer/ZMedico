@@ -43,22 +43,33 @@ Deno.serve(async (req) => {
     const autoCredentials = body.auto_credentials === true;
     if (!patientId) return jsonResponse({ error: "patient_id is required" }, 400);
 
-    const [{ data: patient, error: patientError }, { data: roles }] = await Promise.all([
-      admin.from("patients").select("id,patient_code,branch_id,email,first_name_en,last_name_en,first_name_ar,last_name_ar").eq("id", patientId).is("deleted_at", null).maybeSingle(),
-      admin.from("user_roles").select("role").eq("user_id", callerData.user.id),
-    ]);
-    if (patientError || !patient) return jsonResponse({ error: "Patient not found" }, 404);
-    if (!patient.email || !String(patient.email).includes("@")) return jsonResponse({ error: "patient_email_required" }, 400);
-
+    // Authorization is resolved before the patient row is read, so nothing about
+    // the row can be described to a caller who is not entitled to it.
+    const { data: roles } = await admin.from("user_roles").select("role").eq("user_id", callerData.user.id);
     const callerRoles = new Set((roles ?? []).map((row: { role: string }) => String(row.role)));
     const isSystemOwner = callerRoles.has("system_owner");
     if (!isSystemOwner && !Array.from(callerRoles).some((role) => allowedRoles.has(role))) {
       return jsonResponse({ error: "Forbidden" }, 403);
     }
+
+    // null means unrestricted (system_owner); a Set is the caller's own branch scope.
+    let scope: Set<string> | null = null;
     if (!isSystemOwner) {
-      const { data: branchLink } = await admin.from("staff_branches").select("branch_id").eq("user_id", callerData.user.id).eq("branch_id", patient.branch_id).limit(1);
-      if (!branchLink?.length) return jsonResponse({ error: "Forbidden" }, 403);
+      const { data: links } = await admin.from("staff_branches").select("branch_id").eq("user_id", callerData.user.id).limit(500);
+      scope = new Set((links ?? []).map((row: { branch_id: string }) => String(row.branch_id)));
     }
+
+    const notFound = () => jsonResponse({ error: "Patient not found" }, 404);
+    const { data: patient, error: patientError } = await admin
+      .from("patients")
+      .select("id,patient_code,branch_id,email,first_name_en,last_name_en,first_name_ar,last_name_ar")
+      .eq("id", patientId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (patientError || !patient) return notFound();
+    if (scope && !scope.has(String(patient.branch_id))) return notFound();
+
+    if (!patient.email || !String(patient.email).includes("@")) return jsonResponse({ error: "patient_email_required" }, 400);
 
     const { data: existing } = await admin.from("patient_portal_accounts").select("id,auth_user_id,status").eq("patient_id", patient.id).maybeSingle();
     if (existing?.auth_user_id) {

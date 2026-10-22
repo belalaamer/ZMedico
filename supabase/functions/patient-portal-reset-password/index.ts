@@ -50,41 +50,50 @@ Deno.serve(async (req) => {
     }
 
     const admin = createClient(supabaseUrl, serviceKey);
-    const [{ data: roles }, { data: patient, error: patientError }, { data: account, error: accountError }] =
-      await Promise.all([
-        admin.from("user_roles").select("role").eq("user_id", callerData.user.id),
-        admin.from("patients")
-          .select("id,branch_id,email")
-          .eq("id", patientId)
-          .is("deleted_at", null)
-          .maybeSingle(),
-        admin.from("patient_portal_accounts")
-          .select("id,patient_id,auth_user_id,status,portal_enabled")
-          .eq("patient_id", patientId)
-          .maybeSingle(),
-      ]);
 
-    if (patientError || !patient || accountError || !account?.auth_user_id) {
-      return jsonResponse({ error: "Patient portal account not found" }, 404);
-    }
-    if (!account.portal_enabled || account.status !== "active") {
-      return jsonResponse({ error: "Patient portal account is not active" }, 409);
-    }
-
+    // Role and branch scope are settled from the caller alone, before any patient
+    // or portal-account row is read, so the answer cannot describe a row the
+    // caller is not entitled to.
+    const { data: roles } = await admin.from("user_roles").select("role").eq("user_id", callerData.user.id);
     const callerRoles = new Set((roles ?? []).map((row: { role: string }) => String(row.role)));
     const isSystemOwner = callerRoles.has("system_owner");
     if (!isSystemOwner && !Array.from(callerRoles).some((role) => allowedRoles.has(role))) {
       return jsonResponse({ error: "Forbidden" }, 403);
     }
 
+    // null means unrestricted (system_owner); a Set is the caller's own branch scope.
+    let scope: Set<string> | null = null;
     if (!isSystemOwner) {
-      const { data: branchLink, error: branchError } = await admin
+      const { data: links, error: linksError } = await admin
         .from("staff_branches")
         .select("branch_id")
         .eq("user_id", callerData.user.id)
-        .eq("branch_id", patient.branch_id)
-        .limit(1);
-      if (branchError || !branchLink?.length) return jsonResponse({ error: "Forbidden" }, 403);
+        .limit(500);
+      if (linksError) return jsonResponse({ error: "Forbidden" }, 403);
+      scope = new Set((links ?? []).map((row: { branch_id: string }) => String(row.branch_id)));
+    }
+
+    // One indistinguishable 404 for absent, soft-deleted, out-of-scope and
+    // account-less: the three-state oracle is gone for a non-entitled caller, and
+    // status detail is only ever returned to someone who already owns the branch.
+    const notFound = () => jsonResponse({ error: "Patient portal account not found" }, 404);
+    const { data: patient, error: patientError } = await admin
+      .from("patients")
+      .select("id,branch_id,email")
+      .eq("id", patientId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (patientError || !patient) return notFound();
+    if (scope && !scope.has(String(patient.branch_id))) return notFound();
+
+    const { data: account, error: accountError } = await admin
+      .from("patient_portal_accounts")
+      .select("id,patient_id,auth_user_id,status,portal_enabled")
+      .eq("patient_id", patient.id)
+      .maybeSingle();
+    if (accountError || !account?.auth_user_id) return notFound();
+    if (!account.portal_enabled || account.status !== "active") {
+      return jsonResponse({ error: "Patient portal account is not active" }, 409);
     }
 
     const password = randomTemporaryPassword();

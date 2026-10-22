@@ -13,6 +13,33 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders, corsPreflight, jsonResponse } from "./_shared/cors.ts";
 
+// ZMED-287: some Supabase router nodes carry a clock behind the dispatcher's own
+// API key and reject it with "JWT issued at future". The rejection is node-local,
+// so the same call a moment later usually lands on a healthy node. Only the
+// documented transient classes are retried, so a real permission error is never
+// looped over.
+const TRANSIENT_CALL_ERROR =
+  /issued at future|could not connect|connection refused|ECONNRESET|ETIMEDOUT|timed out|temporarily unavailable|service unavailable|bad gateway/i;
+
+type TransientResult = { error?: { message?: string } | null };
+
+function isTransientCallError(error: TransientResult["error"]): boolean {
+  return TRANSIENT_CALL_ERROR.test(String(error?.message ?? ""));
+}
+
+async function withTransientRetry<T extends TransientResult>(
+  call: () => PromiseLike<T>,
+  attempts = 3,
+): Promise<T> {
+  let last = await call();
+  for (let attempt = 1; attempt < attempts; attempt++) {
+    if (!last.error || !isTransientCallError(last.error)) return last;
+    await new Promise((resolve) => setTimeout(resolve, 300 * attempt));
+    last = await call();
+  }
+  return last;
+}
+
 // Sprint 1 hardening: bulk-abuse protection. Cap the number of reminders
 // processed per invocation (configurable via SEND_REMINDER_MAX_BATCH, default
 // 200). Requests that would exceed the cap are rejected with 413 so callers
@@ -165,12 +192,22 @@ async function sendOne(
   reminder: Reminder,
   patientPhone: string | null,
   patientEmail: string | null,
+  patientWhatsappOptIn: boolean | null,
   cfg: NotifySettings | null,
 ): Promise<{ ok: boolean; error?: string; provider_message_id?: string; provider_response?: Record<string, string>; cancelled?: boolean }> {
   const message = reminder.message_en || reminder.message_ar;
 
   const consent = consentBlockReason(reminder.event_type, cfg);
   if (consent) return { ok: false, error: consent, cancelled: true };
+
+  // Branch flags are not patient consent. patients.whatsapp_opt_in defaults to false and is
+  // the invariant every other producer honours (20260826040000:139/:257/:318), so it is
+  // re-read here: a reminder queued hours ago must not overtake a patient who opted out
+  // since. 'manual' keeps the operator escape hatch documented above EVENT_CONSENT_FLAG.
+  if (reminder.reminder_type === "whatsapp" && reminder.event_type !== "manual"
+      && patientWhatsappOptIn !== true) {
+    return { ok: false, error: "patient_not_opted_in", cancelled: true };
+  }
 
   if (reminder.reminder_type === "whatsapp" || reminder.reminder_type === "sms") {
     if (!patientPhone) return { ok: false, error: "Patient has no phone" };
@@ -446,23 +483,25 @@ Deno.serve(async (req) => {
   }
 
   const MAX_BATCH = maxBatchSize();
-  // Build query
-  let q = supabase
-    .from("reminders")
-    .select("id,branch_id,patient_id,reminder_type,message_en,message_ar,scheduled_time,status,event_type,payload,attempt_count");
+  // A retry has to issue a fresh request, so the query is built by a factory
+  // rather than awaited once.
+  const buildReminderQuery = () => {
+    let q = supabase
+      .from("reminders")
+      .select("id,branch_id,patient_id,reminder_type,message_en,message_ar,scheduled_time,status,event_type,payload,attempt_count");
 
-  if (body.reminder_id) {
-    q = q.eq("id", body.reminder_id);
-  } else {
+    if (body.reminder_id) {
+      return q.eq("id", body.reminder_id);
+    }
     q = q.eq("status", "pending");
     if (body.branch_id) q = q.eq("branch_id", body.branch_id);
     if (body.due_only !== false) q = q.lte("scheduled_time", new Date().toISOString());
     // Fetch one extra so we can detect (and reject) oversized batches
     // instead of silently truncating.
-    q = q.limit(MAX_BATCH + 1);
-  }
+    return q.limit(MAX_BATCH + 1);
+  };
 
-  const { data: reminders, error: fetchErr } = await q;
+  const { data: reminders, error: fetchErr } = await withTransientRetry(buildReminderQuery);
   if (fetchErr) {
     return jsonResponse({ error: fetchErr.message }, 500);
   }
@@ -480,21 +519,30 @@ Deno.serve(async (req) => {
   }
   let sent = 0;
   let failed = 0;
-  const results: Array<{ id: string; ok: boolean; error?: string; provider_message_id?: string; provider_response?: Record<string, string> }> = [];
+  let deferred = 0;
+  const results: Array<{ id: string; ok: boolean; error?: string; deferred?: boolean; provider_message_id?: string; provider_response?: Record<string, string> }> = [];
+  const sentUnconfirmed: Array<{ id: string; provider_message_id: string | null; error: string }> = [];
 
   // Cache config & patient lookups
   const cfgCache = new Map<string, NotifySettings | null>();
-  const patientCache = new Map<string, { phone: string | null; email: string | null }>();
+  const patientCache = new Map<string, { phone: string | null; email: string | null; whatsappOptIn: boolean | null }>();
 
   for (const r of list) {
     let cfg: NotifySettings | null = null;
     if (r.branch_id) {
       if (!cfgCache.has(r.branch_id)) {
-        const { data } = await supabase
+        const { data, error } = await withTransientRetry(() => supabase
           .from("notification_settings")
           .select("whatsapp_api_key,whatsapp_api_url,whatsapp_business_number,sms_api_key,sms_api_url,sms_sender_id,email_sender_address,email_sender_name,whatsapp_enabled,sms_enabled,send_appointment_reminders,send_appointment_confirmation,send_appointment_cancellation,send_invoice_notification,send_payment_receipt,winback_enabled,whatsapp_provider,sms_provider,meta_phone_number_id,twilio_account_sid,twilio_auth_token,twilio_from_whatsapp,twilio_from_sms,smsmisr_username,smsmisr_password,smsmisr_sender_token,smsmisr_environment,smsmisr_language")
           .eq("branch_id", r.branch_id)
-          .maybeSingle();
+          .maybeSingle());
+        if (error) {
+          // A failed lookup is not a business failure: leaving the row pending lets
+          // the next tick retry instead of recording a permanent send failure.
+          deferred++;
+          results.push({ id: r.id, ok: false, deferred: true, error: `settings_lookup_failed: ${String(error.message ?? "")}` });
+          continue;
+        }
         cfgCache.set(r.branch_id, (data as NotifySettings) ?? null);
       }
       cfg = cfgCache.get(r.branch_id) ?? null;
@@ -502,30 +550,38 @@ Deno.serve(async (req) => {
 
     let phone: string | null = null;
     let email: string | null = null;
+    let whatsappOptIn: boolean | null = null;
     if (r.patient_id) {
       if (!patientCache.has(r.patient_id)) {
-        const { data } = await supabase
+        const { data, error } = await withTransientRetry(() => supabase
           .from("patients")
-          .select("phone,email,deleted_at")
+          .select("phone,email,deleted_at,whatsapp_opt_in")
           .eq("id", r.patient_id)
           .is("deleted_at", null)
-          .maybeSingle();
+          .maybeSingle());
+        if (error) {
+          deferred++;
+          results.push({ id: r.id, ok: false, deferred: true, error: `patient_lookup_failed: ${String(error.message ?? "")}` });
+          continue;
+        }
         patientCache.set(r.patient_id, {
           phone: (data as any)?.phone ?? null,
           email: (data as any)?.email ?? null,
+          whatsappOptIn: data ? (data as any).whatsapp_opt_in === true : null,
         });
       }
       const p = patientCache.get(r.patient_id)!;
       phone = p.phone;
       email = p.email;
+      whatsappOptIn = p.whatsappOptIn;
     }
 
-    const res = await sendOne(r, phone, email, cfg);
+    const res = await sendOne(r, phone, email, whatsappOptIn, cfg);
     results.push({ id: r.id, ok: res.ok, error: res.error, provider_message_id: res.provider_message_id, provider_response: res.provider_response });
 
     if (res.ok) {
       sent++;
-      await supabase
+      const mark = await withTransientRetry(() => supabase
         .from("reminders")
         .update({
           status: "sent",
@@ -541,21 +597,26 @@ Deno.serve(async (req) => {
             ? { ...(r.payload ?? {}), provider_response: res.provider_response }
             : r.payload,
         })
-        .eq("id", r.id);
+        .eq("id", r.id));
+      if (mark.error) {
+        // The provider accepted the message but the row is still pending, so the
+        // next tick could send it again. This has to be reported, never swallowed.
+        sentUnconfirmed.push({ id: r.id, provider_message_id: res.provider_message_id ?? null, error: String(mark.error.message ?? "") });
+      }
     } else if (res.cancelled) {
       // No provider call was made and none is retried while the branch keeps this
       // event disabled; the row records why it was withdrawn.
-      await supabase
+      await withTransientRetry(() => supabase
         .from("reminders")
         .update({
           status: "cancelled",
           error_message: res.error ?? "disabled by branch settings",
           destination_phone: phone,
         })
-        .eq("id", r.id);
+        .eq("id", r.id));
     } else {
       failed++;
-      await supabase
+      await withTransientRetry(() => supabase
         .from("reminders")
         .update({
           status: "failed",
@@ -565,9 +626,14 @@ Deno.serve(async (req) => {
           attempt_count: (r as any).attempt_count ? (r as any).attempt_count + 1 : 1,
           last_attempt_at: new Date().toISOString(),
         })
-        .eq("id", r.id);
+        .eq("id", r.id));
     }
   }
 
-  return jsonResponse({ processed: list.length, sent, failed, results });
+  const outcome: Record<string, unknown> = { processed: list.length, sent, failed, results };
+  if (deferred > 0) outcome.deferred = deferred;
+  if (sentUnconfirmed.length > 0) outcome.sent_unconfirmed = sentUnconfirmed;
+  // 500 only when a completed send could not be recorded: the row is still pending
+  // and the next tick can duplicate it, so the failure must be retained visibly.
+  return jsonResponse(outcome, sentUnconfirmed.length > 0 ? 500 : 200);
 });

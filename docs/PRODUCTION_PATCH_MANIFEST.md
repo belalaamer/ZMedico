@@ -13,7 +13,7 @@ Receipts named as `outputs/…` or `work/…` are the local audit trail of the s
 | | |
 |---|---|
 | Files staged locally | 25 (17 function files + 8 migrations). The 17 function files are 11 `index.ts` — the 9 patched by ZMED-279/285/286/287/288/289 plus the 2 orphans recovered off Production (§3.1) — 4 per-function `_shared/cors.ts` copies, the repo top-level `_shared/cors.ts` and `admin-export/_shared/active-session.ts` |
-| Files published on this branch | 22 + this manifest: the 11 `index.ts`, 8 migrations, and only the 3 per-function `cors.ts` copies that some source actually imports (the other 2 staged `_shared` files are byte-identical to what the tip already has — §4 explains the subset) |
+| Files published on this branch | 22 + this manifest: the 11 `index.ts`, 8 migrations, and only the 3 per-function `cors.ts` copies that some source actually imports (the other 2 staged `_shared` files are byte-identical to what the tip already has — §4 explains the subset). A 24th path, `src/lib/adminExportSession.test.ts`, is not a Production artifact but had to come along: CI reads function sources off disk, and the first commit made the repo's own test contradict the deployed `admin-export` (§6.1) |
 | Deployed to Production | **all 11 functions** and **7 of the 8** migrations. The 9 patched functions are byte-identical to the staged file (§3), the 2 recovered orphans are byte-identical to the Production readback they were reconstructed from (§3.1), and the 7 migrations are verified by `pg_get_functiondef` md5 against the same files (§5). `20261018140000` is **staged only and deliberately not applied**: Production already holds those objects, and its version sorts before a published migration on purpose (§5.1) |
 | Published to the repo | **this branch** — see §6 |
 | Safe to `supabase db push` from here | **no** — measured this session, not assumed: Production records **468** rows in `supabase_migrations.schema_migrations`, the repo tip carries **410** migration files, and only **66** version prefixes are common to both (344 repo-only, 402 Production-only). Every file here is named by the `version` Production recorded, so `migrate` applies them individually and skips the seven already in. Bulk replay of the repo's history against Production is explicitly out of scope and prohibited by the standing brief |
@@ -146,7 +146,22 @@ Two constraints that shaped this and still apply to anyone merging:
 
 Merging this branch is a documentation/rebuild-ability change only. It closes the F-6 gap ("the repo cannot rebuild or roll back Production") for the eleven functions and eight migrations listed above; it does **not** reconcile the remaining 402 Production-only rows or the 344 repo-only files, and §1's `db push` warning stands.
 
+### 6.1 Why the first commit broke CI, and what the second commit changed
+
+`src/lib/adminExportSession.test.ts` is a static-source harness: it reads `supabase/functions/admin-export/index.ts` off disk, strips the imports, transpiles it with the `typescript` package and runs it against a mocked `Deno`/`createClient`. So publishing the deployed `admin-export` re-compiles that test against different bytes, and the test modelled the **pre-F-4** contract — it expected the service-role client to read `staff_branches` for the branch link. Deployed v11 does not: it calls `userClient.rpc("user_has_branch_access", { _branch })` on the caller's own JWT client (a `SECURITY DEFINER` helper every RLS path uses, so a lapsed or suspended tenant is denied too) and never touches `staff_branches`. Result on commit `7f7485b`: `Test and build` failed at two assertions — the happy path returned 403 because the mock answered `data: undefined` for an unfamiliar RPC name, and the branch-denial test expected a `staff_branches` call that no longer exists.
+
+The second commit realigns the harness to the deployed contract and keeps its binding power:
+
+* asserts the scope RPC is made with `{ _branch: <requested> }` on the anon-key client, and that the service-role client's table reads never include `staff_branches` or `tenant_branches`;
+* asserts the audit-then-read order (`user_roles` → `audit_logs` → `patients` → `audit_logs`);
+* asserts denial before any audit insert or data read for a scope verdict that is not an explicit `true` (`null`, `false`, `0`, `"true"`) and for an RPC that errors.
+
+Negative control, measured: this test file run against the **tip** `admin-export/index.ts` fails 5 of 15; run against the published v11 source it is 15/15. So the assertions describe the deployed artifact, not whatever source happens to be checked out. The `undefined` case is deliberately excluded from the non-`true` loop: PostgREST yields `null` for a SQL NULL, and the harness parameter's JS default would silently restore `true` for a literal `undefined`, turning a vacuous pass into a fake one.
+
+Local full-suite runs on this host are load-flaky (an 866-test pass took 436 s and a rerun produced 4 timeouts in jsdom files unrelated to this change, each of which passes in isolation), so CI is treated as the authority for the suite; the checks above were run in isolation precisely so they do not inherit that flakiness.
+
 ## 7. Do-not-do list attached to this patch set
+
 
 * Do not `supabase db push` the repo against Production. The brief forbids bulk migration-history replay, and the measured overlap is 66 of 468 rows.
 * Do not re-deploy from the old `main`: it rolls back nine functions (§2).
@@ -170,6 +185,7 @@ A build passing or a `smoke` tick succeeding is not proof of a flow. These are t
 | `20261022084812/…84845/…85312` (ZMED-291 cron) | — | re-applied on QA, 0 `cron.job` rows changed; `assert_cron_health()` md5 `9119a570…` | — | — |
 | `20261018140000` (F-6 version) | — | 19/19 on a fresh QA stack, exit 0 (`outputs/ZMED-F6-qa-receipt-2026-10-22.json`) | — | — |
 | `20261022115129` (key_hash hardening) | — | QA receipt `outputs/ZMED-F6-hardening-qa-receipt-2026-10-22.json`, then Production | — | see §8.2 — live hashed buckets |
+| `src/lib/adminExportSession.test.ts` | 15/15 against the published v11 source, and the four harnesses that read `supabase/functions/**` pass together 33/33; **5 of 15 fail** against the tip source (negative control, §6.1). `tsc --noEmit` on both projects and `vite build` exit 0 in the same worktree | — | — | — |
 
 ### 8.1 The one browser-level proof, in short
 

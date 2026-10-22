@@ -29,6 +29,29 @@ type Connection = {
 
 const encoder = new TextEncoder();
 
+// ZMED-286 F-5. meta-ads-connection is the only writer of api_version and ad_account_id, and
+// from this revision on it validates both. This function still refuses an unvalidated stored
+// value: a row written before that revision, written by hand, or written through another
+// surface would otherwise be interpolated straight into the path of a Graph call carrying
+// this tenant's access token. Fail closed rather than encode around an unknown shape.
+const API_VERSION_RE = /^v\d+(\.\d+)?$/;
+const AD_ACCOUNT_RE = /^act_\d+$/;
+const GRAPH_HOST = "graph.facebook.com";
+function assertApiVersion(value: string | null | undefined): string {
+  const candidate = (value ?? "").trim();
+  if (!API_VERSION_RE.test(candidate)) throw new Error(`Stored API version is not a bare version token: ${errorMessage(candidate)}`);
+  return candidate;
+}
+function assertAdAccount(value: string | null | undefined): string {
+  const candidate = (value ?? "").trim().replace(/^act_/i, "");
+  const normalized = `act_${candidate}`;
+  if (!AD_ACCOUNT_RE.test(normalized)) throw new Error(`Stored Ad Account ID is not numeric: ${errorMessage(candidate)}`);
+  return normalized;
+}
+function graphUrl(apiVersion: string, account: string, edge: string): URL {
+  return new URL(`https://${GRAPH_HOST}/${encodeURIComponent(apiVersion)}/${encodeURIComponent(account)}/${edge}`);
+}
+
 function errorMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error);
   return raw.replace(/[\x00-\x1f\x7f]+/g, " ").slice(0, 200);
@@ -37,6 +60,21 @@ function errorMessage(error: unknown): string {
 function fromBase64(value: string): Uint8Array {
   const binary = atob(value);
   return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+}
+
+// ZMED-286 F-5 (f). lead_campaign_spend.raw_hash is NOT NULL with no database default, this
+// function is the only writer of that table in published code, and the published payload
+// never fills it - so the published spend upsert cannot succeed at all. Nothing else in the
+// repository computes a raw_hash, so this revision defines the convention: a SHA-256 of the
+// source row, key-sorted so it is stable across the same Graph response.
+function canonicalJson(value: Record<string, unknown>): string {
+  const keys = Object.keys(value).sort();
+  return JSON.stringify(keys.map((key) => [key, value[key] ?? null]));
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", encoder.encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 async function encryptionKey(): Promise<CryptoKey> {
@@ -124,15 +162,16 @@ Deno.serve(async (req) => {
     const days = Math.min(Math.max(Number(input.days) || 28, 1), 90);
     const until = new Date();
     const since = new Date(until.getTime() - days * 86_400_000);
-    const apiVersion = connection.api_version || "v20.0";
-    const account = `act_${connection.ad_account_id.replace(/^act_/, "")}`;
+    const apiVersion = assertApiVersion(connection.api_version);
+    const account = assertAdAccount(connection.ad_account_id);
     const startedAt = new Date().toISOString();
 
     // ---------- Part 1: daily campaign spend -> lead_campaign_spend ----------
     let spendRows = 0;
     let totalSpend = 0;
-    {
-      const url = new URL(`https://graph.facebook.com/${apiVersion}/${account}/insights`);
+    let spendError: string | null = null;
+    try {
+      const url = graphUrl(apiVersion, account, "insights");
       url.searchParams.set("level", "campaign");
       url.searchParams.set("fields", "campaign_id,campaign_name,date_start,date_stop,spend,impressions,reach,clicks,actions");
       url.searchParams.set("time_increment", "1");
@@ -141,7 +180,7 @@ Deno.serve(async (req) => {
       url.searchParams.set("access_token", token);
       const body = await graphGet(url);
       const rows = Array.isArray(body.data) ? body.data as Record<string, unknown>[] : [];
-      const upserts = rows.map((row) => {
+      const mapped = await Promise.all(rows.map(async (row) => {
         const actions = Array.isArray(row.actions) ? row.actions as { action_type?: string; value?: string }[] : [];
         const actionValue = (type: string) => {
           const hit = actions.find((a) => a.action_type === type);
@@ -166,20 +205,28 @@ Deno.serve(async (req) => {
           clicks: Number(row.clicks ?? 0),
           link_clicks: actionValue("link_click"),
           leads_reported: actionValue("lead") ?? actionValue("leadgen_grouped"),
-          actions: actions.length ? actions : null,
+          // actions is jsonb NOT NULL: the published `null` for an empty array can never land.
+          actions,
+          raw_hash: await sha256Hex(canonicalJson(row)),
           is_active: true,
           is_estimated: false,
           last_synced_at: startedAt,
           source_updated_at: startedAt,
         };
-      }).filter((row) => row.campaign_id);
+      }));
+      const upserts = mapped.filter((row) => row.campaign_id);
       if (upserts.length) {
         const { error } = await adminClient
           .from("lead_campaign_spend")
-          .upsert(upserts, { onConflict: "provider,ad_account_id,campaign_id,report_date,currency" });
+          // ZMED-286 F-5: branch_id joins the conflict target, matched by the migration's
+          // branch-scoped unique index. Two clinics may legitimately point at one act_ id;
+          // without branch_id in the key they DO UPDATE each other's spend rows instead.
+          .upsert(upserts, { onConflict: "branch_id,provider,ad_account_id,campaign_id,report_date,currency" });
         if (error) throw new Error(`spend_upsert: ${errorMessage(error.message)}`);
         spendRows = upserts.length;
       }
+    } catch (error) {
+      spendError = errorMessage(error);
     }
 
     // ---------- Part 2: Lead Ads form submissions -> leads ----------
@@ -199,7 +246,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
       const stageId = (stage as { id?: string } | null)?.id ?? null;
 
-      let nextUrl: URL | null = new URL(`https://graph.facebook.com/${apiVersion}/${account}/ads`);
+      let nextUrl: URL | null = graphUrl(apiVersion, account, "ads");
       nextUrl.searchParams.set("fields", `id,name,campaign_id,adset_name,campaign{name},leads.limit(50){id,created_time,field_data}`);
       nextUrl.searchParams.set("limit", "100");
       nextUrl.searchParams.set("access_token", token);
@@ -249,48 +296,75 @@ Deno.serve(async (req) => {
           }
         }
         const paging = body.paging as { next?: string } | undefined;
-        nextUrl = paging?.next ? new URL(paging.next) : null;
+        // The cursor Meta hands back is an absolute URL, and this request carries the tenant's
+        // access token in its query string. Following it without checking the host would turn a
+        // tampered or proxied response into token disclosure, so the pagination loop is pinned
+        // to the same host the first page was built for.
+        if (paging?.next) {
+          const candidate = new URL(paging.next);
+          if (candidate.protocol !== "https:" || candidate.hostname !== GRAPH_HOST) {
+            throw new Error(`Pagination cursor left ${GRAPH_HOST}: ${errorMessage(candidate.hostname)}`);
+          }
+          nextUrl = candidate;
+        } else {
+          nextUrl = null;
+        }
       }
     } catch (error) {
       leadsError = errorMessage(error);
     }
 
     const finishedAt = new Date().toISOString();
-    await adminClient.from("meta_ads_sync_runs").insert({
+    // ZMED-286 F-5. This write was silent on main: the status literal it sent ("success") is
+    // not in meta_ads_sync_runs_status_check ('succeeded' is), currency_set is jsonb NOT NULL
+    // and was given a bare string, and neither error was checked - so every run left no audit
+    // trail while the connection was still marked connected. Proven on QA Postgres: 23514 for
+    // the status, 22P02 for the currency, and a clean insert once both are corrected.
+    const runStatus = spendError ? "failed" : leadsError ? "partial" : "succeeded";
+    const { error: runError } = await adminClient.from("meta_ads_sync_runs").insert({
       connection_id: connection.id,
       requested_start: isoDate(since),
       requested_stop: isoDate(until),
       api_version: apiVersion,
-      status: leadsError ? "partial" : "success",
+      status: runStatus,
       rows_received: spendRows + leadsSeen,
       rows_inserted: leadsInserted,
       rows_updated: spendRows,
       rows_rejected: 0,
       pages_read: 1,
       total_spend: totalSpend,
-      currency_set: connection.currency || "EGP",
-      error_code: leadsError ? leadsError.split(":")[0] : null,
-      error_message: leadsError,
+      currency_set: [connection.currency || "EGP"],
+      error_code: (spendError ?? leadsError) ? (spendError ?? leadsError as string).split(":")[0] : null,
+      error_message: spendError ?? leadsError,
       started_at: startedAt,
       finished_at: finishedAt,
     });
+    const syncError = spendError ?? leadsError;
     await adminClient.from("meta_ads_connections").update({
-      status: "connected",
+      // "connected" and last_successful_sync_at are only advanced when nothing in the run
+      // failed; a partial run must not be reported to the owner as a clean sync. The status
+      // vocabulary is the live meta_ads_connections_status_check list, which has no "partial".
+      status: syncError ? "error" : "connected",
       last_attempted_sync_at: finishedAt,
-      last_successful_sync_at: finishedAt,
-      last_error_code: leadsError ? leadsError.split(":")[0] : null,
-      last_error_message: leadsError,
+      ...(syncError ? {} : { last_successful_sync_at: finishedAt }),
+      last_error_code: syncError ? syncError.split(":")[0] : null,
+      last_error_message: syncError,
       updated_by: userId,
     }).eq("id", connection.id);
+    if (runError) console.error(`meta_ads_sync_runs insert failed: ${errorMessage(runError.message)}`);
 
     return jsonResponse({
-      ok: true,
+      ok: !syncError,
+      status: runStatus,
       days,
       spend_rows: spendRows,
       total_spend: totalSpend,
+      spend_error: spendError,
       leads_seen: leadsSeen,
       leads_inserted: leadsInserted,
       leads_error: leadsError,
+      error: syncError,
+      audit_run_recorded: !runError,
     });
   } catch (error) {
     return jsonResponse({ error: errorMessage(error) }, 400);

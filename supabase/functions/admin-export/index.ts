@@ -1,4 +1,5 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import { corsHeaders, corsPreflight, jsonResponse } from "../_shared/cors.ts";
 import { requireActiveSession } from "../_shared/active-session.ts";
 
@@ -82,14 +83,13 @@ Deno.serve(async (req) => {
       return json({ error: "branch_id is required for branch administrators" }, 400);
     }
 
-    if (branchId && !isSystemOwner) {
-      const { data: branchLink, error: branchLinkErr } = await admin
-        .from("staff_branches")
-        .select("branch_id")
-        .eq("user_id", userData.user.id)
-        .eq("branch_id", branchId)
-        .maybeSingle();
-      if (branchLinkErr || !branchLink) {
+    // Branch scope is proved by the same SECURITY DEFINER helper every RLS path
+    // uses, so a lapsed or suspended tenant is denied here too. It resolves
+    // auth.uid() internally, so it must run on the caller's own JWT client, never
+    // on the service-role client, and it only authorises an explicit true.
+    if (branchId) {
+      const { data: granted, error: scopeErr } = await userClient.rpc("user_has_branch_access", { _branch: branchId });
+      if (scopeErr || granted !== true) {
         return json({ error: "Requested branch is outside your scope" }, 403);
       }
     }

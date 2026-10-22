@@ -11,6 +11,21 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 type Action = "get" | "list" | "save" | "test" | "sync" | "disconnect";
+
+// ZMED-286 F-5: api_version is interpolated into the *path* of a Graph call made with this
+// tenant's own access token, and lead_campaign_spend stores nothing that constrains its shape.
+// A value like `v20.0/act_<other>/insights?x=` therefore rewrites the path and query of that
+// call. A bare version token is the only thing that may be stored, so it is checked here, at
+// the single writer, instead of trusting every reader.
+const API_VERSION_RE = /^v\d+(\.\d+)?$/;
+const AD_ACCOUNT_RE = /^act_\d+$/;
+function normalizeApiVersion(value: string | null | undefined): string {
+  const candidate = (value ?? "").trim();
+  if (!candidate) return "v20.0";
+  if (!API_VERSION_RE.test(candidate)) throw new Error("API version must look like v20.0");
+  return candidate;
+}
+
 type Input = {
   action?: Action;
   branch_id?: string;
@@ -218,7 +233,7 @@ Deno.serve(async (req) => {
         business_id: input.business_id?.trim() || null,
         currency: input.currency?.trim().toUpperCase() || "EGP",
         timezone: input.timezone?.trim() || "Africa/Cairo",
-        api_version: input.api_version?.trim() || "v20.0",
+        api_version: normalizeApiVersion(input.api_version),
         token_ciphertext: encrypted.ciphertext,
         token_iv: encrypted.iv,
         token_fingerprint: tokenFingerprint,

@@ -30,7 +30,7 @@ main = "src/worker.ts"
 name = "EMAIL"
 
 [vars]
-EMAIL_FROM = "noreply@belalaamer.com"
+EMAIL_FROM = "support@zmedico.com"
 
 [assets]
 directory = "./dist"

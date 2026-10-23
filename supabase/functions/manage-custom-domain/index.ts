@@ -1,12 +1,18 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
+// The Cloudflare account subdomain still reads "belalaamer", so this preview
+// origin survives the retirement of that marketing domain: it is the CORS
+// fallback for requests that carry no Origin header at all.
 const DEFAULT_ORIGIN = "https://zmedico2.belalaamer.workers.dev";
-// Default base for newly created "provider subdomain" (ZMedico-branded)
-// clinic subdomains. Changed from belalaamer.com to zmedico.com now that
-// zmedico.com is a registered platform hostname with its own wildcard DNS +
-// Workers Route. Existing subdomains already created under belalaamer.com
-// (blitz-physio, amr, hady) are unaffected -- their hostname is stored
-// literally per-row and worker.ts recognizes both suffixes.
+// Every origin the platform serves the app from. TenantDomains.tsx and
+// TenantHealthDialog.tsx invoke this function from the browser, so a host
+// missing here is refused by assertAllowedOrigin even for a correctly
+// authorised caller. Previously the list could only be extended through the
+// CUSTOM_DOMAIN_ALLOWED_ORIGINS secret, which pinned the retired domain.
+const PLATFORM_ORIGINS = ["https://zmedico.com", "https://www.zmedico.com", DEFAULT_ORIGIN];
+// Base for the "provider subdomain" (ZMedico-branded) clinic subdomains this
+// function creates. zmedico.com is the project's only domain, and worker.ts
+// recognises this suffix and no other.
 const PROVIDER_SUBDOMAIN_SUFFIX = (Deno.env.get("CUSTOM_DOMAIN_SUBDOMAIN_SUFFIX") ?? "zmedico.com").trim().toLowerCase();
 const MAX_BODY_BYTES = 32 * 1024;
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -15,8 +21,7 @@ const rateBuckets = new Map<string, number[]>();
 
 function allowedOrigins(): Set<string> {
   return new Set(
-    `${DEFAULT_ORIGIN},${Deno.env.get("CUSTOM_DOMAIN_ALLOWED_ORIGINS") ?? ""}`
-      .split(",")
+    [...PLATFORM_ORIGINS, ...(Deno.env.get("CUSTOM_DOMAIN_ALLOWED_ORIGINS") ?? "").split(",")]
       .map((value) => value.trim())
       .filter(Boolean),
   );

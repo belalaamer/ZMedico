@@ -17,12 +17,10 @@ type RecordItem = { type?: string; name?: string; value?: string; url?: string; 
 type ProvisioningMode = "custom_hostname" | "provider_subdomain";
 type Domain = { id: string; tenant_id: string; hostname: string; default_branch_id: string | null; status: string; validation_method: string; validation_records: RecordItem[]; cname_target: string | null; hostname_status: string | null; ssl_status: string | null; is_enabled: boolean; verified_at: string | null; last_checked_at: string | null; last_error: string | null; provisioning_mode: ProvisioningMode; created_at: string };
 
-// Default suggested/displayed suffix for newly created ZMedico-branded
-// clinic subdomains. Changed from belalaamer.com to zmedico.com to match the
-// backend's new default (manage-custom-domain edge function) -- zmedico.com
-// is now a registered platform hostname with its own wildcard DNS + Workers
-// Route. This is a display-only constant; the actual hostname is constructed
-// server-side, so it must stay in sync with that default.
+// Suggested/displayed suffix for ZMedico-branded clinic subdomains. Display
+// only -- the hostname is constructed server-side by the manage-custom-domain
+// edge function, which defaults to the same suffix, so the two must stay in
+// sync.
 const ZMEDICO_SUBDOMAIN_SUFFIX = "zmedico.com";
 
 type Props = { tenant: Tenant | null; branches: Branch[]; open: boolean; onOpenChange: (open: boolean) => void };

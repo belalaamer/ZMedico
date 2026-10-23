@@ -8,11 +8,12 @@ export interface Env {
 const DOMAIN_FUNCTION_URL = "https://rqcmnfzfytyyicelvifk.supabase.co/functions/v1/manage-custom-domain";
 const SUPABASE_REST_URL = "https://rqcmnfzfytyyicelvifk.supabase.co/rest/v1/rpc/resolve_active_tenant_domain";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_Vu3oi0N4hmxPzTsScwrwFA_Wt3-CUyU";
-// Both suffixes a provider-issued clinic subdomain can end in. belalaamer.com
-// has three live clinics on it already (blitz-physio, amr, hady); zmedico.com
-// is the new default suffix for subdomains created going forward -- both must
-// keep working.
-const PROVIDER_SUBDOMAIN_SUFFIXES = ["belalaamer.com", "zmedico.com"];
+// The only suffix a provider-issued clinic subdomain ends in. zmedico.com is
+// the project's single domain for the site, e-mail and invitations, so the
+// former belalaamer.com suffix is gone: that zone no longer resolves, its three
+// clinics are already served on *.zmedico.com, and its two remaining
+// tenant_domains rows are disabled.
+const PROVIDER_SUBDOMAIN_SUFFIXES = ["zmedico.com"];
 const DOMAIN_GATEWAY_PATH = "/api/domains";
 const PATIENT_PORTAL_EMAIL_PATH = "/api/patient-portal-email";
 const MAX_PORTAL_EMAIL_BODY_BYTES = 16 * 1024;
@@ -22,15 +23,15 @@ const SUPABASE_EMAIL_TEMPLATE_URL = "https://rqcmnfzfytyyicelvifk.supabase.co/re
 const PROVIDER_SUBDOMAIN_HEALTH_PATH = "/_zmedico/provisioning-check";
 const MAX_GATEWAY_BODY_BYTES = 32 * 1024;
 const UPSTREAM_TIMEOUT_MS = 10_000;
+// The Cloudflare account subdomain still reads "belalaamer", so this preview
+// host is not the retired marketing domain and cannot be renamed from here. It
+// is kept because CI's smoke test and the CORS pin below both depend on it.
 const DEFAULT_ORIGIN = "https://zmedico2.belalaamer.workers.dev";
-// Both platform-owned marketing domains. zmedico.com/www were registered as
-// Workers Custom Domains alongside belalaamer.com/www -- without listing them
-// here they would be misread as an unregistered tenant custom domain (same
-// bug fixed for www.belalaamer.com earlier) and 404 instead of serving the
-// marketing site.
+// Platform-owned hostnames: the marketing site on the apex and www, plus the
+// account-subdomain preview host above. A hostname absent from this set is
+// treated as a tenant's own domain and must resolve to an active tenant_domains
+// row, or it 404s -- which is how www used to break the marketing site.
 const PLATFORM_HOSTNAMES = new Set([
-  "belalaamer.com",
-  "www.belalaamer.com",
   "zmedico.com",
   "www.zmedico.com",
   "zmedico2.belalaamer.workers.dev",
@@ -293,9 +294,9 @@ export default {
     const isPlatformHostname = PLATFORM_HOSTNAMES.has(hostname);
     // A platform hostname (the marketing site itself, on the apex or www) is
     // never a tenant's booking/app portal, even though "www" happens to also
-    // satisfy the generic subdomain-slug pattern below. Without this guard,
-    // www.belalaamer.com was misclassified as an unregistered tenant
-    // subdomain and got a 404 instead of the marketing site.
+    // satisfy the generic subdomain-slug pattern below. Without this guard a
+    // www marketing host is misclassified as an unregistered tenant subdomain
+    // and gets a 404 instead of the site.
     const providerSubdomain = !isPlatformHostname && isProviderSubdomainHost(hostname);
     const customTenantHostname = !isPlatformHostname && !hostname.endsWith(".workers.dev");
     if (isHtmlRequest && (providerSubdomain || customTenantHostname)) {

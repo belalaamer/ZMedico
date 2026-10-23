@@ -4,7 +4,7 @@
 interface __BaseEnv_WorkerBindings {
 	EMAIL: SendEmail;
 	ASSETS: Fetcher;
-	EMAIL_FROM: "noreply@belalaamer.com";
+	EMAIL_FROM: "support@zmedico.com";
 	VITE_AUTHZ_CANONICAL: string;
 	VITE_SUPABASE_ANON_KEY: string;
 	VITE_SUPABASE_PROJECT_ID: string;

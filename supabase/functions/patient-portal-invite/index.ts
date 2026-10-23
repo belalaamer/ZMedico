@@ -11,6 +11,10 @@ function jsonResponse(body: unknown, status = 200) {
 function corsPreflight() { return new Response("ok", { headers: corsHeaders }); }
 
 const allowedRoles = new Set(["system_owner", "admin", "manager", "receptionist", "doctor", "nurse"]);
+// Origin of the link GoTrue puts in the invitation e-mail. It must be a host
+// listed in the project's Auth URL Configuration, and it is the only domain
+// the platform serves the app from.
+const PORTAL_ORIGIN = (Deno.env.get("PATIENT_PORTAL_ORIGIN") ?? "https://zmedico.com").replace(/\/+$/, "");
 function randomTemporaryPassword() {
   const bytes = crypto.getRandomValues(new Uint8Array(18));
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
@@ -94,7 +98,7 @@ Deno.serve(async (req) => {
     const metadata = { full_name: fullName, patient_portal: true, patient_id: patient.id, portal_username: portalUsername, force_password_change: autoCredentials };
     const { data: invited, error: inviteError } = autoCredentials
       ? await admin.auth.admin.createUser({ email, password: temporaryPassword!, email_confirm: true, user_metadata: metadata })
-      : await admin.auth.admin.inviteUserByEmail(email, { redirectTo: `${Deno.env.get("PATIENT_PORTAL_ORIGIN") ?? "https://belalaamer.com"}/auth/callback?next=/patient-portal`, data: metadata });
+      : await admin.auth.admin.inviteUserByEmail(email, { redirectTo: `${PORTAL_ORIGIN}/auth/callback?next=/patient-portal`, data: metadata });
     if (inviteError || !invited.user) return jsonResponse({ error: inviteError?.message ?? "Portal invitation failed" }, 400);
 
     // The generic signup trigger may provision a default staff role. A portal

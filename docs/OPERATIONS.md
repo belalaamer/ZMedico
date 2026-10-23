@@ -5,7 +5,10 @@ someone who has never seen it before.
 
 - **Frontend:** Vite + React SPA served by a Cloudflare Worker (`zmedico2`)
 - **Backend:** Supabase project `rqcmnfzfytyyicelvifk` (Postgres + Edge Functions)
-- **Live URL:** https://zmedico2.belalaamer.workers.dev
+- **Live URL:** https://zmedico.com (www redirects to the apex)
+- **Worker preview host:** https://zmedico2.belalaamer.workers.dev — the Cloudflare
+  account subdomain still carries the old name, so this host serves the same
+  Worker and is what CI smokes, because it needs no DNS or certificate.
 
 ---
 

@@ -13,7 +13,12 @@ function jsonResponse(body: unknown, status = 200) {
 function corsPreflight() { return new Response("ok", { headers: corsHeaders }); }
 
 const allowedRoles = new Set(["system_owner", "admin", "manager", "receptionist", "doctor", "nurse"]);
-const WORKER_ORIGIN = Deno.env.get("PATIENT_PORTAL_WORKER_ORIGIN") ?? "https://zmedico2.belalaamer.workers.dev";
+// The Worker builds the portal link inside the credential e-mail from the Host
+// of the request it receives, so this origin decides what a patient clicks.
+// zmedico.com is a Workers Custom Domain on the same Worker and the project's
+// only domain; the account-subdomain fallback would have produced a
+// *.workers.dev link.
+const WORKER_ORIGIN = (Deno.env.get("PATIENT_PORTAL_WORKER_ORIGIN") ?? "https://zmedico.com").replace(/\/+$/, "");
 const META_GRAPH_VERSION = Deno.env.get("META_GRAPH_VERSION") ?? "v23.0";
 
 function normalizeWhatsAppRecipient(raw: string): string {

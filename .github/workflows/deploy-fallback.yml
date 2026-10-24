@@ -10,7 +10,8 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Same browser-install cost as deploy.yml, and this job had even less room for it: 20m.
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,6 +29,14 @@ jobs:
 
       - name: Build
         run: bun run build
+
+      - name: Restore Playwright browser cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-webkit-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-webkit-
 
       - name: Install Chromium and WebKit for E2E smoke
         run: bunx playwright install --with-deps chromium webkit

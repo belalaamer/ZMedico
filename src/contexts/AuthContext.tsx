@@ -7,6 +7,7 @@ import { toast } from "@/hooks/use-toast";
 import {
   clearPersistedAuthSessions,
   getAuthStorageSnapshot,
+  hasArrivingAuthRedirect,
   hasPersistedAuthSession,
   persistAuthSessionForPreview,
   readPersistedAuthSession,
@@ -93,9 +94,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
+    const isArrivingAuthRedirect = hasArrivingAuthRedirect();
     let hadSession = Boolean(readPersistedAuthSession());
     const bootstrappedSession = readPersistedAuthSession();
-    if (bootstrappedSession) {
+    if (bootstrappedSession && isArrivingAuthRedirect) {
+      // A redirect that carries its own session must win: replaying the previously stored one
+      // here races the callback and leaves the browser signed in as the old identity.
+      authDebug("canonical storage bootstrap skipped for arriving auth redirect", getAuthStorageSnapshot());
+    }
+    if (bootstrappedSession && !isArrivingAuthRedirect) {
       authDebug("auth state bootstrapped from canonical storage", getAuthStorageSnapshot());
       void supabase.auth.setSession({
         access_token: bootstrappedSession.access_token,
@@ -145,6 +152,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
       .then(async ({ data: { session: s }, error }) => {
         if (!active) return;
+        if (isArrivingAuthRedirect) {
+          authDebug("getSession bootstrap skipped for arriving auth redirect", describeSession(s));
+          return;
+        }
         authDebug("auth.getSession completed", { ...describeSession(s), ...getAuthStorageSnapshot(), error: error?.message ?? null });
         persistAuthSessionForPreview(s, "get-session-bootstrap");
         setSession(s);

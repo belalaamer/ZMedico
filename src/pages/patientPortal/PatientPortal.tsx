@@ -50,6 +50,7 @@ export default function PatientPortal() {
   const [data, setData] = useState<PortalData | null>(null);
   const [loading, setLoading] = useState(true);
   const [mustChangePassword, setMustChangePassword] = useState(false);
+  const [firstPasswordSetup, setFirstPasswordSetup] = useState(true);
   const [newPassword, setNewPassword] = useState("");
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [username, setUsername] = useState("");
@@ -96,8 +97,13 @@ export default function PatientPortal() {
         setLoading(false);
         return;
       }
-      const forceChange = (state as any)?.must_change_password === true;
+      // ZMED-301: activated_at IS NULL is the state an invitation leaves the patient in -- no secret of
+      // their own. patient_portal_password_state() already folds that into must_change_password; checking
+      // `activated === false` as well covers a database where only one of the two RPCs is migrated.
+      const activated = (state as { activated?: boolean } | null)?.activated;
+      const forceChange = (state as { must_change_password?: boolean } | null)?.must_change_password === true || activated === false;
       setMustChangePassword(forceChange);
+      setFirstPasswordSetup(activated === false);
       if (forceChange) {
         setData(null);
         setLoading(false);
@@ -150,7 +156,30 @@ export default function PatientPortal() {
   };
   if (authLoading || !user) return <main className="min-h-dvh grid place-items-center text-muted-foreground">…</main>;
   if (loading) return <main className="min-h-dvh grid place-items-center text-muted-foreground">…</main>;
-  if (mustChangePassword) return <main className="min-h-dvh grid place-items-center bg-muted/30 p-6" dir={lang === "ar" ? "rtl" : "ltr"}><Card className="w-full max-w-md p-6"><div className="text-center"><ShieldCheck className="mx-auto size-10 text-primary" /><h1 className="mt-3 text-2xl font-black">{lang === "ar" ? "يجب تغيير كلمة المرور" : "Password change required"}</h1><p className="mt-2 text-sm text-muted-foreground">{lang === "ar" ? "لأمان حسابك، يجب تعيين كلمة مرور جديدة قبل عرض أي بيانات في بوابة المريض." : "For your security, set a new password before any Patient Portal data can be displayed."}</p></div><form onSubmit={savePassword} className="mt-6 space-y-3"><input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={8} required placeholder={lang === "ar" ? "كلمة مرور جديدة" : "New password"} className="h-10 w-full rounded-md border bg-background px-3 text-sm" autoComplete="new-password" /><Button type="submit" className="w-full" disabled={passwordSaving || newPassword.length < 8}>{passwordSaving ? "…" : (lang === "ar" ? "تغيير كلمة المرور والمتابعة" : "Change password and continue")}</Button></form><button type="button" className="mt-4 w-full text-center text-xs text-primary hover:underline" onClick={logout}>{lang === "ar" ? "تسجيل الخروج" : "Sign out"}</button></Card></main>;
+  if (mustChangePassword) {
+    const title = firstPasswordSetup
+      ? (lang === "ar" ? "عيّن كلمة مرورك للمتابعة" : "Set your password to continue")
+      : (lang === "ar" ? "يجب تغيير كلمة المرور" : "Password change required");
+    const hint = firstPasswordSetup
+      ? (lang === "ar" ? "رابط الدعوة يُستخدم مرة واحدة ولا يمنحك كلمة مرور. عيّن واحدة الآن، وإلا لن تتمكن من الدخول إلى بوابة المريض بعد إغلاق هذه الصفحة." : "Your invitation link can be used once and does not come with a password. Set one now — otherwise you cannot sign in to the Patient Portal after this page is closed.")
+      : (lang === "ar" ? "لأمان حسابك، يجب تعيين كلمة مرور جديدة قبل عرض أي بيانات في بوابة المريض." : "For your security, set a new password before any Patient Portal data can be displayed.");
+    return (
+      <main className="min-h-dvh grid place-items-center bg-muted/30 p-6" dir={lang === "ar" ? "rtl" : "ltr"}>
+        <Card className="w-full max-w-md p-6">
+          <div className="text-center">
+            <ShieldCheck className="mx-auto size-10 text-primary" />
+            <h1 className="mt-3 text-2xl font-black">{title}</h1>
+            <p className="mt-2 text-sm text-muted-foreground">{hint}</p>
+          </div>
+          <form onSubmit={savePassword} className="mt-6 space-y-3">
+            <input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={8} required placeholder={lang === "ar" ? "كلمة مرور جديدة" : "New password"} className="h-10 w-full rounded-md border bg-background px-3 text-sm" autoComplete="new-password" />
+            <Button type="submit" className="w-full" disabled={passwordSaving || newPassword.length < 8}>{passwordSaving ? "…" : (firstPasswordSetup ? (lang === "ar" ? "تعيين كلمة المرور والمتابعة" : "Set password and continue") : (lang === "ar" ? "تغيير كلمة المرور والمتابعة" : "Change password and continue"))}</Button>
+          </form>
+          <button type="button" className="mt-4 w-full text-center text-xs text-primary hover:underline" onClick={logout}>{lang === "ar" ? "تسجيل الخروج" : "Sign out"}</button>
+        </Card>
+      </main>
+    );
+  }
   if (!data) return <main className="min-h-dvh grid place-items-center p-6"><Card className="max-w-md p-6 text-center"><ShieldCheck className="mx-auto mb-3 size-8 text-primary" /><h1 className="text-xl font-bold">{lang === "ar" ? "بوابة المريض غير متاحة" : "Patient portal unavailable"}</h1><p className="mt-2 text-sm text-muted-foreground">{lang === "ar" ? "استخدم رابط الدعوة أو تواصل مع العيادة لتفعيل الوصول." : "Use your invitation link or contact the clinic to activate access."}</p></Card></main>;
 
   const upcoming = data.appointments.filter((item) => !["cancelled", "completed"].includes(item.status));
@@ -207,7 +236,7 @@ export default function PatientPortal() {
       </Card>
       <Card className="border-primary/20 bg-background p-5">
         <h2 className="font-bold">{lang === "ar" ? "تأمين الحساب" : "Secure your account"}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{lang === "ar" ? "بعد فتح رابط الدعوة، يمكنك تعيين كلمة مرور خاصة بك لاستخدام البريد الإلكتروني في الدخول لاحقًا." : "After opening your invitation link, set a personal password to sign in with your email next time."}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{lang === "ar" ? "حدّث كلمة مرورك في أي وقت. تحتاج 8 أحرف على الأقل، ويستخدمها البريد الإلكتروني عند الدخول." : "Change your password whenever you like. It needs at least 8 characters and is what your e-mail sign-in uses."}</p>
         <form onSubmit={savePassword} className="mt-3 flex flex-col gap-3 sm:flex-row"><input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={8} placeholder={lang === "ar" ? "كلمة مرور جديدة" : "New password"} className="h-10 flex-1 rounded-md border bg-background px-3 text-sm" autoComplete="new-password" /><Button type="submit" disabled={passwordSaving || newPassword.length < 8}>{passwordSaving ? "…" : (lang === "ar" ? "حفظ كلمة المرور" : "Save password")}</Button></form>
       </Card>
       <p className="text-center text-xs text-muted-foreground">{lang === "ar" ? "هذه البوابة تعرض بياناتك الصحية فقط ولا تحتوي على أدوات تعديل أو حذف للسجلات الطبية." : "This portal shows only your own health information. It does not provide tools to edit or delete medical records."}</p>

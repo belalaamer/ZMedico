@@ -95,7 +95,9 @@ Deno.serve(async (req) => {
       temporaryPassword = randomTemporaryPassword();
     }
     const email = String(patient.email).trim().toLowerCase();
-    const metadata = { full_name: fullName, patient_portal: true, patient_id: patient.id, portal_username: portalUsername, force_password_change: autoCredentials };
+    // Every invitation ends with the patient choosing their own secret: the link is single-use and, in the
+    // mail-safe branch, no password exists at all, so skipping the setup step would strand the account.
+    const metadata = { full_name: fullName, patient_portal: true, patient_id: patient.id, portal_username: portalUsername, force_password_change: true };
     const { data: invited, error: inviteError } = autoCredentials
       ? await admin.auth.admin.createUser({ email, password: temporaryPassword!, email_confirm: true, user_metadata: metadata })
       : await admin.auth.admin.inviteUserByEmail(email, { redirectTo: `${PORTAL_ORIGIN}/auth/callback?next=/patient-portal`, data: metadata });
@@ -115,7 +117,7 @@ Deno.serve(async (req) => {
       tenant_id: branch.tenant_id,
       portal_enabled: true,
       status: "active",
-      must_change_password: autoCredentials,
+      must_change_password: true,
       invited_at: new Date().toISOString(),
     }, { onConflict: "patient_id" });
     if (accountError) {

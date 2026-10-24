@@ -126,14 +126,17 @@ export default function AuthCallback() {
         return;
       }
 
+      // supabase-js clears the fragment before the second effect run, so `type` is often already
+      // gone here. `next=/patient-portal` is only ever written by patient-portal-invite's redirectTo.
+      const isInvite = redirectType === "invite" || (!redirectType && next.startsWith("/patient-portal"));
       const message =
         lang === "ar"
-          ? redirectType === "invite"
+          ? isInvite
             ? "تم تأكيد دعوة البوابة. جارٍ فتح صفحة المريض…"
             : redirectType === "recovery"
               ? "تم تأكيد إعادة تعيين كلمة المرور. جارٍ المتابعة…"
               : "تم تسجيل الدخول بنجاح. جارٍ المتابعة…"
-          : redirectType === "invite"
+          : isInvite
             ? "Portal invitation confirmed. Opening the patient portal…"
             : redirectType === "recovery"
               ? "Password reset confirmed. Continuing…"

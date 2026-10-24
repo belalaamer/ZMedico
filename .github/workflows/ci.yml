@@ -16,7 +16,7 @@ jobs:
   frontend:
     name: Test and build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,6 +32,14 @@ jobs:
 
       - name: Typecheck and production build
         run: bun run build
+
+      - name: Restore Playwright browser cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-only-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-only-
 
       - name: Install Playwright Chromium
         run: bunx playwright install --with-deps chromium

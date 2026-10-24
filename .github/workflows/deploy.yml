@@ -14,8 +14,11 @@ jobs:
     runs-on: ubuntu-latest
     # The 15m budget cancelled the run of 2026-10-22 (merge of #197) while it was still on
     # "Install Chromium and WebKit", so the Deploy step never ran and Production kept serving the
-    # previous bundle. apt + two browser downloads do not fit in a quarter of an hour on a cold runner.
-    timeout-minutes: 30
+    # previous bundle. The 30m budget then cancelled the run of 2026-10-23 (merge of #199) the same
+    # way: on a cold runner that one step burned 18:00:31 -> 18:28:52 and the job died 3s into the
+    # smoke. The browser download is now cached, and the budget keeps enough headroom for the first
+    # run after a Playwright bump, when the cache is cold again.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -26,6 +29,14 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run test
       - run: bun run build
+
+      - name: Restore Playwright browser cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-webkit-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-webkit-
 
       - name: Install Chromium and WebKit for E2E smoke
         run: bunx playwright install --with-deps chromium webkit

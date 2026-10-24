@@ -65,6 +65,33 @@ export function hasPersistedAuthSession() {
   return Boolean(readPersistedAuthSession());
 }
 
+// Frozen per document: supabase-js strips these parameters from the address bar as it consumes
+// them, so checking later would miss the handoff this protects.
+let arrivingAuthRedirect: boolean | null = null;
+
+export function hasArrivingAuthRedirect() {
+  if (typeof window === "undefined") return false;
+  if (arrivingAuthRedirect === null) {
+    try {
+      const url = new URL(window.location.href);
+      const hashKeys = new Set(
+        url.hash
+          .replace(/^#/, "")
+          .split("&")
+          .map((pair) => pair.split("=")[0]),
+      );
+      arrivingAuthRedirect =
+        url.searchParams.has("code") ||
+        url.searchParams.has("token_hash") ||
+        hashKeys.has("access_token") ||
+        hashKeys.has("refresh_token");
+    } catch {
+      arrivingAuthRedirect = false;
+    }
+  }
+  return arrivingAuthRedirect;
+}
+
 export function getAuthStorageSnapshot() {
   if (typeof window === "undefined") {
     return {

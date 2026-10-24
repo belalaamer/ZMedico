@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Loader2 } from "lucide-react";
+import { CheckCircle2, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -8,6 +8,9 @@ import { useI18n } from "@/contexts/I18nContext";
 import { hasPersistedAuthSession, persistAuthSessionForPreview } from "@/lib/authSessionPersistence";
 
 const AUTH_DEBUG_PREFIX = "[auth-debug]";
+
+// How long the confirmation stays on screen before the portal handoff.
+const CONFIRMATION_DWELL_MS = 1400;
 
 function safeRedirectPath(value?: string | null) {
   if (!value) return "/";
@@ -30,9 +33,11 @@ export default function AuthCallback() {
   const nav = useNavigate();
   const location = useLocation();
   const [error, setError] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState<{ message: string; next: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    let handoff: ReturnType<typeof setTimeout> | undefined;
 
     const completeCallback = async () => {
       const params = new URLSearchParams(location.search);
@@ -40,6 +45,7 @@ export default function AuthCallback() {
       const code = params.get("code");
       const tokenHash = params.get("token_hash");
       const tokenType = params.get("type") || "invite";
+      const redirectType = params.get("type") || hashParams.get("type");
       const providerError = params.get("error_description") || hashParams.get("error_description") || params.get("error") || hashParams.get("error");
       const next = safeRedirectPath(params.get("next") || hashParams.get("next") || "/");
 
@@ -119,13 +125,38 @@ export default function AuthCallback() {
         setError(error?.message ?? (lang === "ar" ? "لم تكتمل جلسة تسجيل الدخول." : "Sign-in session was not completed."));
         return;
       }
-      nav(next, { replace: true });
+
+      const message =
+        lang === "ar"
+          ? redirectType === "invite"
+            ? "تم تأكيد دعوة البوابة. جارٍ فتح صفحة المريض…"
+            : redirectType === "recovery"
+              ? "تم تأكيد إعادة تعيين كلمة المرور. جارٍ المتابعة…"
+              : "تم تسجيل الدخول بنجاح. جارٍ المتابعة…"
+          : redirectType === "invite"
+            ? "Portal invitation confirmed. Opening the patient portal…"
+            : redirectType === "recovery"
+              ? "Password reset confirmed. Continuing…"
+              : "Signed in successfully. Continuing…";
+
+      console.info(AUTH_DEBUG_PREFIX, "callback confirmed, handing off", {
+        next,
+        redirectType: redirectType ?? null,
+        userIdPrefix: data.session.user.id.slice(0, 8),
+      });
+      setConfirmed({ message, next });
+      // Full-document handoff: a fresh load reads the session that just arrived from storage,
+      // so no provider still mounted in this document can leave the previous identity in place.
+      handoff = setTimeout(() => {
+        if (!cancelled) window.location.replace(next);
+      }, CONFIRMATION_DWELL_MS);
     };
 
     void completeCallback();
 
     return () => {
       cancelled = true;
+      if (handoff) clearTimeout(handoff);
     };
   }, [lang, location.hash, location.search, nav]);
 
@@ -137,6 +168,17 @@ export default function AuthCallback() {
             <h1 className="text-xl font-bold">{lang === "ar" ? "تعذر إكمال تسجيل الدخول" : "Sign-in could not be completed"}</h1>
             <p className="text-sm text-muted-foreground">{error}</p>
             <Button onClick={() => nav("/auth", { replace: true })}>{lang === "ar" ? "العودة لتسجيل الدخول" : "Back to sign in"}</Button>
+          </div>
+        ) : confirmed ? (
+          <div className="space-y-4">
+            <CheckCircle2 className="mx-auto size-8 text-primary" aria-hidden="true" />
+            <h1 className="text-xl font-bold">{confirmed.message}</h1>
+            <p className="text-sm text-muted-foreground">
+              {lang === "ar" ? "لو لم تفتح الصفحة تلقائياً اضغط هنا" : "If the page did not open automatically, continue here"}
+            </p>
+            <Button onClick={() => window.location.replace(confirmed.next)}>
+              {lang === "ar" ? "المتابعة الآن" : "Continue now"}
+            </Button>
           </div>
         ) : (
           <div className="space-y-4">

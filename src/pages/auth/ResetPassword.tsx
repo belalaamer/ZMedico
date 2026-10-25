@@ -95,7 +95,10 @@ export default function ResetPassword() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (busy.current || state !== "ready" || !identity.current) return;
-    if (!updated && password.length < 6) { toast.error(lang === "ar" ? "كلمة المرور قصيرة" : "Password too short"); return; }
+    // P4: 8, the floor the invitation generator and the portal's own
+    // change-password step already required; recovery was the only way to make a
+    // shorter patient password.
+    if (!updated && password.length < 8) { toast.error(lang === "ar" ? "كلمة المرور يجب ألا تقل عن 8 أحرف" : "Password must be at least 8 characters"); return; }
     if (!updated && password !== confirm) { toast.error(lang === "ar" ? "كلمتا المرور غير متطابقتين" : "Passwords do not match"); return; }
     const expectedId = identity.current;
     const operation = generation.current;
@@ -148,11 +151,13 @@ export default function ResetPassword() {
           <form onSubmit={submit} className="space-y-4">
             {!updated ? <><div className="space-y-2">
               <Label htmlFor="np">{t("newPassword")}</Label>
-              <Input id="np" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
+              {/* P4: deliberately no minLength -- a native constraint would swallow the localized toast. */}
+              <Input id="np" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" />
+              <p className="text-xs text-muted-foreground">{lang === "ar" ? "8 أحرف على الأقل." : "At least 8 characters."}</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="cp">{t("confirmPassword")}</Label>
-              <Input id="cp" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required minLength={6} />
+              <Input id="cp" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required autoComplete="new-password" />
             </div></> : <p role="status">{t("passwordUpdated")}</p>}
             <Button type="submit" className="w-full gradient-primary text-primary-foreground" disabled={loading}>
               {updated && !loading ? (lang === "ar" ? "تسجيل الخروج" : "Sign out") : t("resetPassword")}

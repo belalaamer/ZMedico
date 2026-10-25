@@ -23,7 +23,9 @@ export default function PatientPortalLogin() {
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!identifier.trim() || password.length < 8) { toast.error(lang === "ar" ? "أدخل البريد أو اسم المستخدم وكلمة المرور" : "Enter your email or username and password"); return; }
+    // P4: a login form cannot know what the account was created with, and this
+    // >=8 gate locked out patients whose recovery link had set a 6-7 char password.
+    if (!identifier.trim() || !password) { toast.error(lang === "ar" ? "أدخل البريد أو اسم المستخدم وكلمة المرور" : "Enter your email or username and password"); return; }
     setLoading(true);
     const { data, error } = await signInWithIdentifier(identifier, password);
     setLoading(false);

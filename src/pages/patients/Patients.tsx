@@ -104,6 +104,7 @@ export default function PatientsPage() {
   const [open, setOpen] = useState(false);
   const [confirmDel, setConfirmDel] = useState<Patient | null>(null);
   const [duesByPatient, setDuesByPatient] = useState<Record<string, number>>({});
+  const [duesUnknown, setDuesUnknown] = useState(false);
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
   const [invoiceForPatient, setInvoiceForPatient] = useState<string | null>(null);
@@ -113,6 +114,10 @@ export default function PatientsPage() {
   const [portalSupportContact, setPortalSupportContact] = useState("");
   const [sendingPortalChannel, setSendingPortalChannel] = useState<"email" | "whatsapp" | null>(null);
   const loadRequestRef = useRef(0);
+  // Inserting a patient and inviting the portal takes seconds; a second tap
+  // during that window registered the same person twice.
+  const creatingRef = useRef(false);
+  const [creating, setCreating] = useState(false);
 
   const [form, setForm] = useState({
     name_en: "", name_ar: "", phone: "", phone2: "", email: "",
@@ -133,6 +138,7 @@ export default function PatientsPage() {
       setItems([]);
       setTotal(0);
       setDuesByPatient({});
+      setDuesUnknown(false);
       setLoading(false);
       return;
     }
@@ -182,7 +188,7 @@ export default function PatientsPage() {
   // Lightweight batched outstanding-debt badge: a single query for the visible
   // patients, no per-row work, no joins.
   useEffect(() => {
-    if (!branchSelectionReady || !currentBranchId || !items.length) { setDuesByPatient({}); return; }
+    if (!branchSelectionReady || !currentBranchId || !items.length) { setDuesByPatient({}); setDuesUnknown(false); return; }
     let active = true;
     const ids = items.map((p) => p.id);
     (async () => {
@@ -193,7 +199,7 @@ export default function PatientsPage() {
         .eq("branch_id", currentBranchId)
         .is("deleted_at", null)
         .in("status", ["pending", "partial"]);
-      const { data } = await q;
+      const { data, error } = await q;
       if (!active) return;
       const map: Record<string, number> = {};
       for (const r of (data ?? []) as Array<{ patient_id: string; total: number | null; paid_amount: number | null }>) {
@@ -201,6 +207,11 @@ export default function PatientsPage() {
         if (due > 0.009) map[r.patient_id] = (map[r.patient_id] ?? 0) + due;
       }
       setDuesByPatient(map);
+      // An unread balance used to collapse into the same empty map as "nobody
+      // owes anything", so a denied or timed-out read printed a green Cleared
+      // badge over patients who actually had money outstanding.
+      setDuesUnknown(Boolean(error));
+      if (error) console.warn("outstanding dues lookup failed", error.message);
     })();
     return () => { active = false; };
   }, [branchSelectionReady, currentBranchId, items]);
@@ -290,6 +301,10 @@ export default function PatientsPage() {
       toast.error(lang === "ar" ? "أدخل البريد الإلكتروني لتوليد بيانات دخول المريض" : "Enter an email to generate patient portal credentials");
       return;
     }
+    if (creatingRef.current) return;
+    creatingRef.current = true;
+    setCreating(true);
+    try {
     const payload = {
       // The enabled BEFORE INSERT trigger allocates zero under an advisory lock.
       patient_code: 0,
@@ -336,6 +351,10 @@ export default function PatientsPage() {
     setAutoCreatePortalCredentials(false);
     setForm({ name_en: "", name_ar: "", phone: "", phone2: "", email: "", dob: "", gender: "", whatsapp_opt_in: false, blood_type: "", address: "", notes: "", referred_by_patient_id: null });
     load();
+    } finally {
+      creatingRef.current = false;
+      setCreating(false);
+    }
   };
 
   const handleDelete = async (p: Patient) => {
@@ -362,7 +381,8 @@ export default function PatientsPage() {
             <Input value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} placeholder={t("search")} className="ps-9" />
           </div>
           <Can permission="patients.create">
-            <Dialog open={open} onOpenChange={setOpen}>
+            {/* Dismissing mid-write left the outcome unknown; the walk-in dialog already guarded this way. */}
+            <Dialog open={open} onOpenChange={(o) => { if (!creatingRef.current) setOpen(o); }}>
               <DialogTrigger asChild>
                 <Button
                   className="gradient-primary text-primary-foreground min-h-11"
@@ -452,8 +472,8 @@ export default function PatientsPage() {
                   <Textarea dir="auto" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} maxLength={1000} />
                 </div>
                 <DialogFooter className="sm:col-span-2">
-                  <Button type="button" variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button>
-                  <Button type="submit" className="gradient-primary text-primary-foreground">{t("save")}</Button>
+                  <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={creating}>{t("cancel")}</Button>
+                  <Button type="submit" className="gradient-primary text-primary-foreground" disabled={creating}>{t("save")}</Button>
                 </DialogFooter>
               </form>
             </DialogContent>
@@ -512,7 +532,11 @@ export default function PatientsPage() {
                         </div>
                       </TableCell>
                       <TableCell className="hidden lg:table-cell align-middle">
-                        {due > 0 ? (
+                        {duesUnknown ? (
+                          <Badge variant="outline" className="text-muted-foreground" title={lang === "ar" ? "تعذر التحقق من المتبقي" : "The balance could not be checked"}>
+                            {lang === "ar" ? "غير متحقق" : "Unknown"}
+                          </Badge>
+                        ) : due > 0 ? (
                           <Badge className="bg-destructive/10 text-destructive border border-destructive/30 tabular-nums hover:bg-destructive/15">
                             {lang === "ar" ? "متبقي" : "Due"} {due.toFixed(2)}
                           </Badge>

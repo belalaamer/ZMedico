@@ -13,7 +13,7 @@ export type SearchGroupKey =
   | "patients" | "invoices" | "appointments"
   | "payments" | "medical_records" | "prescriptions" | "staff";
 
-export type SearchGroup = { key: SearchGroupKey; module: string; hits: SearchHit[] };
+export type SearchGroup = { key: SearchGroupKey; module: string; hits: SearchHit[]; failed?: boolean };
 
 const LIMIT = 5;
 const ASSOC_LIMIT = 10;

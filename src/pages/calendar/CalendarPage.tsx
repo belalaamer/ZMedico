@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import { RowActions } from "@/components/RowActions";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { buildStatusPatch } from "@/lib/appointmentStatus";
+import { reminderSendOutcome } from "@/lib/reminderSendOutcome";
 
 function statusLabel(s: Appt["status"], t: (k: any) => string) {
   const map: Record<Appt["status"], string> = {
@@ -650,9 +651,9 @@ export default function CalendarPage() {
       reminderId = ins!.id as string;
     }
     const { data, error } = await supabase.functions.invoke("send-reminder", { body: { reminder_id: reminderId } });
-    if (error) { toast.error(error.message); return; }
-    if (data?.sent > 0) toast.success(lang === "ar" ? "تم إرسال التذكير" : "Reminder sent");
-    else toast.error(data?.results?.[0]?.error ?? (lang === "ar" ? "فشل الإرسال" : "Send failed"));
+    const outcome = await reminderSendOutcome({ data: data as any, error, lang, single: true });
+    if (outcome.tone === "error") toast.error(outcome.title, { description: outcome.description });
+    else toast.success(outcome.title, { description: outcome.description });
   };
 
   const handleSave = async (e: React.FormEvent) => {

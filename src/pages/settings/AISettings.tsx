@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { toast } from "sonner";
 import { ShieldAlert, Sparkles, KeyRound, Loader2 } from "lucide-react";
+import { invokeFailureReason } from "@/lib/edgeFailure";
 
 // Single source of truth for selectable AI providers. Adding OpenAI /
 // Anthropic / Groq later is just adding an entry here.
@@ -43,23 +44,11 @@ const DEFAULT_CONFIG: AIConfig = {
   has_api_key: false,
 };
 
-/** Mirrors the error-unwrapping pattern used across admin-* edge function
- *  callers (see UserManagement.tsx's admin-create-user call): a functions.invoke
- *  failure can surface either as `error` (network/HTTP) or `data.error`
- *  (function-level failure), and the real message for the former is often
- *  buried in `error.context`. */
+/** A functions.invoke failure can surface either as `error` (HTTP/network, with
+ *  the real body buried in `error.context`) or as `data.error` on a 200. Both
+ *  are read through the shared helper so provider prose never reaches the UI. */
 async function extractErrorMessage(data: any, error: any, fallback: string): Promise<string> {
-  let msg = (data as any)?.error ?? error?.message ?? fallback;
-  try {
-    const ctx: any = (error as any)?.context;
-    if (ctx && typeof ctx.json === "function") {
-      const body = await ctx.json();
-      if (body?.error) msg = body.error;
-    }
-  } catch {
-    // best-effort only — fall back to whatever msg already holds
-  }
-  return msg;
+  return invokeFailureReason(error, data?.error, fallback);
 }
 
 export default function AISettings() {

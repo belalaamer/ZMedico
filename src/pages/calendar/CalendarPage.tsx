@@ -29,6 +29,10 @@ import { RowActions } from "@/components/RowActions";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { buildStatusPatch } from "@/lib/appointmentStatus";
 import { reminderSendOutcome } from "@/lib/reminderSendOutcome";
+import {
+  deepLinkBanner, deepLinkPatientId, deepLinkPickerLabel, patientDeepLinkId, withoutPatientParam,
+  type DeepLinkedPatient, type PatientNameRow,
+} from "@/lib/calendarPatientDeepLink";
 
 function statusLabel(s: Appt["status"], t: (k: any) => string) {
   const map: Record<Appt["status"], string> = {
@@ -175,6 +179,10 @@ export default function CalendarPage() {
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectingAppointment, setRejectingAppointment] = useState<Appt | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  // C3: ?patient_id=<uuid> is written by the patients list and by the profile's Book
+  // action. The row is kept, not the label, so a language switch re-labels without a
+  // second query.
+  const [deepLinkRow, setDeepLinkRow] = useState<{ id: string; row: PatientNameRow | null; failed: boolean } | null>(null);
 
   // Per-branch working hours window (source of truth: branches.working_hours_start/end).
   const [dayStartHour, setDayStartHour] = useState<number>(DEFAULT_DAY_START_HOUR);
@@ -402,6 +410,40 @@ export default function CalendarPage() {
     // eslint-disable-next-line
   }, [searchParams]);
 
+  // C3: resolve the deep-linked patient once per id. A failed lookup and a patient that
+  // genuinely is not there are kept apart, because the desk needs to know which happened.
+  const deepLinkId = patientDeepLinkId(searchParams.get("patient_id"));
+  useEffect(() => {
+    if (!deepLinkId) { setDeepLinkRow(null); return; }
+    let cancelled = false;
+    void (async () => {
+      const { data, error } = await supabase.from("patients")
+        .select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language")
+        .eq("id", deepLinkId).is("deleted_at", null).maybeSingle();
+      if (cancelled) return;
+      if (error) { setDeepLinkRow({ id: deepLinkId, row: null, failed: true }); return; }
+      setDeepLinkRow({ id: deepLinkId, row: (data ?? null) as PatientNameRow | null, failed: false });
+    })();
+    return () => { cancelled = true; };
+  }, [deepLinkId]);
+
+  const deepLink: DeepLinkedPatient | null = useMemo(() => {
+    if (!deepLinkId || deepLinkRow?.id !== deepLinkId) return null;
+    return {
+      id: deepLinkId,
+      name: deepLinkRow.row ? patientDisplayName(deepLinkRow.row, lang) : null,
+      lookupFailed: deepLinkRow.failed,
+    };
+  }, [deepLinkRow, deepLinkId, lang]);
+
+  const deepLinkPending = Boolean(deepLinkId) && !deepLink;
+  const deepLinkCopy = deepLinkBanner(lang, deepLink);
+
+  const clearPatientDeepLink = () => {
+    setDeepLinkRow(null);
+    if (deepLinkId) setSearchParams(withoutPatientParam(searchParams), { replace: true });
+  };
+
   // Month dots
   const loadMonthDots = async () => {
     if (!branchSelectionReady || !currentBranchId) {
@@ -498,14 +540,16 @@ export default function CalendarPage() {
     if (remainder !== 0 || base.getSeconds() > 0) base.setMinutes(base.getMinutes() + (30 - remainder), 0, 0);
     const tz = base.getTimezoneOffset();
     const local = new Date(base.getTime() - tz * 60000).toISOString().slice(0, 16);
-    setForm({ patient_id: "", doctor_id: "", scheduled_at: local, duration_minutes: 30, service_id: "", procedure: "", room: "", resource_id: "", notes: "", status: "scheduled" });
+    // C3: an arrival from a patient screen carries that patient into the form instead of
+    // being discarded, and an unverified id is never prefilled.
+    setForm({ patient_id: deepLinkPatientId(deepLink), doctor_id: "", scheduled_at: local, duration_minutes: 30, service_id: "", procedure: "", room: "", resource_id: "", notes: "", status: "scheduled" });
     setOpen(true);
   };
   const openNewAt = (slot: Date) => {
     setEditId(null);
     const tz = slot.getTimezoneOffset();
     const local = new Date(slot.getTime() - tz * 60000).toISOString().slice(0, 16);
-    setForm({ patient_id: "", doctor_id: "", scheduled_at: local, duration_minutes: 30, service_id: "", procedure: "", room: "", resource_id: "", notes: "", status: "scheduled" });
+    setForm({ patient_id: deepLinkPatientId(deepLink), doctor_id: "", scheduled_at: local, duration_minutes: 30, service_id: "", procedure: "", room: "", resource_id: "", notes: "", status: "scheduled" });
     setOpen(true);
   };
   const openEdit = (a: Appt) => {
@@ -690,6 +734,9 @@ export default function CalendarPage() {
     if (error) { toast.error(error.message); return; }
     toast.success(lang === "ar" ? "تم حفظ الموعد" : "Appointment saved");
     setOpen(false); setEditId(null);
+    // C3: the link asked for one booking; keeping it would prefill the next form with the
+    // patient who was just saved.
+    clearPatientDeepLink();
     setForm({ patient_id: "", doctor_id: "", scheduled_at: "", duration_minutes: 30, service_id: "", procedure: "", room: "", resource_id: "", notes: "", status: "scheduled" });
     load();
   };
@@ -1028,7 +1075,7 @@ export default function CalendarPage() {
                       >
                         <span className={cn("truncate", !form.patient_id && "text-muted-foreground")}>
                           {form.patient_id
-                            ? (patients.find((p) => p.id === form.patient_id)?.label ?? "—")
+                            ? deepLinkPickerLabel(patients, form.patient_id, deepLink)
                             : (lang === "ar" ? "ابحث عن مريض..." : "Search patient...")}
                         </span>
                         <ChevronsUpDown className="ms-2 size-4 opacity-50 shrink-0" />
@@ -1238,6 +1285,32 @@ export default function CalendarPage() {
           </Dialog>
         </div>
       </div>
+
+      {/* C3: the patient the link arrived with, stated out loud instead of silently dropped. */}
+      {deepLinkPending || deepLinkCopy ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
+          {deepLinkPending || !deepLinkCopy ? (
+            <span role="status" className="text-sm text-muted-foreground">
+              {lang === "ar" ? "جارٍ التحقق من المريض…" : "Checking the patient…"}
+            </span>
+          ) : (
+            <>
+              <div className="min-w-0">
+                <div className="text-sm font-semibold truncate">{deepLinkCopy.title}</div>
+                <div className="text-xs text-muted-foreground">{deepLinkCopy.detail}</div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <Button size="sm" variant={deepLink?.name ? "default" : "outline"} onClick={openNew}>
+                  <Plus className="me-2 size-4" />{deepLinkCopy.action}
+                </Button>
+                <Button size="icon" variant="ghost" aria-label={deepLinkCopy.dismiss} onClick={clearPatientDeepLink}>
+                  <X className="size-4" />
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      ) : null}
 
       {/* Stats strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

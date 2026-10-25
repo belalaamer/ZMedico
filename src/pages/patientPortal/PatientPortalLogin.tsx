@@ -9,7 +9,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { signInWithIdentifier } from "@/lib/signInWithIdentifier";
+import { identifierLoginErrorText, signInWithIdentifier } from "@/lib/signInWithIdentifier";
 
 export default function PatientPortalLogin() {
   const { lang, setLang } = useI18n();
@@ -27,7 +27,7 @@ export default function PatientPortalLogin() {
     setLoading(true);
     const { data, error } = await signInWithIdentifier(identifier, password);
     setLoading(false);
-    if (error || !data.session) { toast.error(lang === "ar" ? "بيانات الدخول غير صحيحة أو لم يتم تفعيل الحساب" : "Invalid credentials or the account has not been activated"); return; }
+    if (error || !data.session) { toast.error(identifierLoginErrorText(error, lang, lang === "ar" ? "بيانات الدخول غير صحيحة أو لم يتم تفعيل الحساب" : "Invalid credentials or the account has not been activated")); return; }
     nav("/patient-portal", { replace: true });
   };
 

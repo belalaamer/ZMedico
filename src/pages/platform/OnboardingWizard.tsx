@@ -9,6 +9,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CLINIC_MODULES, type ClinicModuleKey } from "@/lib/clinicModules";
+import { invokeFailureReason, safeEdgeReason } from "@/lib/edgeFailure";
 import { normalizeTenantSlug } from "@/lib/saasOnboarding";
 import { defaultModulesForPlan, planAllowsModule } from "@/lib/subscriptionEntitlements";
 
@@ -119,7 +120,7 @@ export default function OnboardingWizard({ open, onOpenChange, plans, onCreated 
     };
     const { data, error } = await supabase.rpc("platform_create_tenant_onboarding" as never, { payload } as never);
     if (error || !data) {
-      toast({ title: error?.message ?? (isAr ? "تعذر إنشاء العميل" : "Unable to create tenant"), variant: "destructive" });
+      toast({ title: safeEdgeReason(error?.message, isAr ? "تعذر إنشاء العميل" : "Unable to create tenant"), variant: "destructive" });
       setSaving(false);
       return;
     }
@@ -142,14 +143,7 @@ export default function OnboardingWizard({ open, onOpenChange, plans, onCreated 
       },
     });
     if (adminError || (adminData as any)?.error) {
-      let msg = (adminData as any)?.error ?? adminError?.message ?? (isAr ? "فشل إنشاء حساب المدير" : "Admin account creation failed");
-      try {
-        const ctx: any = (adminError as any)?.context;
-        if (ctx && typeof ctx.json === "function") {
-          const body = await ctx.json();
-          if (body?.error) msg = body.error;
-        }
-      } catch {}
+      const msg = await invokeFailureReason(adminError, (adminData as any)?.error, isAr ? "فشل إنشاء حساب المدير" : "Admin account creation failed");
       toast({
         title: isAr ? "تم إنشاء العميل، لكن تعذر إنشاء حساب المدير" : "Tenant created, but the admin account failed",
         description: isAr

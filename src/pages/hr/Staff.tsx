@@ -17,6 +17,7 @@ import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
+import { describeEdgeFailure, invokeFailureReason } from "@/lib/edgeFailure";
 import { useNavigate } from "react-router-dom";
 import JobRoleSelect from "@/components/JobRoleSelect";
 import { Can } from "@/components/Can";
@@ -146,7 +147,7 @@ export default function Staff() {
       });
       setCreatingUser(false);
       if (error || (data as any)?.error) {
-        toast.error((data as any)?.error ?? error?.message ?? (lang === "ar" ? "فشل إنشاء المستخدم" : "Failed to create user"));
+        toast.error(await invokeFailureReason(error, (data as any)?.error, lang === "ar" ? "فشل إنشاء المستخدم" : "Failed to create user"));
         return;
       }
       profileId = (data as any).user_id;
@@ -256,19 +257,9 @@ export default function Staff() {
       body: { user_id: s.id, branch_id: s.branch_id ?? null },
     });
     if (delErr) {
-      // functions.invoke reports every non-2xx as the same generic sentence and
-      // hides the response body, which is where the actual reason is. Read it.
-      let detail = "";
-      try {
-        const ctx: any = (delErr as any).context;
-        if (ctx && typeof ctx.json === "function") {
-          const parsed = await ctx.json();
-          if (parsed?.error) detail = String(parsed.error);
-        }
-      } catch {
-        /* keep the generic message */
-      }
-      toast.error(detail || delErr.message);
+      // invoke reports every non-2xx as the same generic sentence and hides the
+      // response body, which is where the actual refusal is.
+      toast.error((await describeEdgeFailure(delErr, lang === "ar" ? "تعذر حذف الموظف" : "Could not delete this staff member")).message);
       return;
     }
     toast.success(t("delete"));

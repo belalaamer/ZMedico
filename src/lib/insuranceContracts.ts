@@ -9,6 +9,10 @@ export type LineForCoverage = {
 export type LineCoverage = {
   rule_id: string | null;
   covered_amount: number;
+  /** The DB resolver could not be reached or answered nothing. The invoice must
+   *  not present 0 as a coverage decision — see ZMED-302, where a revoked
+   *  EXECUTE made every insured line silently claim zero. */
+  unresolved?: boolean;
 };
 
 /**
@@ -48,7 +52,7 @@ export async function resolveLineCoverage(
     _product_id: line.product_id ?? null,
     _line_total: line.line_total,
   });
-  if (error || !data || !data.length) return { rule_id: null, covered_amount: 0 };
+  if (error || !data || !data.length) return { rule_id: null, covered_amount: 0, unresolved: true };
   const row = data[0];
   return {
     rule_id: row.rule_id ?? null,

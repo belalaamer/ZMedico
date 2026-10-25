@@ -10,6 +10,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { reminderSendOutcome } from "@/lib/reminderSendOutcome";
 
 type Form = {
   whatsapp_enabled: boolean;
@@ -119,10 +120,11 @@ export default function RemindersSettings() {
       const { data, error } = await supabase.functions.invoke("send-reminder", {
         body: { branch_id: branchId, due_only: true },
       });
-      if (error) throw error;
-      toast.success(`${data?.sent ?? 0} sent / ${data?.failed ?? 0} failed`);
+      const outcome = await reminderSendOutcome({ data: data as any, error, lang });
+      if (outcome.tone === "error") toast.error(outcome.title, { description: outcome.description });
+      else toast.success(outcome.title, { description: outcome.description });
     } catch (e: any) {
-      toast.error(e.message ?? "Error");
+      toast.error(e?.message ?? (lang === "ar" ? "تعذر إرسال التنبيهات." : "Sending reminders failed."));
     } finally { setTesting(false); }
   };
 

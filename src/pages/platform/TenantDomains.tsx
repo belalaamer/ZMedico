@@ -10,6 +10,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { localizedTenantName } from "@/lib/tenantName";
+import { describeEdgeFailure } from "@/lib/edgeFailure";
 
 type Tenant = { id: string; name: string; name_en?: string | null; name_ar?: string | null };
 type Branch = { id: string; name_en: string; name_ar: string; tenant_id?: string | null; is_active: boolean };
@@ -50,7 +51,7 @@ export default function TenantDomains({ tenant, branches, open, onOpenChange }: 
   const invoke = useCallback(async (body: Record<string, unknown>) => {
     if (import.meta.env.DEV) {
       const result = await supabase.functions.invoke("manage-custom-domain", { body });
-      if (result.error) throw new Error(result.error.message || (isAr ? "تعذر الاتصال بخدمة الدومينات" : "Unable to contact domain service"));
+      if (result.error) throw new Error((await describeEdgeFailure(result.error, "")).message || (isAr ? "تعذر الاتصال بخدمة الدومينات" : "Unable to contact domain service"));
       const payload = result.data as { error?: string };
       if (payload?.error) throw new Error(payload.error);
       return result.data as { domains?: Domain[]; domain?: Domain; ok?: boolean };

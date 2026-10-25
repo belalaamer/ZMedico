@@ -28,6 +28,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ListSkeleton } from "@/components/ListSkeleton";
+import { invokeFailureReason } from "@/lib/edgeFailure";
 import { TablePager } from "@/components/TablePager";
 import { toast } from "sonner";
 import { roleLabel } from "@/lib/roleLabels";
@@ -426,15 +427,7 @@ export default function UserManagement() {
     });
     setCreating(false);
     if (error || (data as any)?.error) {
-      let msg = (data as any)?.error ?? error?.message ?? "Failed";
-      try {
-        const ctx: any = (error as any)?.context;
-        if (ctx && typeof ctx.json === "function") {
-          const body = await ctx.json();
-          if (body?.error) msg = body.error;
-        }
-      } catch {}
-      toast.error(msg);
+      toast.error(await invokeFailureReason(error, (data as any)?.error, lang === "ar" ? "تعذر إنشاء المستخدم" : "User creation failed"));
       return; // keep modal open on failure
     }
     const info = data as { email: string; password?: string; action_link?: string };
@@ -470,7 +463,7 @@ export default function UserManagement() {
     });
     setDeleting(false);
     if (error || (data as any)?.error) {
-      toast.error((data as any)?.error ?? error?.message ?? "Failed");
+      toast.error(await invokeFailureReason(error, (data as any)?.error, lang === "ar" ? "تعذر حذف المستخدم" : "User deletion failed"));
       return;
     }
     toast.success(lang === "ar" ? "تم حذف المستخدم" : "User deleted");
@@ -491,15 +484,7 @@ export default function UserManagement() {
     });
     setResetting(false);
     if (error || (data as any)?.error) {
-      let msg = (data as any)?.error ?? error?.message ?? "Failed";
-      try {
-        const ctx: any = (error as any)?.context;
-        if (ctx && typeof ctx.json === "function") {
-          const body = await ctx.json();
-          if (body?.error) msg = body.error;
-        }
-      } catch {}
-      toast.error(msg);
+      toast.error(await invokeFailureReason(error, (data as any)?.error, lang === "ar" ? "تعذر إعادة تعيين كلمة المرور" : "Password reset failed"));
       return;
     }
     const info = data as { email: string; password?: string; action_link?: string };

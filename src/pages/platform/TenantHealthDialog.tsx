@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { CLINIC_MODULES, type ClinicModuleKey } from "@/lib/clinicModules";
+import { describeEdgeFailure, safeEdgeReason } from "@/lib/edgeFailure";
 import { filterModulesByPlan, planAllowsModule } from "@/lib/subscriptionEntitlements";
 import { localizedTenantName } from "@/lib/tenantName";
 
@@ -77,13 +78,18 @@ export default function TenantHealthDialog({ tenant, branches, plans, open, onOp
       supabase.from("platform_change_log").select("id,category,action,summary,created_at").eq("tenant_id", tenant.id).order("created_at", { ascending: false }).limit(8),
     ]);
     const problems: string[] = [];
-    if (domainResult.error) problems.push(domainResult.error.message);
+    if (domainResult.error) problems.push((await describeEdgeFailure(domainResult.error, "")).message);
     else setDomains(((domainResult.data as { domains?: Domain[] } | null)?.domains ?? []));
-    if (moduleResult.error) problems.push(moduleResult.error.message);
+    if (moduleResult.error) problems.push(safeEdgeReason(moduleResult.error.message, ""));
     else setModules((moduleResult.data ?? []) as ModuleSetting[]);
-    if (changeResult.error) problems.push(changeResult.error.message);
+    if (changeResult.error) problems.push(safeEdgeReason(changeResult.error.message, ""));
     else setChanges((changeResult.data ?? []) as Change[]);
-    if (problems.length) setError(isAr ? "تعذر تحميل بعض مؤشرات الصحة؛ راجع التفاصيل المتاحة أدناه." : "Some health indicators could not be loaded; available details are shown below.");
+    if (problems.length) {
+      // The old copy promised details "shown below" that this dialog never rendered.
+      const summary = isAr ? "تعذر تحميل بعض مؤشرات الصحة." : "Some health indicators could not be loaded.";
+      const details = problems.filter(Boolean).slice(0, 2).join(" — ");
+      setError(details ? `${summary} ${details}` : summary);
+    }
     setLoading(false);
   }, [isAr, tenant]);
 

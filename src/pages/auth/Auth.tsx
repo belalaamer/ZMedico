@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { hasPersistedAuthSession, persistAuthSessionForPreview } from "@/lib/authSessionPersistence";
 import { resolvePostAuthDestination } from "@/lib/authRedirect";
 import { useTenantBranding } from "@/contexts/TenantBrandingContext";
-import { signInWithIdentifier } from "@/lib/signInWithIdentifier";
+import { identifierLoginErrorText, signInWithIdentifier } from "@/lib/signInWithIdentifier";
 import { reportAuthFailure } from "@/lib/authFailureTelemetry";
 
 function authDebug(message: string, details?: Record<string, unknown>) {
@@ -151,7 +151,7 @@ export default function AuthPage() {
       hasUser: Boolean(data.user),
       error: error?.message ?? null,
     });
-    if (error) { toast.error(error.message); return; }
+    if (error) { toast.error(identifierLoginErrorText(error, lang)); return; }
     persistAuthSessionForPreview(data.session, "password-login-result");
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     persistAuthSessionForPreview(sessionData.session, "password-login-get-session");

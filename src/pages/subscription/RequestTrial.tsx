@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeSubscriptionRequest, validateSubscriptionRequest } from "@/lib/subscriptionRequest";
+import { describeEdgeFailure, edgeCode, safeEdgeReason } from "@/lib/edgeFailure";
 
 type Plan = { id: string; name_ar: string; name_en: string; price_monthly: number; currency: string };
 type RequestResult = { accepted?: boolean; code?: string };
@@ -62,7 +63,14 @@ export default function RequestTrial() {
     });
     setSaving(false);
     if (requestError) {
-      setError(isAr ? "تعذر إرسال الطلب الآن. حاول مرة أخرى أو تواصل معنا مباشرة." : "We could not send your request. Please try again or contact us directly.");
+      // A rate limit is answered with HTTP 429, so invoke reports its generic
+      // sentence and the body — including its code — never reaches this page.
+      const f = await describeEdgeFailure(requestError, "");
+      if (f.status === 429 || edgeCode(f.body) === "rate_limited") {
+        setError(isAr ? "تم إرسال عدد كبير من الطلبات من هذا الاتصال. حاول مرة أخرى لاحقًا." : "Too many requests were sent from this connection. Please try again later.");
+        return;
+      }
+      setError(safeEdgeReason(f.message, isAr ? "تعذر إرسال الطلب الآن. حاول مرة أخرى أو تواصل معنا مباشرة." : "We could not send your request. Please try again or contact us directly."));
       return;
     }
     const result = data as RequestResult | null;

@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { formatDateTime } from "@/lib/format";
 import { useBranch } from "@/contexts/BranchContext";
+import { describeEdgeFailure, safeEdgeReason } from "@/lib/edgeFailure";
 
 export default function BackupExport() {
   const { t, lang } = useI18n();
@@ -57,7 +58,10 @@ export default function BackupExport() {
       const { data: result, error } = await supabase.functions.invoke("admin-export", {
         body: { mode: "table", table, branch_id: currentBranchId },
       });
-      if (error || (result as any)?.error) throw error ?? new Error(String((result as any)?.error));
+      if (error || (result as any)?.error) {
+        toast.error((await describeEdgeFailure(error, safeEdgeReason((result as any)?.error, t("backupExportFailed")))).message);
+        return;
+      }
       const rows = (result as any)?.data?.[table];
       if (!Array.isArray(rows)) throw new Error("Invalid table export response");
       const XLSX = await import("xlsx");
@@ -66,8 +70,8 @@ export default function BackupExport() {
       XLSX.utils.book_append_sheet(wb, ws, table);
       XLSX.writeFile(wb, filename);
       toast.success(t("saved"));
-    } catch {
-      toast.error(t("backupExportFailed"));
+    } catch (e) {
+      toast.error(safeEdgeReason((e as Error)?.message, t("backupExportFailed")));
     } finally {
       setExporting(null);
     }
@@ -80,7 +84,10 @@ export default function BackupExport() {
       const { data: result, error } = await supabase.functions.invoke("admin-export", {
         body: { mode: "all", branch_id: currentBranchId },
       });
-      if (error || (result as any)?.error) throw error ?? new Error(String((result as any)?.error));
+      if (error || (result as any)?.error) {
+        toast.error((await describeEdgeFailure(error, safeEdgeReason((result as any)?.error, t("backupExportFailed")))).message);
+        return;
+      }
       const out = (result as any)?.data;
       if (!out || typeof out !== "object" || Array.isArray(out)) throw new Error("Invalid full export response");
       const blob = new Blob([JSON.stringify(out, null, 2)], { type: "application/json" });
@@ -98,8 +105,8 @@ export default function BackupExport() {
         await refreshLastBackup();
       } catch {}
       toast.success(t("saved"));
-    } catch {
-      toast.error(t("backupExportFailed"));
+    } catch (e) {
+      toast.error(safeEdgeReason((e as Error)?.message, t("backupExportFailed")));
     } finally {
       setExporting(null);
     }

@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Copy, Download, RefreshCw, Trash2, ShieldAlert } from "lucide-react";
 import SettingsLayout from "./SettingsLayout";
+import { invokeFailureReason, safeEdgeReason } from "@/lib/edgeFailure";
 
 type QARoleKey =
   | "admin"
@@ -104,7 +105,7 @@ export default function QAIdentities() {
     });
     setBusy(null);
     if (error || (data as any)?.error) {
-      toast.error((data as any)?.error ?? error?.message ?? "Failed");
+      toast.error(await invokeFailureReason(error, (data as any)?.error, "User creation failed"));
       return;
     }
     const info = data as { email: string; password?: string };
@@ -133,7 +134,7 @@ export default function QAIdentities() {
     });
     setBusy(null);
     if (error || (data as any)?.error) {
-      toast.error((data as any)?.error ?? error?.message ?? "Failed");
+      toast.error(await invokeFailureReason(error, (data as any)?.error, "Password reset failed"));
       return;
     }
     const info = data as { email: string; password?: string };
@@ -161,10 +162,11 @@ export default function QAIdentities() {
         const { data, error } = await supabase.functions.invoke("admin-delete-user", {
           body: { user_id: target!.id },
         });
-        const message = (data as any)?.error ?? error?.message;
-        return { email: acc.email, ok: !message, message };
+        const failed = Boolean(error) || Boolean((data as any)?.error);
+        const message = failed ? await invokeFailureReason(error, (data as any)?.error, "Deletion failed") : null;
+        return { email: acc.email, ok: !failed, message };
       } catch (error) {
-        return { email: acc.email, ok: false, message: error instanceof Error ? error.message : "Request failed" };
+        return { email: acc.email, ok: false, message: safeEdgeReason(error instanceof Error ? error.message : "", "Request failed") };
       }
     }));
     setBusy(null);

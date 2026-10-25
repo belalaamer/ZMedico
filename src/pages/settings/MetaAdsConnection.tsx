@@ -10,6 +10,7 @@ import { useBranch } from "@/contexts/BranchContext";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { safeEdgeReason } from "@/lib/edgeFailure";
 
 type Connection = {
   id: string;
@@ -47,7 +48,7 @@ async function functionErrorMessage(error: unknown, data: { error?: string } | u
     const body = await response.clone().json().catch(() => null) as { error?: string } | null;
     if (body?.error) return body.error;
   }
-  if (error instanceof Error && error.message && !error.message.includes("non-2xx")) return error.message;
+  if (error instanceof Error && error.message && !error.message.includes("non-2xx")) return safeEdgeReason(error.message, fallback);
   return fallback;
 }
 

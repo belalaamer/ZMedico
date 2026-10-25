@@ -7,6 +7,7 @@ import { Copy, KeyRound, RefreshCw, ShieldCheck } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { portalMutationFailure } from "@/lib/portalMutationFailure";
 import { toast } from "sonner";
 
 type PortalAccount = {
@@ -82,7 +83,17 @@ function PortalAccountCard({ patientId, patientEmail }: Props) {
         body: reset ? { patient_id: patientId } : { patient_id: patientId, auto_credentials: true },
       });
       if (!alive.current) return;
-      if (error || data?.error || data?.success !== true) throw new Error("Unconfirmed portal operation");
+      if (error || data?.error || data?.success !== true) {
+        const f = await portalMutationFailure(error, data?.error, lang, {
+          en: "The operation could not be confirmed. Refresh the account status before retrying; the password may have changed.",
+          ar: "لم يتأكد إكمال العملية. حدّث حالة الحساب قبل إعادة المحاولة؛ ربما تغيرت كلمة المرور.",
+        });
+        if (!alive.current) return;
+        if (f.description) toast.error(f.title, { description: f.description });
+        else toast.error(f.title);
+        await load();
+        return;
+      }
       const nextCredentials = readCredentials(data.credentials);
       if (nextCredentials) {
         setCredentials(nextCredentials);

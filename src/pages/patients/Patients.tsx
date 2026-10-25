@@ -28,6 +28,8 @@ import { PullToRefresh } from "@/components/PullToRefresh";
 import { TablePager } from "@/components/TablePager";
 import { CreateInvoiceDialog } from "../invoices/CreateInvoiceDialog";
 import { containsArabicScript, patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
+import { describeEdgeFailure, safeEdgeReason } from "@/lib/edgeFailure";
+import { portalFailureReason } from "@/lib/portalMutationFailure";
 import { sanitizeSearch } from "@/lib/sanitizeSearch";
 
 const PAGE_SIZE = 50;
@@ -276,7 +278,8 @@ export default function PatientsPage() {
     });
     setSendingPortalChannel(null);
     if (error || result?.error) {
-      toast.error(result?.error ?? error?.message ?? (lang === "ar" ? "تعذر إرسال الرسالة" : "Message could not be sent"));
+      const f = await describeEdgeFailure(error, lang === "ar" ? "تعذر إرسال الرسالة" : "Message could not be sent");
+      toast.error(safeEdgeReason(result?.error, f.message));
       return;
     }
     toast.success(lang === "ar" ? "تم قبول الرسالة للإرسال" : "Message accepted for delivery");
@@ -323,7 +326,8 @@ export default function PatientsPage() {
     if (createdPatient?.id && d.email) {
       const { data: portalResult, error: portalError } = await supabase.functions.invoke("patient-portal-invite", { body: { patient_id: createdPatient.id, auto_credentials: autoCreatePortalCredentials } });
       if (portalError || portalResult?.error) {
-        toast.warning(lang === "ar" ? "تم إنشاء المريض، لكن تعذر إرسال دعوة البوابة. يمكنك إعادة المحاولة من ملف المريض." : "Patient created, but the portal invitation could not be sent. You can retry from the patient profile.");
+        const reason = await portalFailureReason(portalError, portalResult?.error, lang);
+        toast.warning(lang === "ar" ? "تم إنشاء المريض، لكن تعذر إرسال دعوة البوابة. يمكنك إعادة المحاولة من ملف المريض." : "Patient created, but the portal invitation could not be sent. You can retry from the patient profile.", reason ? { description: reason } : undefined);
       } else if (portalResult?.credentials) {
         setPortalCredentials({
           ...portalResult.credentials,

@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
+import { reminderSendOutcome } from "@/lib/reminderSendOutcome";
 
 type Reminder = {
   id: string; appointment_id: string | null; patient_id: string | null;
@@ -48,6 +49,9 @@ export default function ScheduledReminders() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [open, setOpen] = useState(false);
   const loadRequestRef = useRef(0);
+  // One send in flight at a time: a second run would message the same patients twice.
+  const sending = useRef(false);
+  const [sendingState, setSendingState] = useState(false);
   const [form, setForm] = useState({
     patient_id: "",
     reminder_type: "sms" as Reminder["reminder_type"],
@@ -117,20 +121,31 @@ export default function ScheduledReminders() {
     load();
   };
   const sendNow = async (id: string) => {
-    const { data, error } = await supabase.functions.invoke("send-reminder", { body: { reminder_id: id } });
-    if (error) { toast({ title: error.message, variant: "destructive" }); return; }
-    const r = (data?.results ?? [])[0];
-    if (r && !r.ok) toast({ title: r.error ?? "Failed", variant: "destructive" });
-    else toast({ title: t("sent") });
-    load();
+    if (sending.current) return;
+    sending.current = true; setSendingState(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-reminder", { body: { reminder_id: id } });
+      const outcome = await reminderSendOutcome({ data: data as any, error, lang, single: true });
+      toast({ title: outcome.title, description: outcome.description, variant: outcome.tone === "error" ? "destructive" : "default" });
+    } finally {
+      sending.current = false; setSendingState(false);
+      load();
+    }
   };
   const sendAllPending = async () => {
-    const { data, error } = await supabase.functions.invoke("send-reminder", {
-      body: { branch_id: currentBranchId ?? undefined, due_only: false },
-    });
-    if (error) { toast({ title: error.message, variant: "destructive" }); return; }
-    toast({ title: `Sent: ${data?.sent ?? 0}, Failed: ${data?.failed ?? 0}` });
-    load();
+    if (!branchSelectionReady) return;
+    if (sending.current) return;
+    sending.current = true; setSendingState(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-reminder", {
+        body: { branch_id: currentBranchId ?? undefined, due_only: false },
+      });
+      const outcome = await reminderSendOutcome({ data: data as any, error, lang });
+      toast({ title: outcome.title, description: outcome.description, variant: outcome.tone === "error" ? "destructive" : "default" });
+    } finally {
+      sending.current = false; setSendingState(false);
+      load();
+    }
   };
   const reschedule = async (id: string) => {
     const next = prompt("New time (YYYY-MM-DD HH:MM)");
@@ -178,8 +193,8 @@ export default function ScheduledReminders() {
           </SelectContent>
         </Select>
         <div className="ms-auto">
-          <Button variant="outline" className="me-2" onClick={sendAllPending}>
-            <Send className="size-4 me-1" />{t("sendAllPending")}
+          <Button variant="outline" className="me-2" onClick={sendAllPending} disabled={sendingState}>
+            {sendingState ? <RefreshCw className="size-4 me-1 animate-spin" /> : <Send className="size-4 me-1" />}{t("sendAllPending")}
           </Button>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -258,7 +273,7 @@ export default function ScheduledReminders() {
                   <TableCell>
                     <div className="flex gap-1">
                       {r.status === "pending" && (
-                        <Button size="icon" variant="ghost" title={t("sendNow")} onClick={() => sendNow(r.id)}>
+                        <Button size="icon" variant="ghost" title={t("sendNow")} onClick={() => sendNow(r.id)} disabled={sendingState}>
                           <Send className="size-4" />
                         </Button>
                       )}

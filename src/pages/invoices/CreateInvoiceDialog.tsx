@@ -17,7 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
 import { useDataSync, notifyDataChange } from "@/lib/dataSync";
-import { fetchActiveContract, resolveAllLines, distributeClaim, type LineForCoverage } from "@/lib/insuranceContracts";
+import { fetchActiveContract, resolveAllLines, distributeClaim, type LineCoverage, type LineForCoverage } from "@/lib/insuranceContracts";
 import { Badge } from "@/components/ui/badge";
 import { patientDisplayName } from "@/lib/patientName";
 import { doctorDisplayName } from "@/lib/doctorName";
@@ -51,7 +51,7 @@ export function CreateInvoiceDialog({
   const [insuranceCompanyId, setInsuranceCompanyId] = useState<string>("");
   const [coverageRatio, setCoverageRatio] = useState<number>(0);
   const [activeContract, setActiveContract] = useState<any>(null);
-  const [lineCoverage, setLineCoverage] = useState<Array<{ rule_id: string | null; covered_amount: number }>>([]);
+  const [lineCoverage, setLineCoverage] = useState<LineCoverage[]>([]);
   const [manualOverride, setManualOverride] = useState(false);
   const [manualClaim, setManualClaim] = useState<number>(0);
   const [items, setItems] = useState<Item[]>([{ item_type: "service", description_en: "", description_ar: "", quantity: 1, unit_price: 0 }]);
@@ -252,6 +252,9 @@ export function CreateInvoiceDialog({
   const patientShare = +(total - claimAmount).toFixed(2);
   const claimSource: "manual" | "contract" | "flat" | "none" =
     !insuranceCompanyId ? "none" : manualOverride ? "manual" : activeContract ? "contract" : "flat";
+  // An unreachable resolver reports zero for every line. Presenting that as a
+  // coverage decision bills the patient for care the contract does cover.
+  const coverageUnresolved = claimSource === "contract" && lineCoverage.some((r) => r.unresolved);
 
   const updateItem = (idx: number, patch: Partial<Item>) =>
     setItems((arr) => arr.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
@@ -730,8 +733,11 @@ export function CreateInvoiceDialog({
                 <div className="flex items-center justify-between text-sm border-t border-border pt-2 gap-2">
                   <span className="text-muted-foreground flex items-center gap-1.5">
                     {t("insuranceShare")}
-                    {claimSource === "contract" && (
+                    {claimSource === "contract" && !coverageUnresolved && (
                       <Badge variant="outline" className="text-[10px] border-success text-success">{lang === "ar" ? "من العقد" : "Contract"}</Badge>
+                    )}
+                    {coverageUnresolved && (
+                      <Badge variant="outline" className="text-[10px] border-destructive text-destructive">{lang === "ar" ? "لم تُحسب" : "Not resolved"}</Badge>
                     )}
                     {claimSource === "manual" && (
                       <Badge variant="outline" className="text-[10px] border-warning text-warning">{lang === "ar" ? "تعديل يدوي" : "Manual"}</Badge>
@@ -767,6 +773,13 @@ export function CreateInvoiceDialog({
                     {t("patientShare")}: <span className="font-medium tabular-nums text-foreground">{formatMoney(patientShare, lang)}</span>
                   </span>
                 </div>
+                {coverageUnresolved && (
+                  <p role="alert" className="text-xs text-destructive">
+                    {lang === "ar"
+                      ? "تعذّر حساب تغطية التعاقد، لذلك المعروض ٠. هذا ليس قرار تغطية: راجع التعاقد أو اضبط المبلغ يدويًا قبل الحفظ."
+                      : "Contract coverage could not be calculated, so the amount shown is 0. That is not a coverage decision: check the contract or set the amount manually before saving."}
+                  </p>
+                )}
               </>
             )}
             </>

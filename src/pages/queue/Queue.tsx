@@ -658,6 +658,11 @@ export default function QueuePage() {
         items.push({ label: t("moveBackToWaiting"), icon: <RotateCcw className="size-4" />, onClick: () => moveBackToWaiting(r) });
       }
       items.push({ label: t("reopen"), icon: <RotateCcw className="size-4" />, onClick: () => doReopen(r) });
+    } else if (canMutate && r.status === "departed") {
+      // A mistapped "departed" used to strand the patient: the row left the
+      // active board, the filter had no entry for it, and nothing offered a
+      // way back, so staff had to leave the desk screen to fix it.
+      items.push({ label: t("reopen"), icon: <RotateCcw className="size-4" />, onClick: () => doReopen(r) });
     }
     if (canMutate && (r.status === "scheduled" || r.status === "confirmed")) {
       items.push({
@@ -753,6 +758,7 @@ export default function QueuePage() {
                 <SelectItem value="completed">{t("statusCompleted")}</SelectItem>
                 <SelectItem value="cancelled">{t("statusCancelled")}</SelectItem>
                 <SelectItem value="no_show">{t("statusNoShow")}</SelectItem>
+                <SelectItem value="departed">{t("statusDeparted")}</SelectItem>
               </SelectContent>
             </Select>
           </div>

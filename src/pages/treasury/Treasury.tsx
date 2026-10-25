@@ -152,7 +152,7 @@ export default function Treasury() {
             </Button>
           </Can>
           <Can permission="treasury.tx.write">
-            <Dialog open={adj.open} onOpenChange={(v) => setAdj({ ...adj, open: v })}>
+            <Dialog open={adj.open} onOpenChange={(v) => { if (!adjSubmittingRef.current) setAdj({ ...adj, open: v }); }}>
             <DialogTrigger asChild>
               <Button className="gradient-primary text-primary-foreground">{t("adjust")}</Button>
             </DialogTrigger>

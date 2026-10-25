@@ -97,7 +97,7 @@ export default function Expenses() {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("expenses")}</h1>
           <p className="text-sm text-muted-foreground mt-1">{items.length} {t("expenses").toLowerCase()}</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(o) => { if (!savingRef.current) setOpen(o); }}>
           <Can module="treasury" action="create">
             <DialogTrigger asChild>
               <Button className="gradient-primary text-primary-foreground"><Plus className="me-2 size-4" />{t("addExpense")}</Button>

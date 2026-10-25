@@ -1036,7 +1036,9 @@ export default function CalendarPage() {
               {sidebarContent}
             </PopoverContent>
           </Popover>
-          <Dialog open={open} onOpenChange={setOpen}>
+          {/* Escape or a backdrop tap during the save hid the form while the write
+              was still landing, so the operator never knew which way it went. */}
+          <Dialog open={open} onOpenChange={(o) => { if (!savingRef.current) setOpen(o); }}>
             <DialogTrigger asChild>
               <Button className="gradient-primary text-primary-foreground hidden md:inline-flex" onClick={openNew}><Plus className="me-2 size-4" />{t("newAppointment")}</Button>
             </DialogTrigger>

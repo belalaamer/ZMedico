@@ -8,6 +8,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, Shield } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
@@ -26,6 +30,8 @@ export default function InsuranceCompanies() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Row | null>(null);
   const [form, setForm] = useState<any>({});
+  const [deleteTarget, setDeleteTarget] = useState<Row | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = async () => {
     const { data } = await (supabase as any).from("insurance_companies").select("*").order("name_en");
@@ -55,11 +61,17 @@ export default function InsuranceCompanies() {
     toast.success(t("save")); setOpen(false); load();
   };
 
-  const remove = async (id: string) => {
-    if (!confirm(lang === "ar" ? "حذف؟" : "Delete?")) return;
-    const { error } = await (supabase as any).from("insurance_companies").delete().eq("id", id);
-    if (error) return toast.error(error.message);
-    toast.success(t("save")); load();
+  const remove = async (row: Row) => {
+    setDeleting(true);
+    try {
+      const { error } = await (supabase as any).from("insurance_companies").delete().eq("id", row.id);
+      if (error) { toast.error(error.message); return; }
+      toast.success(lang === "ar" ? "تم حذف شركة التأمين" : "Insurance company deleted");
+      load();
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
+    }
   };
 
   const filtered = rows.filter(r => !q || (r.name_en + r.name_ar + r.contact_phone).toLowerCase().includes(q.toLowerCase()));
@@ -98,7 +110,7 @@ export default function InsuranceCompanies() {
                 {canEdit && (
                   <>
                     <Button size="icon" variant="ghost" onClick={() => openEdit(r)}><Pencil className="size-4" /></Button>
-                    <Button size="icon" variant="ghost" onClick={() => remove(r.id)} className="text-destructive"><Trash2 className="size-4" /></Button>
+                    <Button size="icon" variant="ghost" onClick={() => setDeleteTarget(r)} className="text-destructive"><Trash2 className="size-4" /></Button>
                   </>
                 )}
               </div>
@@ -129,6 +141,29 @@ export default function InsuranceCompanies() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && !deleting && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{lang === "ar" ? "حذف شركة التأمين؟" : "Delete this insurance company?"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {lang === "ar"
+                ? `سيُحذف «${deleteTarget?.name_ar || deleteTarget?.name_en || ""}» نهائياً مع كل عقود التأمين المسجلة لها. المرضى والفواتير المرتبطة بها تبقى لكنها تفقد ربط التأمين، ولا يمكن التراجع.`
+                : `${deleteTarget?.name_en ?? ""} will be deleted permanently, together with every insurance contract recorded under it. Patients and invoices that referenced it are kept but lose their insurance link. This cannot be undone.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && remove(deleteTarget)}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? (lang === "ar" ? "جارٍ الحذف..." : "Deleting...") : t("delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SettingsLayout>
   );
 }

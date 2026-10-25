@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import { RowActions } from "@/components/RowActions";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { buildStatusPatch } from "@/lib/appointmentStatus";
+import { matchesStatusFilter, nextStatusFilter } from "@/lib/appointmentStatusFilter";
 
 function statusLabel(s: Appt["status"], t: (k: any) => string) {
   const map: Record<Appt["status"], string> = {
@@ -143,6 +144,10 @@ export default function CalendarPage() {
   const [monthCursor, setMonthCursor] = useState<Date>(startOfMonth(new Date()));
   const [items, setItems] = useState<Appt[]>([]);
   const loadRequestRef = useRef(0);
+  // Queue's walk-in dialog already guarded this way; the booking dialog didn't,
+  // so a double tap on a lagging phone created two appointments.
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [doctors, setDoctors] = useState<{ id: string; full_name: string | null; full_name_en?: string | null; full_name_ar?: string | null }[]>([]);
   const [serviceDoctors, setServiceDoctors] = useState<{ id: string; full_name: string | null; full_name_en?: string | null; full_name_ar?: string | null }[] | null>(null);
@@ -671,6 +676,10 @@ export default function CalendarPage() {
       toast.error(lang === "ar" ? `من فضلك اختر ${missing}` : `Please select ${missing}`);
       return;
     }
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    try {
     const payload: any = {
       patient_id: form.patient_id,
       doctor_id: form.doctor_id || null,
@@ -682,7 +691,18 @@ export default function CalendarPage() {
       room: form.resource_id ? (resources.find((resource) => resource.id === form.resource_id)?.name_en || form.room || null) : (form.room || null),
       notes: form.notes || null,
     };
-    if (editId) payload.status = form.status;
+    if (editId && editingAppointment && form.status !== editingAppointment.status) {
+      // The row quick-actions and this dialog were two separate implementations
+      // of the same transition. Only the quick-actions kept the queue stamps,
+      // so reopening a visit here left a stale checked_in_at and the Queue board
+      // still showed a patient who was no longer in the room.
+      Object.assign(payload, buildStatusPatch(form.status, {
+        checked_in_at: (editingAppointment as any).checked_in_at ?? null,
+        started_at: (editingAppointment as any).started_at ?? null,
+      }));
+    } else if (editId) {
+      payload.status = form.status;
+    }
     const { error } = editId
       ? await supabase.from("appointments").update(payload).eq("id", editId)
       : await supabase.from("appointments").insert({ ...payload, branch_id: currentBranchId, status: "scheduled" });
@@ -691,23 +711,32 @@ export default function CalendarPage() {
     setOpen(false); setEditId(null);
     setForm({ patient_id: "", doctor_id: "", scheduled_at: "", duration_minutes: 30, service_id: "", procedure: "", room: "", resource_id: "", notes: "", status: "scheduled" });
     load();
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
   };
+
+  // Doctor/room scope only: the status cards below report this set, so their
+  // numbers survive whichever card the operator selects.
+  const scopedItems = useMemo(() => {
+    return items.filter((a) => {
+      if (doctorFilter !== "all" && (a.doctor_id ?? "__none__") !== doctorFilter) return false;
+      if (roomFilter !== "all" && (a.room ?? "__none__") !== roomFilter) return false;
+      return true;
+    });
+  }, [items, doctorFilter, roomFilter]);
 
   // Group items by day for week view
   const itemsByDay = useMemo(() => {
-    const filtered = items.filter((a) => {
-      if (doctorFilter !== "all" && (a.doctor_id ?? "__none__") !== doctorFilter) return false;
-      if (roomFilter !== "all" && (a.room ?? "__none__") !== roomFilter) return false;
-      if (statusFilter !== "all" && a.status !== statusFilter) return false;
-      return true;
-    });
+    const filtered = scopedItems.filter((a) => matchesStatusFilter(statusFilter, a.status));
     const map: Record<string, Appt[]> = {};
     for (const a of filtered) {
       const k = new Date(a.scheduled_at).toDateString();
       (map[k] ??= []).push(a);
     }
     return map;
-  }, [items, doctorFilter, roomFilter, statusFilter]);
+  }, [scopedItems, statusFilter]);
 
   const filteredItems = useMemo(
     () => Object.values(itemsByDay).flat(),
@@ -726,14 +755,14 @@ export default function CalendarPage() {
 
   // Stats for current visible range
   const stats = useMemo(() => {
-    const s = { total: filteredItems.length, scheduled: 0, completed: 0, cancelled: 0 };
-    for (const a of filteredItems) {
-      if (a.status === "scheduled" || a.status === "confirmed") s.scheduled++;
-      else if (a.status === "completed") s.completed++;
-      else if (a.status === "cancelled" || a.status === "no_show") s.cancelled++;
+    const s = { total: scopedItems.length, upcoming: 0, completed: 0, missed: 0 };
+    for (const a of scopedItems) {
+      if (matchesStatusFilter("upcoming", a.status)) s.upcoming++;
+      else if (matchesStatusFilter("completed", a.status)) s.completed++;
+      else if (matchesStatusFilter("missed", a.status)) s.missed++;
     }
     return s;
-  }, [filteredItems]);
+  }, [scopedItems]);
 
   // Block position for time grid.
   //
@@ -1229,8 +1258,8 @@ export default function CalendarPage() {
                   </div>
                 ) : null}
                 <DialogFooter>
-                  <Button type="button" variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button>
-                  <Button type="submit" className="gradient-primary text-primary-foreground">{t("save")}</Button>
+                  <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={saving}>{t("cancel")}</Button>
+                  <Button type="submit" className="gradient-primary text-primary-foreground" disabled={saving}>{t("save")}</Button>
                 </DialogFooter>
               </form>
             </DialogContent>
@@ -1238,23 +1267,21 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* Stats strip */}
+      {/* Stats strip — each card filters the list to exactly what it counted */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {([
           { key: "all",      label: lang === "ar" ? "إجمالي"  : "Total",     value: stats.total,     cls: "text-foreground" },
-          { key: "scheduled",label: lang === "ar" ? "قادمة"   : "Upcoming",  value: stats.scheduled, cls: "text-primary" },
+          { key: "upcoming", label: lang === "ar" ? "قادمة"   : "Upcoming",  value: stats.upcoming, cls: "text-primary" },
           { key: "completed",label: lang === "ar" ? "مكتمل"   : "Completed", value: stats.completed, cls: "text-emerald-500" },
-          { key: "cancelled",label: lang === "ar" ? "ملغية"   : "Cancelled", value: stats.cancelled, cls: "text-destructive" },
+          { key: "missed",   label: lang === "ar" ? "ملغية"   : "Cancelled", value: stats.missed,   cls: "text-destructive" },
         ] as const).map((s) => {
-          const active = (s.key === "all" && statusFilter === "all")
-            || (s.key === "scheduled" && (statusFilter === "scheduled" || statusFilter === "confirmed"))
-            || (s.key === "completed" && statusFilter === "completed")
-            || (s.key === "cancelled" && (statusFilter === "cancelled" || statusFilter === "no_show"));
+          const active = statusFilter === s.key;
           return (
             <button
               key={s.key}
               type="button"
-              onClick={() => setStatusFilter(s.key === "all" ? "all" : s.key === "scheduled" ? "scheduled" : s.key)}
+              aria-pressed={active}
+              onClick={() => setStatusFilter(nextStatusFilter(statusFilter, s.key))}
               className="text-start"
             >
               <Card className={`p-4 shadow-card transition-all hover:shadow-elegant ${active ? "ring-2 ring-primary" : ""}`}>
@@ -1294,6 +1321,10 @@ export default function CalendarPage() {
           <SelectTrigger className="h-10 md:h-9 w-auto min-w-[130px] text-sm md:text-xs shrink-0"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{lang === "ar" ? "كل الحالات" : "All statuses"}</SelectItem>
+            {/* The cards filter by these group tokens; without an option here the
+                trigger would render blank after a card click. */}
+            <SelectItem value="upcoming">{lang === "ar" ? "قادمة (مجدولة + مؤكدة)" : "Upcoming (scheduled + confirmed)"}</SelectItem>
+            <SelectItem value="missed">{lang === "ar" ? "ملغية (ملغاة + لم تحضر)" : "Cancelled (cancelled + no-show)"}</SelectItem>
             <SelectItem value="scheduled">{t("statusScheduled")}</SelectItem>
             <SelectItem value="confirmed">{t("statusConfirmed")}</SelectItem>
             <SelectItem value="in_progress">{t("statusInProgress")}</SelectItem>

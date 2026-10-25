@@ -194,10 +194,24 @@ export default function Payroll() {
 
   const remove = async (p: any) => {
     if (!canDelete) { toast.error(notPermittedMsg); return; }
-    await supabase.from("salary_adjustments").delete().eq("payroll_id", p.id);
+    if (p.status === "paid") {
+      toast.error(lang === "ar"
+        ? "رواتب مدفوعة: لا يمكن حذفها. أعد الحالة إلى مسودة أولًا للحفاظ على سجل الدفع."
+        : "This payroll is marked paid and cannot be deleted. Set it back to draft first so the payment stays auditable.");
+      return;
+    }
+    const { error: adjustmentError } = await supabase.from("salary_adjustments").delete().eq("payroll_id", p.id);
     const { error } = await supabase.from("payroll").delete().eq("id", p.id);
     if (error) { toast.error(error.message); return; }
-    toast.success(t("delete"));
+    // salary_adjustments cascades from payroll, so a failed child delete here
+    // usually still leaves the row gone; say so instead of swallowing it.
+    if (adjustmentError) {
+      toast.error(lang === "ar"
+        ? "حُذف السجل لكن تعذر حذف البدلات المرتبطة به."
+        : "The record was deleted, but its salary adjustments could not be.");
+    } else {
+      toast.success(t("delete"));
+    }
     load();
   };
 
@@ -519,15 +533,20 @@ export default function Payroll() {
           <AlertDialogHeader>
             <AlertDialogTitle>{t("confirmDelete")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {lang === "ar"
-                ? "هل أنت متأكد من حذف هذا السجل؟ لا يمكن التراجع عن هذا الإجراء."
-                : "Are you sure you want to delete this record? This action cannot be undone."}
+              {confirmDelete?.status === "paid"
+                ? (lang === "ar"
+                    ? "هذه الرواتب مسجّلة كمدفوعة، وحذفها يمحو سجل دفع نهائي. أعد الحالة إلى مسودة أولًا ثم احذفها."
+                    : "This payroll is marked paid. Deleting it erases a settled payment record - set it back to draft first, then delete.")
+                : (lang === "ar"
+                    ? "هل أنت متأكد من حذف هذا السجل؟ لا يمكن التراجع عن هذا الإجراء."
+                    : "Are you sure you want to delete this record? This action cannot be undone.")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={confirmDelete?.status === "paid"}
               onClick={async () => { const p = confirmDelete; setConfirmDelete(null); if (p) await remove(p); }}
             >
               {t("delete")}

@@ -113,6 +113,10 @@ export default function PatientsPage() {
   const [portalSupportContact, setPortalSupportContact] = useState("");
   const [sendingPortalChannel, setSendingPortalChannel] = useState<"email" | "whatsapp" | null>(null);
   const loadRequestRef = useRef(0);
+  // Inserting a patient and inviting the portal takes seconds; a second tap
+  // during that window registered the same person twice.
+  const creatingRef = useRef(false);
+  const [creating, setCreating] = useState(false);
 
   const [form, setForm] = useState({
     name_en: "", name_ar: "", phone: "", phone2: "", email: "",
@@ -290,6 +294,10 @@ export default function PatientsPage() {
       toast.error(lang === "ar" ? "أدخل البريد الإلكتروني لتوليد بيانات دخول المريض" : "Enter an email to generate patient portal credentials");
       return;
     }
+    if (creatingRef.current) return;
+    creatingRef.current = true;
+    setCreating(true);
+    try {
     const payload = {
       // The enabled BEFORE INSERT trigger allocates zero under an advisory lock.
       patient_code: 0,
@@ -336,6 +344,10 @@ export default function PatientsPage() {
     setAutoCreatePortalCredentials(false);
     setForm({ name_en: "", name_ar: "", phone: "", phone2: "", email: "", dob: "", gender: "", whatsapp_opt_in: false, blood_type: "", address: "", notes: "", referred_by_patient_id: null });
     load();
+    } finally {
+      creatingRef.current = false;
+      setCreating(false);
+    }
   };
 
   const handleDelete = async (p: Patient) => {
@@ -362,7 +374,8 @@ export default function PatientsPage() {
             <Input value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} placeholder={t("search")} className="ps-9" />
           </div>
           <Can permission="patients.create">
-            <Dialog open={open} onOpenChange={setOpen}>
+            {/* Dismissing mid-write left the outcome unknown; the walk-in dialog already guarded this way. */}
+            <Dialog open={open} onOpenChange={(o) => { if (!creatingRef.current) setOpen(o); }}>
               <DialogTrigger asChild>
                 <Button
                   className="gradient-primary text-primary-foreground min-h-11"
@@ -452,8 +465,8 @@ export default function PatientsPage() {
                   <Textarea dir="auto" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} maxLength={1000} />
                 </div>
                 <DialogFooter className="sm:col-span-2">
-                  <Button type="button" variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button>
-                  <Button type="submit" className="gradient-primary text-primary-foreground">{t("save")}</Button>
+                  <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={creating}>{t("cancel")}</Button>
+                  <Button type="submit" className="gradient-primary text-primary-foreground" disabled={creating}>{t("save")}</Button>
                 </DialogFooter>
               </form>
             </DialogContent>

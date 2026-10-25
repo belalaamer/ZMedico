@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import SettingsLayout from "./SettingsLayout";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,8 @@ export default function GeneralSettings() {
   const { branches, currentBranchId } = useBranch();
   const [branchId, setBranchId] = useState<string>(currentBranchId ?? "");
   const [uploading, setUploading] = useState(false);
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
   const [portalSettings, setPortalSettings] = useState({ portal_enabled: true, support_email: "", support_phone: "", complaint_instructions_ar: "", complaint_instructions_en: "" });
   const [form, setForm] = useState<any>({
     clinic_name_ar: "", clinic_name_en: "", logo_url: "", favicon_url: "",
@@ -40,12 +42,24 @@ export default function GeneralSettings() {
 
   const save = async () => {
     if (!branchId) return toast.error(t("branch"));
-    const payload = { ...form, branch_id: branchId };
-    const { error } = await supabase.from("clinic_profile").upsert(payload, { onConflict: "branch_id" });
-    if (error) return toast.error(error.message);
-    const { error: portalError } = await (supabase as any).from("patient_portal_settings").upsert({ ...portalSettings, branch_id: branchId }, { onConflict: "branch_id" });
-    if (portalError) return toast.error(portalError.message);
-    toast.success(t("saved"));
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    try {
+      const payload = { ...form, branch_id: branchId };
+      const { error } = await supabase.from("clinic_profile").upsert(payload, { onConflict: "branch_id" });
+      if (error) return toast.error(`${lang === "ar" ? "تعذر حفظ ملفات العيادة." : "The clinic profile could not be saved."} ${error.message}`);
+      const { error: portalError } = await (supabase as any).from("patient_portal_settings").upsert({ ...portalSettings, branch_id: branchId }, { onConflict: "branch_id" });
+      if (portalError) {
+        // Two separate upserts: the clinic half is already committed here, and
+        // saying only "failed" sent the operator back through both sections.
+        return toast.error(`${lang === "ar" ? "تم حفظ ملفات العيادة لكن تعذر حفظ إعدادات البوابة." : "The clinic profile was saved, but the portal settings could not be."} ${portalError.message}`);
+      }
+      toast.success(t("saved"));
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
   };
 
   const onLogoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -86,7 +100,7 @@ export default function GeneralSettings() {
               <SelectTrigger className="w-56"><SelectValue placeholder={t("branch")} /></SelectTrigger>
               <SelectContent>{branches.map(b => <SelectItem key={b.id} value={b.id}>{lang === "ar" ? b.name_ar : b.name_en}</SelectItem>)}</SelectContent>
             </Select>
-            <Button className="gradient-primary text-primary-foreground shadow-md hover:shadow-lg transition-all" onClick={save}>{t("save")}</Button>
+            <Button className="gradient-primary text-primary-foreground shadow-md hover:shadow-lg transition-all" onClick={save} disabled={saving}>{t("save")}</Button>
           </div>
         </div>
 
@@ -213,7 +227,7 @@ export default function GeneralSettings() {
 
         <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] inset-x-0 z-30 border-t bg-background/90 backdrop-blur-md md:hidden">
           <div className="p-3 flex justify-end">
-            <Button className="gradient-primary text-primary-foreground w-full" onClick={save}>{t("save")}</Button>
+            <Button className="gradient-primary text-primary-foreground w-full" onClick={save} disabled={saving}>{t("save")}</Button>
           </div>
         </div>
       </div>

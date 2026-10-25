@@ -59,7 +59,7 @@ function statusOf(error: any, body: Record<string, unknown> | null): number | nu
 
 /** Never throws: an unreadable body degrades to the generic transport message. */
 export async function describeEdgeFailure(error: unknown, fallback: string): Promise<EdgeFailure> {
-  if (!error) return { message: fallback, status: null, body: null };
+  if (!error) return { message: fallback, status: null, code: null, body: null };
   const err: any = error;
   let body: Record<string, unknown> | null = null;
   try {

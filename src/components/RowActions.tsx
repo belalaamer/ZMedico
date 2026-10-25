@@ -32,11 +32,19 @@ export function RowActions({
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  const showsEdit = Boolean(canEdit && onEdit);
+  const showsExtra = Boolean(extraItems?.length);
+  const showsDelete = Boolean(canDelete && onDelete);
+
   const handleDelete = async () => {
     if (!onDelete) return;
     setBusy(true);
     try { await onDelete(); } finally { setBusy(false); setConfirm(false); }
   };
+
+  // Every action below is permission-gated, so a row whose rights hide all of them would
+  // otherwise offer a kebab that opens an empty menu.
+  if (!showsEdit && !showsExtra && !showsDelete) return null;
 
   return (
     <>
@@ -47,7 +55,7 @@ export function RowActions({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-          {canEdit && onEdit && (
+          {showsEdit && (
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
               <Pencil className="me-2 size-4" />{t("edit")}
             </DropdownMenuItem>
@@ -58,7 +66,7 @@ export function RowActions({
               {it.label}
             </DropdownMenuItem>
           ))}
-          {canDelete && onDelete && (
+          {showsDelete && (
             <DropdownMenuItem className="text-destructive focus:text-destructive"
               onClick={(e) => { e.stopPropagation(); setConfirm(true); }}>
               {deleteAsCancel ? <X className="me-2 size-4" /> : <Trash2 className="me-2 size-4" />}

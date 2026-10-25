@@ -29,6 +29,9 @@ export default function Expenses() {
   const [cats, setCats] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
   const loadRequestRef = useRef(0);
+  // A double tap on a slow connection used to post the expense twice.
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     category_id: "", amount: 0, description_en: "", description_ar: "",
     expense_date: new Date().toISOString().slice(0,10), payment_method: "cash" as "cash"|"card"|"bank_transfer",
@@ -59,9 +62,13 @@ export default function Expenses() {
   };
 
   const save = async () => {
+    if (savingRef.current) return;
     if (!currentBranchId) { toast.error(t("selectBranch")); return; }
     if (!form.amount || form.amount <= 0) { toast.error(t("amountRequired")); return; }
     if (!form.description_en) { toast.error(t("descriptionRequired")); return; }
+    savingRef.current = true;
+    setSaving(true);
+    try {
     const { error } = await supabase.from("expenses").insert({
       branch_id: currentBranchId,
       category_id: form.category_id || null,
@@ -77,6 +84,10 @@ export default function Expenses() {
     setOpen(false);
     setForm({ category_id: "", amount: 0, description_en: "", description_ar: "", expense_date: new Date().toISOString().slice(0,10), payment_method: "cash" });
     load();
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
   };
 
   return (
@@ -131,8 +142,8 @@ export default function Expenses() {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="ghost" onClick={() => setOpen(false)}>{t("cancel")}</Button>
-              <Button className="gradient-primary text-primary-foreground" onClick={save}>{t("save")}</Button>
+              <Button variant="ghost" onClick={() => setOpen(false)} disabled={saving}>{t("cancel")}</Button>
+              <Button className="gradient-primary text-primary-foreground" onClick={save} disabled={saving}>{t("save")}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

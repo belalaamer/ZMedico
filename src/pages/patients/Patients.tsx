@@ -111,6 +111,10 @@ export default function PatientsPage() {
   const [portalSupportContact, setPortalSupportContact] = useState("");
   const [sendingPortalChannel, setSendingPortalChannel] = useState<"email" | "whatsapp" | null>(null);
   const loadRequestRef = useRef(0);
+  // Inserting a patient and inviting the portal takes seconds; a second tap
+  // during that window registered the same person twice.
+  const creatingRef = useRef(false);
+  const [creating, setCreating] = useState(false);
 
   const [form, setForm] = useState({
     name_en: "", name_ar: "", phone: "", phone2: "", email: "",
@@ -287,6 +291,10 @@ export default function PatientsPage() {
       toast.error(lang === "ar" ? "أدخل البريد الإلكتروني لتوليد بيانات دخول المريض" : "Enter an email to generate patient portal credentials");
       return;
     }
+    if (creatingRef.current) return;
+    creatingRef.current = true;
+    setCreating(true);
+    try {
     const payload = {
       // The enabled BEFORE INSERT trigger allocates zero under an advisory lock.
       patient_code: 0,
@@ -332,6 +340,10 @@ export default function PatientsPage() {
     setAutoCreatePortalCredentials(false);
     setForm({ name_en: "", name_ar: "", phone: "", phone2: "", email: "", dob: "", gender: "", whatsapp_opt_in: false, blood_type: "", address: "", notes: "", referred_by_patient_id: null });
     load();
+    } finally {
+      creatingRef.current = false;
+      setCreating(false);
+    }
   };
 
   const handleDelete = async (p: Patient) => {

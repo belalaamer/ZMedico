@@ -29,6 +29,10 @@ export default function Treasury() {
   const [adjIsCash, setAdjIsCash] = useState<"cash" | "non_cash">("cash");
   const [today, setToday] = useState({ income: 0, expense: 0 });
   const [transferOpen, setTransferOpen] = useState(false);
+  // Unlike TransferDialog, the manual adjustment had no in-flight guard: a
+  // double click posted the ledger entry twice.
+  const adjSubmittingRef = useRef(false);
+  const [adjSaving, setAdjSaving] = useState(false);
   const loadRequestRef = useRef(0);
 
   const load = async () => {
@@ -103,8 +107,12 @@ export default function Treasury() {
   const totalBalance = totalCashBalance + totalNonCashBalance;
 
   const submitAdj = async () => {
+    if (adjSubmittingRef.current) return;
     if (!branchSelectionReady || !currentBranchId) { toast.error(t("selectBranch")); return; }
     if (!adj.treasury_id || !adj.amount || !adj.desc_en) { toast.error(t("fillAllFields")); return; }
+    adjSubmittingRef.current = true;
+    setAdjSaving(true);
+    try {
     const { error } = await supabase.rpc("add_treasury_tx", {
       _treasury_id: adj.treasury_id,
       _type: adj.type,
@@ -120,6 +128,10 @@ export default function Treasury() {
     toast.success(t("save"));
     setAdj({ open: false, type: "income", amount: 0, desc_en: "", desc_ar: "", treasury_id: "" });
     load();
+    } finally {
+      adjSubmittingRef.current = false;
+      setAdjSaving(false);
+    }
   };
 
   return (
@@ -186,8 +198,8 @@ export default function Treasury() {
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="ghost" onClick={() => setAdj({ ...adj, open: false })}>{t("cancel")}</Button>
-                <Button className="gradient-primary text-primary-foreground" onClick={submitAdj}>{t("save")}</Button>
+                <Button variant="ghost" onClick={() => setAdj({ ...adj, open: false })} disabled={adjSaving}>{t("cancel")}</Button>
+                <Button className="gradient-primary text-primary-foreground" onClick={submitAdj} disabled={adjSaving}>{t("save")}</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

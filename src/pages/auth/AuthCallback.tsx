@@ -50,7 +50,9 @@ export default function AuthCallback() {
       const next = safeRedirectPath(params.get("next") || hashParams.get("next") || "/");
 
       console.info(AUTH_DEBUG_PREFIX, "callback redirect received", {
-        path: window.location.pathname + window.location.search,
+        // The query is not logged: on the PKCE flow it carries the live single-use `?code=`.
+        path: window.location.pathname,
+        type: redirectType ?? null,
         hasCode: Boolean(code),
         hasHashTokens: Boolean(hashParams.get("access_token") || hashParams.get("refresh_token")),
         hasProviderError: Boolean(providerError),

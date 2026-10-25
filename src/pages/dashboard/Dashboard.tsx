@@ -387,7 +387,12 @@ export default function Dashboard() {
         .sort((a, b) => b.count - a.count).slice(0, 8));
 
       setLoading(false);
-  }, [branchSelectionReady, currentBranchId, rangeStart, rangeEnd, lang, user?.id]);
+    // The five can* flags are read inside run() to decide which queries fire, but
+    // they arrive asynchronously. Left out of this list, a branch that resolved
+    // before permissions did latched an all-empty result and nothing re-ran, so
+    // the dashboard stayed on "No data yet" for a user who could see the data.
+  }, [branchSelectionReady, currentBranchId, rangeStart, rangeEnd, lang, user?.id,
+      canBookings, canClinical, canHR, canInvoices, canPatients]);
 
   // Initial load + refetch on branch change
   useEffect(() => { run(); }, [run]);

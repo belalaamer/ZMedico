@@ -79,6 +79,11 @@ export default function InvoiceDetail() {
   const name = patientDisplayName(p, lang);
   const nameDirection = patientDisplayDirection(p, lang);
   const remaining = +(Number(inv.total) - Number(inv.paid_amount)).toFixed(2);
+  // CreateInvoiceDialog folds the coupon into the stored discount
+  // (`discount: discount + couponDiscount`) while `total` already subtracts it once,
+  // so listing both rows subtracted it twice on screen and the lines never summed to
+  // the total printed underneath them.
+  const manualDiscount = Math.max(0, Number(inv.discount || 0) - (coupon?.amount ?? 0));
   const statusLabel = ({ draft: t("statusDraft"), pending: t("statusPending"), paid: t("statusPaid"), partial: t("statusPartial"), cancelled: t("statusCancelled") } as any)[inv.status];
 
   const cancelInvoice = async () => {
@@ -289,7 +294,7 @@ export default function InvoiceDetail() {
           </div>
           <div className="space-y-2 text-sm rounded-lg bg-muted/30 p-4 border border-border">
             <div className="flex justify-between"><span className="text-muted-foreground">{t("subtotal")}</span><span className="tabular-nums">{formatMoney(inv.subtotal, lang)}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">{t("discount")}</span><span className="tabular-nums">- {formatMoney(inv.discount, lang)}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">{t("discount")}</span><span className="tabular-nums">- {formatMoney(manualDiscount, lang)}</span></div>
             {coupon && (
               <div className="flex justify-between"><span className="text-muted-foreground">{lang === "ar" ? `كوبون (${coupon.code})` : `Coupon (${coupon.code})`}</span><span className="tabular-nums text-success">- {formatMoney(coupon.amount, lang)}</span></div>
             )}

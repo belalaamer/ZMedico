@@ -87,8 +87,12 @@ export function GlobalSearch({ variant = "desktop", onClose }: Props) {
           try {
             const hits = await runners[g.key](term, currentBranchId ?? null, lang);
             return { key: g.key, module: g.module, hits } as SearchGroup;
-          } catch {
-            return { key: g.key, module: g.module, hits: [] } as SearchGroup;
+          } catch (err) {
+            // Swallowing this into an empty group made a denied or failed read
+            // indistinguishable from "this patient does not exist", and the desk
+            // registered a duplicate.
+            console.warn(`global search failed for ${g.key}`, err);
+            return { key: g.key, module: g.module, hits: [], failed: true } as SearchGroup;
           }
         }),
       );
@@ -103,6 +107,7 @@ export function GlobalSearch({ variant = "desktop", onClose }: Props) {
   const groupLabel = (k: SearchGroupKey): string => allowedGroups.find((g) => g.key === k)?.label ?? k;
 
   const visibleGroups = groups.filter((g) => g.hits.length > 0);
+  const failedGroups = groups.filter((g) => g.failed);
   const totalHits = visibleGroups.reduce((s, g) => s + g.hits.length, 0);
 
   const go = (to: string) => {
@@ -224,8 +229,15 @@ export function GlobalSearch({ variant = "desktop", onClose }: Props) {
             {t("searching")}
           </div>
         ) : totalHits === 0 ? (
-          <div className="p-4 text-sm text-muted-foreground text-center">{t("noResults")}</div>
-        ) : (
+          failedGroups.length > 0 ? (
+            <div role="alert" className="p-4 text-sm text-destructive text-center">
+              {t("searchPartialFailure")}
+              <div className="mt-1 text-xs text-muted-foreground">{failedGroups.map((g) => groupLabel(g.key)).join(", ")}</div>
+            </div>
+          ) : (
+            <div className="p-4 text-sm text-muted-foreground text-center">{t("noResults")}</div>
+          )
+        ) : (<>
           <div className="py-2" role="listbox" aria-label={t("search")}>
             {(() => { let idx = -1; return visibleGroups.map((g) => (
               <div key={g.key} className="px-1">
@@ -258,6 +270,12 @@ export function GlobalSearch({ variant = "desktop", onClose }: Props) {
               </div>
             )); })()}
           </div>
+          {failedGroups.length > 0 && (
+            <div role="alert" className="border-t px-4 py-3 text-xs text-destructive">
+              {t("searchPartialFailure")} <span className="text-muted-foreground">{failedGroups.map((g) => groupLabel(g.key)).join(", ")}</span>
+            </div>
+          )}
+        </>
         )}
       </PopoverContent>
     </Popover>

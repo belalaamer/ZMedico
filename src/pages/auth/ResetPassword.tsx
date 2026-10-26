@@ -11,6 +11,7 @@ import { Card } from "@/components/ui/card";
 import { useI18n } from "@/contexts/I18nContext";
 import { toast } from "sonner";
 import { withTimeout } from "@/lib/withTimeout";
+import { markSignOutReason } from "@/lib/authSignOutReason";
 import { reportAuthFailure } from "@/lib/authFailureTelemetry";
 
 /**
@@ -74,6 +75,9 @@ export default function ResetPassword() {
     // A completion belonging to a previous account must not log out the new one.
     if (!mounted.current || identity.current !== expectedId || generation.current !== operation) return;
     try {
+      // This sign-out is the flow's own step and says so on its way to /auth; without
+      // the mark, SIGNED_OUT here would look like an unexplained session loss.
+      markSignOutReason("password-change");
       const { error } = await supabase.auth.signOut();
       const sameOperation = identity.current === expectedId && generation.current === operation;
       const expectedSignOut = identity.current === null && generation.current === operation + 1;

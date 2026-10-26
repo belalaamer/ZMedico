@@ -3,6 +3,7 @@ import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
 import { withTimeout } from "@/lib/withTimeout";
+import { markSignOutReason, takeSignOutReason, type SignOutReason } from "@/lib/authSignOutReason";
 import { toast } from "@/hooks/use-toast";
 import {
   clearPersistedAuthSessions,
@@ -64,14 +65,31 @@ function clearLocalAppState() {
   clearPersistedAuthSessions();
 }
 
-function notifySessionInvalid() {
+// S2: one sentence covered two different causes, and the two endings users actually
+// complained about (idle timeout, a session ending on its own) produced no message at
+// all. Each notice now names the reason and what to do next.
+type SessionNotice = "deleted" | "idle" | "lost";
+
+const SESSION_NOTICES: Record<SessionNotice, { ar: string; en: string }> = {
+  deleted: {
+    ar: "انتهت صلاحية الجلسة أو لم يعد الحساب متاحًا. برجاء تسجيل الدخول مرة أخرى.",
+    en: "Your session is no longer valid. Please sign in again.",
+  },
+  idle: {
+    ar: "تم تسجيل خروجك بعد فترة من عدم النشاط. برجاء تسجيل الدخول مرة أخرى.",
+    en: "You were signed out after a period of inactivity. Please sign in again.",
+  },
+  lost: {
+    ar: "انتهت الجلسة. برجاء تسجيل الدخول مرة أخرى.",
+    en: "Your session ended. Please sign in again.",
+  },
+};
+
+function notifySessionEnded(notice: SessionNotice) {
   const lang = (typeof window !== "undefined" && localStorage.getItem("zmedico.lang")) || "ar";
-  const msg =
-    lang === "ar"
-      ? "انتهت صلاحية الجلسة أو لم يعد الحساب متاحًا. برجاء تسجيل الدخول مرة أخرى."
-      : "Your session is no longer valid. Please sign in again.";
+  const copy = SESSION_NOTICES[notice];
   try {
-    toast({ title: msg });
+    toast({ title: lang === "ar" ? copy.ar : copy.en });
   } catch {
     /* ignore */
   }
@@ -84,12 +102,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(() => !readPersistedAuthSession());
 
   const forceLocalLogout = async (notify: boolean) => {
+    // This path owns its own notice, and the provider call below fires SIGNED_OUT in
+    // this tab. Recording the reason is what keeps that event from adding a second.
+    markSignOutReason("account-closed");
     try { await supabase.auth.signOut(); } catch { /* deleted-user JWT may fail */ }
     clearLocalAppState();
     setSession(null);
     setUser(null);
     setLoading(false);
-    if (notify) notifySessionInvalid();
+    if (notify) notifySessionEnded("deleted");
   };
 
   useEffect(() => {
@@ -132,8 +153,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(null);
         setUser(null);
         setLoading(false);
-        // A normal SIGNED_OUT event is expected user intent; only deleted or invalid users need a warning.
-        if ((event as string) === "USER_DELETED") notifySessionInvalid();
+        const reason = takeSignOutReason();
+        if ((event as string) === "USER_DELETED") {
+          notifySessionEnded("deleted");
+        } else if (reason === "idle") {
+          notifySessionEnded("idle");
+        } else if (!reason && hadSession) {
+          // S2: a refresh token rejected mid-day, or a second tab signing out, landed
+          // the desk on /auth with no message at all. `hadSession` is what makes this
+          // an ending rather than an anonymous first load.
+          notifySessionEnded("lost");
+        }
         hadSession = false;
         return;
       }
@@ -204,7 +234,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signOut = async (notify = true) => {
+  const signOut = async (notify = true, reason: SignOutReason = "user") => {
+    markSignOutReason(reason);
     try {
       await supabase.auth.signOut();
     } catch {
@@ -222,7 +253,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let timer: ReturnType<typeof setTimeout>;
     const reset = () => {
       clearTimeout(timer);
-      timer = setTimeout(() => { void signOut(false); }, IDLE_TIMEOUT_MS);
+      // S2: `notify` was false, so the desk vanished mid-session with no explanation
+      // of any kind. The reason now reaches the SIGNED_OUT handler, which owns the copy.
+      timer = setTimeout(() => { void signOut(false, "idle"); }, IDLE_TIMEOUT_MS);
     };
     const events = ["mousemove", "mousedown", "keydown", "touchstart", "scroll", "visibilitychange"];
     events.forEach((e) => window.addEventListener(e, reset, { passive: true } as AddEventListenerOptions));

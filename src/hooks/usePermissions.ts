@@ -69,17 +69,21 @@ export function usePermissions() {
       fetchCanonicalPermissions(user.id)
         .then((map) => {
           if (!active) return;
-          console.info("[auth-debug] canonical permissions loaded", {
-            modules: Object.keys(map).length,
-          });
+          if (import.meta.env.DEV) {
+            console.info("[auth-debug] canonical permissions loaded", {
+              modules: Object.keys(map).length,
+            });
+          }
           setPerms(map);
           setLoading(false);
         })
         .catch((error) => {
           if (!active) return;
-          console.warn("[auth-debug] canonical permissions unavailable; access remains denied", {
-            code: typeof error?.code === "string" ? error.code : "unconfirmed_permissions",
-          });
+          if (import.meta.env.DEV) {
+            console.warn("[auth-debug] canonical permissions unavailable; access remains denied", {
+              code: typeof error?.code === "string" ? error.code : "unconfirmed_permissions",
+            });
+          }
           setPerms({});
           setLoading(false);
         });
@@ -102,9 +106,11 @@ export function usePermissions() {
     )
       .then(({ data }: any) => {
         if (!active) return;
-        console.info("[auth-debug] role_permissions fetch completed", {
-          rows: data?.length ?? 0,
-        });
+        if (import.meta.env.DEV) {
+          console.info("[auth-debug] role_permissions fetch completed", {
+            rows: data?.length ?? 0,
+          });
+        }
         const map: Record<string, Set<string>> = {};
         const seen = new Set<string>();
         (data ?? []).forEach((r: any) => {
@@ -128,7 +134,9 @@ export function usePermissions() {
       })
       .catch((error) => {
         if (!active) return;
-        console.warn("[auth-debug] role_permissions fetch threw; using defaults", { message: error instanceof Error ? error.message : String(error) });
+        if (import.meta.env.DEV) {
+          console.warn("[auth-debug] role_permissions fetch threw; using defaults", { message: error instanceof Error ? error.message : String(error) });
+        }
         const map: Record<string, Set<string>> = {};
         roles.forEach((role) => {
           MODULES.forEach((mod) => {

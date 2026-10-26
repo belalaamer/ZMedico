@@ -24,21 +24,25 @@ export function useUserRole() {
     )
       .then(({ data, error }: any) => {
         if (!active) return;
-        if (error) {
-          console.warn("[auth-debug] user_roles fetch error", {
-            message: error.message,
-            code: error.code,
-          });
-        } else {
-          console.info("[auth-debug] user_roles fetch completed", {
-            rows: data?.length ?? 0,
-          });
+        if (import.meta.env.DEV) {
+          if (error) {
+            console.warn("[auth-debug] user_roles fetch error", {
+              message: error.message,
+              code: error.code,
+            });
+          } else {
+            console.info("[auth-debug] user_roles fetch completed", {
+              rows: data?.length ?? 0,
+            });
+          }
         }
         setRoles((data ?? []).map((r: any) => r.role as AppRole));
       })
       .catch((error) => {
         if (!active) return;
-        console.warn("[auth-debug] user_roles fetch threw", { message: error instanceof Error ? error.message : String(error) });
+        if (import.meta.env.DEV) {
+          console.warn("[auth-debug] user_roles fetch threw", { message: error instanceof Error ? error.message : String(error) });
+        }
         setRoles([]);
       })
       .finally(() => {

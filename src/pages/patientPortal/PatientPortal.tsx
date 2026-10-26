@@ -55,6 +55,9 @@ export default function PatientPortal() {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [username, setUsername] = useState("");
   const [usernameSaving, setUsernameSaving] = useState(false);
+  // P7: "failed" may succeed on retry, "inactive" never will. They shared one card
+  // whose only instruction was the invitation link -- single-use, already consumed.
+  const [blocked, setBlocked] = useState<"inactive" | "failed" | null>(null);
 
   // RBAC-12 fix: this route was never wrapped in an auth check at all --
   // visiting it with no session (or a session for a different account,
@@ -93,7 +96,10 @@ export default function PatientPortal() {
         return;
       }
       if (stateError || !(state as any)?.active) {
-        toast.error(lang === "ar" ? "لا يمكن الوصول إلى بوابة المريض بهذا الحساب" : "This account cannot access the patient portal");
+        setBlocked(stateError ? "failed" : "inactive");
+        toast.error(stateError
+          ? (lang === "ar" ? "تعذر التحقق من الحساب. تحقق من الاتصال وأعد المحاولة." : "Could not verify your account. Check your connection and try again.")
+          : (lang === "ar" ? "لا يمكن الوصول إلى بوابة المريض بهذا الحساب" : "This account cannot access the patient portal"));
         setLoading(false);
         return;
       }
@@ -119,7 +125,7 @@ export default function PatientPortal() {
         window.location.assign("/patient-portal/login");
         return;
       }
-      if (error) { toast.error(lang === "ar" ? "لا يمكن الوصول إلى بوابة المريض بهذا الحساب" : "This account cannot access the patient portal"); setLoading(false); return; }
+      if (error) { setBlocked("failed"); toast.error(lang === "ar" ? "تعذر تحميل بيانات بوابة المريض. تحقق من الاتصال وأعد المحاولة." : "Could not load your portal data. Check your connection and try again."); setLoading(false); return; }
       setData(snapshot as unknown as PortalData);
       setUsername(profile?.username ?? "");
       setLoading(false);
@@ -173,6 +179,8 @@ export default function PatientPortal() {
           </div>
           <form onSubmit={savePassword} className="mt-6 space-y-3">
             <input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={8} required placeholder={lang === "ar" ? "كلمة مرور جديدة" : "New password"} className="h-10 w-full rounded-md border bg-background px-3 text-sm" autoComplete="new-password" />
+            {/* P4: the submit button stays disabled under 8 characters, so the rule has to be on screen. */}
+            <p className="text-xs text-muted-foreground">{lang === "ar" ? "8 أحرف على الأقل." : "At least 8 characters."}</p>
             <Button type="submit" className="w-full" disabled={passwordSaving || newPassword.length < 8}>{passwordSaving ? "…" : (firstPasswordSetup ? (lang === "ar" ? "تعيين كلمة المرور والمتابعة" : "Set password and continue") : (lang === "ar" ? "تغيير كلمة المرور والمتابعة" : "Change password and continue"))}</Button>
           </form>
           <button type="button" className="mt-4 w-full text-center text-xs text-primary hover:underline" onClick={logout}>{lang === "ar" ? "تسجيل الخروج" : "Sign out"}</button>
@@ -180,7 +188,8 @@ export default function PatientPortal() {
       </main>
     );
   }
-  if (!data) return <main className="min-h-dvh grid place-items-center p-6"><Card className="max-w-md p-6 text-center"><ShieldCheck className="mx-auto mb-3 size-8 text-primary" /><h1 className="text-xl font-bold">{lang === "ar" ? "بوابة المريض غير متاحة" : "Patient portal unavailable"}</h1><p className="mt-2 text-sm text-muted-foreground">{lang === "ar" ? "استخدم رابط الدعوة أو تواصل مع العيادة لتفعيل الوصول." : "Use your invitation link or contact the clinic to activate access."}</p></Card></main>;
+  // P7: a refused request is worth retrying; a disabled account never is.
+  if (!data) return <main className="min-h-dvh grid place-items-center p-6" dir={lang === "ar" ? "rtl" : "ltr"}><Card className="max-w-md p-6 text-center"><ShieldCheck className="mx-auto mb-3 size-8 text-primary" />{blocked === "failed" ? <><h1 className="text-xl font-bold">{lang === "ar" ? "تعذر فتح بوابة المريض" : "The patient portal could not be loaded"}</h1><p className="mt-2 text-sm leading-6 text-muted-foreground">{lang === "ar" ? "حدث خطأ أثناء فتح حسابك. أعد المحاولة، وإن تكرر الأمر تواصل مع العيادة." : "Something went wrong while opening your account. Try again, and if it keeps happening contact the clinic."}</p><Button className="mt-4" onClick={() => window.location.reload()}>{lang === "ar" ? "إعادة المحاولة" : "Try again"}</Button></> : <><h1 className="text-xl font-bold">{lang === "ar" ? "بوابة المريض غير متاحة" : "Patient portal unavailable"}</h1><p className="mt-2 text-sm leading-6 text-muted-foreground">{lang === "ar" ? "حسابك لدى هذه العيادة غير مفعّل. تواصل مع العيادة لتفعيل الوصول؛ رابط الدعوة يُستخدم مرة واحدة ولا يمكنه إعادة فتح الحساب." : "This clinic has not enabled your account. Contact the clinic to enable access; the invitation link works only once and cannot reopen an account."}</p></>}</Card></main>;
 
   const upcoming = data.appointments.filter((item) => !["cancelled", "completed"].includes(item.status));
   const supportEmail = data.clinic.support_email;

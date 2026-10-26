@@ -21,6 +21,19 @@ async function form() {
   return password.closest("form")!;
 }
 describe("password recovery screen", () => {
+  it("refuses a 7-character password with the requirement named", async () => {
+    // Every other surface that writes a ZMedico password requires 8. Accepting 6
+    // here produced accounts the portal itself would refuse to sign in to.
+    render(<ResetPassword />);
+    const password = await screen.findByLabelText("newPassword");
+    fireEvent.change(password, { target: { value: "sevensv" } });
+    fireEvent.change(screen.getByLabelText("confirmPassword"), { target: { value: "sevensv" } });
+    fireEvent.submit(password.closest("form")!);
+    await waitFor(() => expect(api.error).toHaveBeenCalledWith("Password must be at least 8 characters"));
+    expect(api.update).not.toHaveBeenCalled();
+    expect(screen.getByText("At least 8 characters.")).toBeInTheDocument();
+  });
+
   it("finishes verification with a useful invalid-link state when no session exists", async () => {
     api.getSession.mockResolvedValue({ data: { session: null }, error: null }); render(<ResetPassword />);
     expect(await screen.findByRole("alert")).toHaveTextContent("expired");

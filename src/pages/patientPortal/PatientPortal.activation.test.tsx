@@ -110,6 +110,33 @@ it("activates the account through the RPC and reloads instead of trusting local 
   await waitFor(() => expect(api.reload).toHaveBeenCalled());
 });
 
+it("distinguishes a refused request from a disabled account on the blocked screen", async () => {
+  // The card used to tell both states to "use your invitation link", which is
+  // single-use and already consumed by anyone who can reach this screen.
+  api.rpc.mockImplementation(async (name: string) => {
+    if (name === "patient_portal_password_state") return { data: { active: false }, error: null };
+    return { data: null, error: null };
+  });
+  mount();
+  await screen.findByRole("heading", { name: "Patient portal unavailable" });
+  expect(screen.getByText(/has not enabled your account/)).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
+  expect(screen.getByText(/invitation link works only once/)).toBeInTheDocument();
+  expect(screen.queryByText(/use your invitation link/i)).toBeNull();
+});
+
+it("offers a retry when the account check itself was refused", async () => {
+  api.rpc.mockImplementation(async (name: string) => {
+    if (name === "patient_portal_password_state") return { data: null, error: { message: "boom", status: 500 } };
+    return { data: null, error: null };
+  });
+  mount();
+  await screen.findByRole("heading", { name: "The patient portal could not be loaded" });
+  expect(screen.queryByText(/has not enabled your account/)).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+  await waitFor(() => expect(api.reload).toHaveBeenCalled());
+});
+
 it("leaves the step blocking when the password was written but the activation RPC failed", async () => {
   api.rpc.mockImplementation(async (name: string) => {
     if (name === "patient_portal_password_state") return { data: { active: true, must_change_password: true, activated: false }, error: null };

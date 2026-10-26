@@ -8,9 +8,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { formatMoney, formatDate } from "@/lib/format";
-import { ReportPageHeader, StatCard } from "./_shared";
+import { ReportPageHeader, StatCard, ExportButtons } from "./_shared";
 import { exportReportPDF, exportReportExcel } from "@/lib/reportExport";
-import { Download, FileSpreadsheet, Printer } from "lucide-react";
+import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function InventoryReports() {
@@ -36,8 +36,7 @@ export default function InventoryReports() {
 function ExportBar({ onPdf, onExcel, t }: any) {
   return (
     <Card><CardContent className="pt-6 flex justify-end gap-2">
-      <Button variant="outline" size="sm" onClick={onPdf}><Download className="size-4 me-1" />PDF</Button>
-      <Button variant="outline" size="sm" onClick={onExcel}><FileSpreadsheet className="size-4 me-1" />Excel</Button>
+      <ExportButtons onPdf={onPdf} onExcel={onExcel} />
       <Button variant="outline" size="sm" onClick={() => window.print()}><Printer className="size-4 me-1" />{t("print")}</Button>
     </CardContent></Card>
   );
@@ -149,8 +148,10 @@ function ExpiryTab({ branchId, lang, t }: any) {
       <Card><CardContent className="pt-6 flex flex-wrap items-end gap-3">
         <div><Label className="text-xs">{t("daysUntilExpiry")}</Label><Input type="number" value={days} onChange={(e) => setDays(Number(e.target.value))} className="w-32" /></div>
         <div className="ms-auto flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => exportReportPDF({ title: t("expiryReport"), columns: cols, rows: enriched, lang })}><Download className="size-4 me-1" />PDF</Button>
-          <Button variant="outline" size="sm" onClick={() => exportReportExcel({ title: t("expiryReport"), columns: cols, rows: enriched })}><FileSpreadsheet className="size-4 me-1" />Excel</Button>
+          <ExportButtons
+            onPdf={() => exportReportPDF({ title: t("expiryReport"), columns: cols, rows: enriched, lang })}
+            onExcel={() => exportReportExcel({ title: t("expiryReport"), columns: cols, rows: enriched })}
+          />
         </div>
       </CardContent></Card>
       <Card><CardContent className="pt-6 overflow-x-auto">

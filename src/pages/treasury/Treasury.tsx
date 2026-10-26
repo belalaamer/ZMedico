@@ -19,6 +19,14 @@ import { TransferDialog } from "./TransferDialog";
 import { RowActions } from "@/components/RowActions";
 import { Can } from "@/components/Can";
 
+// One treasury holds one currency, so any branch total has to stay split by
+// currency: a number that adds EGP to USD does not exist in any ledger.
+type MoneyByCurrency = Record<string, number>;
+
+const addMoney = (into: MoneyByCurrency, currency: string, amount: number) => {
+  into[currency] = (into[currency] ?? 0) + amount;
+};
+
 export default function Treasury() {
   const { t, lang } = useI18n();
   const { currentBranchId, branchSelectionReady } = useBranch();
@@ -27,7 +35,7 @@ export default function Treasury() {
   const [txs, setTxs] = useState<any[]>([]);
   const [adj, setAdj] = useState({ open: false, type: "income", amount: 0, desc_en: "", desc_ar: "", treasury_id: "" });
   const [adjIsCash, setAdjIsCash] = useState<"cash" | "non_cash">("cash");
-  const [today, setToday] = useState({ income: 0, expense: 0 });
+  const [today, setToday] = useState<{ income: MoneyByCurrency; expense: MoneyByCurrency }>({ income: {}, expense: {} });
   const [transferOpen, setTransferOpen] = useState(false);
   // Unlike TransferDialog, the manual adjustment had no in-flight guard: a
   // double click posted the ledger entry twice.
@@ -41,7 +49,7 @@ export default function Treasury() {
     if (!branchSelectionReady || !branchId) {
       setTreasuries([]);
       setTxs([]);
-      setToday({ income: 0, expense: 0 });
+      setToday({ income: {}, expense: {} });
       return;
     }
     const tq = supabase.from("treasury").select("*").eq("branch_id", branchId).is("deleted_at", null).order("created_at");
@@ -70,7 +78,7 @@ export default function Treasury() {
       setTxs(visible);
 
       const startISO = new Date(new Date().setHours(0,0,0,0)).toISOString();
-      const { data: tt, error: ttError } = await supabase.from("treasury_transactions").select("transaction_type,amount,reference_type,reference_id,created_at").in("treasury_id", ids).gte("created_at", startISO);
+      const { data: tt, error: ttError } = await supabase.from("treasury_transactions").select("transaction_type,amount,reference_type,reference_id,created_at,treasury_id").in("treasury_id", ids).gte("created_at", startISO);
       if (ttError) { toast.error(ttError.message); return; }
       const reversedToday = new Set(
         (tt ?? [])
@@ -82,12 +90,18 @@ export default function Treasury() {
         if (r.reference_type === "expense" && r.reference_id && reversedToday.has(r.reference_id)) return false;
         return true;
       });
-      const inc = ttVisible.filter((r: any) => r.transaction_type === "income").reduce((s: number, r: any) => s + Number(r.amount), 0);
-      const exp = ttVisible.filter((r: any) => r.transaction_type === "expense").reduce((s: number, r: any) => s + Number(r.amount), 0);
+      const currencyOfTreasury = new Map((trs ?? []).map((tr: any) => [tr.id as string, String(tr.currency || "EGP")]));
+      const inc: MoneyByCurrency = {};
+      const exp: MoneyByCurrency = {};
+      for (const r of ttVisible as any[]) {
+        const currency = currencyOfTreasury.get(r.treasury_id) ?? "EGP";
+        if (r.transaction_type === "income") addMoney(inc, currency, Number(r.amount));
+        else if (r.transaction_type === "expense") addMoney(exp, currency, Number(r.amount));
+      }
       if (requestId !== loadRequestRef.current) return;
       setToday({ income: inc, expense: exp });
     } else {
-      setTxs([]); setToday({ income: 0, expense: 0 });
+      setTxs([]); setToday({ income: {}, expense: {} });
     }
   };
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, [branchSelectionReady, currentBranchId]);
@@ -102,9 +116,23 @@ export default function Treasury() {
     toast.success(t("delete")); load();
   };
 
-  const totalCashBalance = treasuries.reduce((s, tr) => s + Number(tr.current_balance), 0);
-  const totalNonCashBalance = treasuries.reduce((s, tr) => s + Number(tr.non_cash_balance ?? 0), 0);
-  const totalBalance = totalCashBalance + totalNonCashBalance;
+  const cashByCurrency: MoneyByCurrency = {};
+  const nonCashByCurrency: MoneyByCurrency = {};
+  for (const tr of treasuries) {
+    const currency = String(tr.currency || "EGP");
+    addMoney(cashByCurrency, currency, Number(tr.current_balance));
+    addMoney(nonCashByCurrency, currency, Number(tr.non_cash_balance ?? 0));
+  }
+  const defaultCurrency = String(treasuries[0]?.currency || "EGP");
+  const currencyById = new Map(treasuries.map((tr) => [tr.id as string, String(tr.currency || "EGP")]));
+
+  // One line per currency. A branch that holds a single currency — which is every
+  // branch today — sees exactly the same card it saw before.
+  const moneyLines = (m: MoneyByCurrency) => {
+    const entries = Object.entries(m);
+    const rows: [string, number][] = entries.length ? entries : [[defaultCurrency, 0]];
+    return rows.map(([currency, value]) => ({ currency, text: formatMoney(value, lang, currency) }));
+  };
 
   const submitAdj = async () => {
     if (adjSubmittingRef.current) return;
@@ -209,10 +237,10 @@ export default function Treasury() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-      { label: t("cashBalance"), value: totalCashBalance, icon: Banknote, tone: "from-primary to-primary-glow" },
-      { label: t("nonCashBalance"), value: totalNonCashBalance, icon: Banknote, tone: "from-info to-info" },
-          { label: t("todayIncome"), value: today.income, icon: ArrowDownToLine, tone: "from-success to-success" },
-          { label: t("todayExpenses"), value: today.expense, icon: ArrowUpFromLine, tone: "from-destructive to-destructive" },
+      { label: t("cashBalance"), money: cashByCurrency, icon: Banknote, tone: "from-primary to-primary-glow" },
+      { label: t("nonCashBalance"), money: nonCashByCurrency, icon: Banknote, tone: "from-info to-info" },
+          { label: t("todayIncome"), money: today.income, icon: ArrowDownToLine, tone: "from-success to-success" },
+          { label: t("todayExpenses"), money: today.expense, icon: ArrowUpFromLine, tone: "from-destructive to-destructive" },
         ].map((m) => (
           <Card key={m.label} className="p-4 shadow-card">
             <div className="flex items-start justify-between">
@@ -221,7 +249,11 @@ export default function Treasury() {
                 <m.icon className="size-4" />
               </div>
             </div>
-            <div className="mt-2 text-xl font-bold tabular-nums">{formatMoney(m.value, lang)}</div>
+            <div className="mt-2 space-y-0.5">
+              {moneyLines(m.money).map((line) => (
+                <div key={line.currency} className="text-xl font-bold tabular-nums leading-tight">{line.text}</div>
+              ))}
+            </div>
           </Card>
         ))}
       </div>
@@ -264,6 +296,7 @@ export default function Treasury() {
               {txs.map((x) => {
                 const isInc = x.transaction_type === "income";
                 const isTrf = x.transaction_type === "transfer";
+                const currency = currencyById.get(x.treasury_id) ?? defaultCurrency;
                 return (
                   <div key={x.id} className="flex items-center gap-3 p-3 text-sm">
                     <Badge variant="outline" className={isInc ? "status-completed" : isTrf ? "status-progress" : "status-departed"}>
@@ -275,9 +308,9 @@ export default function Treasury() {
                     </div>
                     <div className="text-end">
                       <div className={`font-semibold tabular-nums ${isInc ? "text-success" : "text-destructive"}`}>
-                        {isInc ? "+" : "-"} {formatMoney(x.amount, lang)}
+                        {isInc ? "+" : "-"} {formatMoney(x.amount, lang, currency)}
                       </div>
-                      <div className="text-[11px] text-muted-foreground tabular-nums">{t("balanceAfter")}: {formatMoney(x.balance_after, lang)}</div>
+                      <div className="text-[11px] text-muted-foreground tabular-nums">{t("balanceAfter")}: {formatMoney(x.balance_after, lang, currency)}</div>
                     </div>
                   </div>
                 );

@@ -66,7 +66,7 @@ export function ReferrerPicker({
       onChange={(v) => onChange(v || null)}
       options={options}
       placeholder={placeholder ?? "—"}
-      searchPlaceholder={searchPlaceholder ?? "Search patient..."}
+      searchPlaceholder={searchPlaceholder ?? (lang === "ar" ? "ابحث عن مريض..." : "Search patient...")}
     />
   );
 }

@@ -1,11 +1,54 @@
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Download, FileSpreadsheet, Printer } from "lucide-react";
+import { Download, FileSpreadsheet, Loader2, Printer } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { CanExport } from "@/components/CanExport";
+import { toast } from "sonner";
+
+export function ExportButtons({
+  onPdf, onExcel,
+}: {
+  onPdf?: () => void | Promise<unknown>; onExcel?: () => void | Promise<unknown>;
+}) {
+  const { t } = useI18n();
+  const [busy, setBusy] = useState<null | "pdf" | "excel">(null);
+
+  // A PDF export rasterises the whole table with html2canvas after loading an
+  // Arabic webfont, so it can run for seconds. The buttons used to stay live the
+  // whole time: a second click started a second export and downloaded the same
+  // report twice, and a failed export rejected with no message at all.
+  const run = async (kind: "pdf" | "excel", fn?: () => void | Promise<unknown>) => {
+    if (!fn || busy) return;
+    setBusy(kind);
+    try {
+      await fn();
+    } catch {
+      toast.error(t("backupExportFailed"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <>
+      {onPdf && (
+        <Button variant="outline" size="sm" disabled={Boolean(busy)} onClick={() => void run("pdf", onPdf)}>
+          {busy === "pdf" ? <Loader2 className="size-4 me-1 animate-spin" /> : <Download className="size-4 me-1" />}
+          {busy === "pdf" ? t("exporting") : "PDF"}
+        </Button>
+      )}
+      {onExcel && (
+        <Button variant="outline" size="sm" disabled={Boolean(busy)} onClick={() => void run("excel", onExcel)}>
+          {busy === "excel" ? <Loader2 className="size-4 me-1 animate-spin" /> : <FileSpreadsheet className="size-4 me-1" />}
+          {busy === "excel" ? t("exporting") : "Excel"}
+        </Button>
+      )}
+    </>
+  );
+}
 
 export function ReportFilterBar({
   start, end, setStart, setEnd, extra, onPdf, onExcel, module = "reports",
@@ -13,7 +56,7 @@ export function ReportFilterBar({
   start: string; end: string;
   setStart: (v: string) => void; setEnd: (v: string) => void;
   extra?: ReactNode;
-  onPdf?: () => void; onExcel?: () => void;
+  onPdf?: () => void | Promise<unknown>; onExcel?: () => void | Promise<unknown>;
   /** Permission module used to gate export/print buttons. */
   module?: string;
 }) {
@@ -32,8 +75,7 @@ export function ReportFilterBar({
         {extra}
         <div className="ms-auto flex gap-2">
           <CanExport module={module}>
-            {onPdf && <Button variant="outline" size="sm" onClick={onPdf}><Download className="size-4 me-1" />PDF</Button>}
-            {onExcel && <Button variant="outline" size="sm" onClick={onExcel}><FileSpreadsheet className="size-4 me-1" />Excel</Button>}
+            <ExportButtons onPdf={onPdf} onExcel={onExcel} />
             <Button variant="outline" size="sm" onClick={() => window.print()}><Printer className="size-4 me-1" />{t("print")}</Button>
           </CanExport>
         </div>

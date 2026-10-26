@@ -37,6 +37,7 @@ import { useAuthorization } from "@/lib/authz/useAuthorization";
 import {manageStaffAccount, staffAccountError, indexStaffAccountRows, type StaffAccountSnapshot} from '@/lib/staffAccountLifecycle';
 import {useOperationScope} from '@/hooks/useOperationScope';
 import {useAuth} from '@/contexts/AuthContext';
+import {notConfirmedCopy, rowsWritten} from '@/lib/writeOutcome';
 
 const ROLES = ["system_owner", "admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr"] as const;
 const ADMIN_PASSWORD_RESET_ENABLED = false;
@@ -376,8 +377,9 @@ export default function UserManagement() {
   };
 
   const revokeInvite = async (id: string) => {
-    const { error } = await (supabase as any).from("allowed_signup_emails").delete().eq("id", id);
+    const { data, error } = await (supabase as any).from("allowed_signup_emails").delete().eq("id", id).select("id");
     if (error) { toast.error(error.message); return; }
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); load(); return; }
     toast.success(lang === "ar" ? "تم إلغاء الدعوة" : "Invite revoked");
     load();
   };

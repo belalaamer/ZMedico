@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatDate } from "@/lib/format";
 import { patientDisplayName } from "@/lib/patientName";
 import { doctorDisplayName } from "@/lib/doctorName";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { logPhiAccess } from "@/lib/observability/phiAudit";
 
@@ -135,22 +136,27 @@ export default function PhysioCaseDetail() {
     } else if (status === "active") {
       patch.completed_at = null;
     }
-    const { error } = await supabase.from("physio_cases" as any).update(patch).eq("id", id!);
+    const { data, error } = await supabase.from("physio_cases" as any).update(patch).eq("id", id!).select("id");
     if (error) return toast.error(error.message);
-    toast.success("Updated"); loadAll();
+    // physio_cases_update_clinical only admits admin and same-branch doctors,
+    // while this dialog is gated on medical_records.edit — a wider set.
+    if (rowsWritten(data) === 0) return toast.error(notConfirmedCopy(lang, "save"));
+    toast.success(lang === "ar" ? "تم التحديث" : "Updated"); loadAll();
   };
 
   const saveFollowup = async (patch: any) => {
-    const { error } = await supabase.from("physio_cases" as any).update(patch).eq("id", id!);
+    const { data, error } = await supabase.from("physio_cases" as any).update(patch).eq("id", id!).select("id");
     if (error) return toast.error(error.message);
-    toast.success("Updated"); loadAll();
+    if (rowsWritten(data) === 0) return toast.error(notConfirmedCopy(lang, "save"));
+    toast.success(lang === "ar" ? "تم التحديث" : "Updated"); loadAll();
   };
 
   const softDeleteCase = async () => {
-    if (!confirm("Soft-delete this physiotherapy case?")) return;
-    const { error } = await supabase.from("physio_cases" as any).update({ deleted_at: new Date().toISOString() } as any).eq("id", id!);
+    if (!confirm(lang === "ar" ? "حذف هذه الحالة العلاجية (ناعم)؟" : "Soft-delete this physiotherapy case?")) return;
+    const { data, error } = await supabase.from("physio_cases" as any).update({ deleted_at: new Date().toISOString() } as any).eq("id", id!).select("id");
     if (error) return toast.error(error.message);
-    toast.success("Deleted");
+    if (rowsWritten(data) === 0) return toast.error(notConfirmedCopy(lang, "delete"));
+    toast.success(lang === "ar" ? "تم الحذف" : "Deleted");
     window.history.back();
   };
 

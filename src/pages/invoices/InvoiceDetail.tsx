@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { reportClientError } from "@/lib/observability/reportError";
 import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 
 type Inv = any;
 
@@ -184,8 +185,11 @@ export default function InvoiceDetail() {
     const patch: any = { claim_status: status };
     if (status === "submitted") patch.claim_submitted_at = new Date().toISOString();
     if (status === "approved" || status === "rejected" || status === "paid") patch.claim_resolved_at = new Date().toISOString();
-    const { error } = await supabase.from("invoices").update(patch).eq("id", inv.id);
+    const { data, error } = await supabase.from("invoices").update(patch).eq("id", inv.id).select("id");
     if (error) return toast.error(error.message);
+    // invoices_update_billing is admin/accountant + branch only, but this
+    // dropdown is rendered for every invoices.edit holder.
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); load(); return; }
     toast.success(t("save")); load();
   };
 

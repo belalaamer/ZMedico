@@ -6,6 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,6 +53,8 @@ export default function AppointmentSettings() {
     name_en: "", name_ar: "", resource_type: "room", capacity: 1, is_active: true, display_order: 0,
   });
   const [resourcesLoading, setResourcesLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<BookingResource | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!branchId) return;
@@ -131,10 +137,16 @@ export default function AppointmentSettings() {
 
   const deleteResource = async (resource: BookingResource) => {
     if (!resource.id) return;
-    const { error } = await resourceTable.from("booking_resources").delete().eq("id", resource.id).eq("branch_id", branchId);
-    if (error) { toast.error(error.message); return; }
-    toast.success(lang === "ar" ? "تم حذف المورد" : "Resource removed");
-    await loadResources();
+    setDeleting(true);
+    try {
+      const { error } = await resourceTable.from("booking_resources").delete().eq("id", resource.id).eq("branch_id", branchId);
+      if (error) { toast.error(error.message); return; }
+      toast.success(lang === "ar" ? "تم حذف المورد" : "Resource removed");
+      await loadResources();
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
+    }
   };
 
   const updateResource = (id: string, patch: Partial<BookingResource>) => {
@@ -183,7 +195,7 @@ export default function AppointmentSettings() {
                   <div><Label>{lang === "ar" ? "السعة" : "Capacity"}</Label><Input type="number" min={1} max={100} value={resource.capacity} onChange={(e) => updateResource(resource.id!, { capacity: +e.target.value })} /></div>
                   <div><Label>{lang === "ar" ? "نشطة" : "Active"}</Label><div className="flex h-10 items-center"><Switch checked={resource.is_active} onCheckedChange={(value) => updateResource(resource.id!, { is_active: value })} /></div></div>
                   <Button variant="outline" onClick={() => saveResource(resource)}>{t("save")}</Button>
-                  <Button variant="ghost" className="text-destructive" onClick={() => deleteResource(resource)}>{lang === "ar" ? "حذف" : "Remove"}</Button>
+                  <Button variant="ghost" className="text-destructive" onClick={() => setDeleteTarget(resource)}>{lang === "ar" ? "حذف" : "Remove"}</Button>
                   <div className="md:col-span-6">
                     <Label>{lang === "ar" ? "الخدمات المسموح بها (اختياري)" : "Allowed services (optional)"}</Label>
                     <div className="mt-2 flex flex-wrap gap-2">
@@ -249,6 +261,29 @@ export default function AppointmentSettings() {
             </div>
           </CardContent>
         </Card>
+
+        <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && !deleting && setDeleteTarget(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{lang === "ar" ? "حذف المورد؟" : "Delete this resource?"}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {lang === "ar"
+                  ? `سيُحذف «${deleteTarget?.name_ar || deleteTarget?.name_en || ""}» نهائياً مع خدماته المرتبطة. المواعيد التي سُجلت فيه تبقى لكنها تفقد تحديد الغرفة، ولا يمكن التراجع.`
+                  : `${deleteTarget?.name_en ?? ""} and its service mappings will be deleted permanently. Appointments already booked in it are kept but lose their room assignment. This cannot be undone.`}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>{t("cancel")}</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteTarget && deleteResource(deleteTarget)}
+                disabled={deleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleting ? (lang === "ar" ? "جارٍ الحذف..." : "Deleting...") : t("delete")}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </SettingsLayout>
   );

@@ -10,6 +10,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -442,7 +446,13 @@ function DiagnosesTab({ record, catalog, items, reload }: any) {
     reload();
   };
   const remove = async (rdId: string) => {
-    await supabase.from("record_diagnoses").delete().eq("id", rdId);
+    // The old call ignored `error`, so a denied or failed delete reloaded the row back
+    // into the list and read as "it came back on its own" rather than "it was not removed".
+    const { error } = await supabase.from("record_diagnoses").delete().eq("id", rdId);
+    if (error) {
+      toast.error(lang === "ar" ? "تعذر حذف التشخيص. ما زال موجوداً." : "The diagnosis could not be deleted. It is still listed.");
+      return;
+    }
     reload();
   };
 
@@ -644,7 +654,14 @@ function PrescriptionTab({ record, patient, catalog, rxList, rxItems, reload, us
     setSelected(null); setSearch(""); setForm({ dosage: "", frequency: "", duration: "", quantity: "1", instructions_en: "" });
     reload();
   };
-  const remove = async (id: string) => { await supabase.from("prescription_items").delete().eq("id", id); reload(); };
+  const remove = async (id: string) => {
+    const { error } = await supabase.from("prescription_items").delete().eq("id", id);
+    if (error) {
+      toast.error(lang === "ar" ? "تعذر حذف الدواء من الوصفة. ما زال موجوداً." : "The medication could not be removed from the prescription. It is still listed.");
+      return;
+    }
+    reload();
+  };
 
   const print = () => {
     if (!rx) return;
@@ -709,6 +726,8 @@ function DocumentsTab({ record, patient, docs, reload, userId }: any) {
   const [type, setType] = useState<string>("other");
   const [title, setTitle] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   const upload = async (file: File) => {
     const ALLOWED_MIME = new Set([
@@ -751,9 +770,24 @@ function DocumentsTab({ record, patient, docs, reload, userId }: any) {
     if (data?.signedUrl) window.open(data.signedUrl, "_blank");
   };
   const remove = async (d: any) => {
-    await supabase.storage.from("patient-docs").remove([d.file_url]);
-    await supabase.from("patient_documents").delete().eq("id", d.id);
-    reload();
+    setRemoving(true);
+    try {
+      // The row goes first now. Deleting the Storage object first meant a failed row
+      // delete left a card in the list whose file was already gone forever; with this
+      // order a failure leaves at worst an orphan file the list no longer points at.
+      const { error } = await supabase.from("patient_documents").delete().eq("id", d.id);
+      if (error) {
+        toast.error(lang === "ar" ? "تعذر حذف المستند. الملف والفهر باقيان كما هما." : "The document could not be deleted. The file and its entry are unchanged.");
+        return;
+      }
+      const { error: storageError } = await supabase.storage.from("patient-docs").remove([d.file_url]);
+      if (storageError) console.warn("document row deleted, storage object left behind", d.file_url, storageError.message);
+      toast.success(lang === "ar" ? "تم حذف المستند" : "Document deleted");
+      reload();
+    } finally {
+      setRemoving(false);
+      setDeleteTarget(null);
+    }
   };
 
   return (
@@ -795,11 +829,34 @@ function DocumentsTab({ record, patient, docs, reload, userId }: any) {
                 <div className="text-xs text-muted-foreground truncate">{t(("doc" + d.document_type.replace(/_/g, "").replace(/(^.)/, (c: string) => c.toUpperCase())) as any) ?? d.document_type}</div>
               </div>
               <Button variant="ghost" size="icon" onClick={() => openDoc(d.file_url)}><Upload className="size-4 rotate-180"/></Button>
-              <Button variant="ghost" size="icon" onClick={() => remove(d)}><Trash2 className="size-4 text-destructive"/></Button>
+              <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(d)}><Trash2 className="size-4 text-destructive"/></Button>
             </Card>
           ))}
         </div>
       )}
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && !removing && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{lang === "ar" ? "حذف المستند؟" : "Delete this document?"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {lang === "ar"
+                ? `سيُحذف «${deleteTarget?.title_ar || deleteTarget?.title_en || deleteTarget?.file_name}» وملفه نهائياً من سجل المريض. لا يمكن التراجع.`
+                : `${deleteTarget?.title_en || deleteTarget?.file_name} and its file will be removed from this patient's record permanently. This cannot be undone.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={removing}>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && remove(deleteTarget)}
+              disabled={removing}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {removing ? (lang === "ar" ? "جارٍ الحذف..." : "Deleting...") : t("delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

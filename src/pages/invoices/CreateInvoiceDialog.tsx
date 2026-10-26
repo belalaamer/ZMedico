@@ -315,7 +315,7 @@ export function CreateInvoiceDialog({
     const { data: patientInBranch } = await supabase.from("patients").select("id").eq("id", patientId).eq("branch_id", currentBranchId).maybeSingle();
     if (!patientInBranch) { toast.error(t("selectPatient")); submittingRef.current = false; return; }
     if (!patientId) { toast.error(t("selectPatient")); submittingRef.current = false; return; }
-    if (items.length === 0 || items.every((it) => !it.description_en)) { toast.error("Add at least one item"); submittingRef.current = false; return; }
+    if (items.length === 0 || items.every((it) => !it.description_en)) { toast.error(t("addAtLeastOneItem")); submittingRef.current = false; return; }
     setSaving(true);
     const invoicePayload: Record<string, unknown> = {
       patient_id: patientId,

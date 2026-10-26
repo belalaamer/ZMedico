@@ -230,7 +230,7 @@ export function RecordPaymentDialog({
                 onChange={(v) => { setPid(v); loadPatients(); }}
                 options={patients.map((p) => ({ value: p.id, label: p.label }))}
                 placeholder={t("selectPatient")}
-                searchPlaceholder="Search patient..."
+                searchPlaceholder={lang === "ar" ? "ابحث عن مريض..." : "Search patient..."}
               />
             </div>
           )}
@@ -242,7 +242,7 @@ export function RecordPaymentDialog({
                 onChange={onInvoiceChange}
                 options={invoices.map((i) => ({ value: i.id, label: i.label }))}
                 placeholder={invoices.length ? "—" : (t("noInvoices") ?? "—")}
-                searchPlaceholder="Search invoice..."
+                searchPlaceholder={lang === "ar" ? "ابحث عن فاتورة..." : "Search invoice..."}
               />
             </div>
           )}

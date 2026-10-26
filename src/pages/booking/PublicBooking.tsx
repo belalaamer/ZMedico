@@ -9,6 +9,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { getPublicBookingLocator } from "@/lib/publicBookingTenant";
+import { getGuestBookingClient } from "@/lib/publicBookingClient";
 import { toast } from "sonner";
 import { localizedTenantName } from "@/lib/tenantName";
 import { captureAdAttribution, getStoredAdAttribution } from "@/lib/adAttribution";
@@ -94,6 +95,16 @@ type RpcError = { message?: string } | null;
 
 function publicRpc<T>(name: string, args?: Record<string, unknown>) {
   const client = supabase as unknown as {
+    rpc: (fn: string, params?: Record<string, unknown>) => Promise<{ data: T | null; error: RpcError }>;
+  };
+  return client.rpc(name, args);
+}
+
+// The same envelope, sent without a session so PostgREST evaluates it as the
+// role the public booking RPC is actually granted to. Only for the guest
+// create; see getGuestBookingClient().
+function guestRpc<T>(name: string, args?: Record<string, unknown>) {
+  const client = getGuestBookingClient() as unknown as {
     rpc: (fn: string, params?: Record<string, unknown>) => Promise<{ data: T | null; error: RpcError }>;
   };
   return client.rpc(name, args);
@@ -195,6 +206,9 @@ export default function PublicBooking() {
   // Portal-aware booking: null while checking / not a portal session, an object
   // once a logged-in patient with an active portal account is confirmed.
   const [portalContext, setPortalContext] = useState<PortalBookingContext | null>(null);
+  // The same probe, as a promise, so the options loader can wait for it instead
+  // of racing it. See the tenant fallback in load().
+  const portalProbe = useRef<Promise<PortalBookingContext | null> | null>(null);
 
   const branch = useMemo(() => branches.find((item) => item.id === branchId) ?? null, [branches, branchId]);
   const service = useMemo(() => services.find((item) => item.id === serviceId) ?? null, [services, serviceId]);
@@ -205,12 +219,13 @@ export default function PublicBooking() {
   // to render the "book as yourself" UI shortcut instead of the anonymous form.
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    portalProbe.current = (async () => {
       const { data: userData } = await supabase.auth.getUser();
-      if (cancelled || !userData?.user) return;
+      if (cancelled || !userData?.user) return null;
       const { data, error } = await publicRpc<PortalBookingContext | null>("patient_portal_booking_context");
-      if (cancelled) return;
-      if (!error && data) setPortalContext(data);
+      if (cancelled || error || !data) return null;
+      setPortalContext(data);
+      return data;
     })();
     return () => { cancelled = true; };
   }, []);
@@ -241,9 +256,20 @@ export default function PublicBooking() {
           return;
         }
       } else {
-        setOptionsError(isArabic ? "رابط الحجز يحتاج إلى معرف العيادة" : "This booking link needs a clinic identifier");
-        setLoadingOptions(false);
-        return;
+        // No custom domain and no ?tenant=. A signed-in portal patient still has
+        // a tenant, and patient_portal_booking_context derives it from auth.uid()
+        // on the server -- which is what lets the portal's "Book new appointment"
+        // CTA (a plain /book link) reach their own clinic instead of dead-ending
+        // here. Nobody else has a tenant to inherit, so every other visitor still
+        // gets the original message.
+        const context = await (portalProbe.current ?? Promise.resolve(null));
+        if (cancelled) return;
+        if (!context?.tenant_id) {
+          setOptionsError(isArabic ? "رابط الحجز يحتاج إلى معرف العيادة" : "This booking link needs a clinic identifier");
+          setLoadingOptions(false);
+          return;
+        }
+        resolvedTenantId = context.tenant_id;
       }
       const { data, error } = await publicRpc<PublicBookingOptions>("public_booking_options_for_tenant", { p_tenant_id: resolvedTenantId });
       if (cancelled) return;
@@ -472,7 +498,9 @@ export default function PublicBooking() {
             landing_path: window.location.pathname,
           },
         })
-      : await publicRpc<BookingResult>("public_create_booking_for_tenant", {
+      // The guest branch is sent without a session: on Production this RPC is
+      // granted to anon only, so a JWT here would be refused, not trusted more.
+      : await guestRpc<BookingResult>("public_create_booking_for_tenant", {
           p_tenant_id: tenantId,
           p_branch_id: branchId,
           p_service_id: serviceId,

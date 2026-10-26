@@ -17,6 +17,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 
 type Company = { id: string; name_en: string; name_ar?: string | null };
 type Contract = any;
@@ -124,11 +125,14 @@ export default function InsuranceContracts() {
       is_active: !!form.is_active,
       notes: form.notes || null,
     };
-    const { error } = contractDialog.row
-      ? await (supabase as any).from("insurance_contracts").update(payload).eq("id", contractDialog.row.id)
+    const { data, error } = contractDialog.row
+      ? await (supabase as any).from("insurance_contracts").update(payload).eq("id", contractDialog.row.id).select("id")
       : await (supabase as any).from("insurance_contracts").insert(payload);
     if (companyScope.current !== companyId) return;
     if (error) { toast.error(error.message); return; }
+    // contracts_write_admin_manager is a FOR ALL policy: the insert is caught by
+    // WITH CHECK, but a filtered update returns 2xx with nothing written.
+    if (contractDialog.row && rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); return; }
     setContractDialog({ open: false, row: null });
     toast.success(T("Saved", "تم الحفظ"));
     await loadContracts(companyId);
@@ -137,9 +141,10 @@ export default function InsuranceContracts() {
   const removeContract = async (id: string) => {
     setDeleting(true);
     try {
-      const { error } = await (supabase as any).from("insurance_contracts").delete().eq("id", id);
+      const { data, error } = await (supabase as any).from("insurance_contracts").delete().eq("id", id).select("id");
       if (companyScope.current !== companyId) return;
       if (error) { toast.error(error.message); return; }
+      if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); await loadContracts(companyId); return; }
       if (selectedContract?.id === id) setSelectedContract(null);
       await loadContracts(companyId);
     } finally { setDeleting(false); setContractDeleteTarget(null); }
@@ -164,11 +169,12 @@ export default function InsuranceContracts() {
     if (payload.scope === "item_type" && !payload.item_type) {
       toast.error(T("Item type required", "نوع البند مطلوب")); return;
     }
-    const { error } = ruleDialog.row
-      ? await (supabase as any).from("insurance_contract_rules").update(payload).eq("id", ruleDialog.row.id)
+    const { data, error } = ruleDialog.row
+      ? await (supabase as any).from("insurance_contract_rules").update(payload).eq("id", ruleDialog.row.id).select("id")
       : await (supabase as any).from("insurance_contract_rules").insert(payload);
     if (contractScope.current !== selectedContract.id) return;
     if (error) { toast.error(error.message); return; }
+    if (ruleDialog.row && rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); return; }
     setRuleDialog({ open: false, row: null });
     toast.success(T("Saved", "تم الحفظ"));
     await loadRules(selectedContract.id);
@@ -177,9 +183,13 @@ export default function InsuranceContracts() {
   const removeRule = async (id: string) => {
     setDeleting(true);
     try {
-      const { error } = await (supabase as any).from("insurance_contract_rules").delete().eq("id", id);
+      const { data, error } = await (supabase as any).from("insurance_contract_rules").delete().eq("id", id).select("id");
       if (error) { toast.error(error.message); return; }
-      setRules((arr) => arr.filter((r) => r.id !== id));
+      if (rowsWritten(data) === 0) toast.error(notConfirmedCopy(lang, "delete"));
+      // Re-read from the server instead of filtering the local array: a delete RLS
+      // filtered away would otherwise leave the screen showing a rule that still
+      // decides coverage.
+      await loadRules(selectedContract?.id);
     } finally { setDeleting(false); setRuleDeleteTarget(null); }
   };
 

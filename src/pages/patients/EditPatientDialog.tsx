@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ReferrerPicker } from "./ReferrerPicker";
 import { doctorDisplayName } from "@/lib/doctorName";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 
 export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
   open: boolean; onOpenChange: (v: boolean) => void; patient: any; onSaved: () => void;
@@ -119,9 +120,12 @@ export function EditPatientDialog({ open, onOpenChange, patient, onSaved }: {
       whatsapp_opt_in_at: form.whatsapp_opt_in ? (patient.whatsapp_opt_in_at ?? new Date().toISOString()) : null,
       whatsapp_opt_in_source: form.whatsapp_opt_in ? (patient.whatsapp_opt_in_source ?? "clinic_staff") : null,
     };
-    const { error } = await supabase.from("patients").update(payload).eq("id", patient.id);
+    const { data, error } = await supabase.from("patients").update(payload).eq("id", patient.id).select("id");
     setSaving(false);
     if (error) { toast.error(error.message); return; }
+    // Both patients_* update policies end in user_has_branch_access(branch_id),
+    // so a patient that moved branch since this dialog opened writes zero rows.
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); onSaved(); return; }
     toast.success(t("save"));
     onSaved();
     onOpenChange(false);

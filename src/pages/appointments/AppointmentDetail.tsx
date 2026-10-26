@@ -15,14 +15,31 @@ import { toast } from "sonner";
 import { CreateInvoiceDialog } from "@/pages/invoices/CreateInvoiceDialog";
 import { Can } from "@/components/Can";
 import { doctorDisplayName } from "@/lib/doctorName";
+import { formatDateTime } from "@/lib/format";
+import type { DictKey } from "@/lib/i18n";
 import { appointmentWhatsAppMessage, openWhatsApp } from "@/lib/whatsapp";
 import { getOrCreateAppointmentMedicalRecord } from "@/lib/medicalRecordEncounter";
 
 import { QUEUE_AUDIT_ACTIONS as QUEUE_ACTIONS, QUEUE_AUDIT_SAFE_KEYS as SAFE_KEYS } from "@/lib/queueAuditActions";
 
-function fmt(iso: string | null | undefined) {
+// The badge used to print the raw DB enum with underscores swapped for spaces,
+// so an Arabic screen read "in progress". CalendarPage already maps these seven
+// statuses onto dictionary keys; this is the same mapping, so the two screens
+// cannot drift apart on an unknown status — anything unmapped still falls back
+// to the old text rather than rendering nothing.
+const STATUS_KEYS: Record<string, DictKey> = {
+  scheduled: "statusScheduled",
+  confirmed: "statusConfirmed",
+  in_progress: "statusInProgress",
+  completed: "statusCompleted",
+  cancelled: "statusCancelled",
+  no_show: "statusNoShow",
+  departed: "statusDeparted",
+};
+
+function fmt(iso: string | null | undefined, lang: "en" | "ar") {
   if (!iso) return "—";
-  try { return new Date(iso).toLocaleString(); } catch { return "—"; }
+  try { return formatDateTime(iso, lang); } catch { return "—"; }
 }
 function diff(o: any, n: any) {
   const so: any = {}; const sn: any = {};
@@ -167,7 +184,7 @@ export default function AppointmentDetailPage() {
           <Link to="/queue" className="text-muted-foreground hover:text-foreground"><ArrowLeft className="size-5" /></Link>
           <div>
             <h1 className="text-xl sm:text-2xl font-bold leading-tight">{t("appointmentDetailTitle")}</h1>
-            <p className="text-xs sm:text-sm text-muted-foreground">{patientName} · {fmt(appt.scheduled_at)}</p>
+            <p className="text-xs sm:text-sm text-muted-foreground">{patientName} · {fmt(appt.scheduled_at, lang)}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -182,7 +199,7 @@ export default function AppointmentDetailPage() {
               onClick={() => {
                 const ok = openWhatsApp(
                   appt.patients.phone,
-                  appointmentWhatsAppMessage({ patientName, appointmentDate: fmt(appt.scheduled_at), branchName, lang }),
+                  appointmentWhatsAppMessage({ patientName, appointmentDate: fmt(appt.scheduled_at, lang), branchName, lang }),
                 );
                 if (!ok) toast.error(lang === "ar" ? "رقم الهاتف غير صالح" : "Invalid phone number");
               }}
@@ -275,12 +292,12 @@ export default function AppointmentDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="p-4 space-y-3 lg:col-span-1">
           <div className="text-xs text-muted-foreground">{t("status")}</div>
-          <Badge variant="outline" className="capitalize">{String(appt.status).replace(/_/g, " ")}</Badge>
+          <Badge variant="outline" className="capitalize">{STATUS_KEYS[String(appt.status)] ? t(STATUS_KEYS[String(appt.status)]) : String(appt.status).replace(/_/g, " ")}</Badge>
           {appt.booking_request_status === "pending" && <Badge variant="secondary" className="ms-1">{lang === "ar" ? "طلب يحتاج تأكيدًا" : "Awaiting confirmation"}</Badge>}
           {appt.booking_request_status === "rejected" && <Badge variant="destructive" className="ms-1">{lang === "ar" ? "مرفوض" : "Rejected"}</Badge>}
           {appt.booking_request_status === "pending" ? (
             <div className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
-              <div className="text-xs text-muted-foreground">{appt.booking_request_expires_at ? (lang === "ar" ? `تنتهي المهلة: ${fmt(appt.booking_request_expires_at)}` : `Hold expires: ${fmt(appt.booking_request_expires_at)}`) : (lang === "ar" ? "في انتظار المراجعة" : "Awaiting review")}</div>
+              <div className="text-xs text-muted-foreground">{appt.booking_request_expires_at ? (lang === "ar" ? `تنتهي المهلة: ${fmt(appt.booking_request_expires_at, lang)}` : `Hold expires: ${fmt(appt.booking_request_expires_at, lang)}`) : (lang === "ar" ? "في انتظار المراجعة" : "Awaiting review")}</div>
               <Can permission="appointments.edit">
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" disabled={bookingActionBusy} onClick={confirmBookingRequest}><Check className="size-4 me-1" />{lang === "ar" ? "تأكيد الحجز" : "Confirm booking"}</Button>
@@ -301,9 +318,9 @@ export default function AppointmentDetailPage() {
           <div className="pt-2 space-y-1.5 text-sm">
             <div className="flex items-center gap-2"><UserIcon className="size-4 text-muted-foreground" /><span>{t("doctor")}: {appt.doctor_id ? (profiles[appt.doctor_id] ? doctorDisplayName(profiles[appt.doctor_id], lang) : appt.doctor_id.slice(0, 8)) : "—"}</span></div>
             <div className="flex items-center gap-2"><MapPin className="size-4 text-muted-foreground" /><span>{branchName}{appt.room ? ` · ${t("room")}: ${appt.room}` : ""}</span></div>
-            <div className="flex items-center gap-2"><Clock className="size-4 text-muted-foreground" /><span>{t("appointmentTime")}: {fmt(appt.scheduled_at)}</span></div>
-            <div className="flex items-center gap-2"><Clock className="size-4 text-muted-foreground" /><span>{t("checkedInAt")}: {fmt(appt.checked_in_at)}</span></div>
-            <div className="flex items-center gap-2"><Clock className="size-4 text-muted-foreground" /><span>{t("inSessionTime")}: {fmt(appt.started_at)}</span></div>
+            <div className="flex items-center gap-2"><Clock className="size-4 text-muted-foreground" /><span>{t("appointmentTime")}: {fmt(appt.scheduled_at, lang)}</span></div>
+            <div className="flex items-center gap-2"><Clock className="size-4 text-muted-foreground" /><span>{t("checkedInAt")}: {fmt(appt.checked_in_at, lang)}</span></div>
+            <div className="flex items-center gap-2"><Clock className="size-4 text-muted-foreground" /><span>{t("inSessionTime")}: {fmt(appt.started_at, lang)}</span></div>
           </div>
           {(appt.services || appt.procedure) && (
             <div className="pt-2 text-sm text-muted-foreground">
@@ -331,7 +348,7 @@ export default function AppointmentDetailPage() {
                   <div className="absolute -start-1.5 mt-1.5 size-3 rounded-full bg-primary/40 border border-primary/60" />
                   <div className="flex items-center gap-2 flex-wrap text-sm">
                     <Badge variant="outline" className="text-[10px] capitalize">{r.action.replace(/_/g, " ")}</Badge>
-                    <span className="text-xs text-muted-foreground">{fmt(r.created_at)}</span>
+                    <span className="text-xs text-muted-foreground">{fmt(r.created_at, lang)}</span>
                     <span className="text-xs text-muted-foreground">· {profiles[r.user_id]?.full_name ?? (r.user_id ? r.user_id.slice(0, 8) : "—")}</span>
                   </div>
                   <div className="text-xs text-muted-foreground mt-0.5">{diff(r.old_values, r.new_values) || "—"}</div>

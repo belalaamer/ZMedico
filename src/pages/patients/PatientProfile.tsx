@@ -230,7 +230,7 @@ export default function PatientProfile() {
       <PatientSummaryStrip patientId={patient.id} patient={patient} insurer={insurer} />
 
       <PatientQuickActions
-        onBook={() => navigate("/calendar")}
+        onBook={() => navigate(`/calendar?patient_id=${patient.id}`)}
         onCreateInvoice={() => setCreateOpen(true)}
         onRecordPayment={() => setPayOpen(true)}
         onTopupWallet={() => setTab("financial")}

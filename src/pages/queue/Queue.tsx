@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { patientDisplayName } from "@/lib/patientName";
 import { doctorDisplayName } from "@/lib/doctorName";
+import { formatDateTime } from "@/lib/format";
 import { buildStatusPatch, type ApptStatus } from "@/lib/appointmentStatus";
 import { updateQueueAppointment } from "@/lib/queueMutation";
 import { openQueueConsultation, queueConsultationErrorCode, queueConsultationErrorMessage } from "@/lib/queueConsultation";
@@ -1016,7 +1017,7 @@ export default function QueuePage() {
                 <Input id="self-checkin-link" value={selfCheckinUrl} readOnly onFocus={(e) => e.currentTarget.select()} dir="ltr" className="text-xs" />
               </div>
               {selfCheckinExpiresAt && (
-                <p className="text-xs text-muted-foreground">{t("linkExpires")}: {new Date(selfCheckinExpiresAt).toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">{t("linkExpires")}: {formatDateTime(selfCheckinExpiresAt, lang)}</p>
               )}
             </div>
           ) : null}
@@ -1150,15 +1151,15 @@ export default function QueuePage() {
           <div className="space-y-3 text-sm">
             <div className="flex items-center justify-between gap-3 rounded-md border p-2.5">
               <span className="text-muted-foreground">{t("longWaitThresholdMin")}</span>
-              <span className="font-medium tabular-nums">{settings.longWaitMinutes} min</span>
+              <span className="font-medium tabular-nums">{settings.longWaitMinutes} {t("minutesShort")}</span>
             </div>
             <div className="flex items-center justify-between gap-3 rounded-md border p-2.5">
               <span className="text-muted-foreground">{t("defaultMyQueueLabel")}</span>
-              <span className="font-medium">{settings.defaultMyQueue ? "On" : "Off"}</span>
+              <span className="font-medium">{settings.defaultMyQueue ? t("enabled") : t("disabled")}</span>
             </div>
             <div className="flex items-center justify-between gap-3 rounded-md border p-2.5">
               <span className="text-muted-foreground">{t("showNoShowsInDefaultLabel")}</span>
-              <span className="font-medium">{settings.showNoShowsInDefault ? "On" : "Off"}</span>
+              <span className="font-medium">{settings.showNoShowsInDefault ? t("enabled") : t("disabled")}</span>
             </div>
             <p className="text-xs text-muted-foreground">
               {lang === "ar"

@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -206,21 +207,35 @@ export default function Leads() {
       navigate(`/leads/${lead.id}`);
       return;
     }
-    const { error } = await supabase.from("leads").update(patch).eq("id", lead.id);
+    const { data, error } = await supabase.from("leads").update(patch).eq("id", lead.id).select("id");
     if (error) {
       toast.error(error.message);
+      await load();
       return;
     }
-    await supabase.from("lead_activities").insert({ lead_id: lead.id, branch_id: lead.branch_id, activity_type: "stage_changed", channel: "crm", body: `${lead.stage?.name_en ?? "Lead"} → ${nextStage.name_en}`, created_by: user?.id ?? null, metadata: { from_stage_id: lead.stage_id, to_stage_id: stageId } });
-    toast.success(isArabic ? "تم تحديث المرحلة" : "Stage updated");
+    if (rowsWritten(data) === 0) {
+      toast.error(notConfirmedCopy(lang, "save"));
+      await load();
+      return;
+    }
+    // An INSERT either writes or errors — RLS cannot turn it into zero rows —
+    // so the activity log only needs its error checked, not counted.
+    const { error: activityError } = await supabase.from("lead_activities").insert({ lead_id: lead.id, branch_id: lead.branch_id, activity_type: "stage_changed", channel: "crm", body: `${lead.stage?.name_en ?? "Lead"} → ${nextStage.name_en}`, created_by: user?.id ?? null, metadata: { from_stage_id: lead.stage_id, to_stage_id: stageId } });
+    if (activityError) toast.message(isArabic ? "تم تحديث المرحلة، لكن لم يُسجَّل النشاط." : "Stage updated, but the activity could not be logged.");
+    else toast.success(isArabic ? "تم تحديث المرحلة" : "Stage updated");
     await load();
   };
 
   const markFollowupDone = async (lead: Lead) => {
     if (!canEdit) return;
-    const { error } = await supabase.from("lead_followups").update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id ?? null }).eq("lead_id", lead.id).eq("status", "pending");
-    if (error) toast.error(error.message);
-    else { toast.success(isArabic ? "تم إنهاء المتابعة" : "Follow-up completed"); await load(); }
+    const { data, error } = await supabase.from("lead_followups").update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id ?? null }).eq("lead_id", lead.id).eq("status", "pending").select("id");
+    if (error) { toast.error(error.message); await load(); return; }
+    if (rowsWritten(data) === 0) {
+      toast.error(isArabic ? "لا توجد متابعة معلّقة لهذا العميل، لذا لم يتغيّر شيء." : "This lead has no pending follow-up left, so nothing changed.");
+      await load();
+      return;
+    }
+    toast.success(isArabic ? "تم إنهاء المتابعة" : "Follow-up completed"); await load();
   };
 
   const staffName = (id: string | null) => {

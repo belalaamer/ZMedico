@@ -13,6 +13,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { supabase } from "@/integrations/supabase/client";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { Fab } from "@/components/ui/fab";
 
@@ -96,16 +97,18 @@ export default function CouponsPage() {
   const remove = async (c: Coupon) => {
     if (!canDelete) { toast.error(lang === "ar" ? "غير مسموح" : "Not allowed"); return; }
     if (!branchSelectionReady || !currentBranchId || (c.branch_id && c.branch_id !== currentBranchId)) { toast.error(lang === "ar" ? "اختر الفرع الصحيح" : "Select the correct branch"); return; }
-    const { error } = await supabase.from("coupons").delete().eq("id", c.id).eq("branch_id", currentBranchId);
-    if (error) { toast.error(error.message); return; }
+    const { data, error } = await supabase.from("coupons").delete().eq("id", c.id).eq("branch_id", currentBranchId).select("id");
+    if (error) { toast.error(error.message); load(); return; }
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); load(); return; }
     toast.success(lang === "ar" ? "تم الحذف" : "Deleted");
     setDel(null); load();
   };
 
   const toggle = async (c: Coupon) => {
     if (!canEdit) { toast.error(lang === "ar" ? "غير مسموح" : "Not allowed"); return; }
-    const { error } = await supabase.from("coupons").update({ is_active: !c.is_active }).eq("id", c.id);
-    if (error) { toast.error(error.message); return; }
+    const { data, error } = await supabase.from("coupons").update({ is_active: !c.is_active }).eq("id", c.id).select("id");
+    if (error) { toast.error(error.message); load(); return; }
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); load(); return; }
     load();
   };
 

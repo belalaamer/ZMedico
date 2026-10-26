@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { useBranch } from "@/contexts/BranchContext";
 import { Can } from "@/components/Can";
@@ -50,10 +51,12 @@ export default function Categories() {
       parent_id: form.parent_id || null,
       description: form.description || null,
     };
-    const { error } = edit
-      ? await supabase.from("product_categories").update(payload).eq("id", edit.id).eq("tenant_id", tenantId)
+    const { data, error } = edit
+      ? await supabase.from("product_categories").update(payload).eq("id", edit.id).eq("tenant_id", tenantId).select("id")
       : await supabase.from("product_categories").insert(payload);
     if (error) { toast.error(error.message); return; }
+    // An insert asks for no rows back, so only the edit can be proved here.
+    if (edit && rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); load(); return; }
     toast.success(t("save"));
     setOpen(false); load();
   };

@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatDateTime } from "@/lib/format";
@@ -57,11 +58,15 @@ export default function ScheduledReports() {
   };
 
   const toggle = async (id: string, active: boolean) => {
-    await supabase.from("report_schedules").update({ is_active: active }).eq("id", id);
+    const { data, error } = await supabase.from("report_schedules").update({ is_active: active }).eq("id", id).select("id");
+    if (error) { toast.error(error.message); load(); return; }
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); load(); return; }
     load();
   };
   const remove = async (id: string) => {
-    await supabase.from("report_schedules").delete().eq("id", id);
+    const { data, error } = await supabase.from("report_schedules").delete().eq("id", id).select("id");
+    if (error) { toast.error(error.message); load(); return; }
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); load(); return; }
     load();
   };
 

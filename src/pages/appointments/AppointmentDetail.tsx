@@ -20,7 +20,7 @@ import type { DictKey } from "@/lib/i18n";
 import { appointmentWhatsAppMessage, openWhatsApp } from "@/lib/whatsapp";
 import { getOrCreateAppointmentMedicalRecord } from "@/lib/medicalRecordEncounter";
 
-import { QUEUE_AUDIT_ACTIONS as QUEUE_ACTIONS, QUEUE_AUDIT_SAFE_KEYS as SAFE_KEYS } from "@/lib/queueAuditActions";
+import { QUEUE_AUDIT_ACTIONS as QUEUE_ACTIONS, QUEUE_AUDIT_SAFE_KEYS as SAFE_KEYS, queueActionLabel } from "@/lib/queueAuditActions";
 
 // The badge used to print the raw DB enum with underscores swapped for spaces,
 // so an Arabic screen read "in progress". CalendarPage already maps these seven
@@ -347,7 +347,7 @@ export default function AppointmentDetailPage() {
                 <li key={r.id} className="ps-4">
                   <div className="absolute -start-1.5 mt-1.5 size-3 rounded-full bg-primary/40 border border-primary/60" />
                   <div className="flex items-center gap-2 flex-wrap text-sm">
-                    <Badge variant="outline" className="text-[10px] capitalize">{r.action.replace(/_/g, " ")}</Badge>
+                    <Badge variant="outline" className="text-[10px] capitalize">{queueActionLabel(r.action, lang)}</Badge>
                     <span className="text-xs text-muted-foreground">{fmt(r.created_at, lang)}</span>
                     <span className="text-xs text-muted-foreground">· {profiles[r.user_id]?.full_name ?? (r.user_id ? r.user_id.slice(0, 8) : "—")}</span>
                   </div>

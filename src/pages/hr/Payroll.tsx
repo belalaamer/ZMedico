@@ -21,6 +21,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { supabase } from "@/integrations/supabase/client";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
 
@@ -175,20 +176,25 @@ export default function Payroll() {
 
   const recalc = (p: any) => Number(p.base_salary) + Number(p.overtime_amount) + Number(p.bonuses) - Number(p.deductions) - Number(p.leave_deductions);
 
-  const updateNet = async (p: any, patch: any) => {
+  const updateNet = async (p: any, patch: any): Promise<boolean> => {
     const next = { ...p, ...patch };
     const net = recalc(next);
-    const { error } = await supabase.from("payroll").update({ ...patch, net_salary: net }).eq("id", p.id);
-    if (error) return toast.error(error.message);
+    const { data, error } = await supabase.from("payroll").update({ ...patch, net_salary: net }).eq("id", p.id).select("id");
+    if (error) { toast.error(error.message); return false; }
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); load(); return false; }
     load();
+    return true;
   };
 
   const setStatus = async (id: string, status: "draft" | "approved" | "paid") => {
     if (!canEdit) { toast.error(notPermittedMsg); return; }
     const patch: any = { status };
     if (status === "paid") { patch.paid_at = new Date().toISOString(); patch.paid_by = user?.id; }
-    const { error } = await supabase.from("payroll").update(patch).eq("id", id);
+    const { data, error } = await supabase.from("payroll").update(patch).eq("id", id).select("id");
     if (error) return toast.error(error.message);
+    // Marking a salary paid is the one write on this screen that moves money out
+    // of the ledger's reach, so a filtered answer has to be said out loud.
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); load(); return; }
     load();
   };
 
@@ -200,9 +206,13 @@ export default function Payroll() {
         : "This payroll is marked paid and cannot be deleted. Set it back to draft first so the payment stays auditable.");
       return;
     }
+    // zero-rows-ok — a drafted payroll that never had an adjustment deletes no
+    // child row, which is the wanted outcome. The parent delete below is the write
+    // that decides whether anything was removed, and it is the one that is proved.
     const { error: adjustmentError } = await supabase.from("salary_adjustments").delete().eq("payroll_id", p.id);
-    const { error } = await supabase.from("payroll").delete().eq("id", p.id);
+    const { data, error } = await supabase.from("payroll").delete().eq("id", p.id).select("id");
     if (error) { toast.error(error.message); return; }
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); load(); return; }
     // salary_adjustments cascades from payroll, so a failed child delete here
     // usually still leaves the row gone; say so instead of swallowing it.
     if (adjustmentError) {
@@ -252,7 +262,10 @@ export default function Payroll() {
       const patch: any = {};
       if (adj.type === "bonus" || adj.type === "allowance") patch.bonuses = Number(p.bonuses) + amount;
       else patch.deductions = Number(p.deductions) + amount;
-      await updateNet(p, patch);
+      // The adjustment row is already in. If the payroll row it belongs to did not
+      // move, the success toast below would be a lie, and leaving the dialog open
+      // would invite a second insert of the same amount.
+      if (!(await updateNet(p, patch))) { setOpenAdj(null); return; }
     }
     toast.success(t("save")); setOpenAdj(null); setAdj({ type: "bonus", amount: "", reason_en: "" });
   };

@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 
 type Spec = { id: string; name_en: string; name_ar: string; description: string | null; icon: string | null; is_active: boolean };
@@ -41,10 +42,11 @@ export default function Specialties() {
       icon: form.icon || null,
       is_active: form.is_active,
     };
-    const { error } = edit
-      ? await supabase.from("medical_specialties").update(payload).eq("id", edit.id)
+    const { data, error } = edit
+      ? await supabase.from("medical_specialties").update(payload).eq("id", edit.id).select("id")
       : await supabase.from("medical_specialties").insert(payload);
     if (error) return toast.error(error.message);
+    if (edit && rowsWritten(data) === 0) return toast.error(notConfirmedCopy(lang, "save"));
     toast.success(t("save")); setOpen(false); load();
   };
 

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/format";
 import { generatePrescriptionPdf } from "@/lib/prescriptionPdf";
@@ -65,8 +66,9 @@ export default function PrescriptionDetail() {
   };
 
   const markCompleted = async () => {
-    const { error } = await supabase.from("prescriptions").update({ status: "completed" }).eq("id", rx.id);
+    const { data, error } = await supabase.from("prescriptions").update({ status: "completed" }).eq("id", rx.id).select("id");
     if (error) return toast.error(error.message);
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); load(); return; }
     toast.success(t("save")); load();
   };
 

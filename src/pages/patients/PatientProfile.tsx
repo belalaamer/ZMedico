@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { formatMoney, formatDate, formatDateTime } from "@/lib/format";
 import { CreateInvoiceDialog } from "../invoices/CreateInvoiceDialog";
@@ -148,8 +149,9 @@ export default function PatientProfile() {
     .reduce((s, i) => s + (Number(i.total) - Number(i.paid_amount)), 0);
 
   const handleDelete = async () => {
-    const { error } = await supabase.from("patients").update({ deleted_at: new Date().toISOString() } as any).eq("id", patient.id);
+    const { data, error } = await supabase.from("patients").update({ deleted_at: new Date().toISOString() } as any).eq("id", patient.id).select("id");
     if (error) { toast.error(error.message); return; }
+    if (rowsWritten(data) === 0) return toast.error(notConfirmedCopy(lang, "delete"));
     toast.success(lang === "ar" ? "تم حذف المريض" : "Patient deleted");
     navigate("/patients");
   };

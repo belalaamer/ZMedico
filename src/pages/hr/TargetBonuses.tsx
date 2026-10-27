@@ -13,6 +13,7 @@ import { Plus, Trash2, Target, TrendingUp } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { Fab } from "@/components/ui/fab";
 
@@ -140,8 +141,9 @@ export default function TargetBonusesPage() {
   };
 
   const handleDelete = async (t: Target) => {
-    const { error } = await supabase.from("staff_targets").delete().eq("id", t.id);
+    const { data, error } = await supabase.from("staff_targets").delete().eq("id", t.id).select("id");
     if (error) { toast.error(error.message); return; }
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); setConfirmDel(null); load(); return; }
     toast.success(lang === "ar" ? "تم الحذف" : "Deleted");
     setConfirmDel(null);
     load();

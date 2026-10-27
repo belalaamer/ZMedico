@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { formatDate } from "@/lib/format";
 import { RowActions } from "@/components/RowActions";
 import { useNavigate } from "react-router-dom";
@@ -36,8 +37,9 @@ export default function Prescriptions() {
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId]);
 
   const softDelete = async (rx: any): Promise<void> => {
-    const { error } = await supabase.from("prescriptions").update({ deleted_at: new Date().toISOString() } as any).eq("id", rx.id);
+    const { data, error } = await supabase.from("prescriptions").update({ deleted_at: new Date().toISOString() } as any).eq("id", rx.id).select("id");
     if (error) { toast.error(error.message); return; }
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); return; }
     toast.success(t("delete")); load();
   };
 

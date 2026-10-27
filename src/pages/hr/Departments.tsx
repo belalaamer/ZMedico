@@ -15,6 +15,7 @@ import { RowActions } from "@/components/RowActions";
 import { Can } from "@/components/Can";
 import { useAuth } from "@/contexts/AuthContext";
 import { useConfirmedRowMutation } from "@/hooks/useConfirmedRowMutation";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 
 type Dept = any;
 
@@ -81,10 +82,13 @@ export default function Departments() {
     }
     setSaving(true);
     const payload: any = { name_en: name, name_ar: name, description: form.description || null, branch_id: effectiveBranchId, manager_id: form.manager_id || null };
-    const { error } = edit
-      ? await supabase.from("departments").update(payload).eq("id", edit.id)
+    const { data, error } = edit
+      ? await supabase.from("departments").update(payload).eq("id", edit.id).select("id")
       : await supabase.from("departments").insert(payload);
     if (error) { setSaving(false); return toast.error(error.message); }
+    // Only the edit can be proved: an insert is checked by the policy's WITH
+    // CHECK and raises, while an update RLS filtered away answers 2xx silently.
+    if (edit && rowsWritten(data) === 0) { setSaving(false); return toast.error(notConfirmedCopy(lang, "save")); }
     toast.success(t("save")); setOpen(false); setSaving(false); refresh();
   };
   const toggle = (d: Dept) => {
@@ -102,8 +106,9 @@ export default function Departments() {
 
   const softDelete = async (d: Dept) => {
     if ((counts[d.id] ?? 0) > 0) { toast.error(t("departmentHasStaff")); return; }
-    const { error } = await supabase.from("departments").update({ deleted_at: new Date().toISOString() } as any).eq("id", d.id);
+    const { data, error } = await supabase.from("departments").update({ deleted_at: new Date().toISOString() } as any).eq("id", d.id).select("id");
     if (error) { toast.error(error.message); return; }
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); refresh(); return; }
     toast.success(t("delete")); refresh();
   };
 

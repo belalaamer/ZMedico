@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { RowActions } from "@/components/RowActions";
 
@@ -37,8 +38,9 @@ export default function Medications() {
   const remove = async (m: any): Promise<void> => {
     const { count } = await supabase.from("prescription_items").select("id", { count: "exact", head: true }).eq("medication_id", m.id);
     if ((count ?? 0) > 0) { toast.error(lang === "ar" ? "لا يمكن الحذف: الدواء مستخدم في وصفات" : "Cannot delete: medication is used in prescriptions"); return; }
-    const { error } = await supabase.from("medications").update({ deleted_at: new Date().toISOString() } as any).eq("id", m.id);
+    const { data, error } = await supabase.from("medications").update({ deleted_at: new Date().toISOString() } as any).eq("id", m.id).select("id");
     if (error) { toast.error(error.message); return; }
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); return; }
     toast.success(t("delete")); load();
   };
 
@@ -71,10 +73,11 @@ export default function Medications() {
       instructions_en: ins || null, instructions_ar: ins || null,
       product_id: form.product_id || null, is_active: form.is_active,
     };
-    const { error } = edit
-      ? await supabase.from("medications").update(payload).eq("id", edit.id)
+    const { data, error } = edit
+      ? await supabase.from("medications").update(payload).eq("id", edit.id).select("id")
       : await supabase.from("medications").insert(payload);
     if (error) return toast.error(error.message);
+    if (edit && rowsWritten(data) === 0) return toast.error(notConfirmedCopy(lang, "save"));
     toast.success(t("save")); setOpen(false); load();
   };
 

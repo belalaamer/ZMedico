@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ListSkeleton } from "@/components/ListSkeleton";
 import { ArrowLeft, Download, ScrollText, ExternalLink, BookmarkPlus, Bookmark, X } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
@@ -15,6 +16,7 @@ import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { patientDisplayName } from "@/lib/patientName";
+import { localDateOnly } from "@/lib/localDate";
 
 import { QUEUE_AUDIT_ACTIONS as QUEUE_ACTIONS, QUEUE_AUDIT_SAFE_KEYS as SAFE_KEYS, queueActionLabel } from "@/lib/queueAuditActions";
 type QAction = typeof QUEUE_ACTIONS[number];
@@ -59,8 +61,10 @@ type LogRow = {
 
 function isoDay(d: string) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x.toISOString(); }
 function isoEndDay(d: string) { const x = new Date(d); x.setHours(23, 59, 59, 999); return x.toISOString(); }
-function defaultFrom() { const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10); }
-function todayStr() { return new Date().toISOString().slice(0, 10); }
+// The desk's own calendar, not UTC's: between midnight and 03:00 in Cairo the
+// UTC day is still yesterday, and the two filters arrive a day short.
+function defaultFrom() { const d = new Date(); d.setDate(d.getDate() - 7); return localDateOnly(d); }
+function todayStr() { return localDateOnly(); }
 
 function pickSafe(o: Record<string, any> | null | undefined) {
   if (!o) return null;
@@ -102,6 +106,8 @@ export default function QueueAuditPage() {
   const [patients, setPatients] = useState<Record<string, { name: string; code: number }>>({});
   const [exportingAll, setExportingAll] = useState(false);
   const [presets, setPresets] = useState<AuditPreset[]>(() => loadCachedPresets(currentBranchId));
+  const [presetSaveOpen, setPresetSaveOpen] = useState(false);
+  const [presetName, setPresetName] = useState("");
 
   // Hydrate presets from the server when branch changes. Falls back to the
   // local cache so the UI is never empty while the request is in flight.
@@ -134,9 +140,14 @@ export default function QueueAuditPage() {
     setRefFilter(p.ref);
     setScopeBranch(p.scopeBranch);
   };
-  const savePresetPrompt = async () => {
-    const name = window.prompt(lang === "ar" ? "اسم الإعداد المسبق" : "Preset name");
-    if (!name || !name.trim()) return;
+  const openPresetSave = () => {
+    setPresetName("");
+    setPresetSaveOpen(true);
+  };
+  const savePreset = async () => {
+    const name = presetName;
+    if (!name.trim()) return;
+    setPresetSaveOpen(false);
     if (!currentBranchId || !user) {
       // No branch / not signed in → local-only fallback so UI keeps working.
       const next: AuditPreset[] = [
@@ -404,12 +415,12 @@ export default function QueueAuditPage() {
       <Card className="p-3">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 items-end">
           <div>
-            <Label className="text-xs text-muted-foreground">{t("from")}</Label>
-            <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="h-9" />
+            <Label htmlFor="audit-from" className="text-xs text-muted-foreground">{t("from")}</Label>
+            <Input id="audit-from" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="h-9" />
           </div>
           <div>
-            <Label className="text-xs text-muted-foreground">{t("to")}</Label>
-            <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="h-9" />
+            <Label htmlFor="audit-to" className="text-xs text-muted-foreground">{t("to")}</Label>
+            <Input id="audit-to" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="h-9" />
           </div>
           <div>
             <Label className="text-xs text-muted-foreground">{t("action")}</Label>
@@ -432,8 +443,8 @@ export default function QueueAuditPage() {
             </Select>
           </div>
           <div className="lg:col-span-2">
-            <Label className="text-xs text-muted-foreground">{t("referenceFilter")}</Label>
-            <Input value={refFilter} onChange={(e) => setRefFilter(e.target.value)} placeholder={t("referenceFilterPh")} className="h-9" />
+            <Label htmlFor="audit-ref" className="text-xs text-muted-foreground">{t("referenceFilter")}</Label>
+            <Input id="audit-ref" value={refFilter} onChange={(e) => setRefFilter(e.target.value)} placeholder={t("referenceFilterPh")} className="h-9" />
           </div>
         </div>
         <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
@@ -453,7 +464,7 @@ export default function QueueAuditPage() {
                 </button>
               </span>
             ))}
-            <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={savePresetPrompt}>
+            <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={openPresetSave}>
               <BookmarkPlus className="size-3.5 me-1" />{lang === "ar" ? "حفظ" : "Save current"}
             </Button>
           </div>
@@ -513,6 +524,35 @@ export default function QueueAuditPage() {
           </Button>
         </div>
       )}
+
+      <Dialog open={presetSaveOpen} onOpenChange={setPresetSaveOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{lang === "ar" ? "حفظ الإعدادات المسبقة" : "Save preset"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="audit-preset-name">{lang === "ar" ? "اسم الإعداد المسبق" : "Preset name"}</Label>
+            <Input
+              id="audit-preset-name"
+              value={presetName}
+              autoFocus
+              maxLength={80}
+              onChange={(e) => setPresetName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && presetName.trim()) void savePreset(); }}
+              placeholder={lang === "ar" ? "مثال: حذف المواعيد اليوم" : "e.g. Today's cancelled appointments"}
+            />
+            <p className="text-xs text-muted-foreground">
+              {lang === "ar"
+                ? "يحفظ هذا الفلاتر الحالية: الإجراء والمستخدم والمرجع و«الاقتصار على الفرع الحالي»."
+                : "Saves the filters as they are now: action, user, reference and “scope to current branch”."}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setPresetSaveOpen(false)}>{t("cancel")}</Button>
+            <Button type="button" onClick={() => void savePreset()} disabled={!presetName.trim()}>{t("save")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -4,9 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { NumberInput } from "@/components/ui/number-input";
 import { Combobox } from "@/components/ui/combobox";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 
 type Row = {
   id?: string;
@@ -27,6 +32,8 @@ export function ConsumablesEditor({
   const [products, setProducts] = useState<{ id: string; name_en: string; name_ar: string; unit: string }[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ index: number; row: Row } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     supabase
@@ -68,11 +75,20 @@ export function ConsumablesEditor({
 
   const removeRow = async (i: number) => {
     const row = rows[i];
-    if (row.id) {
-      const { error } = await supabase.from("service_consumables").delete().eq("id", row.id);
-      if (error) { toast.error(error.message); return; }
+    setDeleting(true);
+    try {
+      if (row.id) {
+        // sc_admin_delete is admin-only; a filtered delete answers 2xx, and
+        // dropping the row locally would hide a consumable that still counts.
+        const { data, error } = await supabase.from("service_consumables").delete().eq("id", row.id).select("id");
+        if (error) { toast.error(error.message); return; }
+        if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); return; }
+      }
+      setRows((r) => r.filter((_, idx) => idx !== i));
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
     }
-    setRows((r) => r.filter((_, idx) => idx !== i));
   };
 
   const saveAll = async () => {
@@ -95,12 +111,20 @@ export function ConsumablesEditor({
       const { error } = await supabase.from("service_consumables").insert(toInsert as any);
       if (error) { toast.error(error.message); return; }
     }
+    let unwritten = 0;
     for (const r of toUpdate) {
-      const { error } = await supabase.from("service_consumables")
-        .update({ product_id: r.product_id, quantity: r.quantity }).eq("id", r.id!);
+      const { data, error } = await supabase.from("service_consumables")
+        .update({ product_id: r.product_id, quantity: r.quantity }).eq("id", r.id!).select("id");
       if (error) { toast.error(error.message); return; }
+      if (rowsWritten(data) === 0) unwritten += 1;
     }
-    toast.success(t("saved"));
+    if (unwritten) {
+      toast.error(lang === "ar"
+        ? `لم يتم حفظ ${unwritten} من صفوف المستهلكات.`
+        : `${unwritten} consumable row(s) were not saved.`);
+    } else {
+      toast.success(t("saved"));
+    }
     // Reload to clear dirty flags + capture new ids
     const { data } = await supabase.from("service_consumables")
       .select("id,product_id,quantity").eq(col, parentId);
@@ -111,6 +135,11 @@ export function ConsumablesEditor({
     value: p.id,
     label: `${lang === "ar" ? (p.name_ar || p.name_en) : p.name_en} · ${p.unit}`,
   }));
+
+  const pendingProduct = deleteTarget ? products.find((p) => p.id === deleteTarget.row.product_id) : undefined;
+  const pendingName = pendingProduct
+    ? (lang === "ar" ? (pendingProduct.name_ar || pendingProduct.name_en) : pendingProduct.name_en)
+    : "";
 
   return (
     <div className="space-y-2 rounded-lg border border-border p-3">
@@ -143,7 +172,7 @@ export function ConsumablesEditor({
                 />
               </div>
               <NumberInput className="w-24" value={r.quantity} onChange={(v) => updateRow(i, { quantity: v })} />
-              <Button type="button" variant="ghost" size="icon" onClick={() => removeRow(i)}>
+              <Button type="button" variant="ghost" size="icon" onClick={() => (r.id ? setDeleteTarget({ index: i, row: r }) : removeRow(i))}>
                 <Trash2 className="size-4" />
               </Button>
             </div>
@@ -155,6 +184,29 @@ export function ConsumablesEditor({
           ? "يتم خصم هذه المستهلكات تلقائياً من المخزون عند سداد الفاتورة بالكامل."
           : "These items are auto-deducted from stock when the invoice is fully paid."}
       </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && !deleting && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{lang === "ar" ? "حذف مستهلك محفوظ؟" : "Delete this saved consumable?"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {lang === "ar"
+                ? `«${pendingName}» بكمية ${deleteTarget?.row.quantity ?? ""} محفوظ بالفعل في قاعدة البيانات، وليس مجرد سطر في النموذج. حذفه يُنفَّذ فوراً ولا ينتظر زر «حفظ»، والسطر لا يمكن استرجاعه.`
+                : `${pendingName} (quantity ${deleteTarget?.row.quantity ?? ""}) is already stored in the database, not just a line in this form. Deleting it runs immediately — it does not wait for the Save button — and the line cannot be recovered.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && removeRow(deleteTarget.index)}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? (lang === "ar" ? "جارٍ الحذف..." : "Deleting...") : t("delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

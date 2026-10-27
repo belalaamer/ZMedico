@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { MapPin, CheckCircle2, AlertTriangle, UserCheck, UserX, Clock, CalendarRange, LogIn, LogOut } from "lucide-react";
 import GpsCheckDialog from "@/components/attendance/GpsCheckDialog";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 
 export default function Attendance() {
   // UX fix: `lang` is now pulled from useI18n() alongside `t` so the
@@ -78,8 +79,9 @@ export default function Attendance() {
       check_in_reason: payload.reason ?? null,
     };
     if (existing) {
-      const { error } = await supabase.from("attendance").update({ check_in_time: time, check_in_method: "gps", status: "present", ...baseLoc } as any).eq("id", existing.id);
+      const { data, error } = await supabase.from("attendance").update({ check_in_time: time, check_in_method: "gps", status: "present", ...baseLoc } as any).eq("id", existing.id).select("id");
       if (error) return toast.error(error.message);
+      if (rowsWritten(data) === 0) return toast.error(notConfirmedCopy(lang, "save"));
     } else {
       const { error } = await supabase.from("attendance").insert({ staff_id: sid, branch_id: currentBranchId, date, check_in_time: time, check_in_method: "gps", status: "present", created_by: user?.id, ...baseLoc } as any);
       if (error) return toast.error(error.message);
@@ -95,21 +97,23 @@ export default function Attendance() {
     // every other toast in this file (t("outsideAllowedZone"), t("checkIn"),
     // t("checkOut")).
     if (!existing) { toast.error(lang === "ar" ? "يجب تسجيل الحضور أولاً" : "Check in first"); return; }
-    const { error } = await supabase.from("attendance").update({
+    const { data, error } = await supabase.from("attendance").update({
       check_out_time: time, check_out_method: "gps",
       check_out_latitude: payload.coords.lat,
       check_out_longitude: payload.coords.lon,
       check_out_accuracy: payload.coords.accuracy ?? null,
-    } as any).eq("id", existing.id);
+    } as any).eq("id", existing.id).select("id");
     if (error) return toast.error(error.message);
+    if (rowsWritten(data) === 0) return toast.error(notConfirmedCopy(lang, "save"));
     toast.success(t("checkOut"));
     load();
   };
   const setStatus = async (sid: string, status: any) => {
     const existing = recOf(sid);
     if (existing) {
-      const { error } = await supabase.from("attendance").update({ status }).eq("id", existing.id);
+      const { data, error } = await supabase.from("attendance").update({ status }).eq("id", existing.id).select("id");
       if (error) { toast.error(error.message); return; }
+      if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); return; }
     } else {
       const { error } = await supabase.from("attendance").insert({ staff_id: sid, branch_id: currentBranchId, date, status, created_by: user?.id } as any);
       if (error) { toast.error(error.message); return; }

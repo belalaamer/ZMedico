@@ -21,6 +21,7 @@ import { fetchActiveContract, resolveAllLines, distributeClaim, type LineCoverag
 import { Badge } from "@/components/ui/badge";
 import { patientDisplayName } from "@/lib/patientName";
 import { doctorDisplayName } from "@/lib/doctorName";
+import { rowsWritten } from "@/lib/writeOutcome";
 
 type Item = {
   item_type: "service" | "product" | "procedure";
@@ -354,16 +355,20 @@ export function CreateInvoiceDialog({
 
       if (couponRedemptionError) {
         const taxWithoutCoupon = +((subtotal - discount) * (Number(taxPct) || 0) / 100).toFixed(2);
-        const { error: rollbackCouponError } = await supabase
+        const { data: rolledBack, error: rollbackCouponError } = await supabase
           .from("invoices")
           .update({
             discount,
             tax: taxWithoutCoupon,
           } as any)
           .eq("id", inv.id)
-          .eq("branch_id", currentBranchId);
+          .eq("branch_id", currentBranchId)
+          .select("id");
 
-        if (rollbackCouponError) {
+        // Zero rows means the discount is still on the invoice with no redemption
+        // behind it, which is the same money problem as a rejected rollback — so
+        // it takes the same branch instead of the "kept without the discount" one.
+        if (rollbackCouponError || rowsWritten(rolledBack) === 0) {
           setSaving(false);
           submittingRef.current = false;
           toast.error(

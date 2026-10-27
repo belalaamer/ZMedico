@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { formatDate, formatMoney } from "@/lib/format";
 import { generatePrescriptionPdf } from "@/lib/prescriptionPdf";
 import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { logPhiAccess } from "@/lib/observability/phiAudit";
 
 type Record = any;
@@ -119,8 +120,16 @@ export default function MedicalRecordEditor() {
   const updateRecord = async (patch: any) => {
     setSaving(true);
     try {
-      const { error } = await supabase.from("medical_records").update(patch).eq("id", record.id);
+      const { data, error } = await supabase.from("medical_records").update(patch).eq("id", record.id).select("id");
       if (error) throw error;
+      // A completed record leaves its author's reach once the grace window
+      // closes, and RLS answers that with 2xx and no rows. Without the read-back
+      // the editor would merge the patch into local state and say "Saved" over a
+      // record that still holds the old values.
+      if (rowsWritten(data) === 0) {
+        toast.error(notConfirmedCopy(lang, "save"));
+        return;
+      }
       toast.success(t("save"));
       setRecord({ ...record, ...patch });
     } catch (e: any) {
@@ -429,6 +438,8 @@ function DiagnosesTab({ record, catalog, items, reload }: any) {
   const [search, setSearch] = useState("");
   const [primary, setPrimary] = useState(false);
   const [notes, setNotes] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const filtered = useMemo(() => {
     const s = search.toLowerCase();
     if (!s) return [];
@@ -446,14 +457,21 @@ function DiagnosesTab({ record, catalog, items, reload }: any) {
     reload();
   };
   const remove = async (rdId: string) => {
-    // The old call ignored `error`, so a denied or failed delete reloaded the row back
-    // into the list and read as "it came back on its own" rather than "it was not removed".
-    const { error } = await supabase.from("record_diagnoses").delete().eq("id", rdId);
-    if (error) {
-      toast.error(lang === "ar" ? "تعذر حذف التشخيص. ما زال موجوداً." : "The diagnosis could not be deleted. It is still listed.");
-      return;
+    setDeleting(true);
+    try {
+      // The old call ignored `error`, so a denied or failed delete reloaded the row back
+      // into the list and read as "it came back on its own" rather than "it was not removed".
+      const { data, error } = await supabase.from("record_diagnoses").delete().eq("id", rdId).select("id");
+      if (error) {
+        toast.error(lang === "ar" ? "تعذر حذف التشخيص. ما زال موجوداً." : "The diagnosis could not be deleted. It is still listed.");
+        return;
+      }
+      reload();
+      if (rowsWritten(data) === 0) toast.error(notConfirmedCopy(lang, "delete"));
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
     }
-    reload();
   };
 
   return (
@@ -493,12 +511,35 @@ function DiagnosesTab({ record, catalog, items, reload }: any) {
                   <div className="text-sm font-medium truncate">{lang === "ar" ? rd.diagnoses?.name_ar : rd.diagnoses?.name_en}</div>
                   {rd.notes_en && <div className="text-xs text-muted-foreground truncate">{rd.notes_en}</div>}
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => remove(rd.id)}><Trash2 className="size-4 text-destructive"/></Button>
+                <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(rd)}><Trash2 className="size-4 text-destructive"/></Button>
               </div>
             ))}
           </div>
         )}
       </Card>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && !deleting && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{lang === "ar" ? "حذف التشخيص من السجل؟" : "Remove this diagnosis from the record?"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {lang === "ar"
+                ? `سيُحذف تشخيص «${deleteTarget?.diagnoses?.name_ar || deleteTarget?.diagnoses?.name_en || deleteTarget?.diagnoses?.code}» من هذا السجل نهائياً. التشخيص نفسه يبقى في قائمة التشخيصات، لكن سطره في السجل لا يمكن استرجاعه.`
+                : `${deleteTarget?.diagnoses?.name_en || deleteTarget?.diagnoses?.code} will be removed from this record permanently. The diagnosis stays in the catalog, but this record line cannot be recovered.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && remove(deleteTarget.id)}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? (lang === "ar" ? "جارٍ الحذف..." : "Deleting...") : t("delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -511,6 +552,8 @@ function ProceduresTab({ record, specialty, catalog, items, reload, userId }: an
   const [tooth, setTooth] = useState("");
   const [qty, setQty] = useState("1");
   const [notes, setNotes] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const isDental = (specialty?.name_en ?? "").toLowerCase().includes("dent");
 
   const filtered = useMemo(() => {
@@ -533,9 +576,11 @@ function ProceduresTab({ record, specialty, catalog, items, reload, userId }: an
     reload();
   };
   const remove = async (id: string) => {
+    setDeleting(true);
     try {
-      const { error } = await supabase.from("record_procedures").delete().eq("id", id);
+      const { data, error } = await supabase.from("record_procedures").delete().eq("id", id).select("id");
       if (error) throw error;
+      if (rowsWritten(data) === 0) toast.error(notConfirmedCopy(lang, "delete"));
       reload();
     } catch (e: any) {
       const msg = String(e?.message ?? "");
@@ -559,6 +604,9 @@ function ProceduresTab({ record, specialty, catalog, items, reload, userId }: an
       } else {
         toast.error(msg || (lang === "ar" ? "تعذر الحذف" : "Delete failed"));
       }
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -606,12 +654,35 @@ function ProceduresTab({ record, specialty, catalog, items, reload, userId }: an
                     {rp.procedures?.default_price != null && <span className="tabular-nums">{formatMoney(rp.procedures.default_price * rp.quantity, lang)}</span>}
                   </div>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => remove(rp.id)}><Trash2 className="size-4 text-destructive"/></Button>
+                <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(rp)}><Trash2 className="size-4 text-destructive"/></Button>
               </div>
             ))}
           </div>
         )}
       </Card>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && !deleting && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{lang === "ar" ? "حذف الإجراء من السجل؟" : "Remove this procedure from the record?"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {lang === "ar"
+                ? `سيُحذف إجراء «${deleteTarget?.procedures?.name_ar || deleteTarget?.procedures?.name_en}» (${deleteTarget?.quantity ?? 1}${deleteTarget?.tooth_number ? ` · ${t("toothNumber")} ${deleteTarget.tooth_number}` : ""}) من هذا السجل نهائياً، ويسقط من الفاتورة التي لم تُدفع بعد. إجراء مقبول الدفع لا يُحذف؛ لا يمكن التراجع.`
+                : `${deleteTarget?.procedures?.name_en} (x${deleteTarget?.quantity ?? 1}${deleteTarget?.tooth_number ? `, ${t("toothNumber")} ${deleteTarget.tooth_number}` : ""}) will be removed from this record permanently and drops out of any invoice not yet paid. A procedure already on a paid invoice is refused. This cannot be undone.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && remove(deleteTarget.id)}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? (lang === "ar" ? "جارٍ الحذف..." : "Deleting...") : t("delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -622,6 +693,8 @@ function PrescriptionTab({ record, patient, catalog, rxList, rxItems, reload, us
   const [selected, setSelected] = useState<any | null>(null);
   const [search, setSearch] = useState("");
   const [form, setForm] = useState({ dosage: "", frequency: "", duration: "", quantity: "1", instructions_en: "" });
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const rx = rxList[0]; // active prescription for this record
   const filtered = useMemo(() => {
@@ -655,12 +728,19 @@ function PrescriptionTab({ record, patient, catalog, rxList, rxItems, reload, us
     reload();
   };
   const remove = async (id: string) => {
-    const { error } = await supabase.from("prescription_items").delete().eq("id", id);
-    if (error) {
-      toast.error(lang === "ar" ? "تعذر حذف الدواء من الوصفة. ما زال موجوداً." : "The medication could not be removed from the prescription. It is still listed.");
-      return;
+    setDeleting(true);
+    try {
+      const { data, error } = await supabase.from("prescription_items").delete().eq("id", id).select("id");
+      if (error) {
+        toast.error(lang === "ar" ? "تعذر حذف الدواء من الوصفة. ما زال موجوداً." : "The medication could not be removed from the prescription. It is still listed.");
+        return;
+      }
+      reload();
+      if (rowsWritten(data) === 0) toast.error(notConfirmedCopy(lang, "delete"));
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
     }
-    reload();
   };
 
   const print = () => {
@@ -710,12 +790,35 @@ function PrescriptionTab({ record, patient, catalog, rxList, rxItems, reload, us
                   <div className="text-xs text-muted-foreground">{[it.dosage, it.frequency, it.duration].filter(Boolean).join(" · ")} · x{it.quantity}</div>
                   {it.instructions_en && <div className="text-xs text-muted-foreground italic mt-0.5">{it.instructions_en}</div>}
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => remove(it.id)}><Trash2 className="size-4 text-destructive"/></Button>
+                <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(it)}><Trash2 className="size-4 text-destructive"/></Button>
               </div>
             ))}
           </div>
         )}
       </Card>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && !deleting && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{lang === "ar" ? "حذف الدواء من الوصفة؟" : "Remove this medication from the prescription?"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {lang === "ar"
+                ? `سيُحذف «${deleteTarget?.medications?.name_ar || deleteTarget?.medications?.name_en}» بسطر ${[deleteTarget?.dosage, deleteTarget?.frequency, deleteTarget?.duration].filter(Boolean).join(" · ") || "بدون تفاصيل"} من هذه الوصفة نهائياً. الدواء نفسه يبقى في قائمة الأدوية، لكن سطره لا يمكن استرجاعه.`
+                : `${deleteTarget?.medications?.name_en || deleteTarget?.medications?.name_ar}${[deleteTarget?.dosage, deleteTarget?.frequency, deleteTarget?.duration].filter(Boolean).length ? ` (${[deleteTarget?.dosage, deleteTarget?.frequency, deleteTarget?.duration].filter(Boolean).join(" · ")})` : ""} will be removed from this prescription permanently. The medication stays in the catalog, but this line cannot be recovered.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && remove(deleteTarget.id)}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? (lang === "ar" ? "جارٍ الحذف..." : "Deleting...") : t("delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -775,9 +878,16 @@ function DocumentsTab({ record, patient, docs, reload, userId }: any) {
       // The row goes first now. Deleting the Storage object first meant a failed row
       // delete left a card in the list whose file was already gone forever; with this
       // order a failure leaves at worst an orphan file the list no longer points at.
-      const { error } = await supabase.from("patient_documents").delete().eq("id", d.id);
+      // `rowsWritten` is what makes that ordering real: RLS can filter the delete away
+      // with no error at all, and then the file must stay exactly where it is.
+      const { data, error } = await supabase.from("patient_documents").delete().eq("id", d.id).select("id");
       if (error) {
         toast.error(lang === "ar" ? "تعذر حذف المستند. الملف والفهر باقيان كما هما." : "The document could not be deleted. The file and its entry are unchanged.");
+        return;
+      }
+      if (rowsWritten(data) === 0) {
+        toast.error(notConfirmedCopy(lang, "delete"));
+        reload();
         return;
       }
       const { error: storageError } = await supabase.storage.from("patient-docs").remove([d.file_url]);

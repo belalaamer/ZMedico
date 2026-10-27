@@ -7,6 +7,10 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { useI18n } from "@/contexts/I18nContext";
@@ -22,6 +26,8 @@ export default function ScheduledReports() {
   const [list, setList] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [form, setForm] = useState({ name: "", template_id: "", frequency: "weekly", recipients: "", format: "pdf" });
 
   const load = async () => {
@@ -64,10 +70,16 @@ export default function ScheduledReports() {
     load();
   };
   const remove = async (id: string) => {
-    const { data, error } = await supabase.from("report_schedules").delete().eq("id", id).select("id");
-    if (error) { toast.error(error.message); load(); return; }
-    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); load(); return; }
-    load();
+    setDeleting(true);
+    try {
+      const { data, error } = await supabase.from("report_schedules").delete().eq("id", id).select("id");
+      if (error) { toast.error(error.message); load(); return; }
+      if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); load(); return; }
+      load();
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
+    }
   };
 
   return (
@@ -128,10 +140,33 @@ export default function ScheduledReports() {
             <TableCell className="uppercase text-xs">{r.format}</TableCell>
             <TableCell>{formatDateTime(r.next_run_at, lang)}</TableCell>
             <TableCell><Switch checked={r.is_active} onCheckedChange={(v) => toggle(r.id, v)} /></TableCell>
-            <TableCell><Button variant="ghost" size="icon" onClick={() => remove(r.id)}><Trash2 className="size-4" /></Button></TableCell>
+            <TableCell><Button variant="ghost" size="icon" onClick={() => setDeleteTarget(r)}><Trash2 className="size-4" /></Button></TableCell>
           </TableRow>
         ))}{!list.length && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">{t("noData")}</TableCell></TableRow>}</TableBody></Table>
       </CardContent></Card>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && !deleting && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{lang === "ar" ? "حذف الجدولة؟" : "Delete this schedule?"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {lang === "ar"
+                ? `سيُحذف جدول «${deleteTarget?.name ?? ""}» (${deleteTarget ? t(deleteTarget.frequency as any) : ""} · ${deleteTarget?.format ?? ""}) نهائياً، وتتوقف تقاريره المجدولة عن الإرسال. القالب نفسه يبقى، لكن الجدولة ومن يستلمها لا يمكن استرجاعهما؛ إعادة إنشائها تتطلب ملء النموذج من جديد.`
+                : `${deleteTarget?.name ?? ""} (${deleteTarget?.frequency ?? ""} · ${deleteTarget?.format ?? ""}) will be deleted permanently and its recurring reports stop being sent. The template itself is kept, but the schedule and its recipient list cannot be recovered — rebuilding it means filling the form again.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && remove(deleteTarget.id)}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? (lang === "ar" ? "جارٍ الحذف..." : "Deleting...") : t("delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

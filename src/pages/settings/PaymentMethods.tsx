@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { useConfirmedRowMutation } from "@/hooks/useConfirmedRowMutation";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 
 const TYPES = ["cash", "card", "bank_transfer", "wallet", "insurance", "other"] as const;
 const PAYMENT_TYPE_KEYS = {
@@ -53,8 +54,11 @@ export default function PaymentMethods() {
     if (!name || !f.code) return toast.error(t("requiredFields"));
     setSaving(true);
     const payload = { name_en: name, name_ar: name, code: f.code, type: f.type, requires_reference: f.requires_reference, processing_fee_percentage: f.processing_fee_percentage, processing_fee_fixed: f.processing_fee_fixed, display_order: f.display_order, is_active: f.is_active };
-    const { error } = edit ? await supabase.from("payment_methods").update(payload).eq("id", edit.id) : await supabase.from("payment_methods").insert(payload);
+    const { data, error } = edit
+      ? await supabase.from("payment_methods").update(payload).eq("id", edit.id).select("id")
+      : await supabase.from("payment_methods").insert(payload);
     if (error) { setSaving(false); return toast.error(error.message); }
+    if (edit && rowsWritten(data) === 0) { setSaving(false); return toast.error(notConfirmedCopy(lang, "save")); }
     toast.success(t("saved")); setOpen(false); setSaving(false); refresh();
   };
   const toggle = (m: any) => mutation.run(m.id, () => supabase.from("payment_methods")

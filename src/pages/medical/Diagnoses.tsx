@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { RowActions } from "@/components/RowActions";
 
@@ -34,8 +35,9 @@ export default function Diagnoses() {
       toast.error(lang === "ar" ? "لا يمكن الحذف: التشخيص مستخدم في سجلات طبية" : "Cannot delete: diagnosis is used in medical records");
       return;
     }
-    const { error } = await supabase.from("diagnoses").update({ deleted_at: new Date().toISOString() } as any).eq("id", d.id);
+    const { data, error } = await supabase.from("diagnoses").update({ deleted_at: new Date().toISOString() } as any).eq("id", d.id).select("id");
     if (error) { toast.error(error.message); return; }
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); return; }
     toast.success(t("delete")); load();
   };
 
@@ -63,10 +65,11 @@ export default function Diagnoses() {
       category: form.category || null,
       description_en: desc || null, description_ar: desc || null,
     };
-    const { error } = edit
-      ? await supabase.from("diagnoses").update(payload).eq("id", edit.id)
+    const { data, error } = edit
+      ? await supabase.from("diagnoses").update(payload).eq("id", edit.id).select("id")
       : await supabase.from("diagnoses").insert(payload);
     if (error) return toast.error(error.message);
+    if (edit && rowsWritten(data) === 0) return toast.error(notConfirmedCopy(lang, "save"));
     toast.success(t("save")); setOpen(false); load();
   };
 

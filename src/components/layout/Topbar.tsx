@@ -130,11 +130,16 @@ export function Topbar() {
     }
   };
   const markAsRead = async (id: string) => {
+    // zero-rows-ok: the bell claims nothing — loadNotifs() re-reads the rows and
+    // an unread notification stays unread, so a filtered write cannot look like
+    // a success to the user.
     await supabase.from("notifications").update({ is_read: true, read_at: new Date().toISOString() }).eq("id", id);
     loadNotifs();
   };
   const markAllRead = async () => {
     if (!user?.id) return;
+    // zero-rows-ok: scoped to the caller's own unread rows and re-read below, so
+    // zero rows means the requested end state already held.
     await supabase.from("notifications").update({ is_read: true, read_at: new Date().toISOString() }).eq("user_id", user.id).eq("is_read", false);
     loadNotifs();
   };

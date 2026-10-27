@@ -10,6 +10,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { templatePreview } from "@/lib/templatePreview";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 
 export default function Templates({ kind }: { kind: "email" | "sms" | "whatsapp" }) {
   const { t, lang } = useI18n();
@@ -30,8 +31,9 @@ export default function Templates({ kind }: { kind: "email" | "sms" | "whatsapp"
     const payload: any = { name_en: sel.name_en, name_ar: sel.name_ar, body_en: sel.body_en, body_ar: sel.body_ar, is_active: sel.is_active };
     if (kind === "email") { payload.subject_en = sel.subject_en; payload.subject_ar = sel.subject_ar; }
     if (kind === "whatsapp") { payload.meta_template_name = sel.meta_template_name || null; payload.meta_template_language = sel.meta_template_language || "ar"; }
-    const { error } = await (supabase as any).from(table).update(payload).eq("id", sel.id);
+    const { data, error } = await (supabase as any).from(table).update(payload).eq("id", sel.id).select("id");
     if (error) return toast.error(error.message);
+    if (rowsWritten(data) === 0) return toast.error(notConfirmedCopy(lang, "save"));
     toast.success(t("saved")); load();
   };
 

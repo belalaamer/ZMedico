@@ -23,6 +23,7 @@ import { Can } from "@/components/Can";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { ListSkeleton } from "@/components/ListSkeleton";
 import { Fab } from "@/components/ui/fab";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { ReferrerPicker } from "./ReferrerPicker";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { TablePager } from "@/components/TablePager";
@@ -358,8 +359,9 @@ export default function PatientsPage() {
   };
 
   const handleDelete = async (p: Patient) => {
-    const { error } = await supabase.from("patients").update({ deleted_at: new Date().toISOString() }).eq("id", p.id);
+    const { data, error } = await supabase.from("patients").update({ deleted_at: new Date().toISOString() }).eq("id", p.id).select("id");
     if (error) { toast.error(error.message); return; }
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); setConfirmDel(null); load(); return; }
     toast.success(lang === "ar" ? "تم حذف المريض" : "Patient deleted");
     setConfirmDel(null);
     load();

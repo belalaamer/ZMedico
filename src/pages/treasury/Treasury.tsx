@@ -18,6 +18,7 @@ import { formatMoney, formatDateTime } from "@/lib/format";
 import { TransferDialog } from "./TransferDialog";
 import { RowActions } from "@/components/RowActions";
 import { Can } from "@/components/Can";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 
 // One treasury holds one currency, so any branch total has to stay split by
 // currency: a number that adds EGP to USD does not exist in any ledger.
@@ -111,8 +112,9 @@ export default function Treasury() {
     if (!branchSelectionReady || !currentBranchId || tr.branch_id !== currentBranchId) { toast.error(t("selectBranch")); return; }
     const { count } = await supabase.from("treasury_transactions").select("id", { count: "exact", head: true }).eq("treasury_id", tr.id);
     if ((count ?? 0) > 0) { toast.error(t("transactionsExist")); return; }
-    const { error } = await supabase.from("treasury").update({ deleted_at: new Date().toISOString() } as any).eq("id", tr.id).eq("branch_id", currentBranchId);
+    const { data, error } = await supabase.from("treasury").update({ deleted_at: new Date().toISOString() } as any).eq("id", tr.id).eq("branch_id", currentBranchId).select("id");
     if (error) { toast.error(error.message); return; }
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); load(); return; }
     toast.success(t("delete")); load();
   };
 

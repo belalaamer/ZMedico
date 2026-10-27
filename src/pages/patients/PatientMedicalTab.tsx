@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/format";
 import { Can } from "@/components/Can";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 
 export default function PatientMedicalTab({ patientId }: { patientId: string }) {
   const { t, lang } = useI18n();
@@ -167,7 +168,7 @@ export default function PatientMedicalTab({ patientId }: { patientId: string }) 
 }
 
 function HistoryDialog({ open, onOpenChange, patientId, userId, initial, onSaved }: any) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [f, setF] = useState<any>(() => initial ?? {});
   useEffect(() => { setF(initial ?? {}); }, [initial, open]);
 
@@ -184,14 +185,19 @@ function HistoryDialog({ open, onOpenChange, patientId, userId, initial, onSaved
       notes_en: f.notes_en || null, notes_ar: f.notes_ar || null,
     };
     let error;
+    let updatedRows = 0;
     if (initial?.id) {
-      const r = await supabase.from("medical_history").update(payload).eq("id", initial.id);
+      const r = await supabase.from("medical_history").update(payload).eq("id", initial.id).select("id");
       error = r.error;
+      updatedRows = rowsWritten(r.data);
     } else {
       const r = await supabase.from("medical_history").insert(payload);
       error = r.error;
     }
     if (error) return toast.error(error.message);
+    // hist_update_clinical is permission-bound; a revoked session or a row that
+    // another clinician just deleted answers 2xx with nothing written.
+    if (initial?.id && updatedRows === 0) return toast.error(notConfirmedCopy(lang, "save"));
     toast.success(t("save")); onSaved();
   };
 

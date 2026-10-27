@@ -14,6 +14,7 @@
  *   - `resolved`    → condition is no longer true (auto-set by sync)
  */
 import { supabase } from "@/integrations/supabase/client";
+import { rowsWritten } from "@/lib/writeOutcome";
 
 export type AlertType = "long_wait" | "no_show_rate" | "busy_queue";
 export type AlertState = "active" | "snoozed" | "acknowledged" | "resolved";
@@ -98,7 +99,12 @@ export async function syncBranchAlerts(branchId: string, conditions: AlertCondit
     }
   }
   // Any open type not mentioned in conditions is left as-is.
-
+  //
+  // zero-rows-ok — these two writes cannot claim a success they did not earn:
+  // the very next line re-reads the server state (`listOpenAlerts`) and returns
+  // that, so a row RLS filtered away simply stays in the list the caller gets.
+  // This mirror of the detect-queue-alerts Edge function is also not invoked
+  // from any client or Edge artifact in this repo.
   await Promise.all([
     inserts.length
       ? (supabase as any).from("queue_alerts").insert(inserts)
@@ -112,36 +118,43 @@ export async function syncBranchAlerts(branchId: string, conditions: AlertCondit
   return listOpenAlerts(branchId);
 }
 
+// `ok` means the row changed, not that PostgREST answered 2xx: an alert another
+// branch resolved first, or one RLS cannot see, is filtered to zero rows and
+// would otherwise leave the banner untouched behind a "success".
 export async function snoozeAlert(id: string, untilIso: string, userId: string | null) {
-  const { error } = await (supabase as any)
+  const { data, error } = await (supabase as any)
     .from("queue_alerts")
     .update({ state: "snoozed", snoozed_until: untilIso, snoozed_by: userId })
-    .eq("id", id);
-  return { ok: !error, error: error?.message };
+    .eq("id", id)
+    .select("id");
+  return { ok: !error && rowsWritten(data) > 0, error: error?.message };
 }
 
 export async function acknowledgeAlert(id: string, userId: string | null) {
-  const { error } = await (supabase as any)
+  const { data, error } = await (supabase as any)
     .from("queue_alerts")
     .update({ state: "acknowledged", acknowledged_at: new Date().toISOString(), acknowledged_by: userId })
-    .eq("id", id);
-  return { ok: !error, error: error?.message };
+    .eq("id", id)
+    .select("id");
+  return { ok: !error && rowsWritten(data) > 0, error: error?.message };
 }
 
 export async function unsnoozeAlert(id: string) {
-  const { error } = await (supabase as any)
+  const { data, error } = await (supabase as any)
     .from("queue_alerts")
     .update({ state: "active", snoozed_until: null, snoozed_by: null })
-    .eq("id", id);
-  return { ok: !error, error: error?.message };
+    .eq("id", id)
+    .select("id");
+  return { ok: !error && rowsWritten(data) > 0, error: error?.message };
 }
 
 export async function resolveAlertNow(id: string) {
-  const { error } = await (supabase as any)
+  const { data, error } = await (supabase as any)
     .from("queue_alerts")
     .update({ state: "resolved", resolved_at: new Date().toISOString() })
-    .eq("id", id);
-  return { ok: !error, error: error?.message };
+    .eq("id", id)
+    .select("id");
+  return { ok: !error && rowsWritten(data) > 0, error: error?.message };
 }
 
 /** Common snooze presets. */

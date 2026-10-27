@@ -10,6 +10,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { toast } from "@/hooks/use-toast";
 import { useBranch } from "@/contexts/BranchContext";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 
 type Branch = { id: string; name_en: string; name_ar: string };
 
@@ -82,13 +83,15 @@ export default function StaffBranchesTab({ userId }: { userId: string }) {
 
   async function remove(branchId: string) {
     setSaving(true);
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("staff_branches")
       .delete()
       .eq("user_id", userId)
-      .eq("branch_id", branchId);
+      .eq("branch_id", branchId)
+      .select("id");
     setSaving(false);
     if (error) { toast({ title: error.message, variant: "destructive" }); return; }
+    if (rowsWritten(data) === 0) { toast({ title: notConfirmedCopy(lang, "delete"), variant: "destructive" }); load(); return; }
     toast({ title: lang === "ar" ? "تمت الإزالة" : "Branch removed" });
     load();
   }

@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Can } from "@/components/Can";
@@ -81,11 +82,12 @@ export default function PatientDental() {
     const existing = chart[tooth];
     let res;
     if (existing?.id) {
-      res = await supabase.from("dental_chart").update({ ...patch, last_updated_by: user?.id }).eq("id", existing.id);
+      res = await supabase.from("dental_chart").update({ ...patch, last_updated_by: user?.id }).eq("id", existing.id).select("id");
     } else {
       res = await supabase.from("dental_chart").insert({ patient_id: id, tooth_number: tooth, status: patch.status ?? "healthy", notes: patch.notes ?? null, last_updated_by: user?.id });
     }
     if (res.error) return toast.error(res.error.message);
+    if (existing?.id && rowsWritten(res.data) === 0) { toast.error(notConfirmedCopy(lang, "save")); load(); return; }
     toast.success(t("save"));
     load();
   };

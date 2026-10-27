@@ -24,6 +24,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
+import { localDateOnly } from "@/lib/localDate";
 
 const now = new Date();
 
@@ -125,15 +126,14 @@ export default function Payroll() {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0); // last day of month
     const totalDaysInMonth = endDate.getDate();
-    const iso = (d: Date) => d.toISOString().slice(0, 10);
 
     const staffIds = candidates.map((s) => s.id);
     const { data: att, error: attErr } = await supabase
       .from("attendance")
       .select("staff_id,status,date")
       .in("staff_id", staffIds)
-      .gte("date", iso(startDate))
-      .lte("date", iso(endDate));
+      .gte("date", localDateOnly(startDate))
+      .lte("date", localDateOnly(endDate));
     if (attErr) { toast.error(attErr.message); return; }
 
     // Count unpaid-absence days per staff (absent OR on_leave treated as unpaid unless leave system says otherwise).

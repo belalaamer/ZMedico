@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatDate } from "@/lib/format";
 import { patientDisplayName } from "@/lib/patientName";
 import { doctorDisplayName } from "@/lib/doctorName";
+import { localDateOnly } from "@/lib/localDate";
 
 export default function PhysioDashboard() {
   const { currentBranchId } = useBranch();
@@ -24,7 +25,7 @@ export default function PhysioDashboard() {
   const load = async () => {
     if (!currentBranchId) { setLoading(false); return; }
     setLoading(true);
-    const since = new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10);
+    const since = localDateOnly(new Date(Date.now() - 30 * 86400_000));
     const [{ data: cs }, { data: ss }, { data: rs }] = await Promise.all([
       supabase.from("physio_cases" as any)
         .select("id,status,therapist_id,patient_id,expected_sessions,followup_due_date,followup_enabled,start_date,diagnosis,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language)")
@@ -63,8 +64,8 @@ export default function PhysioDashboard() {
 
   if (loading) return <div className="p-6"><ListSkeleton rows={6} /></div>;
 
-  const today = new Date().toISOString().slice(0, 10);
-  const weekAgo = new Date(Date.now() - 6 * 86400_000).toISOString().slice(0, 10); // rolling 7 days incl. today
+  const today = localDateOnly(new Date());
+  const weekAgo = localDateOnly(new Date(Date.now() - 6 * 86400_000)); // rolling 7 days incl. today
   const active = cases.filter(c => c.status === "active");
   const completed = cases.filter(c => c.status === "completed");
   const sessionsToday = sessions.filter(s => s.session_date === today && s.attendance === "done");

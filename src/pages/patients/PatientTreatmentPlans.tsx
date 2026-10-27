@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { Can } from "@/components/Can";
 import { doctorDisplayName } from "@/lib/doctorName";
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
+import { localDateOnly } from "@/lib/localDate";
 
 type Plan = any;
 type Session = any;
@@ -34,7 +35,7 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
   const [doctors, setDoctors] = useState<{ id: string; full_name: string; full_name_en?: string | null; full_name_ar?: string | null }[]>([]);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name_ar: "", name_en: "", doctor_id: "", total_sessions: 10, price: 0, start_date: new Date().toISOString().slice(0, 10) });
+  const [form, setForm] = useState({ name_ar: "", name_en: "", doctor_id: "", total_sessions: 10, price: 0, start_date: localDateOnly(new Date()) });
   const [schedSession, setSchedSession] = useState<Session | null>(null);
   const [schedAt, setSchedAt] = useState<string>("");
   const [conflict, setConflict] = useState<{ clash: any; reason: string } | null>(null);
@@ -99,7 +100,11 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
     }).select("id").single();
     if (error) { setSaving(false); toast.error(error.message); return; }
     // Pre-generate session placeholders, spaced weekly from start_date
-    const start = new Date(form.start_date);
+    // `start_date` is a `YYYY-MM-DD` value, which `new Date(string)` anchors at
+    // UTC midnight; the weekly walk below and localDateOnly() both read the local
+    // wall clock, so a bare parse names the day before in any zone west of
+    // Greenwich. Noon-local keeps the walk on the clinic's own calendar.
+    const start = new Date(`${form.start_date}T12:00:00`);
     const rows = Array.from({ length: form.total_sessions }, (_, i) => {
       const d = new Date(start);
       d.setDate(start.getDate() + i * 7);
@@ -107,7 +112,7 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
         treatment_plan_id: data.id,
         session_number: i + 1,
         doctor_id: form.doctor_id || null,
-        scheduled_date: d.toISOString().slice(0, 10),
+        scheduled_date: localDateOnly(d),
         status: "pending",
         created_by: user?.id ?? null,
       };
@@ -115,7 +120,7 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
     const { error: sessionError } = await (supabase as any).from("treatment_sessions").insert(rows);
     setSaving(false);
     setOpen(false);
-    setForm({ name_ar: "", name_en: "", doctor_id: "", total_sessions: 10, price: 0, start_date: new Date().toISOString().slice(0, 10) });
+    setForm({ name_ar: "", name_en: "", doctor_id: "", total_sessions: 10, price: 0, start_date: localDateOnly(new Date()) });
     // The plan row is committed by now, so a failed session batch must be said
     // out loud instead of showing an empty plan under a "created" toast.
     if (sessionError) {

@@ -19,6 +19,7 @@ import { formatMoney, formatDate } from "@/lib/format";
 import { RowActions } from "@/components/RowActions";
 import { Can } from "@/components/Can";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
+import { localDateOnly } from "@/lib/localDate";
 
 export default function Expenses() {
   const { t, lang } = useI18n();
@@ -35,7 +36,7 @@ export default function Expenses() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     category_id: "", amount: 0, description_en: "", description_ar: "",
-    expense_date: new Date().toISOString().slice(0,10), payment_method: "cash" as "cash"|"card"|"bank_transfer",
+    expense_date: localDateOnly(new Date()), payment_method: "cash" as "cash"|"card"|"bank_transfer",
   });
 
   const load = async () => {
@@ -84,7 +85,7 @@ export default function Expenses() {
     if (error) { toast.error(error.message); return; }
     toast.success(t("save"));
     setOpen(false);
-    setForm({ category_id: "", amount: 0, description_en: "", description_ar: "", expense_date: new Date().toISOString().slice(0,10), payment_method: "cash" });
+    setForm({ category_id: "", amount: 0, description_en: "", description_ar: "", expense_date: localDateOnly(new Date()), payment_method: "cash" });
     load();
     } finally {
       savingRef.current = false;

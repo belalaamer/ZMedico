@@ -17,6 +17,7 @@ import { Can } from "@/components/Can";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney, formatDateTime } from "@/lib/format";
+import { localDateOnly } from "@/lib/localDate";
 
 type Tx = {
   id: string;
@@ -174,7 +175,7 @@ function TopupDialog({
   const { t } = useI18n();
   const [amount, setAmount] = useState(0);
   const [method, setMethod] = useState<TopupMethod>("cash");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(localDateOnly(new Date()));
   const [ref, setRef] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
@@ -183,7 +184,7 @@ function TopupDialog({
   useEffect(() => {
     if (!open) return;
     setAmount(0); setMethod("cash"); setRef(""); setNotes("");
-    setDate(new Date().toISOString().slice(0, 10));
+    setDate(localDateOnly(new Date()));
     submittingRef.current = false;
   }, [open]);
 

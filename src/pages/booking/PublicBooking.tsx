@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { localizedTenantName } from "@/lib/tenantName";
 import { captureAdAttribution, getStoredAdAttribution } from "@/lib/adAttribution";
 import { nearestBookingDay } from "@/lib/nearestBookingDay";
+import { localDateOnly } from "@/lib/localDate";
 
  type Lang = "ar" | "en";
 
@@ -115,11 +116,6 @@ const WEEKDAY_NAMES: Record<Lang, string[]> = {
   ar: ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"],
 };
 
-function localDateInputValue(date: Date) {
-  const tz = date.getTimezoneOffset();
-  return new Date(date.getTime() - tz * 60_000).toISOString().slice(0, 10);
-}
-
 // Same-day booking is allowed (the actual "how soon" cutoff is enforced by
 // the branch's min_advance_booking_hours in public_booking_slots_for_tenant,
 // not by the date picker), so the search starts from today (offset 0) and
@@ -131,10 +127,10 @@ function nextBookableDate(branch?: Branch | null) {
     const candidate = new Date(today);
     candidate.setDate(today.getDate() + offset);
     if (!branch?.working_days?.length || branch.working_days.includes(candidate.getDay())) {
-      return localDateInputValue(candidate);
+      return localDateOnly(candidate);
     }
   }
-  return localDateInputValue(today);
+  return localDateOnly(today);
 }
 
 function displayName(item: { name_en?: string | null; name_ar?: string | null }, lang: Lang) {
@@ -392,12 +388,12 @@ export default function PublicBooking() {
   // Same-day booking is allowed; the branch's min_advance_booking_hours
   // setting (enforced by public_booking_slots_for_tenant) is what actually
   // hides same-day slots that are too soon, not this date picker.
-  const minDate = localDateInputValue(new Date());
+  const minDate = localDateOnly(new Date());
   const maxDate = useMemo(() => {
     const days = branch?.max_future_booking_days ?? 30;
     const max = new Date();
     max.setDate(max.getDate() + days);
-    return localDateInputValue(max);
+    return localDateOnly(max);
   }, [branch]);
 
   const findNearest = async () => {
@@ -411,6 +407,9 @@ export default function PublicBooking() {
       const cairoToday = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
       const horizon = new Date(`${cairoToday}T12:00:00Z`);
       horizon.setUTCDate(horizon.getUTCDate() + (branch?.max_future_booking_days ?? 30));
+      // Deliberately UTC, not localDateOnly: `horizon` is noon UTC on the *tenant's*
+      // calendar day and nearestBookingDay walks UTC day keys from it, so reading this
+      // back on the visitor's wall clock would move the booking horizon by a day.
       const found = await nearestBookingDay<Slot>(cairoToday, horizon.toISOString().slice(0, 10), branch?.working_days ?? null, async day => {
         const response = await publicRpc<Slot[]>("public_booking_slots_for_tenant", {
           p_tenant_id: tenantId, p_branch_id: branchId, p_service_id: serviceId,

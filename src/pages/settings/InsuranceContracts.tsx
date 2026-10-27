@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Combobox } from "@/components/ui/combobox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { FileSignature, Plus, Pencil, Trash2, Ban, ListPlus } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
@@ -54,6 +55,9 @@ export default function InsuranceContracts() {
 
   const [contractDialog, setContractDialog] = useState<{ open: boolean; row: Contract | null }>({ open: false, row: null });
   const [ruleDialog, setRuleDialog] = useState<{ open: boolean; row: Rule | null }>({ open: false, row: null });
+  const [contractDeleteTarget, setContractDeleteTarget] = useState<Contract | null>(null);
+  const [ruleDeleteTarget, setRuleDeleteTarget] = useState<Rule | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const [services, setServices] = useState<any[]>([]);
   const [procedures, setProcedures] = useState<any[]>([]);
@@ -82,6 +86,8 @@ export default function InsuranceContracts() {
   useEffect(() => {
     setContractDialog({ open: false, row: null });
     setRuleDialog({ open: false, row: null });
+    setContractDeleteTarget(null);
+    setRuleDeleteTarget(null);
     void loadContracts(companyId);
     return () => { contractRequest.current++; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -99,6 +105,7 @@ export default function InsuranceContracts() {
 
   useEffect(() => {
     setRuleDialog({ open: false, row: null });
+    setRuleDeleteTarget(null);
     void loadRules(selectedContract?.id);
     return () => { ruleRequest.current++; };
     // Scope changes invalidate both initial and post-save rule refreshes.
@@ -128,12 +135,14 @@ export default function InsuranceContracts() {
   };
 
   const removeContract = async (id: string) => {
-    if (!confirm(T("Delete this contract and all its rules?", "حذف العقد وكل قواعده؟"))) return;
-    const { error } = await (supabase as any).from("insurance_contracts").delete().eq("id", id);
-    if (companyScope.current !== companyId) return;
-    if (error) { toast.error(error.message); return; }
-    if (selectedContract?.id === id) setSelectedContract(null);
-    await loadContracts(companyId);
+    setDeleting(true);
+    try {
+      const { error } = await (supabase as any).from("insurance_contracts").delete().eq("id", id);
+      if (companyScope.current !== companyId) return;
+      if (error) { toast.error(error.message); return; }
+      if (selectedContract?.id === id) setSelectedContract(null);
+      await loadContracts(companyId);
+    } finally { setDeleting(false); setContractDeleteTarget(null); }
   };
 
   const saveRule = async (form: any) => {
@@ -166,10 +175,12 @@ export default function InsuranceContracts() {
   };
 
   const removeRule = async (id: string) => {
-    if (!confirm(T("Delete rule?", "حذف القاعدة؟"))) return;
-    const { error } = await (supabase as any).from("insurance_contract_rules").delete().eq("id", id);
-    if (error) { toast.error(error.message); return; }
-    setRules((arr) => arr.filter((r) => r.id !== id));
+    setDeleting(true);
+    try {
+      const { error } = await (supabase as any).from("insurance_contract_rules").delete().eq("id", id);
+      if (error) { toast.error(error.message); return; }
+      setRules((arr) => arr.filter((r) => r.id !== id));
+    } finally { setDeleting(false); setRuleDeleteTarget(null); }
   };
 
   const ruleTargetLabel = (r: Rule) => {
@@ -251,7 +262,7 @@ export default function InsuranceContracts() {
                     {canEdit && (
                       <div className="flex items-center gap-1">
                         <Button size="sm" variant="ghost" onClick={() => setContractDialog({ open: true, row: selectedContract })}><Pencil className="size-4" /></Button>
-                        <Button size="sm" variant="ghost" className="text-destructive" onClick={() => removeContract(selectedContract.id)}><Trash2 className="size-4" /></Button>
+                        <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setContractDeleteTarget(selectedContract)}><Trash2 className="size-4" /></Button>
                       </div>
                     )}
                   </div>
@@ -298,7 +309,7 @@ export default function InsuranceContracts() {
                                   {canEdit && (
                                     <>
                                       <Button size="icon" variant="ghost" onClick={() => setRuleDialog({ open: true, row: r })}><Pencil className="size-4" /></Button>
-                                      <Button size="icon" variant="ghost" className="text-destructive" onClick={() => removeRule(r.id)}><Trash2 className="size-4" /></Button>
+                                      <Button size="icon" variant="ghost" className="text-destructive" onClick={() => setRuleDeleteTarget(r)}><Trash2 className="size-4" /></Button>
                                     </>
                                   )}
                                 </td>
@@ -339,6 +350,86 @@ export default function InsuranceContracts() {
         t={t}
         isAr={isAr}
       />
+
+      <AlertDialog open={!!contractDeleteTarget} onOpenChange={(o) => !o && !deleting && setContractDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{T("Delete this contract?", "حذف هذا العقد؟")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              <span className="block font-medium text-foreground">
+                {contractDeleteTarget ? (isAr ? (contractDeleteTarget.name_ar || contractDeleteTarget.name_en) : contractDeleteTarget.name_en) : ""}
+              </span>
+              <span className="block mt-2">
+                {rules.length === 0
+                  ? T("This contract has no coverage rules.", "لا توجد قواعد تغطية لهذا العقد.")
+                  : T(
+                      `Its ${rules.length} coverage rule${rules.length === 1 ? "" : "s"} will be deleted with it.`,
+                      `سيُحذف معه ${rules.length} قاعدة تغطية.`
+                    )}
+              </span>
+              <span className="block mt-2">
+                {T(
+                  "Contracts are not soft-deleted: this contract cannot be recovered. Invoice lines already priced keep their amounts but lose the link to the rule that priced them. If a line still points at this contract, coverage resolves to 0%. The insurance company itself is untouched.",
+                  "العقود لا تُحذف حذفًا ناعمًا: لا يمكن استرجاع هذا العقد. بنود الفواتير المحسوبة مسبقاً تحتفظ بقيمها لكنها تفقد الربط بالقاعدة التي حسبتها. وإن ظلّ بند مشيراً إلى هذا العقد فستُحسب تغطيته صفراً. شركة التأمين نفسها لا تتأثر."
+                )}
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => contractDeleteTarget && removeContract(contractDeleteTarget.id)}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? T("Deleting...", "جارٍ الحذف...") : t("delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!ruleDeleteTarget} onOpenChange={(o) => !o && !deleting && setRuleDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{T("Delete this coverage rule?", "حذف قاعدة التغطية؟")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              <span className="block font-medium text-foreground">
+                {ruleDeleteTarget
+                  ? `${ruleDeleteTarget.scope === "service"
+                      ? T("Service", "خدمة")
+                      : ruleDeleteTarget.scope === "procedure"
+                        ? T("Procedure", "إجراء")
+                        : T("Item type", "نوع البند")}: ${ruleTargetLabel(ruleDeleteTarget)}`
+                  : ""}
+              </span>
+              <span className="block mt-2">
+                {ruleDeleteTarget?.excluded
+                  ? T("It excludes this item from coverage entirely.", "هذه القاعدة تستثني هذا البند من التغطية تماماً.")
+                  : T(
+                      `It gives ${ruleDeleteTarget?.coverage_percent}% coverage${ruleDeleteTarget?.max_amount_per_item ? ` capped at ${ruleDeleteTarget.max_amount_per_item} per item` : ""}.`,
+                      `تمنح تغطية ${ruleDeleteTarget?.coverage_percent}%${ruleDeleteTarget?.max_amount_per_item ? ` بحد أقصى ${ruleDeleteTarget.max_amount_per_item} لكل بند` : ""}.`
+                    )}
+              </span>
+              <span className="block mt-2">
+                {T(
+                  `New lines for this target fall back to the item type rule, then the contract default of ${selectedContract?.default_coverage_percent ?? 0}%. Existing invoice lines keep their amounts but lose the link to this rule. Rules are not soft-deleted and cannot be recovered. The contract itself is untouched.`,
+                  `البنود الجديدة لهذا الهدف ترجع إلى قاعدة نوع البند ثم إلى النسبة الافتراضية للعقد ${selectedContract?.default_coverage_percent ?? 0}%. بنود الفواتير الحالية تحتفظ بقيمها لكنها تفقد الربط بهذه القاعدة. القواعد لا تُحذف حذفًا ناعمًا ولا يمكن استرجاعها. العقد نفسه لا يتأثر.`
+                )}
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => ruleDeleteTarget && removeRule(ruleDeleteTarget.id)}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? T("Deleting...", "جارٍ الحذف...") : t("delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SettingsLayout>
   );
 }

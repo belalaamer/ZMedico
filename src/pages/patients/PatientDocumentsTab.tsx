@@ -4,6 +4,10 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,6 +25,8 @@ export default function PatientDocumentsTab({ patientId, autoOpenUpload }: Props
   const [docs, setDocs] = useState<any[]>([]);
   const [uploadType, setUploadType] = useState<string>("other");
   const [uploading, setUploading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const phiLogged = useRef(false);
 
@@ -80,9 +86,15 @@ export default function PatientDocumentsTab({ patientId, autoOpenUpload }: Props
     if (data?.signedUrl) window.open(data.signedUrl, "_blank");
   };
   const remove = async (d: any) => {
-    await supabase.storage.from("patient-docs").remove([d.file_url]);
-    await supabase.from("patient_documents").delete().eq("id", d.id);
-    load();
+    setDeleting(true);
+    try {
+      await supabase.storage.from("patient-docs").remove([d.file_url]);
+      await supabase.from("patient_documents").delete().eq("id", d.id);
+      load();
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
+    }
   };
 
   return (
@@ -137,7 +149,7 @@ export default function PatientDocumentsTab({ patientId, autoOpenUpload }: Props
                 </div>
               </div>
               <Can permission="medical_records.delete">
-                <Button variant="ghost" size="icon" onClick={() => remove(d)}>
+                <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(d)}>
                   <Trash2 className="size-4 text-destructive" />
                 </Button>
               </Can>
@@ -145,6 +157,29 @@ export default function PatientDocumentsTab({ patientId, autoOpenUpload }: Props
           ))}
         </div>
       )}
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && !deleting && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{lang === "ar" ? "حذف المستند؟" : "Delete this document?"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {lang === "ar"
+                ? `سيُحذف «${deleteTarget?.title_ar || deleteTarget?.title_en || deleteTarget?.file_name || ""}» وملفه نهائياً من سجل هذا المريض. لا يمكن التراجع.`
+                : `${deleteTarget?.title_en || deleteTarget?.file_name || ""} and its stored file will be removed from this patient's record permanently. This cannot be undone.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && remove(deleteTarget)}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? (lang === "ar" ? "جارٍ الحذف..." : "Deleting...") : t("delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

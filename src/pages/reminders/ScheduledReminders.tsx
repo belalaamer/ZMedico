@@ -15,6 +15,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
 import { reminderSendOutcome } from "@/lib/reminderSendOutcome";
@@ -49,6 +53,8 @@ export default function ScheduledReminders() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [open, setOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Reminder | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const loadRequestRef = useRef(0);
   // One send in flight at a time: a second run would message the same patients twice.
   const sending = useRef(false);
@@ -161,10 +167,16 @@ export default function ScheduledReminders() {
     load();
   };
   const remove = async (id: string) => {
-    const { data, error } = await supabase.from("reminders").delete().eq("id", id).select("id");
-    if (error) { toast({ title: error.message, variant: "destructive" }); load(); return; }
-    if (rowsWritten(data) === 0) { toast({ title: notConfirmedCopy(lang, "delete"), variant: "destructive" }); load(); return; }
-    load();
+    setDeleting(true);
+    try {
+      const { data, error } = await supabase.from("reminders").delete().eq("id", id).select("id");
+      if (error) { toast({ title: error.message, variant: "destructive" }); load(); return; }
+      if (rowsWritten(data) === 0) { toast({ title: notConfirmedCopy(lang, "delete"), variant: "destructive" }); load(); return; }
+      load();
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
+    }
   };
 
   return (
@@ -287,7 +299,7 @@ export default function ScheduledReminders() {
                       <Button size="icon" variant="ghost" title="Reschedule" onClick={() => reschedule(r.id)}>
                         <RefreshCw className="size-4" />
                       </Button>
-                      <Button size="icon" variant="ghost" onClick={() => remove(r.id)}>
+                      <Button size="icon" variant="ghost" onClick={() => setDeleteTarget(r)}>
                         <Trash2 className="size-4 text-destructive" />
                       </Button>
                     </div>
@@ -301,6 +313,29 @@ export default function ScheduledReminders() {
           </Table>
         </CardContent>
       </Card>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && !deleting && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{lang === "ar" ? "حذف التذكير المجدول؟" : "Delete this scheduled reminder?"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget && (lang === "ar"
+                ? `سيُحذف تذكير ${t(deleteTarget.reminder_type as any)} المجدول في ${new Date(deleteTarget.scheduled_time).toLocaleString("ar-EG")} لـ «${patientName(deleteTarget.patient_id)}» نهائياً من قائمة التذكيرات. المريض وموعده لا يتأثران${deleteTarget.status === "pending" ? "، ولن يُرسل هذا التذكير أبداً" : ""}، والسطر المحذوف لا يمكن استرجاعه.`
+                : `The ${t(deleteTarget.reminder_type as any)} reminder scheduled for ${new Date(deleteTarget.scheduled_time).toLocaleString("en-US")} for ${patientName(deleteTarget.patient_id)} will be deleted from this list permanently. The patient and their appointment are untouched${deleteTarget.status === "pending" ? ", and this reminder will never be sent" : ""}, and the deleted row cannot be recovered.`)}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && remove(deleteTarget.id)}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? (lang === "ar" ? "جارٍ الحذف..." : "Deleting...") : t("delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

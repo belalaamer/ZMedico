@@ -5,6 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBranch } from "@/contexts/BranchContext";
@@ -27,6 +31,8 @@ export default function DocumentsCenter() {
   const [uploadPatient, setUploadPatient] = useState("");
   const [uploadType, setUploadType] = useState("other");
   const [uploading, setUploading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = async () => {
     // `patient_documents` has no branch_id column; branch scope is derived
@@ -109,9 +115,15 @@ export default function DocumentsCenter() {
     if (data?.signedUrl) window.open(data.signedUrl, "_blank");
   };
   const remove = async (d: any) => {
-    await supabase.storage.from("patient-docs").remove([d.file_url]);
-    await supabase.from("patient_documents").delete().eq("id", d.id);
-    load();
+    setDeleting(true);
+    try {
+      await supabase.storage.from("patient-docs").remove([d.file_url]);
+      await supabase.from("patient_documents").delete().eq("id", d.id);
+      load();
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
+    }
   };
 
   return (
@@ -183,12 +195,35 @@ export default function DocumentsCenter() {
                   <button onClick={() => open(d.file_url)} className="text-sm font-medium truncate text-start hover:underline block w-full">{lang === "ar" ? d.title_ar : d.title_en}</button>
                   <Link to={`/patients/${d.patient_id}`} className="text-xs text-muted-foreground truncate hover:underline block"><span dir={patientDisplayDirection(p, lang)}>{name}</span> · {formatDate(d.created_at, lang)}</Link>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => remove(d)}><Trash2 className="size-4 text-destructive"/></Button>
+                <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(d)}><Trash2 className="size-4 text-destructive"/></Button>
               </Card>
             );
           })}
         </div>
       )}
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && !deleting && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{lang === "ar" ? "حذف المستند؟" : "Delete this document?"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {lang === "ar"
+                ? `سيُحذف «${deleteTarget?.title_ar || deleteTarget?.title_en || deleteTarget?.file_name || ""}» وملفه نهائياً. المريض وسجله يبقيان، لكن المستند نفسه لا يمكن استرجاعه. لا يمكن التراجع.`
+                : `${deleteTarget?.title_en || deleteTarget?.file_name || ""} and its stored file will be deleted permanently. The patient and their record are untouched, but this document cannot be recovered. This cannot be undone.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && remove(deleteTarget)}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? (lang === "ar" ? "جارٍ الحذف..." : "Deleting...") : t("delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

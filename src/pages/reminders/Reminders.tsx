@@ -11,6 +11,10 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +49,8 @@ export default function Reminders() {
   const [items, setItems] = useState<Notif[]>([]);
   const [filter, setFilter] = useState<"all" | "unread" | "read">("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [deleteTarget, setDeleteTarget] = useState<Notif | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const isScheduled = pathname.startsWith("/reminders/scheduled");
 
@@ -108,10 +114,16 @@ export default function Reminders() {
     load();
   };
   const remove = async (id: string) => {
-    const { data, error } = await supabase.from("notifications").delete().eq("id", id).select("id");
-    if (error) { toast({ title: error.message, variant: "destructive" }); load(); return; }
-    if (rowsWritten(data) === 0) { toast({ title: notConfirmedCopy(lang, "delete"), variant: "destructive" }); load(); return; }
-    load();
+    setDeleting(true);
+    try {
+      const { data, error } = await supabase.from("notifications").delete().eq("id", id).select("id");
+      if (error) { toast({ title: error.message, variant: "destructive" }); load(); return; }
+      if (rowsWritten(data) === 0) { toast({ title: notConfirmedCopy(lang, "delete"), variant: "destructive" }); load(); return; }
+      load();
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
+    }
   };
 
   return (
@@ -197,7 +209,7 @@ export default function Reminders() {
                               <Check className="size-4" />
                             </Button>
                           )}
-                          <Button variant="ghost" size="icon" onClick={() => remove(n.id)}>
+                          <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(n)}>
                             <Trash2 className="size-4 text-destructive" />
                           </Button>
                         </div>
@@ -208,6 +220,29 @@ export default function Reminders() {
               )}
             </CardContent>
           </Card>
+
+          <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && !deleting && setDeleteTarget(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{lang === "ar" ? "حذف التنبيه؟" : "Delete this notification?"}</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {lang === "ar"
+                    ? `سيُحذف «${deleteTarget ? (deleteTarget.title_ar || deleteTarget.title_en) : ""}» من مركز التنبيهات نهائياً. المريض أو الفاتورة أو الموعد المرتبط لا يتأثر، لكن التنبيه نفسه لا يمكن استرجاعه.`
+                    : `${deleteTarget ? (deleteTarget.title_en || deleteTarget.title_ar) : ""} will be removed from the notifications center permanently. The patient, invoice or appointment it points at is untouched, but this alert cannot be recovered.`}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={deleting}>{t("cancel")}</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => deleteTarget && remove(deleteTarget.id)}
+                  disabled={deleting}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {deleting ? (lang === "ar" ? "جارٍ الحذف..." : "Deleting...") : t("delete")}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </>
       )}
     </div>

@@ -114,6 +114,8 @@ export default function UserManagement() {
   const [roles, setRoles] = useState<Record<string, string[]>>({});
   const [q, setQ] = useState("");
   const [invites, setInvites] = useState<any[]>([]);
+  const [inviteTarget, setInviteTarget] = useState<any | null>(null);
+  const [revoking, setRevoking] = useState(false);
   const [branches, setBranches] = useState<any[]>([]);
   const [staffLinks, setStaffLinks] = useState<Record<string, StaffLink>>({});
   const [open, setOpen] = useState(false);
@@ -376,10 +378,16 @@ export default function UserManagement() {
   };
 
   const revokeInvite = async (id: string) => {
-    const { error } = await (supabase as any).from("allowed_signup_emails").delete().eq("id", id);
-    if (error) { toast.error(error.message); return; }
-    toast.success(lang === "ar" ? "تم إلغاء الدعوة" : "Invite revoked");
-    load();
+    setRevoking(true);
+    try {
+      const { error } = await (supabase as any).from("allowed_signup_emails").delete().eq("id", id);
+      if (error) { toast.error(error.message); return; }
+      toast.success(lang === "ar" ? "تم إلغاء الدعوة" : "Invite revoked");
+      load();
+    } finally {
+      setRevoking(false);
+      setInviteTarget(null);
+    }
   };
 
   const createUser = async (e: React.FormEvent) => {
@@ -736,7 +744,7 @@ export default function UserManagement() {
                     size="icon"
                     variant="ghost"
                     className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => revokeInvite(i.id)}
+                    onClick={() => setInviteTarget(i)}
                     aria-label={lang === "ar" ? "إلغاء" : "Revoke"}
                     title={lang === "ar" ? "إلغاء الدعوة" : "Revoke invite"}
                   >
@@ -756,6 +764,29 @@ export default function UserManagement() {
               ? "ادعُ المستخدم بإضافة بريده هنا، ثم اطلب منه فتح صفحة تسجيل الدخول والتسجيل بنفس البريد. سيتم تعيين الدور تلقائياً."
               : "Add the user's email here, then ask them to sign up on the login page using the same email. Their role will be assigned automatically."}
           </p>
+
+          <AlertDialog open={!!inviteTarget} onOpenChange={(o) => !o && !revoking && setInviteTarget(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{lang === "ar" ? "إلغاء الدعوة؟" : "Revoke this invite?"}</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {lang === "ar"
+                    ? `سيُسحب إذن التسجيل بالبريد ${inviteTarget?.email ?? ""}. بعد الحذف لا يستطيع هذا البريد إنشاء حساب إطلاقاً — دعوة التسجيل التي وصلت إليه تتعطّل — حتى تضيفه هنا من جديد. السطر المحذوف لا يمكن استرجاعه.`
+                    : `${inviteTarget?.email ?? ""} is on the signup allow-list. Removing this row means that email cannot create an account at all — the invitation already sent to it stops working — until you add it here again. The deleted row cannot be recovered.`}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={revoking}>{t("cancel")}</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => inviteTarget && revokeInvite(inviteTarget.id)}
+                  disabled={revoking}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {revoking ? (lang === "ar" ? "جارٍ الإلغاء..." : "Revoking...") : (lang === "ar" ? "إلغاء الدعوة" : "Revoke invite")}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
 
         <Dialog open={open} onOpenChange={setOpen}>

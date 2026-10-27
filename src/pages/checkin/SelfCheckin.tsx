@@ -85,8 +85,10 @@ export default function SelfCheckin() {
   const copy = {
     title: isArabic ? "تسجيل الوصول" : "Self check-in",
     subtitle: isArabic ? "سجّل وصولك للموعد من هاتفك بسهولة" : "Check in for your appointment from your phone",
-    invalidTitle: isArabic ? "الرابط غير صالح أو منتهي" : "This link is invalid or expired",
-    invalidBody: isArabic ? "اطلب من موظف الاستقبال إرسال رابط جديد. لا تحاول مشاركة بيانات شخصية هنا." : "Ask the front desk for a new link. Do not enter personal information here.",
+    missingTitle: isArabic ? "رابط تسجيل الوصول غير مكتمل" : "This check-in link is incomplete",
+    missingBody: isArabic ? "لم يجد هاتفك رمز تسجيل الوصول داخل الرابط. افتح الرسالة كاملة أو اطلب من موظف الاستقبال إرسال رابط جديد." : "Your phone did not find a check-in code inside this link. Open the full message, or ask the front desk to send a new link.",
+    rejectedTitle: isArabic ? "رابط تسجيل الوصول لم يعد مقبولًا" : "This check-in link is no longer accepted",
+    rejectedBody: isArabic ? "ربما انتهت صلاحية الرابط، أو أن تسجيل الوصول الذاتي لهذا الموعد لم يفتح بعد أو أُغلق. إذا كنت داخل العيادة، توجّه إلى الاستقبال ليسجّلوا وصولك ويرسلوا رابطًا جديدًا." : "The link may have expired, or self check-in for this appointment may not be open yet or may have closed. If you are at the clinic, go to the front desk — they can check you in and send a new link.",
     errorTitle: isArabic ? "تعذر تحميل الرابط" : "We could not load this link",
     errorBody: isArabic ? "تحقق من اتصال الإنترنت وحاول مرة أخرى." : "Check your internet connection and try again.",
     readyTitle: isArabic ? "موعدك جاهز لتسجيل الوصول" : "Your appointment is ready",
@@ -135,11 +137,15 @@ export default function SelfCheckin() {
       );
     }
     if (resultState === "invalid" || detailsState !== "ready" || !details) {
+      // Two causes are observable here, and only two: no usable token ever left the URL,
+      // or the clinic returned nothing for a real token. The RPC collapses expiry, the
+      // appointment window, an ineligible status and a lapsed plan into that same answer.
+      const rejectedByClinic = token !== null;
       return (
-        <div className="py-5 text-center">
+        <div className="py-5 text-center" role="alert">
           <Link2Off className="mx-auto size-12 text-muted-foreground" aria-hidden="true" />
-          <h2 className="mt-4 text-xl font-semibold">{copy.invalidTitle}</h2>
-          <p className="mt-2 text-sm text-muted-foreground">{copy.invalidBody}</p>
+          <h2 className="mt-4 text-xl font-semibold">{rejectedByClinic ? copy.rejectedTitle : copy.missingTitle}</h2>
+          <p className="mt-2 text-sm text-muted-foreground">{rejectedByClinic ? copy.rejectedBody : copy.missingBody}</p>
         </div>
       );
     }

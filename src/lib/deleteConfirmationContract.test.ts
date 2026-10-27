@@ -156,8 +156,13 @@ const sitesFor = (file: string): Site[] => {
   };
 
   const sites: Site[] = [];
+  // A `.delete()` that exists only inside a comment is not a call site. The per-line prefix test
+  // below cannot see a wrapped block comment's continuation lines, which carry no `/*` or `*`; that
+  // is how batch 15's A14 prose in RowActions.tsx came to read as an unguarded delete.
+  const commentSpans = [...src.matchAll(/\/\*[\s\S]*?\*\//g)].map((m) => [m.index, m.index + m[0].length] as const);
   for (const m of src.matchAll(/\.delete\(\s*\)/g)) {
     const line = lineAt(m.index);
+    if (commentSpans.some(([s, e]) => m.index >= s && m.index < e)) continue;
     if (/^\s*(\/\/|\*|\/\*)/.test(lines[line])) continue;
     const before = src.slice(Math.max(0, m.index - 400), m.index);
     const froms = [...before.matchAll(/\.from\(\s*"([a-z_]+)"/g)];

@@ -86,7 +86,7 @@ describe("batch-13 zero-row write contract", () => {
     expect(marked).toEqual([
       "src/pages/hr/Schedules.tsx:137 .delete()",
       "src/pages/hr/Schedules.tsx:180 .delete()",
-      "src/pages/reminders/Reminders.tsx:105 .update(",
+      "src/pages/reminders/Reminders.tsx:111 .update(",
     ]);
   });
 

@@ -81,9 +81,14 @@ export function RowActions({
           <AlertDialogHeader>
             <AlertDialogTitle>{deleteTitle ?? t("confirmDelete")}</AlertDialogTitle>
             <AlertDialogDescription>
+              {/* A14: this said "cannot be undone" on 12 screens whose handlers all just set
+                  deleted_at. Measured per consumer on main: no RowActions consumer issues a
+                  `.delete()`; PurchaseOrders goes through delete_purchase_order_draft, whose
+                  body is `update … set deleted_at = now()`. There is no restore screen yet
+                  (C12), so the copy states what the app does instead of promising either end. */}
               {deleteDescription ?? (lang === "ar"
-                ? "هل أنت متأكد من حذف هذا السجل؟ لا يمكن التراجع عن هذا الإجراء."
-                : "Are you sure you want to delete this record? This action cannot be undone.")}
+                ? "سيُخفى هذا السجل من القوائم — أي يُعلَّم كمحذوف في قاعدة البيانات ولا يُمحى منها."
+                : "This record will be hidden from the lists — it is marked deleted in the database, not erased.")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

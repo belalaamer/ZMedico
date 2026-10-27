@@ -25,9 +25,17 @@ const AuthContext = createContext<Ctx | null>(null);
 
 const AUTH_DEBUG_PREFIX = "[auth-debug]";
 
+// S17: the query string can BE the credential (?code=… from the PKCE handoff, ?token=…
+// from a portal invite), and these lines fire on every sign-in and on every session
+// failure. Log the route and only whether a query existed.
+function authDebugFields() {
+  if (typeof window === "undefined") return { path: "", hasQuery: false };
+  return { path: window.location.pathname, hasQuery: window.location.search.length > 0 };
+}
+
 function authDebug(message: string, details?: Record<string, unknown>) {
   console.info(AUTH_DEBUG_PREFIX, message, {
-    path: typeof window !== "undefined" ? window.location.pathname + window.location.search : "",
+    ...authDebugFields(),
     ...details,
   });
 }
@@ -204,14 +212,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 await forceLocalLogout(true);
               } else {
                 console.warn(AUTH_DEBUG_PREFIX, "auth.getUser validation failed; keeping stored session for auth retry", {
-                  path: window.location.pathname + window.location.search,
+                  ...authDebugFields(),
                   error: error?.message ?? "missing user",
                 });
               }
             }
           } catch {
             console.warn(AUTH_DEBUG_PREFIX, "auth.getUser validation threw; keeping stored session for auth retry", {
-              path: window.location.pathname + window.location.search,
+              ...authDebugFields(),
             });
           }
         }

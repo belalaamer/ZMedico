@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { patientDisplayName } from "@/lib/patientName";
 
-import { QUEUE_AUDIT_ACTIONS as QUEUE_ACTIONS, QUEUE_AUDIT_SAFE_KEYS as SAFE_KEYS } from "@/lib/queueAuditActions";
+import { QUEUE_AUDIT_ACTIONS as QUEUE_ACTIONS, QUEUE_AUDIT_SAFE_KEYS as SAFE_KEYS, queueActionLabel } from "@/lib/queueAuditActions";
 type QAction = typeof QUEUE_ACTIONS[number];
 
 
@@ -410,7 +410,7 @@ export default function QueueAuditPage() {
               <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("allActions")}</SelectItem>
-                {QUEUE_ACTIONS.map((a) => (<SelectItem key={a} value={a}>{a}</SelectItem>))}
+                {QUEUE_ACTIONS.map((a) => (<SelectItem key={a} value={a}>{queueActionLabel(a, lang)}</SelectItem>))}
               </SelectContent>
             </Select>
           </div>
@@ -477,7 +477,7 @@ export default function QueueAuditPage() {
                 return (
                   <tr key={r.id} className="border-t border-border hover:bg-muted/30">
                     <td className="px-3 py-2 whitespace-nowrap text-xs">{new Date(r.created_at).toLocaleString()}</td>
-                    <td className="px-3 py-2"><Badge variant="outline" className="text-[10px] capitalize">{r.action.replace(/_/g, " ")}</Badge></td>
+                    <td className="px-3 py-2"><Badge variant="outline" className="text-[10px] capitalize">{queueActionLabel(r.action, lang)}</Badge></td>
                     <td className="px-3 py-2 truncate max-w-[180px]">{profiles[r.user_id ?? ""] ?? (r.user_id ? r.user_id.slice(0, 8) : "—")}</td>
                     <td className="px-3 py-2">
                       {p ? (

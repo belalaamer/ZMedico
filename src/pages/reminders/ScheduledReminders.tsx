@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Send, RefreshCw, Trash2, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { useDataSync } from "@/lib/dataSync";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
@@ -117,7 +118,9 @@ export default function ScheduledReminders() {
 
   const markSent = async (id: string) => {
     if (!branchSelectionReady || !currentBranchId) return;
-    await supabase.from("reminders").update({ status: "sent", sent_at: new Date().toISOString() }).eq("id", id).eq("branch_id", currentBranchId);
+    const { data, error } = await supabase.from("reminders").update({ status: "sent", sent_at: new Date().toISOString() }).eq("id", id).eq("branch_id", currentBranchId).select("id");
+    if (error) { toast({ title: error.message, variant: "destructive" }); load(); return; }
+    if (rowsWritten(data) === 0) { toast({ title: notConfirmedCopy(lang, "save"), variant: "destructive" }); load(); return; }
     load();
   };
   const sendNow = async (id: string) => {
@@ -152,11 +155,15 @@ export default function ScheduledReminders() {
     if (!next) return;
     const d = new Date(next);
     if (isNaN(d.getTime())) { toast({ title: "Invalid date", variant: "destructive" }); return; }
-    await supabase.from("reminders").update({ scheduled_time: d.toISOString(), status: "pending" }).eq("id", id);
+    const { data, error } = await supabase.from("reminders").update({ scheduled_time: d.toISOString(), status: "pending" }).eq("id", id).select("id");
+    if (error) { toast({ title: error.message, variant: "destructive" }); load(); return; }
+    if (rowsWritten(data) === 0) { toast({ title: notConfirmedCopy(lang, "save"), variant: "destructive" }); load(); return; }
     load();
   };
   const remove = async (id: string) => {
-    await supabase.from("reminders").delete().eq("id", id);
+    const { data, error } = await supabase.from("reminders").delete().eq("id", id).select("id");
+    if (error) { toast({ title: error.message, variant: "destructive" }); load(); return; }
+    if (rowsWritten(data) === 0) { toast({ title: notConfirmedCopy(lang, "delete"), variant: "destructive" }); load(); return; }
     load();
   };
 

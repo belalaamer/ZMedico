@@ -13,6 +13,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { formatMoney, formatDate } from "@/lib/format";
 import { RowActions } from "@/components/RowActions";
@@ -56,8 +57,9 @@ export default function Expenses() {
 
   const softDelete = async (x: any): Promise<void> => {
     if (!branchSelectionReady || !currentBranchId || x.branch_id !== currentBranchId) { toast.error(t("selectBranch")); return; }
-    const { error } = await supabase.from("expenses").update({ deleted_at: new Date().toISOString() } as any).eq("id", x.id).eq("branch_id", currentBranchId);
-    if (error) { toast.error(error.message); return; }
+    const { data, error } = await supabase.from("expenses").update({ deleted_at: new Date().toISOString() } as any).eq("id", x.id).eq("branch_id", currentBranchId).select("id");
+    if (error) { toast.error(error.message); load(); return; }
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); load(); return; }
     toast.success(t("delete")); load();
   };
 

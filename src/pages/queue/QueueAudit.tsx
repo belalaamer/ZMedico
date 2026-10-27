@@ -11,6 +11,7 @@ import { ArrowLeft, Download, ScrollText, ExternalLink, BookmarkPlus, Bookmark, 
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { patientDisplayName } from "@/lib/patientName";
@@ -168,12 +169,18 @@ export default function QueueAuditPage() {
     cachePresets(currentBranchId, next);
   };
   const deletePreset = async (id: string) => {
-    const next = presets.filter((p) => p.id !== id);
+    const previous = presets;
+    const next = previous.filter((p) => p.id !== id);
     setPresets(next);
     cachePresets(currentBranchId, next);
-    // Best-effort server delete; RLS will block deletes for presets the
-    // user does not own, which is fine — local list still updates.
-    await (supabase as any).from("audit_export_presets").delete().eq("id", id);
+    // aep_delete_own only lets a preset's own author delete it, and RLS reports
+    // that as zero rows rather than an error — so the local list must be put back.
+    const { data, error } = await (supabase as any).from("audit_export_presets").delete().eq("id", id).select("id");
+    if (error || rowsWritten(data) === 0) {
+      setPresets(previous);
+      cachePresets(currentBranchId, previous);
+      toast.error(error ? error.message : notConfirmedCopy(lang, "own"));
+    }
   };
 
   const PAGE_SIZE = 200;

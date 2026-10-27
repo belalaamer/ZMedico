@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { formatMoney, formatDate, invoiceCountLabel } from "@/lib/format";
 import { CreateInvoiceDialog } from "./CreateInvoiceDialog";
@@ -149,6 +150,7 @@ export default function Invoices() {
       return;
     }
     const nowIso = new Date().toISOString();
+    let voided = false;
     // For non-draft admin deletes: fully void first (cancels invoice, soft-deletes
     // payments, restores inventory, cancels commissions) then soft-delete the row.
     if (i.status !== "draft" && canOverride) {
@@ -158,13 +160,23 @@ export default function Invoices() {
         _user_id: user?.id ?? null,
       });
       if (voidErr) { toast.error(voidErr.message); return; }
+      voided = true;
       notifyDataChange("invoices");
       notifyDataChange("inventory");
       notifyDataChange("payments");
       notifyDataChange("doctor_commissions");
     }
-    const { error } = await supabase.from("invoices").update({ deleted_at: nowIso } as any).eq("id", i.id).eq("branch_id", currentBranchId);
-    if (error) { toast.error(error.message); return; }
+    const { data, error } = await supabase.from("invoices").update({ deleted_at: nowIso } as any).eq("id", i.id).eq("branch_id", currentBranchId).select("id");
+    if (error) { toast.error(error.message); load(); return; }
+    if (rowsWritten(data) === 0) {
+      toast.error(voided
+        ? (lang === "ar"
+            ? "تم إلغاء الفاتورة، لكن تعذر إخفاؤها من هذه القائمة. حدّث القائمة وتحقّق من حالتها."
+            : "The invoice was cancelled, but it could not be removed from this list. Refresh and check its status.")
+        : notConfirmedCopy(lang, "delete"));
+      load();
+      return;
+    }
     toast.success(t("delete")); load();
   };
 

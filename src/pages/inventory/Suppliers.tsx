@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { Can } from "@/components/Can";
 import { useBranch } from "@/contexts/BranchContext";
@@ -69,16 +70,19 @@ export default function Suppliers() {
       phone: form.phone || null, email: form.email || null,
       address: form.address || null, tax_number: form.tax_number || null, notes: form.notes || null,
     };
-    const { error } = edit
-      ? await supabase.from("suppliers").update(payload).eq("id", edit.id).eq("tenant_id", tenantId)
+    const { data, error } = edit
+      ? await supabase.from("suppliers").update(payload).eq("id", edit.id).eq("tenant_id", tenantId).select("id")
       : await supabase.from("suppliers").insert(payload);
     if (error) { toast.error(error.message); return; }
+    // An insert asks for no rows back, so only the edit can be proved here.
+    if (edit && rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); load(); return; }
     toast.success(t("save")); setOpen(false); load();
   };
 
   const toggleActive = async (s: Supplier) => {
-    const { error } = await supabase.from("suppliers").update({ is_active: !s.is_active }).eq("id", s.id).eq("tenant_id", tenantId);
-    if (error) { toast.error(error.message); return; }
+    const { data, error } = await supabase.from("suppliers").update({ is_active: !s.is_active }).eq("id", s.id).eq("tenant_id", tenantId).select("id");
+    if (error) { toast.error(error.message); load(); return; }
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); load(); return; }
     load();
   };
 

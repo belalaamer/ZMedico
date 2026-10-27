@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { formatDate } from "@/lib/format";
 import { RowActions } from "@/components/RowActions";
 import { useNavigate } from "react-router-dom";
@@ -47,8 +48,11 @@ export default function MedicalRecords() {
 
   const softDelete = async (r: any): Promise<void> => {
     if (!branchSelectionReady || !currentBranchId || r.branch_id !== currentBranchId) { toast.error(t("selectBranch")); return; }
-    const { error } = await supabase.from("medical_records").update({ deleted_at: new Date().toISOString() } as any).eq("id", r.id).eq("branch_id", currentBranchId);
-    if (error) { toast.error(error.message); return; }
+    const { data, error } = await supabase.from("medical_records").update({ deleted_at: new Date().toISOString() } as any).eq("id", r.id).eq("branch_id", currentBranchId).select("id");
+    if (error) { toast.error(error.message); load(); return; }
+    // rec_update_clinical only lets the treating doctor touch their own draft,
+    // so a finalized or colleague-owned record comes back as 0 rows, not an error.
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); load(); return; }
     toast.success(t("delete")); load();
   };
 

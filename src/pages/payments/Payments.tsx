@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { formatMoney, formatDateTime } from "@/lib/format";
 import { RecordPaymentDialog } from "./RecordPaymentDialog";
@@ -83,8 +84,9 @@ export default function Payments() {
 
   const softDelete = async (p: any): Promise<void> => {
     if (!branchSelectionReady || !currentBranchId || p.branch_id !== currentBranchId) { toast.error(t("selectBranch")); return; }
-    const { error } = await supabase.from("payments").update({ deleted_at: new Date().toISOString() } as any).eq("id", p.id).eq("branch_id", currentBranchId);
-    if (error) { toast.error(error.message); return; }
+    const { data, error } = await supabase.from("payments").update({ deleted_at: new Date().toISOString() } as any).eq("id", p.id).eq("branch_id", currentBranchId).select("id");
+    if (error) { toast.error(error.message); load(); return; }
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); load(); return; }
     // Treasury reversal & invoice recalc happen automatically via DB trigger.
     toast.success(t("delete")); load();
   };

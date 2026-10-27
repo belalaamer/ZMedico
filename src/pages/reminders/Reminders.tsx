@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { Bell, Check, Trash2, Inbox, Clock, AlertTriangle, Calendar as CalIcon, CreditCard, RefreshCw, Settings as SettingsIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { subscribeResilient } from "@/lib/realtime";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -90,12 +91,16 @@ export default function Reminders() {
   const unreadCount = items.filter((n) => !n.is_read).length;
 
   const markRead = async (id: string, val = true) => {
-    await supabase.from("notifications")
-      .update({ is_read: val, read_at: val ? new Date().toISOString() : null }).eq("id", id);
+    const { data, error } = await supabase.from("notifications")
+      .update({ is_read: val, read_at: val ? new Date().toISOString() : null }).eq("id", id).select("id");
+    if (error) { toast({ title: error.message, variant: "destructive" }); load(); return; }
+    if (rowsWritten(data) === 0) { toast({ title: notConfirmedCopy(lang, "save"), variant: "destructive" }); load(); return; }
     load();
   };
   const markAllRead = async () => {
     if (!user) return;
+    // zero-rows-ok: scoped to the caller's own unread rows, so RLS cannot filter
+    // this away, and zero rows simply means the requested end state already held.
     await supabase.from("notifications")
       .update({ is_read: true, read_at: new Date().toISOString() })
       .eq("user_id", user.id).eq("is_read", false);
@@ -103,7 +108,9 @@ export default function Reminders() {
     load();
   };
   const remove = async (id: string) => {
-    await supabase.from("notifications").delete().eq("id", id);
+    const { data, error } = await supabase.from("notifications").delete().eq("id", id).select("id");
+    if (error) { toast({ title: error.message, variant: "destructive" }); load(); return; }
+    if (rowsWritten(data) === 0) { toast({ title: notConfirmedCopy(lang, "delete"), variant: "destructive" }); load(); return; }
     load();
   };
 

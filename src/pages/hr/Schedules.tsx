@@ -114,10 +114,14 @@ export default function Schedules() {
   };
 
   const invalidShift = (s: Slot) => s.is_working_day && s.start_time >= s.end_time;
+  const clearNotSaved = lang === "ar"
+    ? "تعذر حذف المواعيد العاملة السابقة، لذا لم يُحفظ أي تغيير."
+    : "The previous working hours could not be cleared, so nothing was saved.";
 
   const applyBranchHours = () => {
     setSlots((arr) => arr.map((s) => s.is_working_day ? { ...s, start_time: branchHours.start, end_time: branchHours.end } : s));
-    toast.success(t("save"));
+    setDetailedDirty(true);
+    toast.message(lang === "ar" ? "طُبّقت ساعات الفرع على الجدول — اضغط حفظ لتخزينها." : "Branch hours applied to the grid — press Save to store them.");
   };
 
   const save = async () => {
@@ -125,10 +129,16 @@ export default function Schedules() {
     if (!currentBranchId) { toast.error(t("errSelectBranchFirst")); return; }
     const bad = slots.find(invalidShift);
     if (bad) { toast.error(lang === "ar" ? "وقت البدء يجب أن يكون قبل وقت الانتهاء" : "Start time must be before end time"); return; }
-    // Delete strictly scoped to the current (non-null) branch — relies on the
-    // same branch guard above as the insert path, so we never send an empty
-    // branch filter that could match legacy NULL rows.
-    await supabase.from("work_schedules").delete().eq("staff_id", staffId).eq("branch_id", currentBranchId);
+    // zero-rows-ok: Delete is strictly scoped to the current (non-null) branch
+    // — relies on the same branch guard above as the insert path, so we never
+    // send an empty branch filter that could match legacy NULL rows. Zero rows
+    // here is the normal first schedule of a staff member, so only a real error
+    // is a failure.
+    const { error: clearError } = await supabase.from("work_schedules").delete().eq("staff_id", staffId).eq("branch_id", currentBranchId);
+    if (clearError) {
+      toast.error(clearNotSaved);
+      return;
+    }
     const rows = slots.map((s) => ({
       staff_id: staffId, branch_id: currentBranchId,
       day_of_week: s.day_of_week, start_time: s.start_time, end_time: s.end_time, is_working_day: s.is_working_day,
@@ -164,9 +174,11 @@ export default function Schedules() {
     if (!currentBranchId) {
       return { error: { message: t("errSelectBranchFirst") } } as any;
     }
-    // Same rationale as save(): delete is strictly bounded by the non-null
-    // currentBranchId guarded above.
-    await supabase.from("work_schedules").delete().eq("staff_id", sid).eq("branch_id", currentBranchId);
+    // zero-rows-ok: Same rationale as save() — the delete is strictly bounded by
+    // the non-null currentBranchId guarded above, and zero rows here is a staff
+    // member's first week, so only a real error counts as a failure.
+    const { error: clearError } = await supabase.from("work_schedules").delete().eq("staff_id", sid).eq("branch_id", currentBranchId);
+    if (clearError) return { error: { message: clearNotSaved } } as any;
     const payload = rows.map((s) => ({
       staff_id: sid, branch_id: currentBranchId,
       day_of_week: s.day_of_week, start_time: s.start_time, end_time: s.end_time,

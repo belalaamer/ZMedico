@@ -21,6 +21,7 @@ import {
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
 import { Can } from "@/components/Can";
@@ -159,8 +160,9 @@ export default function Products() {
       expiry_tracking: form.expiry_tracking, image_url: form.image_url || null,
     };
     if (edit) {
-      const { error } = await supabase.from("products").update(payload).eq("id", edit.id).eq("tenant_id", tenantId);
+      const { data, error } = await supabase.from("products").update(payload).eq("id", edit.id).eq("tenant_id", tenantId).select("id");
       if (error) { toast.error(error.message); return; }
+      if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); load(); return; }
     } else {
       if (form.sku) payload.sku = form.sku;
       const { error } = await supabase.from("products").insert(payload);
@@ -170,8 +172,9 @@ export default function Products() {
   };
 
   const toggleActive = async (p: Product) => {
-    const { error } = await supabase.from("products").update({ is_active: !p.is_active }).eq("id", p.id).eq("tenant_id", tenantId);
+    const { data, error } = await supabase.from("products").update({ is_active: !p.is_active }).eq("id", p.id).eq("tenant_id", tenantId).select("id");
     if (error) { toast.error(error.message); return; }
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); load(); return; }
     load();
   };
 

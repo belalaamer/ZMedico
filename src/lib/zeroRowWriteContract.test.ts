@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 // PostgREST answers a write that RLS filtered to zero rows with HTTP 2xx,
 // error:null and no representation, so "no error" is not proof that anything
-// was written. Batches 13 to 16 fixed that for every guarded write reachable
+// was written. Batches 13 to 17 fixed that for every guarded write reachable
 // from these screens. This contract freezes the fix: a browser-authored
 // .delete()/.update() here must either ask for the rows it touched, or carry a
 // written reason why zero rows is a legitimate outcome.
@@ -53,6 +53,25 @@ const FILES = [
   "src/pages/hr/StaffBranchesTab.tsx",
   "src/pages/invoices/CreateInvoiceDialog.tsx",
   "src/pages/treasury/Treasury.tsx",
+  // batch 17 — payroll, catalog and patient writes
+  "src/pages/hr/Payroll.tsx",
+  "src/pages/hr/TargetBonuses.tsx",
+  "src/pages/inventory/Products.tsx",
+  "src/pages/medical/Diagnoses.tsx",
+  "src/pages/medical/Medications.tsx",
+  "src/pages/medical/Procedures.tsx",
+  "src/pages/medical/Prescriptions.tsx",
+  "src/pages/medical/PrescriptionDetail.tsx",
+  "src/pages/medical/Specialties.tsx",
+  "src/pages/medical/DocumentsCenter.tsx",
+  "src/pages/patients/PatientDocumentsTab.tsx",
+  "src/pages/patients/PatientDental.tsx",
+  "src/pages/patients/PatientProfile.tsx",
+  // Folded into the freeze with no behaviour change: these two were already
+  // proved before this campaign, by optimistic-concurrency reads that a later
+  // edit could strip as easily as a naive one.
+  "src/pages/queue/Queue.tsx",
+  "src/pages/settings/Languages.tsx",
 ];
 
 const MARKER = "zero-rows-ok";
@@ -141,14 +160,18 @@ function clientWrites(src: string): Write[] {
   return writes;
 }
 
-describe("zero-row write contract (batches 13-16)", () => {
+describe("zero-row write contract (batches 13-17)", () => {
   const all = FILES.map((file) => ({ file, src: source(file), writes: clientWrites(source(file)) }));
 
   it("scans the batch scope and finds the writes it is meant to freeze", () => {
-    expect(all).toHaveLength(42);
+    expect(all).toHaveLength(57);
     expect(all.filter((e) => e.writes.length === 0)).toEqual([]);
-    // 91 browser-authored deletes/updates remain across the 42 screens.
-    expect(all.reduce((n, e) => n + e.writes.length, 0)).toBe(91);
+    // 114 browser-authored deletes/updates remain across the 57 screens. The
+    // app-wide census finds 115; the one write outside this list is
+    // leads/LeadDetail.tsx:85, proved by `.select("*").single()` — a form this
+    // file's rows-back check cannot see, so listing it would fail the screen
+    // rather than the defect.
+    expect(all.reduce((n, e) => n + e.writes.length, 0)).toBe(114);
   });
 
   it("proves every browser-authored write, or documents why zero rows is fine", () => {
@@ -171,6 +194,7 @@ describe("zero-row write contract (batches 13-16)", () => {
       "src/contexts/I18nContext.tsx:106 .update(",
       "src/pages/branches/Branches.tsx:285 .update(",
       "src/pages/settings/AppointmentSettings.tsx:112 .delete()",
+      "src/pages/hr/Payroll.tsx:212 .delete()",
     ]);
   });
 

@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
 import { RowActions } from "@/components/RowActions";
@@ -68,8 +69,9 @@ export default function Procedures() {
   const remove = async (p: ProcedureRow): Promise<void> => {
     const { count } = await supabase.from("record_procedures").select("id", { count: "exact", head: true }).eq("procedure_id", p.id);
     if ((count ?? 0) > 0) { toast.error(lang === "ar" ? "لا يمكن الحذف: الإجراء مستخدم في سجلات طبية" : "Cannot delete: procedure is used in medical records"); return; }
-    const { error } = await supabase.from("procedures").update({ deleted_at: new Date().toISOString() }).eq("id", p.id);
+    const { data, error } = await supabase.from("procedures").update({ deleted_at: new Date().toISOString() }).eq("id", p.id).select("id");
     if (error) { toast.error(error.message); return; }
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); return; }
     toast.success(t("delete")); load();
   };
 
@@ -99,10 +101,11 @@ export default function Procedures() {
       doctor_commission_percent: Math.max(0, Math.min(100, Number(form.doctor_commission_percent) || 0)),
       is_active: form.is_active,
     };
-    const { error } = edit
-      ? await supabase.from("procedures").update(payload).eq("id", edit.id)
+    const { data, error } = edit
+      ? await supabase.from("procedures").update(payload).eq("id", edit.id).select("id")
       : await supabase.from("procedures").insert(payload);
     if (error) return toast.error(error.message);
+    if (edit && rowsWritten(data) === 0) return toast.error(notConfirmedCopy(lang, "save"));
     toast.success(t("save")); setOpen(false); load();
   };
 

@@ -11,6 +11,7 @@ import {
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/format";
 import { useDataSync } from "@/lib/dataSync";
@@ -88,8 +89,13 @@ export default function PatientDocumentsTab({ patientId, autoOpenUpload }: Props
   const remove = async (d: any) => {
     setDeleting(true);
     try {
+      // Row first, object second — the same order the record editor's documents
+      // tab uses. A filtered-out delete must leave the stored file intact.
+      const { data, error } = await supabase.from("patient_documents").delete().eq("id", d.id).select("id");
+      if (error) { load(); return toast.error(error.message); }
+      if (rowsWritten(data) === 0) { load(); return toast.error(notConfirmedCopy(lang, "delete")); }
       await supabase.storage.from("patient-docs").remove([d.file_url]);
-      await supabase.from("patient_documents").delete().eq("id", d.id);
+      toast.success(t("delete"));
       load();
     } finally {
       setDeleting(false);

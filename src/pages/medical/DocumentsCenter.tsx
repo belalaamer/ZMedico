@@ -13,6 +13,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/format";
 import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
@@ -117,8 +118,14 @@ export default function DocumentsCenter() {
   const remove = async (d: any) => {
     setDeleting(true);
     try {
+      // Row first, object second. Deleting the Storage object before the row meant
+      // a write that RLS filtered to zero rows still destroyed the file, leaving
+      // this centre listing a document that 404s when opened.
+      const { data, error } = await supabase.from("patient_documents").delete().eq("id", d.id).select("id");
+      if (error) { load(); return toast.error(error.message); }
+      if (rowsWritten(data) === 0) { load(); return toast.error(notConfirmedCopy(lang, "delete")); }
       await supabase.storage.from("patient-docs").remove([d.file_url]);
-      await supabase.from("patient_documents").delete().eq("id", d.id);
+      toast.success(t("delete"));
       load();
     } finally {
       setDeleting(false);

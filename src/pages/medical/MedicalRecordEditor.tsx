@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { formatDate, formatMoney } from "@/lib/format";
 import { generatePrescriptionPdf } from "@/lib/prescriptionPdf";
 import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { logPhiAccess } from "@/lib/observability/phiAudit";
 
 type Record = any;
@@ -115,8 +116,16 @@ export default function MedicalRecordEditor() {
   const updateRecord = async (patch: any) => {
     setSaving(true);
     try {
-      const { error } = await supabase.from("medical_records").update(patch).eq("id", record.id);
+      const { data, error } = await supabase.from("medical_records").update(patch).eq("id", record.id).select("id");
       if (error) throw error;
+      // A completed record leaves its author's reach once the grace window
+      // closes, and RLS answers that with 2xx and no rows. Without the read-back
+      // the editor would merge the patch into local state and say "Saved" over a
+      // record that still holds the old values.
+      if (rowsWritten(data) === 0) {
+        toast.error(notConfirmedCopy(lang, "save"));
+        return;
+      }
       toast.success(t("save"));
       setRecord({ ...record, ...patch });
     } catch (e: any) {
@@ -442,8 +451,10 @@ function DiagnosesTab({ record, catalog, items, reload }: any) {
     reload();
   };
   const remove = async (rdId: string) => {
-    await supabase.from("record_diagnoses").delete().eq("id", rdId);
+    const { data, error } = await supabase.from("record_diagnoses").delete().eq("id", rdId).select("id");
     reload();
+    if (error) return toast.error(error.message);
+    if (rowsWritten(data) === 0) toast.error(notConfirmedCopy(lang, "delete"));
   };
 
   return (
@@ -524,8 +535,9 @@ function ProceduresTab({ record, specialty, catalog, items, reload, userId }: an
   };
   const remove = async (id: string) => {
     try {
-      const { error } = await supabase.from("record_procedures").delete().eq("id", id);
+      const { data, error } = await supabase.from("record_procedures").delete().eq("id", id).select("id");
       if (error) throw error;
+      if (rowsWritten(data) === 0) toast.error(notConfirmedCopy(lang, "delete"));
       reload();
     } catch (e: any) {
       const msg = String(e?.message ?? "");
@@ -644,7 +656,12 @@ function PrescriptionTab({ record, patient, catalog, rxList, rxItems, reload, us
     setSelected(null); setSearch(""); setForm({ dosage: "", frequency: "", duration: "", quantity: "1", instructions_en: "" });
     reload();
   };
-  const remove = async (id: string) => { await supabase.from("prescription_items").delete().eq("id", id); reload(); };
+  const remove = async (id: string) => {
+    const { data, error } = await supabase.from("prescription_items").delete().eq("id", id).select("id");
+    reload();
+    if (error) return toast.error(error.message);
+    if (rowsWritten(data) === 0) toast.error(notConfirmedCopy(lang, "delete"));
+  };
 
   const print = () => {
     if (!rx) return;
@@ -751,8 +768,14 @@ function DocumentsTab({ record, patient, docs, reload, userId }: any) {
     if (data?.signedUrl) window.open(data.signedUrl, "_blank");
   };
   const remove = async (d: any) => {
+    // The row goes first. If the object were removed while RLS filtered the row
+    // away, the tab would keep listing a document whose file no longer exists;
+    // an unreferenced object is invisible by comparison. Storage cleanup stays
+    // best-effort after a confirmed delete.
+    const { data, error } = await supabase.from("patient_documents").delete().eq("id", d.id).select("id");
+    if (error) { reload(); return toast.error(error.message); }
+    if (rowsWritten(data) === 0) { reload(); return toast.error(notConfirmedCopy(lang, "delete")); }
     await supabase.storage.from("patient-docs").remove([d.file_url]);
-    await supabase.from("patient_documents").delete().eq("id", d.id);
     reload();
   };
 

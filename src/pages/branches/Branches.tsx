@@ -19,6 +19,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import LocationMap from "@/components/LocationMap";
 import { Slider } from "@/components/ui/slider";
 import { getCurrentLocation } from "@/lib/geo";
@@ -225,16 +226,26 @@ export default function Branches() {
       is_main_branch: form.is_main_branch, is_active: form.is_active,
     };
     let error;
+    let touched: unknown;
     let savedBranchId = editId;
     const isNewBranch = !editId;
     if (editId) {
-      ({ error } = await supabase.from("branches").update(payload).eq("id", editId));
+      ({ data: touched, error } = await supabase.from("branches").update(payload).eq("id", editId).select("id"));
     } else {
       const created = await supabase.from("branches").insert(payload).select("id").single();
       error = created.error;
       savedBranchId = created.data?.id ?? null;
     }
     if (error) { toast({ title: error.message, variant: "destructive" }); return; }
+    // A branch another session deleted or moved out of reach filters to zero
+    // rows and still answers 2xx. Reload the table — that is the truth — and say
+    // nothing was saved, before the main-branch cascade below can demote a real
+    // branch on behalf of a row that does not exist.
+    if (editId && rowsWritten(touched) === 0) {
+      setOpen(false); void load();
+      toast({ title: notConfirmedCopy(lang, "save"), variant: "destructive" });
+      return;
+    }
     // Newly created branches need explicit staff_branches rows — branch-scoped
     // RLS everywhere requires one (see user_has_branch_access()). Without this,
     // the branch exists but nobody can access it until someone manually
@@ -265,6 +276,10 @@ export default function Branches() {
     }
     // Keep the main-branch invariant inside this tenant only.
     if (form.is_main_branch && savedBranchId) {
+      // zero-rows-ok — this demotes the *other* branches of the tenant. When the
+      // saved branch was already the only main one, no row matches and zero rows
+      // is the wanted outcome; the invariant is checked by the read-back in
+      // load(), and no message claims anything about these rows.
       const { error: mainBranchError } = await supabase
         .from("branches")
         .update({ is_main_branch: false })
@@ -365,12 +380,13 @@ export default function Branches() {
 
   const saveLocation = async () => {
     if (!locBranch || !locCenter) return;
-    const { error } = await supabase.from("branches").update({
+    const { data, error } = await supabase.from("branches").update({
       allowed_latitude: locCenter.lat,
       allowed_longitude: locCenter.lon,
       allowed_radius: locRadius,
-    } as never).eq("id", locBranch.id);
+    } as never).eq("id", locBranch.id).select("id");
     if (error) { toast({ title: error.message, variant: "destructive" }); return; }
+    if (rowsWritten(data) === 0) { toast({ title: notConfirmedCopy(lang, "save"), variant: "destructive" }); return; }
     toast({ title: t("locationSaved") });
     setLocBranch(null); load();
   };

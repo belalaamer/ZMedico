@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/format";
 import { Can } from "@/components/Can";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 
 function diffDays(a: string, b: string) {
   const d1 = new Date(a), d2 = new Date(b);
@@ -90,8 +91,11 @@ export default function Leaves() {
     // tenant was enough to approve or reject it.
     const allowedStaffIds = staff.map((row: any) => row.id).filter(Boolean);
     if (!allowedStaffIds.length) return;
-    const { error } = await supabase.from("leave_requests").update({ status, approved_by: user?.id, approved_at: new Date().toISOString(), rejection_reason: reason ?? null }).eq("id", id).in("staff_id", allowedStaffIds);
+    const { data, error } = await supabase.from("leave_requests").update({ status, approved_by: user?.id, approved_at: new Date().toISOString(), rejection_reason: reason ?? null }).eq("id", id).in("staff_id", allowedStaffIds).select("id");
     if (error) return toast.error(error.message);
+    // A request outside this branch filters to zero rows and answers 2xx, and the
+    // list used to reload onto the same pending row with nothing said.
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); load(); return; }
     load();
   };
 

@@ -13,6 +13,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 
 type Row = any;
 
@@ -48,17 +49,19 @@ export default function InsuranceCompanies() {
       is_active: !!form.is_active,
       notes: form.notes || null,
     };
-    const { error } = editing
-      ? await (supabase as any).from("insurance_companies").update(payload).eq("id", editing.id)
+    const { data, error } = editing
+      ? await (supabase as any).from("insurance_companies").update(payload).eq("id", editing.id).select("id")
       : await (supabase as any).from("insurance_companies").insert(payload);
     if (error) return toast.error(error.message);
+    if (editing && rowsWritten(data) === 0) return toast.error(notConfirmedCopy(lang, "save"));
     toast.success(t("save")); setOpen(false); load();
   };
 
   const remove = async (id: string) => {
     if (!confirm(lang === "ar" ? "حذف؟" : "Delete?")) return;
-    const { error } = await (supabase as any).from("insurance_companies").delete().eq("id", id);
+    const { data, error } = await (supabase as any).from("insurance_companies").delete().eq("id", id).select("id");
     if (error) return toast.error(error.message);
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); load(); return; }
     toast.success(t("save")); load();
   };
 

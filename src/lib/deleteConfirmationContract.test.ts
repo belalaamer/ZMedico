@@ -37,7 +37,9 @@ const WAIVERS: Waiver[] = [
     handler: "removeRow",
     reason:
       "The trash button calls removeRow directly only for a row that was never persisted; the delete statement itself sits behind `if (row.id)`, so a row that exists in the database is reachable only through the dialog.",
-    premise: /if\s*\(row\.id\)\s*\{[\s\S]{0,80}from\("service_consumables"\)\.delete\(\)/,
+    // The window covers batch 16's two-line note about sc_admin_delete, which now
+    // sits between the guard and the call.
+    premise: /if\s*\(row\.id\)\s*\{[\s\S]{0,240}from\("service_consumables"\)\.delete\(\)/,
   },
 ];
 

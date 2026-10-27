@@ -21,14 +21,10 @@ import { describe, expect, it } from "vitest";
 
 type Exemption = { file: string; calls: number; owner: string; premise: RegExp };
 
-const EXEMPT: Exemption[] = [
-  {
-    file: "src/pages/physio/PhysioCaseDetail.tsx",
-    calls: 2,
-    owner: "PR #219 replaces both completion/pause prompts with dialog input",
-    premise: /prompt\("Completion summary \(optional\)"\)[\s\S]{0,200}prompt\("Pause reason \(optional\)"\)/,
-  },
-];
+// Empty from this branch onward: the only exemption was PhysioCaseDetail's two
+// completion/pause prompts, and batch 16 — the PR that exemption named — is in
+// this branch, so both now take their answer from a <DialogContent>.
+const EXEMPT: Exemption[] = [];
 
 const sourceFiles = (dir: string): string[] => {
   const out: string[] = [];

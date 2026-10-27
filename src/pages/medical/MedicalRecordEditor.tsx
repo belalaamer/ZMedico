@@ -15,6 +15,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useI18n } from "@/contexts/I18nContext";
+import { enumLabel } from "@/lib/enumLabels";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -1041,7 +1042,7 @@ function InvoicePreviewTab({ record, patient, procs, nav, userId }: any) {
                   <tr key={inv.id} className="border-t border-border hover:bg-muted/30 cursor-pointer" onClick={() => nav(`/invoices/${inv.id}`)}>
                     <td className="p-2 font-medium">{inv.invoice_number}</td>
                     <td className="p-2">{formatDate(inv.invoice_date, lang)}</td>
-                    <td className="p-2"><Badge variant="outline">{inv.status}</Badge></td>
+                    <td className="p-2"><Badge variant="outline">{enumLabel("invoice_status", inv.status, lang)}</Badge></td>
                     <td className="p-2 text-end tabular-nums">{formatMoney(inv.total, lang)}</td>
                     <td className="p-2 text-end tabular-nums">{formatMoney(inv.paid_amount, lang)}</td>
                   </tr>

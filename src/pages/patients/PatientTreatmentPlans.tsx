@@ -13,6 +13,7 @@ import { Plus, Check, X, Trash2, FileText } from "lucide-react";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useI18n } from "@/contexts/I18nContext";
+import { enumLabel } from "@/lib/enumLabels";
 import { useBranch } from "@/contexts/BranchContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -351,7 +352,7 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <div className="font-semibold">{lang === "ar" ? (p.name_ar || p.name_en) : (p.name_en || p.name_ar)}</div>
-                      <Badge variant="outline" className={statusBadge(p.status)}>{p.status}</Badge>
+                      <Badge variant="outline" className={statusBadge(p.status)}>{enumLabel("treatment_plan_status", p.status, lang)}</Badge>
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
                       {doc ? doctorDisplayName(doc, lang) : "—"} · {formatDate(p.start_date, lang)} · {formatMoney(p.price, lang)}

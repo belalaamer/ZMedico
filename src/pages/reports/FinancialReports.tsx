@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
+import { enumLabel } from "@/lib/enumLabels";
 import { useBranch } from "@/contexts/BranchContext";
 import { formatMoney, formatDate } from "@/lib/format";
 import { patientDisplayName } from "@/lib/patientName";
@@ -146,7 +147,7 @@ function RevenueTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
               <TableCell>{formatDate(r.invoice_date, lang)}</TableCell>
               <TableCell className="font-mono text-xs">{r.invoice_number}</TableCell>
               <TableCell>{r.patients ? patientDisplayName(r.patients, lang) : "—"}</TableCell>
-              <TableCell><span className="text-xs px-2 py-0.5 rounded bg-muted">{r.status}</span></TableCell>
+              <TableCell><span className="text-xs px-2 py-0.5 rounded bg-muted">{enumLabel("invoice_status", r.status, lang)}</span></TableCell>
               <TableCell className="text-end tabular-nums font-semibold">{formatMoney(r.total, lang)}</TableCell>
             </TableRow>
           ))}

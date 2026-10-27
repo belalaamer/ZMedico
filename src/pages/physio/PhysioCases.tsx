@@ -18,6 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatDate } from "@/lib/format";
 import { patientDisplayName } from "@/lib/patientName";
 import { doctorDisplayName } from "@/lib/doctorName";
+import { enumLabel } from "@/lib/enumLabels";
 import { toast } from "sonner";
 
 type Patient = { id: string; first_name_en?: string; last_name_en?: string; first_name_ar?: string; last_name_ar?: string; name_language?: "ar" | "en" | null; patient_code?: number };
@@ -159,16 +160,7 @@ export default function PhysioCases() {
   const statusVariant = (s: string) =>
     s === "active" ? "status-progress" : s === "completed" ? "status-completed" : s === "paused" ? "status-pending" : "status-cancelled";
 
-  const statusLabel = (s: string) => {
-    if (lang !== "ar") return s;
-    switch (s) {
-      case "active": return "نشطة";
-      case "completed": return "مكتملة";
-      case "paused": return "متوقفة";
-      case "cancelled": return "ملغاة";
-      default: return s;
-    }
-  };
+  const statusLabel = (s: string) => enumLabel("physio_case_status", s, lang);
 
   const therapistLabel = (s: Therapist) => {
     const name = doctorDisplayName(s.profile, lang).trim() || s.employee_id || s.id.slice(0, 8);

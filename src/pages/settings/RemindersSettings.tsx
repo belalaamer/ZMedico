@@ -113,6 +113,8 @@ export default function RemindersSettings() {
     } finally { setSaving(false); }
   };
 
+  const keepSecretPlaceholder = lang === "ar" ? "•••••• (اتركه فارغًا للإبقاء على المحفوظ)" : "•••••• (leave blank to keep)";
+
   const sendTest = async () => {
     if (!branchId) return toast.error(t("branch"));
     setTesting(true);
@@ -147,7 +149,7 @@ export default function RemindersSettings() {
               : "For automated Meta messages: enter the Phone Number ID and permanent access token, configure the webhook, and use a Meta-approved template with patient opt-in."}
           </p>
           <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
-            <div className="font-medium text-foreground">Webhook URL</div>
+            <div className="font-medium text-foreground">{lang === "ar" ? "رابط Webhook" : "Webhook URL"}</div>
             <code className="mt-1 block break-all">https://rqcmnfzfytyyicelvifk.supabase.co/functions/v1/whatsapp-webhook</code>
             <div className="mt-1">{lang === "ar" ? "ضع هذا الرابط في Meta Developers، واضبط WHATSAPP_VERIFY_TOKEN وWHATSAPP_APP_SECRET في Supabase Secrets." : "Use this URL in Meta Developers, and set WHATSAPP_VERIFY_TOKEN and WHATSAPP_APP_SECRET in Supabase Secrets."}</div>
           </div>
@@ -174,40 +176,40 @@ export default function RemindersSettings() {
 
             {f.whatsapp_provider === "meta" && (<>
               <div>
-                <Label>Phone Number ID (Meta)</Label>
+                <Label>{lang === "ar" ? "معرّف رقم الهاتف (Meta)" : "Phone Number ID (Meta)"}</Label>
                 <Input value={f.meta_phone_number_id} onChange={e => setF({ ...f, meta_phone_number_id: e.target.value })} />
               </div>
               <div>
-                <Label>Access Token (Meta)</Label>
-                <Input type="password" autoComplete="new-password" placeholder="•••••• (leave blank to keep)"
+                <Label>{lang === "ar" ? "رمز الوصول (Meta)" : "Access Token (Meta)"}</Label>
+                <Input type="password" autoComplete="new-password" placeholder={keepSecretPlaceholder}
                   value={f.whatsapp_api_key} onChange={e => setF({ ...f, whatsapp_api_key: e.target.value })} />
               </div>
             </>)}
 
             {f.whatsapp_provider === "twilio" && (<>
               <div>
-                <Label>Twilio Account SID</Label>
+                <Label>{lang === "ar" ? "معرّف حساب Twilio" : "Twilio Account SID"}</Label>
                 <Input value={f.twilio_account_sid} onChange={e => setF({ ...f, twilio_account_sid: e.target.value })} />
               </div>
               <div>
-                <Label>Twilio Auth Token</Label>
-                <Input type="password" autoComplete="new-password" placeholder="•••••• (leave blank to keep)"
+                <Label>{lang === "ar" ? "رمز Twilio Auth Token" : "Twilio Auth Token"}</Label>
+                <Input type="password" autoComplete="new-password" placeholder={keepSecretPlaceholder}
                   value={f.twilio_auth_token} onChange={e => setF({ ...f, twilio_auth_token: e.target.value })} />
               </div>
               <div className="sm:col-span-2">
-                <Label>Twilio WhatsApp From</Label>
+                <Label>{lang === "ar" ? "رقم WhatsApp المرسل عبر Twilio" : "Twilio WhatsApp From"}</Label>
                 <Input value={f.twilio_from_whatsapp} onChange={e => setF({ ...f, twilio_from_whatsapp: e.target.value })} placeholder="whatsapp:+14155238886" />
               </div>
             </>)}
 
             {f.whatsapp_provider === "custom" && (<>
               <div>
-                <Label>API URL</Label>
+                <Label>{lang === "ar" ? "رابط API" : "API URL"}</Label>
                 <Input value={f.whatsapp_api_url} onChange={e => setF({ ...f, whatsapp_api_url: e.target.value })} placeholder="https://..." />
               </div>
               <div>
-                <Label>API Key</Label>
-                <Input type="password" autoComplete="new-password" placeholder="•••••• (leave blank to keep)"
+                <Label>{lang === "ar" ? "مفتاح API" : "API Key"}</Label>
+                <Input type="password" autoComplete="new-password" placeholder={keepSecretPlaceholder}
                   value={f.whatsapp_api_key} onChange={e => setF({ ...f, whatsapp_api_key: e.target.value })} />
               </div>
             </>)}
@@ -239,29 +241,29 @@ export default function RemindersSettings() {
 
             {f.sms_provider === "twilio" && (<>
               <div>
-                <Label>Twilio Account SID</Label>
+                <Label>{lang === "ar" ? "معرّف حساب Twilio" : "Twilio Account SID"}</Label>
                 <Input value={f.twilio_account_sid} onChange={e => setF({ ...f, twilio_account_sid: e.target.value })} />
               </div>
               <div>
-                <Label>Twilio Auth Token</Label>
-                <Input type="password" autoComplete="new-password" placeholder="•••••• (leave blank to keep)"
+                <Label>{lang === "ar" ? "رمز Twilio Auth Token" : "Twilio Auth Token"}</Label>
+                <Input type="password" autoComplete="new-password" placeholder={keepSecretPlaceholder}
                   value={f.twilio_auth_token} onChange={e => setF({ ...f, twilio_auth_token: e.target.value })} />
               </div>
               <div className="sm:col-span-2">
-                <Label>Twilio SMS From</Label>
+                <Label>{lang === "ar" ? "رقم SMS المرسل عبر Twilio" : "Twilio SMS From"}</Label>
                 <Input value={f.twilio_from_sms} onChange={e => setF({ ...f, twilio_from_sms: e.target.value })} placeholder="+12025550123" />
               </div>
             </>)}
 
             {(f.sms_provider === "messagebird" || f.sms_provider === "custom") && (<>
               <div>
-                <Label>API URL</Label>
+                <Label>{lang === "ar" ? "رابط API" : "API URL"}</Label>
                 <Input value={f.sms_api_url} onChange={e => setF({ ...f, sms_api_url: e.target.value })}
                   placeholder={f.sms_provider === "messagebird" ? "https://rest.messagebird.com/messages" : "https://..."} />
               </div>
               <div>
-                <Label>API Key</Label>
-                <Input type="password" autoComplete="new-password" placeholder="•••••• (leave blank to keep)"
+                <Label>{lang === "ar" ? "مفتاح API" : "API Key"}</Label>
+                <Input type="password" autoComplete="new-password" placeholder={keepSecretPlaceholder}
                   value={f.sms_api_key} onChange={e => setF({ ...f, sms_api_key: e.target.value })} />
               </div>
             </>)}

@@ -9,6 +9,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useI18n } from "@/contexts/I18nContext";
+import { enumLabel } from "@/lib/enumLabels";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
@@ -151,7 +152,7 @@ export default function PatientDocumentsTab({ patientId, autoOpenUpload }: Props
                   {lang === "ar" ? (d.title_ar || d.title_en) : (d.title_en || d.title_ar)}
                 </button>
                 <div className="text-xs text-muted-foreground truncate">
-                  {d.document_type} · {formatDate(d.created_at, lang)}
+                  {enumLabel("document_type", d.document_type, lang)} · {formatDate(d.created_at, lang)}
                 </div>
               </div>
               <Can permission="medical_records.delete">

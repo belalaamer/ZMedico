@@ -194,7 +194,7 @@ describe("zero-row write contract (batches 13-17)", () => {
       "src/contexts/I18nContext.tsx:106 .update(",
       "src/pages/branches/Branches.tsx:285 .update(",
       "src/pages/settings/AppointmentSettings.tsx:118 .delete()",
-      "src/pages/hr/Payroll.tsx:212 .delete()",
+      "src/pages/hr/Payroll.tsx:213 .delete()",
     ]);
   });
 

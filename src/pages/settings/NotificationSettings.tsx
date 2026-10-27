@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
+import { enumLabel } from "@/lib/enumLabels";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -91,6 +92,7 @@ export default function NotificationSettings() {
     : channel === "email"
       ? (lang === "ar" ? "فعّل البريد وحدد عنوان From موثقًا لدى Cloudflare أو Resend. اسم العيادة سيظهر كاسم المرسل." : "Enable email and set a From address verified with Cloudflare or Resend. The clinic name will appear as the display name.")
       : (lang === "ar" ? "القناة غير جاهزة: فعّلها وأدخل Provider URL/المفاتيح ثم احفظ الإعدادات." : "The channel is not ready: enable it, enter the provider URL/credentials, then save the settings.");
+  const keepSecretPlaceholder = lang === "ar" ? "••••••••  (اتركه فارغًا للإبقاء على المحفوظ)" : "••••••••  (leave blank to keep current)";
   return (
     <SettingsLayout>
       <div className="space-y-6">
@@ -116,13 +118,13 @@ export default function NotificationSettings() {
           <div><Label>{t("reminderChannel")}</Label>
             <Select value={f.reminder_channel} onValueChange={v => setF({ ...f, reminder_channel: v })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{["email","sms","whatsapp","push"].map(x => <SelectItem key={x} value={x}>{x}</SelectItem>)}</SelectContent>
+              <SelectContent>{["email","sms","whatsapp","push"].map(x => <SelectItem key={x} value={x}>{enumLabel("reminder_channel", x, lang)}</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          <Toggle k="send_appointment_confirmation" label="Send appointment confirmation" />
-          <Toggle k="send_appointment_cancellation" label="Send appointment cancellation" />
-          <Toggle k="send_invoice_notification" label="Send invoice notification" />
-          <Toggle k="send_payment_receipt" label="Send payment receipt" />
+          <Toggle k="send_appointment_confirmation" label={lang === "ar" ? "إرسال تأكيد الموعد" : "Send appointment confirmation"} />
+          <Toggle k="send_appointment_cancellation" label={lang === "ar" ? "إرسال إلغاء الموعد" : "Send appointment cancellation"} />
+          <Toggle k="send_invoice_notification" label={lang === "ar" ? "إرسال إشعار الفاتورة" : "Send invoice notification"} />
+          <Toggle k="send_payment_receipt" label={lang === "ar" ? "إرسال إيصال الدفع" : "Send payment receipt"} />
           <Toggle k="send_birthday_greeting" label={t("sendBirthdayGreeting")} />
           <div><Label>{t("birthdayDiscountPercentage")}</Label><Input type="number" step="0.01" value={f.birthday_discount_percentage} onChange={e => setF({ ...f, birthday_discount_percentage: +e.target.value })} /></div>
           <Toggle k="send_follow_up_reminder" label={t("sendFollowUpReminder")} />
@@ -147,29 +149,29 @@ export default function NotificationSettings() {
                 <SelectItem value="twilio">Twilio</SelectItem>
                 <SelectItem value="messagebird">MessageBird</SelectItem>
                 <SelectItem value="smsmisr">SMS Misr</SelectItem>
-                <SelectItem value="custom">Custom</SelectItem>
+                <SelectItem value="custom">{lang === "ar" ? "مخصص" : "Custom"}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div><Label>{t("whatsappBusinessNumber")}</Label><Input value={f.whatsapp_business_number ?? ""} onChange={e => setF({ ...f, whatsapp_business_number: e.target.value })} /></div>
           <div><Label>{t("whatsappApiUrl")}</Label><Input value={f.whatsapp_api_url ?? ""} onChange={e => setF({ ...f, whatsapp_api_url: e.target.value })} placeholder="https://..." /></div>
-          <div><Label>{t("whatsappApiKey")}</Label><Input type="password" autoComplete="new-password" placeholder="••••••••  (leave blank to keep current)" value={f.whatsapp_api_key ?? ""} onChange={e => setF({ ...f, whatsapp_api_key: e.target.value })} /></div>
+          <div><Label>{t("whatsappApiKey")}</Label><Input type="password" autoComplete="new-password" placeholder={keepSecretPlaceholder} value={f.whatsapp_api_key ?? ""} onChange={e => setF({ ...f, whatsapp_api_key: e.target.value })} /></div>
           <div><Label>{t("smsApiUrl")}</Label><Input value={f.sms_api_url ?? ""} onChange={e => setF({ ...f, sms_api_url: e.target.value })} placeholder="https://..." /></div>
-          <div><Label>{t("smsApiKey")}</Label><Input type="password" autoComplete="new-password" placeholder="••••••••  (leave blank to keep current)" value={f.sms_api_key ?? ""} onChange={e => setF({ ...f, sms_api_key: e.target.value })} /></div>
+          <div><Label>{t("smsApiKey")}</Label><Input type="password" autoComplete="new-password" placeholder={keepSecretPlaceholder} value={f.sms_api_key ?? ""} onChange={e => setF({ ...f, sms_api_key: e.target.value })} /></div>
           {smsProvider === "smsmisr" && <>
-            <div><Label>{lang === "ar" ? "SMS Misr Username" : "SMS Misr Username"}</Label><Input autoComplete="off" placeholder={lang === "ar" ? "اتركه فارغًا للإبقاء على المحفوظ" : "Leave blank to keep saved value"} value={f.smsmisr_username ?? ""} onChange={e => setF({ ...f, smsmisr_username: e.target.value })} /></div>
-            <div><Label>{lang === "ar" ? "SMS Misr Password" : "SMS Misr Password"}</Label><Input type="password" autoComplete="new-password" placeholder="••••••••  (leave blank to keep current)" value={f.smsmisr_password ?? ""} onChange={e => setF({ ...f, smsmisr_password: e.target.value })} /></div>
+            <div><Label>{lang === "ar" ? "اسم المستخدم في SMS Misr" : "SMS Misr Username"}</Label><Input autoComplete="off" placeholder={lang === "ar" ? "اتركه فارغًا للإبقاء على المحفوظ" : "Leave blank to keep saved value"} value={f.smsmisr_username ?? ""} onChange={e => setF({ ...f, smsmisr_username: e.target.value })} /></div>
+            <div><Label>{lang === "ar" ? "كلمة مرور SMS Misr" : "SMS Misr Password"}</Label><Input type="password" autoComplete="new-password" placeholder={keepSecretPlaceholder} value={f.smsmisr_password ?? ""} onChange={e => setF({ ...f, smsmisr_password: e.target.value })} /></div>
             <div><Label>{lang === "ar" ? "Sender Token التجريبي" : "Test Sender Token"}</Label><Input value={f.smsmisr_sender_token ?? ""} onChange={e => setF({ ...f, smsmisr_sender_token: e.target.value })} /></div>
             <div><Label>{lang === "ar" ? "بيئة SMS Misr" : "SMS Misr Environment"}</Label>
               <Select value={String(f.smsmisr_environment ?? 2)} onValueChange={v => setF({ ...f, smsmisr_environment: Number(v) })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="2">Test (2)</SelectItem><SelectItem value="1">Live (1)</SelectItem></SelectContent>
+                <SelectContent><SelectItem value="2">{lang === "ar" ? "تجريبي (2)" : "Test (2)"}</SelectItem><SelectItem value="1">{lang === "ar" ? "إنتاجي (1)" : "Live (1)"}</SelectItem></SelectContent>
               </Select>
             </div>
             <div><Label>{lang === "ar" ? "لغة الرسالة" : "Message Language"}</Label>
               <Select value={String(f.smsmisr_language ?? 1)} onValueChange={v => setF({ ...f, smsmisr_language: Number(v) })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="1">English</SelectItem><SelectItem value="2">Arabic</SelectItem><SelectItem value="3">Unicode</SelectItem></SelectContent>
+                <SelectContent><SelectItem value="1">{lang === "ar" ? "إنجليزي" : "English"}</SelectItem><SelectItem value="2">{lang === "ar" ? "عربي" : "Arabic"}</SelectItem><SelectItem value="3">{lang === "ar" ? "يونيكود" : "Unicode"}</SelectItem></SelectContent>
               </Select>
             </div>
           </>}

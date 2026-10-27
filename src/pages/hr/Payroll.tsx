@@ -21,6 +21,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { supabase } from "@/integrations/supabase/client";
+import { enumLabel } from "@/lib/enumLabels";
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
@@ -517,7 +518,7 @@ export default function Payroll() {
                         <td className="p-2 text-end tabular-nums">{Number(r.commission_percent).toFixed(2)}%</td>
                         <td className="p-2 text-end tabular-nums">{formatMoney(r.collected_amount, lang)}</td>
                         <td className="p-2 text-end tabular-nums font-medium text-primary">{formatMoney(r.commission_amount, lang)}</td>
-                        <td className="p-2"><Badge variant="outline">{r.status}</Badge></td>
+                        <td className="p-2"><Badge variant="outline">{enumLabel("commission_status", r.status, lang)}</Badge></td>
                         <td className="p-2 text-xs">{accrual ? new Date(accrual).toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US") : "—"}</td>
                       </tr>
                     );

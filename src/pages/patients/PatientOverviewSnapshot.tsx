@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useI18n } from "@/contexts/I18nContext";
+import { enumLabel } from "@/lib/enumLabels";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import { doctorDisplayName } from "@/lib/doctorName";
@@ -402,7 +403,7 @@ export default function PatientOverviewSnapshot({
                     </div>
                     <div className="text-xs font-medium truncate">{title || "—"}</div>
                     <div className="text-[10px] text-muted-foreground truncate">
-                      {d.document_type} · {formatDate(d.created_at, lang)}
+                      {enumLabel("document_type", d.document_type, lang)} · {formatDate(d.created_at, lang)}
                     </div>
                   </button>
                 );

@@ -16,6 +16,7 @@ import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatDateTime } from "@/lib/format";
+import { enumLabel } from "@/lib/enumLabels";
 import { ReportPageHeader } from "./_shared";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -91,7 +92,7 @@ export default function ScheduledReports() {
           <DialogContent>
             <DialogHeader><DialogTitle>{t("createSchedule")}</DialogTitle></DialogHeader>
             <div className="space-y-3">
-              <div><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+              <div><Label>{t("name")}</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
               <div><Label>{t("reportTemplate")}</Label>
                 <Select value={form.template_id} onValueChange={(v) => setForm({ ...form, template_id: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -116,7 +117,7 @@ export default function ScheduledReports() {
                   <SelectContent>
                     <SelectItem value="pdf">PDF</SelectItem>
                     <SelectItem value="excel">Excel</SelectItem>
-                    <SelectItem value="both">Both</SelectItem>
+                    <SelectItem value="both">{lang === "ar" ? "الصيغتان" : "Both"}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -137,7 +138,7 @@ export default function ScheduledReports() {
             <TableCell className="font-medium">{r.name}</TableCell>
             <TableCell>{lang === "ar" ? r.report_templates?.name_ar : r.report_templates?.name_en}</TableCell>
             <TableCell>{t(r.frequency as any)}</TableCell>
-            <TableCell className="uppercase text-xs">{r.format}</TableCell>
+            <TableCell className="uppercase text-xs">{enumLabel("report_format", r.format, lang)}</TableCell>
             <TableCell>{formatDateTime(r.next_run_at, lang)}</TableCell>
             <TableCell><Switch checked={r.is_active} onCheckedChange={(v) => toggle(r.id, v)} /></TableCell>
             <TableCell><Button variant="ghost" size="icon" onClick={() => setDeleteTarget(r)}><Trash2 className="size-4" /></Button></TableCell>

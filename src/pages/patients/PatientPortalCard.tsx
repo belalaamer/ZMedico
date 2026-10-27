@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Copy, KeyRound, RefreshCw, ShieldCheck } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
+import { enumLabel } from "@/lib/enumLabels";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { portalMutationFailure } from "@/lib/portalMutationFailure";
@@ -133,7 +134,7 @@ function PortalAccountCard({ patientId, patientEmail }: Props) {
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="text-muted-foreground">{lang === "ar" ? "الحالة" : "Status"}</span>
-            <Badge variant={account.status === "active" ? "default" : "secondary"} className="capitalize">{account.status}</Badge>
+            <Badge variant={account.status === "active" ? "default" : "secondary"}>{enumLabel("portal_account_status", account.status, lang)}</Badge>
             {account.must_change_password && (
               <Badge variant="outline">{lang === "ar" ? "يجب تغيير كلمة المرور عند أول دخول" : "Must change password on first login"}</Badge>
             )}

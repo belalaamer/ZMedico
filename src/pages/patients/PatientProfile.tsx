@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useI18n } from "@/contexts/I18nContext";
+import { enumLabel } from "@/lib/enumLabels";
 import { supabase } from "@/integrations/supabase/client";
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
@@ -446,7 +447,7 @@ export default function PatientProfile() {
                           <div className="text-sm font-medium truncate">{pc.diagnosis || "—"}</div>
                           <div className="text-xs text-muted-foreground">{formatDate(pc.start_date, lang)}</div>
                         </div>
-                        <Badge variant="outline" className="text-[10px] capitalize">{pc.status}</Badge>
+                        <Badge variant="outline" className="text-[10px]">{enumLabel("physio_case_status", pc.status, lang)}</Badge>
                       </Link>
                     ))}
                   </div>

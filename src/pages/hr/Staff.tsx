@@ -21,6 +21,8 @@ import { describeEdgeFailure, invokeFailureReason } from "@/lib/edgeFailure";
 import { useNavigate } from "react-router-dom";
 import JobRoleSelect from "@/components/JobRoleSelect";
 import { Can } from "@/components/Can";
+import { roleLabel } from "@/lib/roleLabels";
+import { enumLabel } from "@/lib/enumLabels";
 
 // Operational roles only. Administrative roles (`admin`, `system_owner`) are
 // intentionally excluded — they must be granted exclusively via the User
@@ -289,24 +291,24 @@ export default function Staff() {
                 <DialogHeader><DialogTitle>{editingId ? t("edit") : t("newStaff")}</DialogTitle></DialogHeader>
                 <Tabs defaultValue="identity" className="w-full">
                   <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 bg-muted/50 p-1 rounded-xl">
-                    <TabsTrigger value="identity">Identity & Access</TabsTrigger>
-                    <TabsTrigger value="employment">Employment</TabsTrigger>
-                    <TabsTrigger value="payroll">Payroll & Leaves</TabsTrigger>
-                    <TabsTrigger value="personal">Emergency</TabsTrigger>
+                    <TabsTrigger value="identity">{lang === "ar" ? "الهوية والصلاحيات" : "Identity & Access"}</TabsTrigger>
+                    <TabsTrigger value="employment">{lang === "ar" ? "التوظيف" : "Employment"}</TabsTrigger>
+                    <TabsTrigger value="payroll">{lang === "ar" ? "الرواتب والإجازات" : "Payroll & Leaves"}</TabsTrigger>
+                    <TabsTrigger value="personal">{lang === "ar" ? "جهات الطوارئ" : "Emergency"}</TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="identity" className="mt-4 space-y-3">
                     {!editingId && <div className="flex gap-2">
-                      <Button type="button" size="sm" variant={mode === "new" ? "default" : "outline"} onClick={() => setMode("new")}>+ New user</Button>
-                      <Button type="button" size="sm" variant={mode === "existing" ? "default" : "outline"} onClick={() => setMode("existing")}>Existing user</Button>
+                      <Button type="button" size="sm" variant={mode === "new" ? "default" : "outline"} onClick={() => setMode("new")}>{lang === "ar" ? "+ مستخدم جديد" : "+ New user"}</Button>
+                      <Button type="button" size="sm" variant={mode === "existing" ? "default" : "outline"} onClick={() => setMode("existing")}>{lang === "ar" ? "مستخدم موجود" : "Existing user"}</Button>
                     </div>}
                     {createdInfo && (
                       <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 p-4 rounded-lg flex flex-col gap-2 shadow-[0_0_20px_-5px_hsl(var(--success)/0.4)]">
-                        <div className="font-semibold flex items-center gap-2">✓ User created successfully</div>
+                        <div className="font-semibold flex items-center gap-2">✓ {lang === "ar" ? "تم إنشاء المستخدم بنجاح" : "User created successfully"}</div>
                         <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-                          <span className="text-emerald-700/70 dark:text-emerald-400/70">Email</span>
+                          <span className="text-emerald-700/70 dark:text-emerald-400/70">{t("email")}</span>
                           <span className="font-mono truncate">{createdInfo.email}</span>
-                          <span className="text-emerald-700/70 dark:text-emerald-400/70">Password</span>
+                          <span className="text-emerald-700/70 dark:text-emerald-400/70">{t("password")}</span>
                           <span className="flex items-center gap-2">
                             <span className="font-mono text-base font-bold px-2 py-0.5 rounded bg-emerald-500/15">{createdInfo.password}</span>
                             <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => { navigator.clipboard.writeText(createdInfo.password); toast.success(lang === "ar" ? "تم النسخ" : "Copied"); }}><Copy className="size-3.5" /></Button>
@@ -325,19 +327,19 @@ export default function Staff() {
                       ) : (
                         <>
                           <div className="space-y-2"><Label>{t("fullName")}</Label>
-                            <Input value={newUser.full_name} onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })} placeholder="Ahmed Ali" />
+                            <Input value={newUser.full_name} onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })} placeholder={lang === "ar" ? "أحمد علي" : "Ahmed Ali"} />
                           </div>
-                          <div className="space-y-2"><Label>Email</Label>
+                          <div className="space-y-2"><Label>{t("email")}</Label>
                             <Input type="email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} placeholder="user@example.com" />
                           </div>
-                          <div className="space-y-2"><Label>Role</Label>
+                          <div className="space-y-2"><Label>{t("role")}</Label>
                             <Select value={newUser.role} onValueChange={(v) => setNewUser({ ...newUser, role: v })}>
                               <SelectTrigger><SelectValue /></SelectTrigger>
-                              <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>)}</SelectContent>
+                              <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r}>{roleLabel(r, lang)}</SelectItem>)}</SelectContent>
                             </Select>
                           </div>
-                          <div className="space-y-2"><Label>Password (optional)</Label>
-                            <Input value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} placeholder="Auto-generated if empty" />
+                          <div className="space-y-2"><Label>{lang === "ar" ? "كلمة المرور (اختياري)" : "Password (optional)"}</Label>
+                            <Input value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} placeholder={lang === "ar" ? "تُولَّد تلقائياً إن تُركت فارغة" : "Auto-generated if empty"} />
                           </div>
                         </>
                       )}
@@ -413,8 +415,8 @@ export default function Staff() {
                       <div className="space-y-2"><Label>{t("commissionPercent")}</Label><Input type="number" step="0.01" min="0" max="100" value={form.commission_percent} onChange={(e) => setForm({ ...form, commission_percent: e.target.value })} /></div>
                       <div className="space-y-2"><Label>{t("bankName")}</Label><Input value={form.bank_name} onChange={(e) => setForm({ ...form, bank_name: e.target.value })} /></div>
                       <div className="space-y-2"><Label>{t("bankAccount")}</Label><Input value={form.bank_account} onChange={(e) => setForm({ ...form, bank_account: e.target.value })} /></div>
-                      <div className="space-y-2"><Label>Annual Leave</Label><Input type="number" value={form.annual_leave_balance} onChange={(e) => setForm({ ...form, annual_leave_balance: e.target.value })} /></div>
-                      <div className="space-y-2"><Label>Sick Leave</Label><Input type="number" value={form.sick_leave_balance} onChange={(e) => setForm({ ...form, sick_leave_balance: e.target.value })} /></div>
+                      <div className="space-y-2"><Label>{t("annualLeave")}</Label><Input type="number" value={form.annual_leave_balance} onChange={(e) => setForm({ ...form, annual_leave_balance: e.target.value })} /></div>
+                      <div className="space-y-2"><Label>{t("sickLeave")}</Label><Input type="number" value={form.sick_leave_balance} onChange={(e) => setForm({ ...form, sick_leave_balance: e.target.value })} /></div>
                     </div>
                   </TabsContent>
 

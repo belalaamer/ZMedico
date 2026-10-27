@@ -16,6 +16,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ConsumablesEditor } from "@/components/ConsumablesEditor";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { useBranch } from "@/contexts/BranchContext";
 
 type ServiceCategoryRow = {
@@ -94,8 +95,13 @@ export default function Services() {
     if (!name) return toast.error(t("nameRequired"));
     setSavingCat(true);
     const payload = { name_en: name, name_ar: name, icon: cf.icon || null, color: cf.color || null, display_order: cf.display_order, is_active: cf.is_active };
-    const { error } = editC ? await supabase.from("service_categories").update(payload).eq("id", editC.id) : await supabase.from("service_categories").insert(payload);
+    const { data, error } = editC
+      ? await supabase.from("service_categories").update(payload).eq("id", editC.id).select("id")
+      : await supabase.from("service_categories").insert(payload);
     if (error) { setSavingCat(false); return toast.error(error.message); }
+    // sc_admin is a FOR ALL policy, so the insert raises on a WITH CHECK failure
+    // but an update RLS filtered away is reported as a plain success.
+    if (editC && rowsWritten(data) === 0) { setSavingCat(false); return toast.error(notConfirmedCopy(lang, "save")); }
     toast.success(t("saved")); setOC(false); setSavingCat(false); load();
   };
   const saveSv = async () => {
@@ -116,8 +122,11 @@ export default function Services() {
       category_id: sf.category_id || null,
       cost_price: sf.cost_price,
     };
-    const { error } = editS ? await supabase.from("services").update(payload).eq("id", editS.id) : await supabase.from("services").insert(payload);
+    const { data, error } = editS
+      ? await supabase.from("services").update(payload).eq("id", editS.id).select("id")
+      : await supabase.from("services").insert(payload);
     if (error) { setSavingSv(false); return toast.error(error.message); }
+    if (editS && rowsWritten(data) === 0) { setSavingSv(false); return toast.error(notConfirmedCopy(lang, "save")); }
     toast.success(t("saved")); setOS(false); setSavingSv(false); load();
   };
   const toggleCatalogRow = async (table: "services" | "service_categories", id: string, active: boolean) => {
@@ -153,13 +162,15 @@ export default function Services() {
 
   const delCat = async (c: ServiceCategoryRow): Promise<void> => {
     if (services.some(s => s.category_id === c.id)) { toast.error(t("servicesHaveItems")); return; }
-    const { error } = await supabase.from("service_categories").update({ deleted_at: new Date().toISOString() }).eq("id", c.id);
+    const { data, error } = await supabase.from("service_categories").update({ deleted_at: new Date().toISOString() }).eq("id", c.id).select("id");
     if (error) { toast.error(error.message); return; }
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); load(); return; }
     toast.success(t("delete")); load();
   };
   const delSv = async (s: ServiceRow): Promise<void> => {
-    const { error } = await supabase.from("services").update({ deleted_at: new Date().toISOString() }).eq("id", s.id);
+    const { data, error } = await supabase.from("services").update({ deleted_at: new Date().toISOString() }).eq("id", s.id).select("id");
     if (error) { toast.error(error.message); return; }
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); load(); return; }
     toast.success(t("delete")); load();
   };
 

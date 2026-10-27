@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { RowActions } from "@/components/RowActions";
 import { Can } from "@/components/Can";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 
 export default function Positions() {
   const { t, lang } = useI18n();
@@ -82,10 +83,11 @@ export default function Positions() {
       group_key: form.group_key.trim() ? form.group_key.trim().toLowerCase() : null,
       sort_order: form.sort_order !== "" ? Number(form.sort_order) : 0,
     };
-    const { error } = edit
-      ? await supabase.from("staff_positions").update(payload).eq("id", edit.id)
+    const { data, error } = edit
+      ? await supabase.from("staff_positions").update(payload).eq("id", edit.id).select("id")
       : await supabase.from("staff_positions").insert(payload);
     if (error) return toast.error(error.message);
+    if (edit && rowsWritten(data) === 0) return toast.error(notConfirmedCopy(lang, "save"));
     toast.success(t("save")); setOpen(false); load();
   };
 
@@ -94,8 +96,9 @@ export default function Positions() {
   const softDelete = async (p: any) => {
     const { count } = await supabase.from("staff_profiles").select("id", { count: "exact", head: true }).eq("position_id", p.id);
     if ((count ?? 0) > 0) { toast.error(lang === "ar" ? "لا يمكن الحذف: مرتبط بموظفين" : "Cannot delete: in use by staff"); return; }
-    const { error } = await supabase.from("staff_positions").update({ deleted_at: new Date().toISOString() } as any).eq("id", p.id);
+    const { data, error } = await supabase.from("staff_positions").update({ deleted_at: new Date().toISOString() } as any).eq("id", p.id).select("id");
     if (error) { toast.error(error.message); return; }
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); load(); return; }
     toast.success(t("delete")); load();
   };
   const filtered = filterDept === "all" ? items : items.filter((p) => p.department_id === filterDept);

@@ -7,6 +7,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 
 type Row = {
   id?: string;
@@ -69,8 +70,11 @@ export function ConsumablesEditor({
   const removeRow = async (i: number) => {
     const row = rows[i];
     if (row.id) {
-      const { error } = await supabase.from("service_consumables").delete().eq("id", row.id);
+      // sc_admin_delete is admin-only; a filtered delete answers 2xx, and
+      // dropping the row locally would hide a consumable that still counts.
+      const { data, error } = await supabase.from("service_consumables").delete().eq("id", row.id).select("id");
       if (error) { toast.error(error.message); return; }
+      if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); return; }
     }
     setRows((r) => r.filter((_, idx) => idx !== i));
   };
@@ -95,12 +99,20 @@ export function ConsumablesEditor({
       const { error } = await supabase.from("service_consumables").insert(toInsert as any);
       if (error) { toast.error(error.message); return; }
     }
+    let unwritten = 0;
     for (const r of toUpdate) {
-      const { error } = await supabase.from("service_consumables")
-        .update({ product_id: r.product_id, quantity: r.quantity }).eq("id", r.id!);
+      const { data, error } = await supabase.from("service_consumables")
+        .update({ product_id: r.product_id, quantity: r.quantity }).eq("id", r.id!).select("id");
       if (error) { toast.error(error.message); return; }
+      if (rowsWritten(data) === 0) unwritten += 1;
     }
-    toast.success(t("saved"));
+    if (unwritten) {
+      toast.error(lang === "ar"
+        ? `لم يتم حفظ ${unwritten} من صفوف المستهلكات.`
+        : `${unwritten} consumable row(s) were not saved.`);
+    } else {
+      toast.success(t("saved"));
+    }
     // Reload to clear dirty flags + capture new ids
     const { data } = await supabase.from("service_consumables")
       .select("id,product_id,quantity").eq(col, parentId);

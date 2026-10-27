@@ -12,6 +12,7 @@ import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Trash2, Plus } from "lucide-react";
+import { rowsWritten } from "@/lib/writeOutcome";
 
 type EventType = "booking_confirmation" | "appointment_reminder" | "appointment_rescheduled" | "appointment_cancelled" | "invoice_issued" | "payment_receipt" | "win_back";
 type Channel = "whatsapp" | "sms" | "email";
@@ -110,8 +111,13 @@ export default function AutomatedCommunication() {
       // Deletes
       const deletes = templates.filter(r => r._delete && r.id).map(r => r.id!);
       if (deletes.length) {
-        const { error } = await supabase.from("communication_templates").delete().in("id", deletes);
+        const { data, error } = await supabase.from("communication_templates").delete().in("id", deletes).select("id");
         if (error) throw error;
+        if (rowsWritten(data) !== deletes.length) {
+          throw new Error(lang === "ar"
+            ? "لم يتم حذف بعض القوالب — لم تعد متاحة لهذا الفرع."
+            : "Some templates were not deleted — they are no longer available to this branch.");
+        }
       }
 
       // Upserts (insert new and update existing)
@@ -128,8 +134,14 @@ export default function AutomatedCommunication() {
         meta_template_language: r.meta_template_language || "ar",
       }));
       if (toUpsert.length) {
-        const { error } = await supabase.from("communication_templates").upsert(toUpsert as any);
+        const { data, error } = await supabase.from("communication_templates").upsert(toUpsert as any).select("id");
         if (error) throw error;
+        // An upsert whose UPDATE half RLS filtered away still answers 2xx.
+        if (rowsWritten(data) !== toUpsert.length) {
+          throw new Error(lang === "ar"
+            ? "لم يتم حفظ بعض القوالب — هذا الفرع غير قابل للتعديل بصلاحيتك."
+            : "Some templates were not saved — this branch is not writable for you.");
+        }
       }
 
       const { error: nsErr } = await (supabase as any).rpc("upsert_notification_settings", {

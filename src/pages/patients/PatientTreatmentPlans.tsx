@@ -20,6 +20,7 @@ import { formatDate, formatMoney } from "@/lib/format";
 import { toast } from "sonner";
 import { Can } from "@/components/Can";
 import { doctorDisplayName } from "@/lib/doctorName";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 
 type Plan = any;
 type Session = any;
@@ -111,10 +112,19 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
         created_by: user?.id ?? null,
       };
     });
-    await (supabase as any).from("treatment_sessions").insert(rows);
+    const { error: sessionError } = await (supabase as any).from("treatment_sessions").insert(rows);
     setSaving(false);
     setOpen(false);
     setForm({ name_ar: "", name_en: "", doctor_id: "", total_sessions: 10, price: 0, start_date: new Date().toISOString().slice(0, 10) });
+    // The plan row is committed by now, so a failed session batch must be said
+    // out loud instead of showing an empty plan under a "created" toast.
+    if (sessionError) {
+      toast.error(lang === "ar"
+        ? `تم إنشاء الخطة، لكن لم يتم إنشاء ${rows.length} جلسة (${sessionError.message}).`
+        : `The plan was created, but its ${rows.length} sessions were not (${sessionError.message}).`);
+      load();
+      return;
+    }
     toast.success(lang === "ar" ? "تم إنشاء الخطة" : "Plan created");
     load();
   };
@@ -123,12 +133,22 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
     const patch: any = { status };
     if (status === "completed") patch.performed_at = new Date().toISOString();
     else if (status === "pending") patch.performed_at = null;
-    const { error } = await (supabase as any).from("treatment_sessions").update(patch).eq("id", s.id);
+    const { data, error } = await (supabase as any).from("treatment_sessions").update(patch).eq("id", s.id).select("id");
     if (error) { toast.error(error.message); return; }
+    // "ts update" only lets a doctor touch sessions of plans they own, so a
+    // second doctor pressing Complete gets HTTP 200 and zero rows today.
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); load(); return; }
     // Sync linked appointment status if any
     if (s.appointment_id) {
       const apptStatus = status === "completed" ? "completed" : status === "missed" ? "no_show" : "scheduled";
-      await (supabase as any).from("appointments").update({ status: apptStatus }).eq("id", s.appointment_id);
+      const { data: apptRows, error: apptError } = await (supabase as any)
+        .from("appointments").update({ status: apptStatus }).eq("id", s.appointment_id).select("id");
+      if (apptError) { toast.error(apptError.message); load(); return; }
+      if (rowsWritten(apptRows) === 0) {
+        toast.error(lang === "ar"
+          ? "تم تحديث الجلسة، لكن الموعد المرتبط بها لم يتحدّث. افتح الموعد وحدّث حالته."
+          : "The session was updated, but its linked appointment was not. Open the appointment and set its status.");
+      }
     }
     load();
   };
@@ -177,8 +197,9 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
         const { data: cur } = await (supabase as any).from("appointments").select("notes").eq("id", appointmentId).maybeSingle();
         patch.notes = `${cur?.notes ?? ""}${overrideNote}`;
       }
-      const { error } = await (supabase as any).from("appointments").update(patch).eq("id", appointmentId);
+      const { data: apptRows, error } = await (supabase as any).from("appointments").update(patch).eq("id", appointmentId).select("id");
       if (error) { toast.error(error.message); return; }
+      if (rowsWritten(apptRows) === 0) { toast.error(notConfirmedCopy(lang, "save")); return; }
     } else {
       const { data, error } = await (supabase as any).from("appointments").insert({
         patient_id: patientId,
@@ -193,14 +214,23 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
       if (error) { toast.error(error.message); return; }
       appointmentId = data.id;
     }
-    const { error: e2 } = await (supabase as any).from("treatment_sessions").update({
+    const { data: linkRows, error: e2 } = await (supabase as any).from("treatment_sessions").update({
       appointment_id: appointmentId,
       scheduled_date: scheduled_at.slice(0, 10),
       notes: overrideReason
         ? `${schedSession.notes ?? ""}${overrideNote}`.trim()
         : schedSession.notes,
-    }).eq("id", schedSession.id);
+    }).eq("id", schedSession.id).select("id");
     if (e2) { toast.error(e2.message); return; }
+    if (rowsWritten(linkRows) === 0) {
+      // The appointment row is already committed at this point, so the message
+      // has to name the half that survived instead of claiming a scheduling.
+      toast.error(lang === "ar"
+        ? "تم حفظ الموعد، لكن تعذر ربطه بالجلسة. افتح الموعد وأضِف رقم الجلسة إليه."
+        : "The appointment was saved, but it could not be linked to this session. Open the appointment and link it to the session.");
+      load();
+      return;
+    }
     toast.success(lang === "ar" ? "تم جدولة الجلسة" : "Session scheduled");
     setSchedSession(null);
     setSchedAt("");
@@ -209,34 +239,60 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
   };
 
   const cancelPlan = async (p: Plan) => {
-    const { error: err1 } = await (supabase as any).from("treatment_plans").update({ status: "cancelled" }).eq("id", p.id);
+    const { data: planRows, error: err1 } = await (supabase as any)
+      .from("treatment_plans").update({ status: "cancelled" }).eq("id", p.id).select("id");
     if (err1) { toast.error(err1.message); return; }
+    // "tp update" filters a doctor who is not the plan's own doctor. Without this
+    // proof the next two writes went through while the plan stayed active.
+    if (rowsWritten(planRows) === 0) { toast.error(notConfirmedCopy(lang, "save")); load(); return; }
     // Cancel any pending sessions and their linked future appointments
     const pending = (sessionsByPlan[p.id] ?? []).filter((s) => s.status === "pending");
     const apptIds = pending.map((s) => s.appointment_id).filter(Boolean);
+    let apptCancelled = 0;
     if (apptIds.length) {
-      const { error: err2 } = await (supabase as any)
+      const { data: apptRows, error: err2 } = await (supabase as any)
         .from("appointments")
         .update({ status: "cancelled" })
         .in("id", apptIds)
-        .gte("scheduled_at", new Date().toISOString());
-      if (err2) { toast.error(err2.message); return; }
+        .gte("scheduled_at", new Date().toISOString())
+        .select("id");
+      if (err2) { toast.error(err2.message); load(); return; }
+      apptCancelled = rowsWritten(apptRows);
     }
     const pendingIds = pending.map((s) => s.id);
+    let sessionCancelled = 0;
     if (pendingIds.length) {
-      const { error: err3 } = await (supabase as any)
+      const { data: sessionRows, error: err3 } = await (supabase as any)
         .from("treatment_sessions")
         .update({ status: "cancelled" })
-        .in("id", pendingIds);
-      if (err3) { toast.error(err3.message); return; }
+        .in("id", pendingIds)
+        .select("id");
+      if (err3) { toast.error(err3.message); load(); return; }
+      sessionCancelled = rowsWritten(sessionRows);
     }
-    toast.success(lang === "ar" ? "تم إلغاء الخطة والمواعيد المرتبطة" : "Plan and linked appointments cancelled");
+    // A past appointment is skipped by the gte() filter on purpose, so only a
+    // total miss on the appointments and a partial miss on this plan's own
+    // sessions (same plan, same doctor, all-or-nothing) are worth reporting.
+    if (apptIds.length > 0 && apptCancelled === 0 && sessionCancelled === pendingIds.length) {
+      toast.error(lang === "ar"
+        ? "تم إلغاء الخطة والجلسات، لكن لم يُلغَ أي موعد مرتبط (ماضي أو خارج صلاحياتك)."
+        : "The plan and its sessions were cancelled, but none of the linked appointments were (past, or outside your access).");
+    } else if (sessionCancelled < pendingIds.length) {
+      toast.error(lang === "ar"
+        ? "تم إلغاء الخطة، لكن بعض الجلسات لم تُلغى. حدّث القائمة وتحقق قبل الاعتماد عليها."
+        : "The plan was cancelled, but some of its sessions were not. Refresh and check before relying on it.");
+    } else {
+      toast.success(lang === "ar" ? "تم إلغاء الخطة والمواعيد المرتبطة" : "Plan and linked appointments cancelled");
+    }
     load();
   };
 
   const deletePlan = async (p: Plan) => {
-    const { error } = await (supabase as any).from("treatment_plans").update({ deleted_at: new Date().toISOString() }).eq("id", p.id);
+    const { data, error } = await (supabase as any)
+      .from("treatment_plans").update({ deleted_at: new Date().toISOString() }).eq("id", p.id).select("id");
     if (error) { toast.error(error.message); return; }
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); load(); return; }
+    toast.success(lang === "ar" ? "تم حذف الخطة" : "Plan deleted");
     load();
   };
 

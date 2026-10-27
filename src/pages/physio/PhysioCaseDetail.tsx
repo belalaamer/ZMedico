@@ -17,12 +17,32 @@ import { ListSkeleton } from "@/components/ListSkeleton";
 import { subscribeResilient } from "@/lib/realtime";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatDateTime } from "@/lib/format";
 import { patientDisplayName } from "@/lib/patientName";
 import { doctorDisplayName } from "@/lib/doctorName";
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { logPhiAccess } from "@/lib/observability/phiAudit";
+
+// Arabic-only labels with an English fallback, the shape PhysioCases.tsx uses, so
+// the English desk is untouched and no enum reaches an Arabic screen raw.
+function enumLabel(lang: string, map: Record<string, string>, value: string) {
+  return lang === "ar" ? (map[value] ?? value) : value;
+}
+
+const CASE_STATUS_AR: Record<string, string> = {
+  active: "نشطة", completed: "مكتملة", paused: "متوقفة", cancelled: "ملغاة",
+};
+const ATTENDANCE_AR: Record<string, string> = {
+  scheduled: "مجدولة", done: "تمت", missed: "لم تحضر", cancelled: "ملغاة",
+};
+const TREND_AR: Record<string, string> = {
+  improving: "في تحسن", unchanged: "بدون تغيير", worsening: "في تدهور",
+};
+const APPT_STATUS_AR: Record<string, string> = {
+  scheduled: "مجدول", confirmed: "مؤكد", in_progress: "جارٍ", completed: "مكتمل",
+  cancelled: "ملغي", no_show: "لم يحضر", departed: "غادر",
+};
 
 export default function PhysioCaseDetail() {
   const { id } = useParams();
@@ -39,6 +59,7 @@ export default function PhysioCaseDetail() {
   const [appointmentMap, setAppointmentMap] = useState<Record<string, any>>({});
   const [sessOpen, setSessOpen] = useState(false);
   const [reOpen, setReOpen] = useState(false);
+  const [statusDraft, setStatusDraft] = useState<{ status: "completed" | "paused"; text: string } | null>(null);
   const phiLogged = useRef(false);
 
   const loadAll = async () => {
@@ -109,6 +130,11 @@ export default function PhysioCaseDetail() {
 
   const patientName = (p: any) => patientDisplayName(p, lang);
 
+  const statusLabel = (s: string) => enumLabel(lang, CASE_STATUS_AR, s);
+  const attendanceLabel = (s: string) => enumLabel(lang, ATTENDANCE_AR, s);
+  const trendLabel = (s: string) => enumLabel(lang, TREND_AR, s);
+  const appointmentStatusLabel = (s: string) => enumLabel(lang, APPT_STATUS_AR, s);
+
   const done = sessions.filter(s => s.attendance === "done").length;
   const remaining = Math.max(0, (c?.expected_sessions ?? 0) - done);
   const lastDone = useMemo(() => {
@@ -124,15 +150,32 @@ export default function PhysioCaseDetail() {
     return upcoming[0] ?? null;
   }, [sessions]);
 
-  const updateStatus = async (status: string) => {
+  // A native prompt() answers Cancel with null, so the old code read a cancelled
+  // "completion summary" as an empty one and wrote the status anyway: pressing
+  // Cancel completed the case. Completed/paused now open a dialog the user has
+  // to confirm, and dismissing it writes nothing.
+  const requestStatus = (next: string) => {
+    if (next === c.status) return;
+    if (next === "completed" || next === "paused") {
+      setStatusDraft({ status: next, text: "" });
+      return;
+    }
+    void updateStatus(next);
+  };
+
+  const saveStatusDraft = async () => {
+    const draft = statusDraft;
+    setStatusDraft(null);
+    if (draft) await updateStatus(draft.status, draft.text);
+  };
+
+  const updateStatus = async (status: string, note?: string) => {
     const patch: any = { status };
     if (status === "completed") {
-      const summary = prompt("Completion summary (optional)") ?? "";
-      patch.completion_summary = summary || c?.completion_summary || null;
+      patch.completion_summary = note?.trim() || c?.completion_summary || null;
       patch.completed_at = new Date().toISOString();
     } else if (status === "paused") {
-      const reason = prompt("Pause reason (optional)") ?? "";
-      patch.pause_reason = reason || c?.pause_reason || null;
+      patch.pause_reason = note?.trim() || c?.pause_reason || null;
     } else if (status === "active") {
       patch.completed_at = null;
     }
@@ -163,15 +206,15 @@ export default function PhysioCaseDetail() {
   if (status === "loading") return <div className="p-6"><ListSkeleton rows={6} /></div>;
   if (status === "notfound") return (
     <div className="p-10 text-center space-y-3">
-      <div className="text-muted-foreground">Case not found or has been removed.</div>
-      <Button asChild variant="outline"><Link to="/physio"><ArrowLeft className="size-4 me-2" />Back</Link></Button>
+      <div className="text-muted-foreground">{lang === "ar" ? "لم يتم العثور على الحالة أو تمت إزالتها." : "Case not found or has been removed."}</div>
+      <Button asChild variant="outline"><Link to="/physio"><ArrowLeft className="size-4 me-2" />{lang === "ar" ? "رجوع" : "Back"}</Link></Button>
     </div>
   );
   if (status === "error") return (
     <div className="p-10 text-center space-y-3">
       <AlertCircle className="size-6 text-destructive mx-auto" />
-      <div className="text-sm text-destructive">{errMsg ?? "Failed to load."}</div>
-      <Button variant="outline" onClick={loadAll}>Retry</Button>
+      <div className="text-sm text-destructive">{errMsg ?? (lang === "ar" ? "تعذر تحميل الحالة." : "Failed to load.")}</div>
+      <Button variant="outline" onClick={loadAll}>{lang === "ar" ? "إعادة المحاولة" : "Retry"}</Button>
     </div>
   );
 
@@ -182,25 +225,25 @@ export default function PhysioCaseDetail() {
           <Button variant="ghost" size="icon" asChild><Link to="/physio"><ArrowLeft className="size-4" /></Link></Button>
           <div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight" dir="auto">{patientName(c.patients)}</h1>
-            <p className="text-sm text-muted-foreground">{c.diagnosis || "—"} · start {formatDate(c.start_date, lang)}</p>
+            <p className="text-sm text-muted-foreground">{c.diagnosis || "—"} · {lang === "ar" ? "بدءًا من" : "start"} {formatDate(c.start_date, lang)}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {authz.can("medical_records.edit") ? (
-            <Select value={c.status} onValueChange={updateStatus}>
+            <Select value={c.status} onValueChange={requestStatus}>
               <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="paused">Paused</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
+                <SelectItem value="active">{lang === "ar" ? "نشطة" : "Active"}</SelectItem>
+                <SelectItem value="paused">{lang === "ar" ? "متوقفة" : "Paused"}</SelectItem>
+                <SelectItem value="completed">{lang === "ar" ? "مكتملة" : "Completed"}</SelectItem>
+                <SelectItem value="cancelled">{lang === "ar" ? "ملغاة" : "Cancelled"}</SelectItem>
               </SelectContent>
             </Select>
           ) : (
-            <Badge variant="outline">{c.status}</Badge>
+            <Badge variant="outline">{statusLabel(c.status)}</Badge>
           )}
           <Can module="medical_records" action="delete">
-            <Button variant="ghost" size="icon" onClick={softDeleteCase} title="Delete case">
+            <Button variant="ghost" size="icon" onClick={softDeleteCase} title={lang === "ar" ? "حذف الحالة" : "Delete case"}>
               <Trash2 className="size-4 text-destructive" />
             </Button>
           </Can>
@@ -209,25 +252,31 @@ export default function PhysioCaseDetail() {
 
       {c.status === "completed" && c.completion_summary && (
         <Card className="p-3 border-success/30 bg-success/5 text-sm">
-          <div className="font-semibold mb-1">Completion summary</div>
+          <div className="font-semibold mb-1">{lang === "ar" ? "ملخص الإتمام" : "Completion summary"}</div>
           <div className="whitespace-pre-wrap">{c.completion_summary}</div>
         </Card>
       )}
       {c.status === "paused" && (
         <Card className="p-3 border-warning/30 bg-warning/5 text-sm">
-          <div className="font-semibold mb-1">Paused</div>
+          <div className="font-semibold mb-1">{lang === "ar" ? "الحالة متوقفة" : "Paused"}</div>
           <div className="whitespace-pre-wrap">{c.pause_reason || "—"}</div>
         </Card>
       )}
       {c.status === "active" && c.followup_enabled && c.followup_due_date && c.followup_due_date < new Date().toISOString().slice(0,10) && (
         <Card className="p-3 border-destructive/40 bg-destructive/5 text-sm flex items-center gap-2">
           <AlertCircle className="size-4 text-destructive" />
-          <span>Follow-up overdue (due {formatDate(c.followup_due_date, lang)}). Consider a reassessment.</span>
+          <span>
+            {lang === "ar"
+              ? `المتابعة متأخرة (المطلوبة ${formatDate(c.followup_due_date, lang)}). يُنصح بإعادة التقييم.`
+              : `Follow-up overdue (due ${formatDate(c.followup_due_date, lang)}). Consider a reassessment.`}
+          </span>
         </Card>
       )}
       {(c.expected_sessions ?? 0) > 0 && sessions.filter(s => s.attendance === "done").length >= (c.expected_sessions ?? 0) && c.status === "active" && (
         <Card className="p-3 border-primary/30 bg-primary/5 text-sm">
-          Expected sessions reached. Consider a reassessment or marking the case as completed.
+          {lang === "ar"
+            ? "وصلت إلى عدد الجلسات المتوقع. أعد التقييم أو علّم الحالة كمكتملة."
+            : "Expected sessions reached. Consider a reassessment or marking the case as completed."}
         </Card>
       )}
 
@@ -235,7 +284,7 @@ export default function PhysioCaseDetail() {
         <Card className="p-4 shadow-card border-l-4 border-l-emerald-500 bg-emerald-500/5">
           <div className="flex items-start justify-between">
             <div>
-              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Completed</div>
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{lang === "ar" ? "المكتملة" : "Completed"}</div>
               <div className="text-3xl font-bold tabular-nums mt-1">{done}</div>
             </div>
             <CheckCircle2 className="size-5 text-emerald-500/70" />
@@ -244,7 +293,7 @@ export default function PhysioCaseDetail() {
         <Card className={`p-4 shadow-card border-l-4 ${remaining === 0 ? "border-l-primary bg-primary/5" : "border-l-amber-500 bg-amber-500/5"}`}>
           <div className="flex items-start justify-between">
             <div>
-              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Remaining</div>
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{lang === "ar" ? "المتبقي" : "Remaining"}</div>
               <div className="text-3xl font-bold tabular-nums mt-1">{remaining}</div>
             </div>
             <Clock className={`size-5 ${remaining === 0 ? "text-primary/70" : "text-amber-500/70"}`} />
@@ -253,7 +302,7 @@ export default function PhysioCaseDetail() {
         <Card className="p-4 shadow-card border-l-4 border-l-sky-500 bg-sky-500/5">
           <div className="flex items-start justify-between">
             <div>
-              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Last session</div>
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{lang === "ar" ? "آخر جلسة" : "Last session"}</div>
               <div className="text-sm font-semibold mt-1">{lastDone ? formatDate(lastDone, lang) : "—"}</div>
             </div>
             <Activity className="size-5 text-sky-500/70" />
@@ -262,7 +311,7 @@ export default function PhysioCaseDetail() {
         <Card className="p-4 shadow-card border-l-4 border-l-primary bg-primary/5">
           <div className="flex items-start justify-between">
             <div>
-              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Next planned</div>
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{lang === "ar" ? "الجلسة القادمة" : "Next planned"}</div>
               <div className="text-sm font-semibold mt-1">{nextPlanned ? formatDate(nextPlanned, lang) : "—"}</div>
             </div>
             <CalendarCheck className="size-5 text-primary/70" />
@@ -277,8 +326,8 @@ export default function PhysioCaseDetail() {
               <Stethoscope className="size-4" />
             </div>
             <div>
-              <div className="text-sm font-semibold">Quick actions</div>
-              <div className="text-xs text-muted-foreground">Document a session or record a reassessment</div>
+              <div className="text-sm font-semibold">{lang === "ar" ? "إجراءات سريعة" : "Quick actions"}</div>
+              <div className="text-xs text-muted-foreground">{lang === "ar" ? "توثيق جلسة أو تسجيل إعادة تقييم" : "Document a session or record a reassessment"}</div>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -303,16 +352,16 @@ export default function PhysioCaseDetail() {
 
       <Tabs defaultValue="sessions" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="sessions">Sessions</TabsTrigger>
-          <TabsTrigger value="reassessments">Reassessments</TabsTrigger>
-          <TabsTrigger value="overview">Plan</TabsTrigger>
-          <TabsTrigger value="followup">Follow-up</TabsTrigger>
+          <TabsTrigger value="sessions">{lang === "ar" ? "الجلسات" : "Sessions"}</TabsTrigger>
+          <TabsTrigger value="reassessments">{lang === "ar" ? "إعادة التقييم" : "Reassessments"}</TabsTrigger>
+          <TabsTrigger value="overview">{lang === "ar" ? "الخطة" : "Plan"}</TabsTrigger>
+          <TabsTrigger value="followup">{lang === "ar" ? "المتابعة" : "Follow-up"}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="sessions" className="space-y-3">
           <Card className="overflow-hidden">
             {sessions.length === 0 ? (
-              <div className="p-10 text-center text-muted-foreground">No sessions yet.</div>
+              <div className="p-10 text-center text-muted-foreground">{lang === "ar" ? "لا توجد جلسات بعد." : "No sessions yet."}</div>
             ) : (
               <div className="p-4">
                 <ol className="relative border-s-2 border-border ms-3 space-y-4">
@@ -332,30 +381,32 @@ export default function PhysioCaseDetail() {
                         <span className={`absolute -start-[9px] mt-1.5 size-4 rounded-full ring-4 ${dotClass}`} />
                         <Card className="p-3 space-y-1.5 shadow-card">
                           <div className="flex items-center justify-between gap-3 flex-wrap">
-                            <div className="font-semibold text-sm">Session #{s.session_number} · {formatDate(s.session_date, lang)}</div>
-                            <Badge variant="outline" className={`capitalize ${badgeClass}`}>{s.attendance}</Badge>
+                            <div className="font-semibold text-sm">{lang === "ar" ? `جلسة رقم ${s.session_number}` : `Session #${s.session_number}`} · {formatDate(s.session_date, lang)}</div>
+                            <Badge variant="outline" className={`capitalize ${badgeClass}`}>{attendanceLabel(s.attendance)}</Badge>
                           </div>
                           {s.appointment_id ? (
                             appointmentMap[s.appointment_id] ? (
                               <div className="text-xs flex items-center gap-1 text-muted-foreground">
                                 <Calendar className="size-3" />
-                                Linked appointment · {new Date(appointmentMap[s.appointment_id].scheduled_at).toLocaleString()} · {appointmentMap[s.appointment_id].status}
+                                {lang === "ar" ? "موعد مرتبط · " : "Linked appointment · "}
+                                {formatDateTime(appointmentMap[s.appointment_id].scheduled_at, lang)} · {appointmentStatusLabel(appointmentMap[s.appointment_id].status)}
                               </div>
                             ) : (
                               <div className="text-xs flex items-center gap-1 text-muted-foreground">
                                 <Calendar className="size-3" />
-                                Linked appointment · <span className="font-mono">#{String(s.appointment_id).slice(0, 8)}</span>
+                                {lang === "ar" ? "موعد مرتبط · " : "Linked appointment · "}
+                                <span className="font-mono">#{String(s.appointment_id).slice(0, 8)}</span>
                               </div>
                             )
                           ) : (
-                            <div className="text-[11px] text-muted-foreground">Standalone (no appointment)</div>
+                            <div className="text-[11px] text-muted-foreground">{lang === "ar" ? "جلسة غير مرتبطة بموعد" : "Standalone (no appointment)"}</div>
                           )}
                           {(s.pain_level !== null && s.pain_level !== undefined) && (
-                            <div className="text-xs"><span className="text-muted-foreground">Pain: </span><span className="font-medium tabular-nums">{s.pain_level}/10</span></div>
+                            <div className="text-xs"><span className="text-muted-foreground">{lang === "ar" ? "الألم: " : "Pain: "}</span><span className="font-medium tabular-nums">{s.pain_level}/10</span></div>
                           )}
-                          {s.interventions && <div className="text-sm"><span className="text-muted-foreground">Interventions: </span>{s.interventions}</div>}
-                          {s.progress_note && <div className="text-sm"><span className="text-muted-foreground">Progress: </span>{s.progress_note}</div>}
-                          {s.next_recommendation && <div className="text-sm"><span className="text-muted-foreground">Next: </span>{s.next_recommendation}</div>}
+                          {s.interventions && <div className="text-sm"><span className="text-muted-foreground">{lang === "ar" ? "التدخلات: " : "Interventions: "}</span>{s.interventions}</div>}
+                          {s.progress_note && <div className="text-sm"><span className="text-muted-foreground">{lang === "ar" ? "التقدم: " : "Progress: "}</span>{s.progress_note}</div>}
+                          {s.next_recommendation && <div className="text-sm"><span className="text-muted-foreground">{lang === "ar" ? "الخطة التالية: " : "Next: "}</span>{s.next_recommendation}</div>}
                         </Card>
                       </li>
                     );
@@ -369,7 +420,7 @@ export default function PhysioCaseDetail() {
         <TabsContent value="reassessments" className="space-y-3">
           <Card className="overflow-hidden">
             {reassessments.length === 0 ? (
-              <div className="p-10 text-center text-muted-foreground">No reassessments yet.</div>
+              <div className="p-10 text-center text-muted-foreground">{lang === "ar" ? "لا توجد إعادة تقييم بعد." : "No reassessments yet."}</div>
             ) : (
               <div className="divide-y divide-border">
                 {reassessments.map(r => (
@@ -378,12 +429,12 @@ export default function PhysioCaseDetail() {
                       <div className="font-medium">{formatDate(r.assessment_date, lang)}</div>
                       <Badge variant="outline" className={r.trend === "improving" ? "status-completed" : r.trend === "worsening" ? "status-cancelled" : "status-pending"}>
                         {r.trend === "improving" ? <TrendingUp className="size-3 me-1 inline" /> : r.trend === "worsening" ? <TrendingDown className="size-3 me-1 inline" /> : <Minus className="size-3 me-1 inline" />}
-                        {r.trend}
+                        {trendLabel(r.trend)}
                       </Badge>
                     </div>
-                    {r.initial_condition && <div className="text-sm"><span className="text-muted-foreground">Initial: </span>{r.initial_condition}</div>}
-                    {r.current_condition && <div className="text-sm"><span className="text-muted-foreground">Current: </span>{r.current_condition}</div>}
-                    {r.plan_update && <div className="text-sm"><span className="text-muted-foreground">Plan update: </span>{r.plan_update}</div>}
+                    {r.initial_condition && <div className="text-sm"><span className="text-muted-foreground">{lang === "ar" ? "الحالة المبدئية: " : "Initial: "}</span>{r.initial_condition}</div>}
+                    {r.current_condition && <div className="text-sm"><span className="text-muted-foreground">{lang === "ar" ? "الحالة الحالية: " : "Current: "}</span>{r.current_condition}</div>}
+                    {r.plan_update && <div className="text-sm"><span className="text-muted-foreground">{lang === "ar" ? "تحديث الخطة: " : "Plan update: "}</span>{r.plan_update}</div>}
                     {r.notes && <div className="text-sm text-muted-foreground">{r.notes}</div>}
                   </div>
                 ))}
@@ -394,10 +445,10 @@ export default function PhysioCaseDetail() {
 
         <TabsContent value="overview">
           <Card className="p-4 space-y-3">
-            <Field label="Goal" value={c.treatment_goal} />
-            <Field label="Plan" value={c.treatment_plan} />
-            <Field label="Notes" value={c.notes} />
-            <Field label="Expected sessions" value={String(c.expected_sessions ?? 0)} />
+            <Field label={lang === "ar" ? "الهدف" : "Goal"} value={c.treatment_goal} />
+            <Field label={lang === "ar" ? "خطة العلاج" : "Plan"} value={c.treatment_plan} />
+            <Field label={lang === "ar" ? "ملاحظات" : "Notes"} value={c.notes} />
+            <Field label={lang === "ar" ? "عدد الجلسات المتوقع" : "Expected sessions"} value={String(c.expected_sessions ?? 0)} />
           </Card>
         </TabsContent>
 
@@ -410,13 +461,13 @@ export default function PhysioCaseDetail() {
                     <BellRing className="size-5" />
                   </div>
                   <div>
-                    <div className="font-semibold">Follow-up reminders</div>
-                    <div className="text-xs text-muted-foreground">Track when this case needs a reassessment or check-in.</div>
+                    <div className="font-semibold">{lang === "ar" ? "تذكيرات المتابعة" : "Follow-up reminders"}</div>
+                    <div className="text-xs text-muted-foreground">{lang === "ar" ? "تتبّع متى تحتاج هذه الحالة إعادة تقييم أو متابعة." : "Track when this case needs a reassessment or check-in."}</div>
                   </div>
                 </div>
-                <Can module="medical_records" action="edit" fallback={<Badge variant="outline">{c.followup_enabled ? "On" : "Off"}</Badge>}>
+                <Can module="medical_records" action="edit" fallback={<Badge variant="outline">{lang === "ar" ? (c.followup_enabled ? "مفعّل" : "متوقف") : (c.followup_enabled ? "On" : "Off")}</Badge>}>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">{c.followup_enabled ? "Enabled" : "Disabled"}</span>
+                    <span className="text-xs text-muted-foreground">{lang === "ar" ? (c.followup_enabled ? "مفعّل" : "متوقف") : (c.followup_enabled ? "Enabled" : "Disabled")}</span>
                     <Switch checked={!!c.followup_enabled} onCheckedChange={(v) => saveFollowup({ followup_enabled: v })} />
                   </div>
                 </Can>
@@ -426,34 +477,34 @@ export default function PhysioCaseDetail() {
             <Can module="medical_records" action="edit">
               <Card className="p-5 shadow-card space-y-4">
                 <div>
-                  <div className="text-sm font-semibold mb-1">Schedule</div>
-                  <div className="text-xs text-muted-foreground mb-3">Configure the interval and due date for the next follow-up.</div>
+                  <div className="text-sm font-semibold mb-1">{lang === "ar" ? "الموعد" : "Schedule"}</div>
+                  <div className="text-xs text-muted-foreground mb-3">{lang === "ar" ? "حدّد المدة بين المتابعات وتاريخ المتابعة القادمة." : "Configure the interval and due date for the next follow-up."}</div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <Label>Interval (days)</Label>
+                      <Label>{lang === "ar" ? "المدة (بالأيام)" : "Interval (days)"}</Label>
                       <Input type="number" min={1} defaultValue={c.followup_interval_days ?? 14}
                         onBlur={(e) => saveFollowup({ followup_interval_days: Number(e.target.value) || 14 })} />
                     </div>
                     <div className="space-y-1.5">
-                      <Label>Next follow-up due</Label>
+                      <Label>{lang === "ar" ? "المتابعة القادمة" : "Next follow-up due"}</Label>
                       <Input type="date" defaultValue={c.followup_due_date ?? ""}
                         onBlur={(e) => saveFollowup({ followup_due_date: e.target.value || null })} />
                     </div>
                   </div>
                 </div>
                 <div className="border-t border-border pt-4">
-                  <div className="text-sm font-semibold mb-1">Quick set</div>
-                  <div className="text-xs text-muted-foreground mb-3">Auto-compute the next follow-up from your interval.</div>
+                  <div className="text-sm font-semibold mb-1">{lang === "ar" ? "تحديد سريع" : "Quick set"}</div>
+                  <div className="text-xs text-muted-foreground mb-3">{lang === "ar" ? "احسب المتابعة القادمة تلقائيًا من المدة التي حددتها." : "Auto-compute the next follow-up from your interval."}</div>
                   <div className="flex gap-2 flex-wrap">
                     <Button variant="outline" size="sm" onClick={() => {
                       const d = new Date(); d.setDate(d.getDate() + (c.followup_interval_days ?? 14));
                       saveFollowup({ followup_enabled: true, followup_due_date: d.toISOString().slice(0,10) });
-                    }}>Suggest from interval</Button>
+                    }}>{lang === "ar" ? "حسب المدة" : "Suggest from interval"}</Button>
                     {reassessments[0]?.assessment_date && (
                       <Button variant="outline" size="sm" onClick={() => {
                         const d = new Date(reassessments[0].assessment_date); d.setDate(d.getDate() + (c.followup_interval_days ?? 14));
                         saveFollowup({ followup_enabled: true, followup_due_date: d.toISOString().slice(0,10) });
-                      }}>From last reassessment</Button>
+                      }}>{lang === "ar" ? "من آخر إعادة تقييم" : "From last reassessment"}</Button>
                     )}
                   </div>
                 </div>
@@ -462,6 +513,36 @@ export default function PhysioCaseDetail() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!statusDraft} onOpenChange={(open) => { if (!open) setStatusDraft(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {statusDraft?.status === "completed"
+                ? (lang === "ar" ? "إتمام الحالة العلاجية" : "Complete physiotherapy case")
+                : (lang === "ar" ? "إيقاف الحالة مؤقتًا" : "Pause physiotherapy case")}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label htmlFor="case-status-note">
+              {statusDraft?.status === "completed"
+                ? (lang === "ar" ? "ملخص الإتمام (اختياري)" : "Completion summary (optional)")
+                : (lang === "ar" ? "سبب الإيقاف (اختياري)" : "Pause reason (optional)")}
+            </Label>
+            <Textarea id="case-status-note" rows={3} value={statusDraft?.text ?? ""}
+              onChange={(e) => setStatusDraft((d) => (d ? { ...d, text: e.target.value } : d))} />
+            <p className="text-xs text-muted-foreground">
+              {lang === "ar"
+                ? "يمكنك تركه فارغًا. الضغط على إلغاء يبقي الحالة دون تغيير."
+                : "You can leave this empty. Cancel leaves the status unchanged."}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStatusDraft(null)}>{lang === "ar" ? "إلغاء" : "Cancel"}</Button>
+            <Button onClick={saveStatusDraft} className="gradient-primary text-primary-foreground">{lang === "ar" ? "حفظ" : "Save"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -504,71 +585,71 @@ function SessionDialog({ open, setOpen, caseId, nextNumber, defaultTherapistId, 
     };
     const { error } = await supabase.from("physio_sessions" as any).insert(payload);
     if (error) return toast.error(error.message);
-    toast.success("Saved"); setOpen(false); onSaved();
+    toast.success(lang === "ar" ? "تم الحفظ" : "Saved"); setOpen(false); onSaved();
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground"><Plus className="me-2 size-4" />Log session</Button></DialogTrigger>
+      <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground"><Plus className="me-2 size-4" />{lang === "ar" ? "تسجيل جلسة" : "Log session"}</Button></DialogTrigger>
       <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><ClipboardList className="size-5 text-primary" />Log physio session</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><ClipboardList className="size-5 text-primary" />{lang === "ar" ? "تسجيل جلسة علاج طبيعي" : "Log physio session"}</DialogTitle>
         </DialogHeader>
         <Tabs defaultValue="soap" className="mt-2">
           <TabsList className="grid grid-cols-2 w-full">
-            <TabsTrigger value="soap"><FileText className="me-2 size-4" />S.O.A.P. Notes</TabsTrigger>
-            <TabsTrigger value="admin"><Calendar className="me-2 size-4" />Admin / Log</TabsTrigger>
+            <TabsTrigger value="soap"><FileText className="me-2 size-4" />{lang === "ar" ? "ملاحظات S.O.A.P." : "S.O.A.P. Notes"}</TabsTrigger>
+            <TabsTrigger value="admin"><Calendar className="me-2 size-4" />{lang === "ar" ? "بيانات التسجيل" : "Admin / Log"}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="soap" className="space-y-4 mt-4">
             <fieldset className="rounded-lg border border-border p-4 space-y-3">
-              <legend className="px-2 text-xs font-semibold uppercase tracking-wide text-primary">Subjective</legend>
+              <legend className="px-2 text-xs font-semibold uppercase tracking-wide text-primary">{lang === "ar" ? "ذاتي" : "Subjective"}</legend>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="space-y-1.5"><Label>Pain (0–10)</Label><Input type="number" min={0} max={10} value={form.pain_level} onChange={e => setForm({ ...form, pain_level: e.target.value })} /></div>
-                <div className="space-y-1.5"><Label>Symptom change</Label><Input value={form.symptom_change} onChange={e => setForm({ ...form, symptom_change: e.target.value })} /></div>
-                <div className="space-y-1.5 md:col-span-2"><Label>Adherence</Label><Input value={form.adherence} onChange={e => setForm({ ...form, adherence: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>{lang === "ar" ? "الألم (0–10)" : "Pain (0–10)"}</Label><Input type="number" min={0} max={10} value={form.pain_level} onChange={e => setForm({ ...form, pain_level: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>{lang === "ar" ? "تغيّر الأعراض" : "Symptom change"}</Label><Input value={form.symptom_change} onChange={e => setForm({ ...form, symptom_change: e.target.value })} /></div>
+                <div className="space-y-1.5 md:col-span-2"><Label>{lang === "ar" ? "الالتزام" : "Adherence"}</Label><Input value={form.adherence} onChange={e => setForm({ ...form, adherence: e.target.value })} /></div>
               </div>
             </fieldset>
 
             <fieldset className="rounded-lg border border-border p-4 space-y-3">
-              <legend className="px-2 text-xs font-semibold uppercase tracking-wide text-primary">Objective</legend>
+              <legend className="px-2 text-xs font-semibold uppercase tracking-wide text-primary">{lang === "ar" ? "موضوعي" : "Objective"}</legend>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="space-y-1.5"><Label>Mobility / ROM</Label><Input value={form.mobility_note} onChange={e => setForm({ ...form, mobility_note: e.target.value })} /></div>
-                <div className="space-y-1.5"><Label>Strength / function</Label><Input value={form.strength_note} onChange={e => setForm({ ...form, strength_note: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>{lang === "ar" ? "الحركة / المدى الحركي" : "Mobility / ROM"}</Label><Input value={form.mobility_note} onChange={e => setForm({ ...form, mobility_note: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>{lang === "ar" ? "القوة / الوظيفة" : "Strength / function"}</Label><Input value={form.strength_note} onChange={e => setForm({ ...form, strength_note: e.target.value })} /></div>
               </div>
             </fieldset>
 
             <fieldset className="rounded-lg border border-border p-4 space-y-3">
-              <legend className="px-2 text-xs font-semibold uppercase tracking-wide text-primary">Assessment</legend>
+              <legend className="px-2 text-xs font-semibold uppercase tracking-wide text-primary">{lang === "ar" ? "التقييم" : "Assessment"}</legend>
               <div className="grid grid-cols-1 gap-3">
-                <div className="space-y-1.5"><Label>Therapist assessment</Label><Textarea rows={2} value={form.therapist_assessment} onChange={e => setForm({ ...form, therapist_assessment: e.target.value })} /></div>
-                <div className="space-y-1.5"><Label>Progress note</Label><Textarea rows={2} value={form.progress_note} onChange={e => setForm({ ...form, progress_note: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>{lang === "ar" ? "تقييم الأخصائي" : "Therapist assessment"}</Label><Textarea rows={2} value={form.therapist_assessment} onChange={e => setForm({ ...form, therapist_assessment: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>{lang === "ar" ? "ملاحظة التقدم" : "Progress note"}</Label><Textarea rows={2} value={form.progress_note} onChange={e => setForm({ ...form, progress_note: e.target.value })} /></div>
               </div>
             </fieldset>
 
             <fieldset className="rounded-lg border border-border p-4 space-y-3">
-              <legend className="px-2 text-xs font-semibold uppercase tracking-wide text-primary">Plan</legend>
+              <legend className="px-2 text-xs font-semibold uppercase tracking-wide text-primary">{lang === "ar" ? "الخطة" : "Plan"}</legend>
               <div className="grid grid-cols-1 gap-3">
-                <div className="space-y-1.5"><Label>Interventions / exercises performed</Label><Textarea rows={2} value={form.interventions} onChange={e => setForm({ ...form, interventions: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>{lang === "ar" ? "التدخلات / التمارين المنفذة" : "Interventions / exercises performed"}</Label><Textarea rows={2} value={form.interventions} onChange={e => setForm({ ...form, interventions: e.target.value })} /></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="space-y-1.5"><Label>Home exercise</Label><Input value={form.home_exercise} onChange={e => setForm({ ...form, home_exercise: e.target.value })} /></div>
-                  <div className="space-y-1.5"><Label>Next session recommendation</Label><Input value={form.next_recommendation} onChange={e => setForm({ ...form, next_recommendation: e.target.value })} /></div>
+                  <div className="space-y-1.5"><Label>{lang === "ar" ? "تمارين منزلية" : "Home exercise"}</Label><Input value={form.home_exercise} onChange={e => setForm({ ...form, home_exercise: e.target.value })} /></div>
+                  <div className="space-y-1.5"><Label>{lang === "ar" ? "توصية الجلسة القادمة" : "Next session recommendation"}</Label><Input value={form.next_recommendation} onChange={e => setForm({ ...form, next_recommendation: e.target.value })} /></div>
                 </div>
-                <div className="space-y-1.5"><Label>Plan for next review</Label><Input value={form.next_review_plan} onChange={e => setForm({ ...form, next_review_plan: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>{lang === "ar" ? "خطة المراجعة القادمة" : "Plan for next review"}</Label><Input value={form.next_review_plan} onChange={e => setForm({ ...form, next_review_plan: e.target.value })} /></div>
               </div>
             </fieldset>
           </TabsContent>
 
           <TabsContent value="admin" className="mt-4">
             <fieldset className="rounded-lg border border-border p-4 space-y-3">
-              <legend className="px-2 text-xs font-semibold uppercase tracking-wide text-primary">Session log</legend>
+              <legend className="px-2 text-xs font-semibold uppercase tracking-wide text-primary">{lang === "ar" ? "سجل الجلسة" : "Session log"}</legend>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="space-y-1.5"><Label>Session #</Label><Input type="number" value={form.session_number} onChange={e => setForm({ ...form, session_number: e.target.value })} /></div>
-                <div className="space-y-1.5"><Label>Date</Label><Input type="date" value={form.session_date} onChange={e => setForm({ ...form, session_date: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>{lang === "ar" ? "رقم الجلسة" : "Session #"}</Label><Input type="number" value={form.session_number} onChange={e => setForm({ ...form, session_number: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>{lang === "ar" ? "التاريخ" : "Date"}</Label><Input type="date" value={form.session_date} onChange={e => setForm({ ...form, session_date: e.target.value })} /></div>
                 <div className="space-y-1.5">
-                  <Label>Therapist</Label>
+                  <Label>{lang === "ar" ? "الأخصائي" : "Therapist"}</Label>
                   <Select value={form.therapist_id || "_none"} onValueChange={v => setForm({ ...form, therapist_id: v === "_none" ? "" : v })}>
-                    <SelectTrigger><SelectValue placeholder="Therapist" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={lang === "ar" ? "الأخصائي" : "Therapist"} /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="_none">—</SelectItem>
                       {therapists.map((s: any) => <SelectItem key={s.id} value={s.id}>{doctorDisplayName(s, lang) || s.id.slice(0,8)}</SelectItem>)}
@@ -576,19 +657,19 @@ function SessionDialog({ open, setOpen, caseId, nextNumber, defaultTherapistId, 
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Attendance</Label>
+                  <Label>{lang === "ar" ? "الحضور" : "Attendance"}</Label>
                   <Select value={form.attendance} onValueChange={v => setForm({ ...form, attendance: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="scheduled">Scheduled</SelectItem>
-                      <SelectItem value="done">Done</SelectItem>
-                      <SelectItem value="missed">Missed</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                      <SelectItem value="scheduled">{lang === "ar" ? "مجدولة" : "Scheduled"}</SelectItem>
+                      <SelectItem value="done">{lang === "ar" ? "تمت" : "Done"}</SelectItem>
+                      <SelectItem value="missed">{lang === "ar" ? "لم تحضر" : "Missed"}</SelectItem>
+                      <SelectItem value="cancelled">{lang === "ar" ? "ملغاة" : "Cancelled"}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5 md:col-span-2">
-                  <Label>Link to appointment (optional)</Label>
+                  <Label>{lang === "ar" ? "الربط بموعد (اختياري)" : "Link to appointment (optional)"}</Label>
                   <Select value={form.appointment_id || "_none"} onValueChange={v => {
                     const aid = v === "_none" ? "" : v;
                     const appt = (appointments ?? []).find((a: any) => a.id === aid);
@@ -597,11 +678,11 @@ function SessionDialog({ open, setOpen, caseId, nextNumber, defaultTherapistId, 
                       session_date: appt ? new Date(appt.scheduled_at).toISOString().slice(0, 10) : f.session_date,
                     }));
                   }}>
-                    <SelectTrigger><SelectValue placeholder="Standalone session" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={lang === "ar" ? "جلسة غير مرتبطة بموعد" : "Standalone session"} /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="_none">— Standalone —</SelectItem>
+                      <SelectItem value="_none">{lang === "ar" ? "— بدون موعد —" : "— Standalone —"}</SelectItem>
                       {(appointments ?? []).slice(0, 50).map((a: any) => (
-                        <SelectItem key={a.id} value={a.id}>{new Date(a.scheduled_at).toLocaleString()} · {a.status}</SelectItem>
+                        <SelectItem key={a.id} value={a.id}>{formatDateTime(a.scheduled_at, lang)} · {enumLabel(lang, APPT_STATUS_AR, a.status)}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -611,8 +692,8 @@ function SessionDialog({ open, setOpen, caseId, nextNumber, defaultTherapistId, 
           </TabsContent>
         </Tabs>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-          <Button onClick={save} className="gradient-primary text-primary-foreground">Save</Button>
+          <Button variant="outline" onClick={() => setOpen(false)}>{lang === "ar" ? "إلغاء" : "Cancel"}</Button>
+          <Button onClick={save} className="gradient-primary text-primary-foreground">{lang === "ar" ? "حفظ" : "Save"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -635,45 +716,45 @@ function ReassessmentDialog({ open, setOpen, caseId, initialFromCase, therapists
     const payload: any = { ...form, case_id: caseId, therapist_id: form.therapist_id || null, created_by: u.user?.id ?? null };
     const { error } = await supabase.from("physio_reassessments" as any).insert(payload);
     if (error) return toast.error(error.message);
-    toast.success("Saved"); setOpen(false); onSaved();
+    toast.success(lang === "ar" ? "تم الحفظ" : "Saved"); setOpen(false); onSaved();
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground"><Plus className="me-2 size-4" />Add reassessment</Button></DialogTrigger>
+      <DialogTrigger asChild><Button className="gradient-primary text-primary-foreground"><Plus className="me-2 size-4" />{lang === "ar" ? "إضافة إعادة تقييم" : "Add reassessment"}</Button></DialogTrigger>
       <DialogContent className="max-w-2xl">
-        <DialogHeader><DialogTitle>Reassessment</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{lang === "ar" ? "إعادة تقييم" : "Reassessment"}</DialogTitle></DialogHeader>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div><Label>Date</Label><Input type="date" value={form.assessment_date} onChange={e => setForm({ ...form, assessment_date: e.target.value })} /></div>
+          <div><Label>{lang === "ar" ? "التاريخ" : "Date"}</Label><Input type="date" value={form.assessment_date} onChange={e => setForm({ ...form, assessment_date: e.target.value })} /></div>
           <div>
-            <Label>Therapist</Label>
+            <Label>{lang === "ar" ? "الأخصائي" : "Therapist"}</Label>
             <Select value={form.therapist_id || "_none"} onValueChange={v => setForm({ ...form, therapist_id: v === "_none" ? "" : v })}>
-              <SelectTrigger><SelectValue placeholder="Therapist" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={lang === "ar" ? "الأخصائي" : "Therapist"} /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="_none">—</SelectItem>
                 {therapists.map((s: any) => <SelectItem key={s.id} value={s.id}>{doctorDisplayName(s, lang) || s.id.slice(0,8)}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
-          <div className="md:col-span-2"><Label>Initial condition</Label><Textarea rows={2} value={form.initial_condition} onChange={e => setForm({ ...form, initial_condition: e.target.value })} /></div>
-          <div className="md:col-span-2"><Label>Current condition</Label><Textarea rows={2} value={form.current_condition} onChange={e => setForm({ ...form, current_condition: e.target.value })} /></div>
+          <div className="md:col-span-2"><Label>{lang === "ar" ? "الحالة المبدئية" : "Initial condition"}</Label><Textarea rows={2} value={form.initial_condition} onChange={e => setForm({ ...form, initial_condition: e.target.value })} /></div>
+          <div className="md:col-span-2"><Label>{lang === "ar" ? "الحالة الحالية" : "Current condition"}</Label><Textarea rows={2} value={form.current_condition} onChange={e => setForm({ ...form, current_condition: e.target.value })} /></div>
           <div>
-            <Label>Trend</Label>
+            <Label>{lang === "ar" ? "الاتجاه" : "Trend"}</Label>
             <Select value={form.trend} onValueChange={v => setForm({ ...form, trend: v })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="improving">Improving</SelectItem>
-                <SelectItem value="unchanged">Unchanged</SelectItem>
-                <SelectItem value="worsening">Worsening</SelectItem>
+                <SelectItem value="improving">{lang === "ar" ? "في تحسن" : "Improving"}</SelectItem>
+                <SelectItem value="unchanged">{lang === "ar" ? "بدون تغيير" : "Unchanged"}</SelectItem>
+                <SelectItem value="worsening">{lang === "ar" ? "في تدهور" : "Worsening"}</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <div className="md:col-span-2"><Label>Plan update</Label><Textarea rows={2} value={form.plan_update} onChange={e => setForm({ ...form, plan_update: e.target.value })} /></div>
-          <div className="md:col-span-2"><Label>Notes</Label><Textarea rows={2} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
+          <div className="md:col-span-2"><Label>{lang === "ar" ? "تحديث الخطة" : "Plan update"}</Label><Textarea rows={2} value={form.plan_update} onChange={e => setForm({ ...form, plan_update: e.target.value })} /></div>
+          <div className="md:col-span-2"><Label>{lang === "ar" ? "ملاحظات" : "Notes"}</Label><Textarea rows={2} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-          <Button onClick={save} className="gradient-primary text-primary-foreground">Save</Button>
+          <Button variant="outline" onClick={() => setOpen(false)}>{lang === "ar" ? "إلغاء" : "Cancel"}</Button>
+          <Button onClick={save} className="gradient-primary text-primary-foreground">{lang === "ar" ? "حفظ" : "Save"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

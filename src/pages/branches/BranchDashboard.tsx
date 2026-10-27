@@ -17,6 +17,8 @@ import {
   type QueueAlert, type AlertType,
 } from "@/lib/queueAlerts";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
+import { notConfirmedCopy } from "@/lib/writeOutcome";
 import type { ApptStatus } from "@/lib/appointmentStatus";
 
 type Row = {
@@ -258,15 +260,18 @@ export default function BranchDashboard() {
   };
 
   const doSnooze = async (id: string, iso: string) => {
-    await snoozeAlert(id, iso, user?.id ?? null);
+    const { ok } = await snoozeAlert(id, iso, user?.id ?? null);
+    if (!ok) toast.error(notConfirmedCopy(lang, "save"));
     await refreshAlerts();
   };
   const doAck = async (id: string) => {
-    await acknowledgeAlert(id, user?.id ?? null);
+    const { ok } = await acknowledgeAlert(id, user?.id ?? null);
+    if (!ok) toast.error(notConfirmedCopy(lang, "save"));
     await refreshAlerts();
   };
   const doUnsnooze = async (id: string) => {
-    await unsnoozeAlert(id);
+    const { ok } = await unsnoozeAlert(id);
+    if (!ok) toast.error(notConfirmedCopy(lang, "save"));
     await refreshAlerts();
   };
 

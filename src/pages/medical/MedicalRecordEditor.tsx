@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { formatDate, formatMoney } from "@/lib/format";
 import { generatePrescriptionPdf } from "@/lib/prescriptionPdf";
 import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { logPhiAccess } from "@/lib/observability/phiAudit";
 
 type Record = any;
@@ -119,8 +120,16 @@ export default function MedicalRecordEditor() {
   const updateRecord = async (patch: any) => {
     setSaving(true);
     try {
-      const { error } = await supabase.from("medical_records").update(patch).eq("id", record.id);
+      const { data, error } = await supabase.from("medical_records").update(patch).eq("id", record.id).select("id");
       if (error) throw error;
+      // A completed record leaves its author's reach once the grace window
+      // closes, and RLS answers that with 2xx and no rows. Without the read-back
+      // the editor would merge the patch into local state and say "Saved" over a
+      // record that still holds the old values.
+      if (rowsWritten(data) === 0) {
+        toast.error(notConfirmedCopy(lang, "save"));
+        return;
+      }
       toast.success(t("save"));
       setRecord({ ...record, ...patch });
     } catch (e: any) {
@@ -452,12 +461,13 @@ function DiagnosesTab({ record, catalog, items, reload }: any) {
     try {
       // The old call ignored `error`, so a denied or failed delete reloaded the row back
       // into the list and read as "it came back on its own" rather than "it was not removed".
-      const { error } = await supabase.from("record_diagnoses").delete().eq("id", rdId);
+      const { data, error } = await supabase.from("record_diagnoses").delete().eq("id", rdId).select("id");
       if (error) {
         toast.error(lang === "ar" ? "تعذر حذف التشخيص. ما زال موجوداً." : "The diagnosis could not be deleted. It is still listed.");
         return;
       }
       reload();
+      if (rowsWritten(data) === 0) toast.error(notConfirmedCopy(lang, "delete"));
     } finally {
       setDeleting(false);
       setDeleteTarget(null);
@@ -568,8 +578,9 @@ function ProceduresTab({ record, specialty, catalog, items, reload, userId }: an
   const remove = async (id: string) => {
     setDeleting(true);
     try {
-      const { error } = await supabase.from("record_procedures").delete().eq("id", id);
+      const { data, error } = await supabase.from("record_procedures").delete().eq("id", id).select("id");
       if (error) throw error;
+      if (rowsWritten(data) === 0) toast.error(notConfirmedCopy(lang, "delete"));
       reload();
     } catch (e: any) {
       const msg = String(e?.message ?? "");
@@ -719,12 +730,13 @@ function PrescriptionTab({ record, patient, catalog, rxList, rxItems, reload, us
   const remove = async (id: string) => {
     setDeleting(true);
     try {
-      const { error } = await supabase.from("prescription_items").delete().eq("id", id);
+      const { data, error } = await supabase.from("prescription_items").delete().eq("id", id).select("id");
       if (error) {
         toast.error(lang === "ar" ? "تعذر حذف الدواء من الوصفة. ما زال موجوداً." : "The medication could not be removed from the prescription. It is still listed.");
         return;
       }
       reload();
+      if (rowsWritten(data) === 0) toast.error(notConfirmedCopy(lang, "delete"));
     } finally {
       setDeleting(false);
       setDeleteTarget(null);
@@ -866,9 +878,16 @@ function DocumentsTab({ record, patient, docs, reload, userId }: any) {
       // The row goes first now. Deleting the Storage object first meant a failed row
       // delete left a card in the list whose file was already gone forever; with this
       // order a failure leaves at worst an orphan file the list no longer points at.
-      const { error } = await supabase.from("patient_documents").delete().eq("id", d.id);
+      // `rowsWritten` is what makes that ordering real: RLS can filter the delete away
+      // with no error at all, and then the file must stay exactly where it is.
+      const { data, error } = await supabase.from("patient_documents").delete().eq("id", d.id).select("id");
       if (error) {
         toast.error(lang === "ar" ? "تعذر حذف المستند. الملف والفهر باقيان كما هما." : "The document could not be deleted. The file and its entry are unchanged.");
+        return;
+      }
+      if (rowsWritten(data) === 0) {
+        toast.error(notConfirmedCopy(lang, "delete"));
+        reload();
         return;
       }
       const { error: storageError } = await supabase.storage.from("patient-docs").remove([d.file_url]);

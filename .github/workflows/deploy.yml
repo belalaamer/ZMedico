@@ -38,8 +38,27 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-webkit-
 
+      # This step downloads ~100 MB per browser from a third-party CDN and is the only step in the job
+      # that can stall on the network. On 2026-10-27 it hung for 43m19s on a *warm* cache, the job hit
+      # its own timeout-minutes, and the run ended `cancelled` with `Deploy` skipped: the merge commit
+      # still showed green while Production kept serving the previous bundle. The 45m job budget is what
+      # made that silent. Each attempt is now capped by timeout(1), which gives a normal non-zero exit
+      # this script controls; timeout-minutes here is only the backstop for the whole loop.
       - name: Install Chromium and WebKit for E2E smoke
-        run: bunx playwright install --with-deps chromium webkit
+        timeout-minutes: 18
+        run: |
+          set -uo pipefail
+          for attempt in 1 2 3; do
+            timeout --kill-after=60s 240s bunx playwright install --with-deps chromium webkit
+            rc=$?
+            if [ "$rc" -eq 0 ]; then
+              echo "Playwright browsers ready (attempt ${attempt}/3)."
+              exit 0
+            fi
+            echo "::warning title=Playwright install attempt ${attempt} failed::exit ${rc} (124 means the 240s cap was hit)"
+          done
+          echo "::error title=Deploy blocked::Playwright browser install failed on all 3 attempts (240s each), so the E2E smokes cannot run and this run will not reach Deploy. Re-run or use the fallback workflow."
+          exit 1
 
       - name: Public E2E smoke
         run: |

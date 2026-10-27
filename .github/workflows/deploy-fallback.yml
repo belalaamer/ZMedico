@@ -38,8 +38,23 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-webkit-
 
+      # Same guard and same reasoning as the step of the same name in deploy.yml: this workflow is the
+      # manual recovery path, so a silent browser-install hang here is worse, not better.
       - name: Install Chromium and WebKit for E2E smoke
-        run: bunx playwright install --with-deps chromium webkit
+        timeout-minutes: 18
+        run: |
+          set -uo pipefail
+          for attempt in 1 2 3; do
+            timeout --kill-after=60s 240s bunx playwright install --with-deps chromium webkit
+            rc=$?
+            if [ "$rc" -eq 0 ]; then
+              echo "Playwright browsers ready (attempt ${attempt}/3)."
+              exit 0
+            fi
+            echo "::warning title=Playwright install attempt ${attempt} failed::exit ${rc} (124 means the 240s cap was hit)"
+          done
+          echo "::error title=Deploy blocked::Playwright browser install failed on all 3 attempts (240s each), so the E2E smokes cannot run and this run will not reach Deploy."
+          exit 1
 
       - name: Public E2E smoke
         run: |

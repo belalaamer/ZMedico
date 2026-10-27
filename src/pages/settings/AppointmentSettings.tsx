@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 
 type CatalogService = { id: string; name_en: string; name_ar: string };
@@ -104,6 +105,10 @@ export default function AppointmentSettings() {
     if (error) { toast.error(error.message); return; }
     const resourceId = saved?.id ?? resource.id;
     if (resourceId) {
+      // zero-rows-ok — this clears the room's old service list before re-inserting
+      // the selection, so a room that had no services mapped yet legitimately
+      // deletes nothing. The insert below and loadResources() decide what the
+      // screen shows; no message counts these rows.
       const { error: deleteMappingError } = await resourceTable.from("booking_resource_services").delete().eq("resource_id", resourceId);
       if (deleteMappingError) { toast.error(deleteMappingError.message); return; }
       const selectedServiceIds = resourceServices[resourceId] ?? [];
@@ -131,8 +136,9 @@ export default function AppointmentSettings() {
 
   const deleteResource = async (resource: BookingResource) => {
     if (!resource.id) return;
-    const { error } = await resourceTable.from("booking_resources").delete().eq("id", resource.id).eq("branch_id", branchId);
+    const { data, error } = await resourceTable.from("booking_resources").delete().eq("id", resource.id).eq("branch_id", branchId).select("id");
     if (error) { toast.error(error.message); return; }
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); await loadResources(); return; }
     toast.success(lang === "ar" ? "تم حذف المورد" : "Resource removed");
     await loadResources();
   };

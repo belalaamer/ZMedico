@@ -17,11 +17,7 @@ export async function updateQueueAppointment(input: QueueMutation): Promise<bool
     .eq("id", input.appointmentId)
     .eq("branch_id", input.branchId)
     .eq("status", input.expectedStatus);
-  if (input.expectedPriority !== undefined) {
-    query = input.expectedPriority === null
-      ? query.is("priority", null)
-      : query.eq("priority", input.expectedPriority);
-  }
+  if (input.expectedPriority !== undefined) query = input.expectedPriority === null ? query.is("priority", null) : query.eq("priority", input.expectedPriority);
   const { data, error } = await query.select("id").maybeSingle();
   if (error) throw error;
   return Boolean(data);

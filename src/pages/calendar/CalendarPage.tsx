@@ -30,6 +30,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { buildStatusPatch } from "@/lib/appointmentStatus";
 import { matchesStatusFilter, nextStatusFilter } from "@/lib/appointmentStatusFilter";
 import { reminderSendOutcome } from "@/lib/reminderSendOutcome";
+import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 
 function statusLabel(s: Appt["status"], t: (k: any) => string) {
   const map: Record<Appt["status"], string> = {
@@ -542,8 +543,9 @@ export default function CalendarPage() {
       checked_in_at: (a as any).checked_in_at ?? null,
       started_at: (a as any).started_at ?? null,
     });
-    const { error } = await supabase.from("appointments").update(patch as any).eq("id", a.id);
+    const { data, error } = await supabase.from("appointments").update(patch as any).eq("id", a.id).select("id");
     if (error) { toast.error(error.message); return; }
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); load(); return; }
     toast.success(lang === "ar" ? "تم إلغاء الموعد" : "Appointment cancelled");
     load();
   };
@@ -554,8 +556,9 @@ export default function CalendarPage() {
       checked_in_at: (a as any).checked_in_at ?? null,
       started_at: (a as any).started_at ?? null,
     });
-    const { error } = await supabase.from("appointments").update(patch as any).eq("id", a.id);
+    const { data, error } = await supabase.from("appointments").update(patch as any).eq("id", a.id).select("id");
     if (error) { toast.error(error.message); return; }
+    if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); load(); return; }
     toast.success(t("saved"));
     load();
   };
@@ -704,10 +707,14 @@ export default function CalendarPage() {
     } else if (editId) {
       payload.status = form.status;
     }
-    const { error } = editId
-      ? await supabase.from("appointments").update(payload).eq("id", editId)
+    // Only the edit arm needs the read-back: an insert the policy rejects
+    // raises (42501) and lands in the error path below, while an update that
+    // filters to zero rows answers 2xx with no error.
+    const { data, error } = editId
+      ? await supabase.from("appointments").update(payload).eq("id", editId).select("id")
       : await supabase.from("appointments").insert({ ...payload, branch_id: currentBranchId, status: "scheduled" });
     if (error) { toast.error(error.message); return; }
+    if (editId && rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); load(); return; }
     toast.success(lang === "ar" ? "تم حفظ الموعد" : "Appointment saved");
     setOpen(false); setEditId(null);
     setForm({ patient_id: "", doctor_id: "", scheduled_at: "", duration_minutes: 30, service_id: "", procedure: "", room: "", resource_id: "", notes: "", status: "scheduled" });

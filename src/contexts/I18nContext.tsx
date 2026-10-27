@@ -99,6 +99,10 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       const uid = data.user?.id;
       if (error || !uid || !current() || (selectedActor && uid !== selectedActor)
           || (actor.current && uid !== actor.current)) return;
+      // zero-rows-ok — this write only mirrors onto the profile a language the
+      // screen already applied and stored locally; nothing here claims "saved",
+      // so a row the session cannot update changes no message and no state. The
+      // rejection path keeps its existing console warning below.
       const { error: writeError } = await supabase.from("profiles").update({ preferred_lang: l }).eq("id", uid);
       if (writeError && current()) console.warn("Language preference could not be saved to the profile.");
     }).catch(() => { console.warn("Language preference persistence failed; local selection remains available."); });

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 // PostgREST answers a write that RLS filtered to zero rows with HTTP 2xx,
 // error:null and no representation, so "no error" is not proof that anything
-// was written. Batches 13 and 14 fixed that for every guarded write reachable
+// was written. Batches 13 to 16 fixed that for every guarded write reachable
 // from these screens. This contract freezes the fix: a browser-authored
 // .delete()/.update() here must either ask for the rows it touched, or carry a
 // written reason why zero rows is a legitimate outcome.
@@ -39,6 +39,20 @@ const FILES = [
   "src/pages/settings/UserManagement.tsx",
   "src/pages/settings/AutomatedCommunication.tsx",
   "src/components/layout/Topbar.tsx",
+  // batch 16 — desk, calendar, treasury and settings writes
+  "src/lib/queueAlerts.ts",
+  "src/lib/queueMutation.ts",
+  "src/contexts/I18nContext.tsx",
+  "src/pages/branches/Branches.tsx",
+  "src/pages/medical/MedicalRecordEditor.tsx",
+  "src/pages/calendar/CalendarPage.tsx",
+  "src/pages/settings/AppointmentSettings.tsx",
+  "src/pages/settings/InsuranceCompanies.tsx",
+  "src/pages/settings/Templates.tsx",
+  "src/pages/hr/Leaves.tsx",
+  "src/pages/hr/StaffBranchesTab.tsx",
+  "src/pages/invoices/CreateInvoiceDialog.tsx",
+  "src/pages/treasury/Treasury.tsx",
 ];
 
 const MARKER = "zero-rows-ok";
@@ -127,14 +141,14 @@ function clientWrites(src: string): Write[] {
   return writes;
 }
 
-describe("zero-row write contract (batches 13-14)", () => {
+describe("zero-row write contract (batches 13-16)", () => {
   const all = FILES.map((file) => ({ file, src: source(file), writes: clientWrites(source(file)) }));
 
   it("scans the batch scope and finds the writes it is meant to freeze", () => {
-    expect(all).toHaveLength(29);
+    expect(all).toHaveLength(42);
     expect(all.filter((e) => e.writes.length === 0)).toEqual([]);
-    // 62 browser-authored deletes/updates remain across the 29 screens.
-    expect(all.reduce((n, e) => n + e.writes.length, 0)).toBe(62);
+    // 91 browser-authored deletes/updates remain across the 42 screens.
+    expect(all.reduce((n, e) => n + e.writes.length, 0)).toBe(91);
   });
 
   it("proves every browser-authored write, or documents why zero rows is fine", () => {
@@ -152,6 +166,11 @@ describe("zero-row write contract (batches 13-14)", () => {
       "src/pages/reminders/Reminders.tsx:105 .update(",
       "src/components/layout/Topbar.tsx:136 .update(",
       "src/components/layout/Topbar.tsx:143 .update(",
+      "src/lib/queueAlerts.ts:112 .update(",
+      "src/lib/queueAlerts.ts:114 .update(",
+      "src/contexts/I18nContext.tsx:106 .update(",
+      "src/pages/branches/Branches.tsx:285 .update(",
+      "src/pages/settings/AppointmentSettings.tsx:112 .delete()",
     ]);
   });
 

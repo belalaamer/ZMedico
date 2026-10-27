@@ -32,6 +32,8 @@ export default function Leaves() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ staff_id: "", leave_type_id: "", start_date: "", end_date: "", reason_en: "" });
+  const [rejectTarget, setRejectTarget] = useState<any | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
 
   const load = async () => {
     // `leave_requests` has no branch_id column, so the branch boundary has to
@@ -169,8 +171,8 @@ export default function Leaves() {
                 {l.status === "pending" && (
                   <Can permission="hr.edit">
                     <div className="flex items-center gap-1">
-                      <Button size="sm" variant="outline" onClick={() => decide(l.id, "approved")}><Check className="size-4" /></Button>
-                      <Button size="sm" variant="outline" onClick={() => { const r = prompt(t("rejectionReason")) || ""; decide(l.id, "rejected", r); }}><X className="size-4" /></Button>
+                      <Button size="sm" variant="outline" aria-label={lang === "ar" ? "قبول الطلب" : "Approve request"} onClick={() => decide(l.id, "approved")}><Check className="size-4" /></Button>
+                      <Button size="sm" variant="outline" aria-label={lang === "ar" ? "رفض الطلب" : "Reject request"} onClick={() => { setRejectReason(""); setRejectTarget(l); }}><X className="size-4" /></Button>
                     </div>
                   </Can>
                 )}
@@ -179,6 +181,54 @@ export default function Leaves() {
           </div>
         )}
       </Card>
+
+      <Dialog open={!!rejectTarget} onOpenChange={(o) => !o && setRejectTarget(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{lang === "ar" ? "رفض الطلب" : "Reject leave request"}</DialogTitle>
+          </DialogHeader>
+          {rejectTarget && (
+            <div className="space-y-3">
+              <div className="text-sm">
+                <div className="font-medium">{profName(rejectTarget.staff_id)}</div>
+                <div className="text-xs text-muted-foreground">
+                  {lang === "ar" ? rejectTarget.leave_type?.name_ar : rejectTarget.leave_type?.name_en} · {formatDate(rejectTarget.start_date, lang)} → {formatDate(rejectTarget.end_date, lang)}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="leave-reject-reason">{t("rejectionReason")}</Label>
+                <Textarea
+                  id="leave-reject-reason"
+                  rows={3}
+                  autoFocus
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder={lang === "ar" ? "اختياري — سيظهر للموظف مع الطلب" : "Optional — shown to the employee with the request"}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {lang === "ar"
+                  ? "يُعلَّم الطلب مرفوضاً، وتظهر حالته في صفحة الموظف."
+                  : "The request is marked rejected, and its status shows on the employee's staff page."}
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRejectTarget(null)}>{t("cancel")}</Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                const row = rejectTarget;
+                if (!row) return;
+                setRejectTarget(null);
+                await decide(row.id, "rejected", rejectReason);
+              }}
+            >
+              {lang === "ar" ? "رفض" : "Reject"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

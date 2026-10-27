@@ -22,6 +22,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
 import { reminderSendOutcome } from "@/lib/reminderSendOutcome";
+import { localDateTimeInput } from "@/lib/localDate";
 
 type Reminder = {
   id: string; appointment_id: string | null; patient_id: string | null;
@@ -55,6 +56,8 @@ export default function ScheduledReminders() {
   const [open, setOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Reminder | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [rescheduleTarget, setRescheduleTarget] = useState<Reminder | null>(null);
+  const [rescheduleValue, setRescheduleValue] = useState("");
   const loadRequestRef = useRef(0);
   // One send in flight at a time: a second run would message the same patients twice.
   const sending = useRef(false);
@@ -62,7 +65,7 @@ export default function ScheduledReminders() {
   const [form, setForm] = useState({
     patient_id: "",
     reminder_type: "sms" as Reminder["reminder_type"],
-    scheduled_time: new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 16),
+    scheduled_time: localDateTimeInput(new Date(Date.now() + 60 * 60 * 1000)),
     message: "",
   });
 
@@ -156,12 +159,20 @@ export default function ScheduledReminders() {
       load();
     }
   };
-  const reschedule = async (id: string) => {
-    const next = prompt("New time (YYYY-MM-DD HH:MM)");
-    if (!next) return;
-    const d = new Date(next);
-    if (isNaN(d.getTime())) { toast({ title: "Invalid date", variant: "destructive" }); return; }
-    const { data, error } = await supabase.from("reminders").update({ scheduled_time: d.toISOString(), status: "pending" }).eq("id", id).select("id");
+  const openReschedule = (r: Reminder) => {
+    setRescheduleValue(localDateTimeInput(new Date(r.scheduled_time)));
+    setRescheduleTarget(r);
+  };
+  const confirmReschedule = async () => {
+    const r = rescheduleTarget;
+    if (!r) return;
+    const d = new Date(rescheduleValue);
+    if (!rescheduleValue || isNaN(d.getTime())) {
+      toast({ title: lang === "ar" ? "وقت غير صالح" : "Invalid time", variant: "destructive" });
+      return;
+    }
+    setRescheduleTarget(null);
+    const { data, error } = await supabase.from("reminders").update({ scheduled_time: d.toISOString(), status: "pending" }).eq("id", r.id).select("id");
     if (error) { toast({ title: error.message, variant: "destructive" }); load(); return; }
     if (rowsWritten(data) === 0) { toast({ title: notConfirmedCopy(lang, "save"), variant: "destructive" }); load(); return; }
     load();
@@ -296,7 +307,7 @@ export default function ScheduledReminders() {
                           <Send className="size-4" />
                         </Button>
                       )}
-                      <Button size="icon" variant="ghost" title="Reschedule" onClick={() => reschedule(r.id)}>
+                      <Button size="icon" variant="ghost" title={lang === "ar" ? "إعادة جدولة" : "Reschedule"} aria-label={lang === "ar" ? "إعادة جدولة" : "Reschedule"} onClick={() => openReschedule(r)}>
                         <RefreshCw className="size-4" />
                       </Button>
                       <Button size="icon" variant="ghost" onClick={() => setDeleteTarget(r)}>
@@ -336,6 +347,45 @@ export default function ScheduledReminders() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!rescheduleTarget} onOpenChange={(o) => !o && setRescheduleTarget(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{lang === "ar" ? "إعادة جدولة التذكير" : "Reschedule reminder"}</DialogTitle>
+          </DialogHeader>
+          {rescheduleTarget && (
+            <div className="space-y-3">
+              <div className="text-sm">
+                <div dir={patientDisplayDirection(patients.find((p) => p.id === rescheduleTarget.patient_id), lang)} className="font-medium">
+                  {patientName(rescheduleTarget.patient_id)}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {t(rescheduleTarget.reminder_type as any)} · {new Date(rescheduleTarget.scheduled_time).toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reminder-reschedule">{t("scheduledTime")}</Label>
+                <Input
+                  id="reminder-reschedule"
+                  type="datetime-local"
+                  autoFocus
+                  value={rescheduleValue}
+                  onChange={(e) => setRescheduleValue(e.target.value)}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {lang === "ar"
+                  ? "بأي وقت تختاره هنا يرجع التذكير \"قيد الانتظار\" ويُرسل مرة أخرى عند حلول موعده."
+                  : "Whatever time you set here, the reminder goes back to “pending” and is sent again when it comes due."}
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRescheduleTarget(null)}>{t("cancel")}</Button>
+            <Button onClick={() => void confirmReschedule()}>{t("save")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

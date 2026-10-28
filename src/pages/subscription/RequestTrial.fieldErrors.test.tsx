@@ -7,9 +7,14 @@ import { SUBSCRIPTION_REQUEST_FIELD_ERRORS, describeSubscriptionRequestFieldErro
 // The plans read is a PostgREST query builder, not an rpc: each link returns the
 // builder and the terminal `then` hands the outcome to the page. Outcomes shift
 // off a queue, so a retry can be scripted to succeed where the first read failed.
+// `reads` counts the moment a query is *sent*. `applied` increments only after
+// the page's own callback has returned, so it is a happens-after marker rather
+// than a guess about scheduling: CI turned a test that waited on `reads` red by
+// clicking submit while that read was still in flight.
 const state = vi.hoisted(() => ({
   outcomes: [] as Array<{ data: unknown; error: unknown }>,
   reads: 0,
+  applied: 0,
   invokes: 0,
   bodies: [] as Array<Record<string, unknown>>,
 }));
@@ -19,10 +24,13 @@ vi.mock("@/integrations/supabase/client", () => {
   const builder = () => {
     const chain: Record<string, unknown> = {};
     for (const method of ["select", "eq", "order"]) chain[method] = () => chain;
-    chain.then = (resolve: (value: unknown) => void) => {
+    chain.then = (handle: (value: unknown) => void) => {
       state.reads += 1;
       const outcome = state.outcomes.shift() ?? { data: [], error: null };
-      return Promise.resolve(outcome).then(resolve);
+      return Promise.resolve().then(() => {
+        handle(outcome);
+        state.applied += 1;
+      });
     };
     return chain;
   };
@@ -52,6 +60,14 @@ function open(route = "/request-trial") {
   );
 }
 
+// The plan picker's trigger names the selected plan even while its list is
+// closed, so this is the only signal that React has *rendered* a choice. A
+// counter can say the page was told; this says the page shows it, which is what
+// has to be true before the submit button is clicked.
+function planField() {
+  return screen.getByRole("combobox");
+}
+
 function fill(overrides: { clinic?: string; owner?: string; email?: string } = {}) {
   fireEvent.change(screen.getByLabelText("Clinic or center name"), { target: { value: overrides.clinic ?? "Blitz Physio" } });
   fireEvent.change(screen.getByLabelText("Owner or manager name"), { target: { value: overrides.owner ?? "Rana Salem" } });
@@ -63,6 +79,7 @@ afterEach(() => {
   cleanup();
   state.outcomes = [];
   state.reads = 0;
+  state.applied = 0;
   state.invokes = 0;
   state.bodies = [];
 });
@@ -131,13 +148,15 @@ describe("the trial request tells the applicant which field it rejected (P8)", (
     expect(notice.textContent).toContain("still send this request");
     expect(notice.textContent).not.toContain("provider detail");
     fireEvent.click(screen.getByRole("button", { name: /Try again/i }));
-    await waitFor(() => expect(state.reads).toBe(2));
+    await waitFor(() => expect(state.applied).toBe(2));
   });
 
   it("does not claim a failure for a plan list that is merely empty", async () => {
     state.outcomes = [{ data: [], error: null }];
     open();
-    await waitFor(() => expect(state.reads).toBe(1));
+    // `applied`, not `reads`: the claim is about what the page did with an empty
+    // answer, so the wait has to reach the far side of the read.
+    await waitFor(() => expect(state.applied).toBe(1));
     expect(screen.queryByRole("status")).toBeNull();
   });
 
@@ -156,24 +175,27 @@ describe("the trial request tells the applicant which field it rejected (P8)", (
   it("asks for the plan list once per mount, not once per value its answer writes", async () => {
     state.outcomes = [{ data: [{ id: "p1", name_ar: "خطة", name_en: "Starter", price_monthly: 100, currency: "EGP" }], error: null }];
     open();
-    await waitFor(() => expect(state.reads).toBe(1));
     // The dependency list held `planId` while the resolved read wrote `planId`,
-    // so every mount sent the same query twice. A plain waitFor would have been
-    // satisfied in the gap between the two reads, which is why the count is
-    // re-checked after a macrotask.
+    // so every mount sent the same query twice. `reads` is the wrong side of
+    // that: it is satisfied before the first answer lands, so the second query
+    // has not been sent yet and the count looks clean.
+    await waitFor(() => expect(state.applied).toBe(1));
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(state.reads).toBe(1);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(state.reads, "the plans read re-fired on the value its own answer wrote").toBe(1);
   });
 
-  it("still preselects the first plan the read returned", async () => {
+  it("still preselects the plan the read returned, and shows it on the form", async () => {
     state.outcomes = [{ data: [{ id: "p1", name_ar: "خطة", name_en: "Starter", price_monthly: 100, currency: "EGP" }], error: null }];
     open();
-    await waitFor(() => expect(state.reads).toBe(1));
+    // Driven from the rendered field, not from a counter: the click must not be
+    // able to overtake the read, and only the DOM says the choice is on screen.
+    await waitFor(() => expect(planField().textContent).toContain("Starter"));
     fill();
     await waitFor(() => expect(state.invokes).toBe(1));
     // Dropping the auto-select would have quietened the duplicate read too, so
     // the count alone is not enough: the plan the applicant never picked has to
-    // still reach the request.
+    // both reach the request and be the plan the screen is showing.
     expect((state.bodies[0].payload as Record<string, unknown>).plan_id).toBe("p1");
   });
 
@@ -184,7 +206,8 @@ describe("the trial request tells the applicant which field it rejected (P8)", (
     // for whatever sorts first.
     state.outcomes = [{ data: [{ id: "p1", name_ar: "خطة", name_en: "Starter", price_monthly: 100, currency: "EGP" }], error: null }];
     open("/request-trial?plan=p9");
-    await waitFor(() => expect(state.reads).toBe(1));
+    await waitFor(() => expect(state.applied).toBe(1));
+    expect(planField().textContent, "the deep-linked plan was overwritten by the read").not.toContain("Starter");
     fill();
     await waitFor(() => expect(state.invokes).toBe(1));
     expect((state.bodies[0].payload as Record<string, unknown>).plan_id).toBe("p9");

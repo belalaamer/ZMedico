@@ -75,6 +75,19 @@ function fill(overrides: { clinic?: string; owner?: string; email?: string } = {
   fireEvent.click(screen.getByRole("button", { name: /Send trial request/i }));
 }
 
+// How long a wait gets for the plans read to become something on screen.
+// testing-library's default is 1000 ms, and this page does not fit inside it:
+// measured over five cold mounts on this machine, the read reached the page at
+// 145–1300 ms and the picker named its plan at 288–1578 ms. Both CI reds on this
+// file were that budget, not the page — the second one (`expected 'I will decide
+// with the team' to contain 'Starter'`) is the label arriving after 1 s, and the
+// DOM dump CI printed proves the very portal that paints the label was working,
+// because it had already painted the *other* item's text. Widening the budget
+// costs a slower red, not a hidden one: the N19/N20 controls still fail these
+// same assertions. A test budget has to sit above the wait budget, hence the
+// per-test timeouts below (vitest's own default is 5000 ms).
+const settle = { timeout: 6000 };
+
 afterEach(() => {
   cleanup();
   state.outcomes = [];
@@ -139,58 +152,58 @@ describe("the trial request tells the applicant which field it rejected (P8)", (
     expect(page).toMatch(/id="request-message"[\s\S]{0,240}maxLength=\{1000\}/);
   });
 
-  it("says so when the plan list could not be read, and still lets the request through", async () => {
+  it("says so when the plan list could not be read, and still lets the request through", { timeout: 20000 }, async () => {
     state.outcomes = [{ data: null, error: { message: "provider detail that must not reach the page" } }];
     open();
-    const notice = await screen.findByRole("status");
+    const notice = await screen.findByRole("status", {}, settle);
     expect(notice.textContent).toContain("plan list could not be loaded");
     // Two claims in one sentence: the read failed, and the send is still open.
     expect(notice.textContent).toContain("still send this request");
     expect(notice.textContent).not.toContain("provider detail");
     fireEvent.click(screen.getByRole("button", { name: /Try again/i }));
-    await waitFor(() => expect(state.applied).toBe(2));
+    await waitFor(() => expect(state.applied).toBe(2), settle);
   });
 
-  it("does not claim a failure for a plan list that is merely empty", async () => {
+  it("does not claim a failure for a plan list that is merely empty", { timeout: 20000 }, async () => {
     state.outcomes = [{ data: [], error: null }];
     open();
     // `applied`, not `reads`: the claim is about what the page did with an empty
     // answer, so the wait has to reach the far side of the read.
-    await waitFor(() => expect(state.applied).toBe(1));
+    await waitFor(() => expect(state.applied).toBe(1), settle);
     expect(screen.queryByRole("status")).toBeNull();
   });
 
-  it("clears the notice when the retry succeeds", async () => {
+  it("clears the notice when the retry succeeds", { timeout: 20000 }, async () => {
     state.outcomes = [
       { data: null, error: { message: "synthetic" } },
       { data: [{ id: "p1", name_ar: "خطة", name_en: "Starter", price_monthly: 100, currency: "EGP" }], error: null },
     ];
     open();
-    await screen.findByRole("status");
+    await screen.findByRole("status", {}, settle);
     fireEvent.click(screen.getByRole("button", { name: /Try again/i }));
-    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+    await waitFor(() => expect(screen.queryByRole("status")).toBeNull(), settle);
     expect(state.reads).toBe(2);
   });
 
-  it("asks for the plan list once per mount, not once per value its answer writes", async () => {
+  it("asks for the plan list once per mount, not once per value its answer writes", { timeout: 20000 }, async () => {
     state.outcomes = [{ data: [{ id: "p1", name_ar: "خطة", name_en: "Starter", price_monthly: 100, currency: "EGP" }], error: null }];
     open();
     // The dependency list held `planId` while the resolved read wrote `planId`,
     // so every mount sent the same query twice. `reads` is the wrong side of
     // that: it is satisfied before the first answer lands, so the second query
     // has not been sent yet and the count looks clean.
-    await waitFor(() => expect(state.applied).toBe(1));
+    await waitFor(() => expect(state.applied).toBe(1), settle);
     await new Promise((resolve) => setTimeout(resolve, 0));
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(state.reads, "the plans read re-fired on the value its own answer wrote").toBe(1);
   });
 
-  it("still preselects the plan the read returned, and shows it on the form", async () => {
+  it("still preselects the plan the read returned, and shows it on the form", { timeout: 20000 }, async () => {
     state.outcomes = [{ data: [{ id: "p1", name_ar: "خطة", name_en: "Starter", price_monthly: 100, currency: "EGP" }], error: null }];
     open();
     // Driven from the rendered field, not from a counter: the click must not be
     // able to overtake the read, and only the DOM says the choice is on screen.
-    await waitFor(() => expect(planField().textContent).toContain("Starter"));
+    await waitFor(() => expect(planField().textContent).toContain("Starter"), settle);
     fill();
     await waitFor(() => expect(state.invokes).toBe(1));
     // Dropping the auto-select would have quietened the duplicate read too, so
@@ -199,14 +212,18 @@ describe("the trial request tells the applicant which field it rejected (P8)", (
     expect((state.bodies[0].payload as Record<string, unknown>).plan_id).toBe("p1");
   });
 
-  it("keeps the plan the applicant arrived with when the read returns a different first plan", async () => {
+  it("keeps the plan the applicant arrived with when the read returns a different first plan", { timeout: 20000 }, async () => {
     // /pricing (Pricing.tsx:218) and /auth (Auth.tsx:58) both deep-link
     // ?plan=<id>, so auto-select may only fill an empty choice: letting the
     // read overwrite it would silently swap the plan card the applicant clicked
     // for whatever sorts first.
     state.outcomes = [{ data: [{ id: "p1", name_ar: "خطة", name_en: "Starter", price_monthly: 100, currency: "EGP" }], error: null }];
     open("/request-trial?plan=p9");
-    await waitFor(() => expect(state.applied).toBe(1));
+    await waitFor(() => expect(state.applied).toBe(1), settle);
+    // The payload is the proof here, and only the payload can be: a deep-linked
+    // plan id the catalog never returned has no item to render, so the picker
+    // shows nothing for it either way. This negative says the read did not paint
+    // its own first plan over the applicant's choice; it is not the claim.
     expect(planField().textContent, "the deep-linked plan was overwritten by the read").not.toContain("Starter");
     fill();
     await waitFor(() => expect(state.invokes).toBe(1));

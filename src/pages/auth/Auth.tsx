@@ -117,7 +117,7 @@ export default function AuthPage() {
     const validEmail = isValidEmailAddress(submittedIdentifier);
     const validUsername = /^[A-Za-z0-9][A-Za-z0-9._-]{2,31}$/.test(submittedIdentifier);
     if ((!validEmail && !validUsername) || submittedPassword.length < 6 || submittedPassword.length > 128) {
-      toast.error("Invalid email or password");
+      toast.error(t("invalidSignInFields"));
       return;
     }
 

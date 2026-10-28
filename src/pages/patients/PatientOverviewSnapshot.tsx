@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useI18n } from "@/contexts/I18nContext";
-import { enumLabel } from "@/lib/enumLabels";
+import { documentTypeLabel } from "@/lib/enumKeys";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import { doctorDisplayName } from "@/lib/doctorName";
@@ -273,9 +273,7 @@ export default function PatientOverviewSnapshot({
                     // Guard: ignore bare-numeric or too-short stray entries
                     // (e.g. a pulse value of "80" accidentally saved as complaint).
                     const meaningful = raw && !/^\d+(\.\d+)?$/.test(raw) && raw.length >= 3;
-                    const title = meaningful
-                      ? raw
-                      : (lang === "ar" ? "استشارة" : "Consultation");
+                    const title = meaningful ? raw : t("consultation");
                     const spec = r.medical_specialties
                       ? (lang === "ar" ? r.medical_specialties.name_ar : r.medical_specialties.name_en) : null;
                     return (
@@ -403,7 +401,7 @@ export default function PatientOverviewSnapshot({
                     </div>
                     <div className="text-xs font-medium truncate">{title || "—"}</div>
                     <div className="text-[10px] text-muted-foreground truncate">
-                      {enumLabel("document_type", d.document_type, lang)} · {formatDate(d.created_at, lang)}
+                      {documentTypeLabel(d.document_type, t)} · {formatDate(d.created_at, lang)}
                     </div>
                   </button>
                 );

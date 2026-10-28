@@ -54,7 +54,7 @@ const CONTRACT_TYPE: Record<E<"contract_type">, string> = {
 };
 
 const DOCUMENT_TYPE: Record<E<"document_type">, string> = {
-  lab_result: "تحليل معمل",
+  lab_result: "تحليل",
   xray: "أشعة سينية",
   mri: "رنين مغناطيسي",
   ct_scan: "أشعة مقطعية",
@@ -74,6 +74,19 @@ const INVOICE_STATUS: Record<E<"invoice_status">, string> = {
   paid: "مدفوعة",
   partial: "جزئية",
   cancelled: "ملغاة",
+};
+
+// The payments money already reads these words through `t(p.payment_method as
+// any)`, because the dictionary happens to key the five values under their
+// stored names (i18n.ts:185-190 — `cash`, `card`, `bank_transfer` …). This map
+// is the same five words, spelled so the compiler can see them; C18 asserts the
+// two routes stay identical rather than letting one drift.
+const PAYMENT_METHOD: Record<E<"payment_method">, string> = {
+  cash: "نقدي",
+  card: "بطاقة",
+  bank_transfer: "تحويل بنكي",
+  insurance: "تأمين",
+  wallet: "محفظة",
 };
 
 const LEAVE_REQUEST_STATUS: Record<E<"leave_request_status">, string> = {
@@ -135,8 +148,13 @@ const STAFF_STATUS: Record<E<"staff_status">, string> = {
   suspended: "موقوف",
 };
 
+// Where the dictionaries already name a value, their word wins: the same
+// screen renders the form control from `t("docLabResult")` and the badge from
+// this map, and one stored value cannot have two Arabic words in front of the
+// same person. Batch 22 aligned these two entries to i18n.ts; the C18 test
+// freezes the identity so a third vocabulary cannot appear.
 const VISIT_TYPE: Record<E<"visit_type">, string> = {
-  consultation: "استشارة",
+  consultation: "كشف",
   follow_up: "متابعة",
   procedure: "إجراء",
   emergency: "طوارئ",
@@ -210,6 +228,7 @@ const LABELS = {
   invoice_status: INVOICE_STATUS,
   leave_request_status: LEAVE_REQUEST_STATUS,
   medical_record_status: MEDICAL_RECORD_STATUS,
+  payment_method: PAYMENT_METHOD,
   payroll_status: PAYROLL_STATUS,
   physio_attendance: PHYSIO_ATTENDANCE,
   physio_case_status: PHYSIO_CASE_STATUS,

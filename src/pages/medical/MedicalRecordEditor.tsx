@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useI18n } from "@/contexts/I18nContext";
 import { enumLabel } from "@/lib/enumLabels";
+import { documentTypeLabel, visitTypeLabel } from "@/lib/enumKeys";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -162,7 +163,7 @@ export default function MedicalRecordEditor() {
           <Button asChild variant="outline" size="sm">
             <Link to={`/medical/consultation/${record.id}`}>{lang === "ar" ? "عرض الاستشارة" : "Consultation view"}</Link>
           </Button>
-          <Badge variant="outline">{t(("visit_" + record.visit_type) as any) ?? record.visit_type}</Badge>
+          <Badge variant="outline">{visitTypeLabel(record.visit_type, t)}</Badge>
           <Badge variant="outline" className={record.status === "completed" ? "status-completed" : record.status === "reviewed" ? "status-progress" : "status-cancelled"}>
             {record.status === "draft" ? t("statusDraft") : record.status === "completed" ? t("statusCompleted") : t("statusReviewed")}
           </Badge>
@@ -937,7 +938,7 @@ function DocumentsTab({ record, patient, docs, reload, userId }: any) {
               <div className="size-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center"><FileText className="size-5"/></div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium truncate">{lang === "ar" ? d.title_ar : d.title_en}</div>
-                <div className="text-xs text-muted-foreground truncate">{t(("doc" + d.document_type.replace(/_/g, "").replace(/(^.)/, (c: string) => c.toUpperCase())) as any) ?? d.document_type}</div>
+                <div className="text-xs text-muted-foreground truncate">{documentTypeLabel(d.document_type, t)}</div>
               </div>
               <Button variant="ghost" size="icon" onClick={() => openDoc(d.file_url)}><Upload className="size-4 rotate-180"/></Button>
               <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(d)}><Trash2 className="size-4 text-destructive"/></Button>
@@ -1061,7 +1062,7 @@ function InvoicePreviewTab({ record, patient, procs, nav, userId }: any) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-muted/40 text-xs uppercase">
-              <tr><th className="p-2 text-start">{t("procedure")}</th><th className="p-2 text-end">{t("qty")}</th><th className="p-2 text-end">{t("price")}</th><th className="p-2 text-end">{t("totals" as any) ?? "Total"}</th></tr>
+              <tr><th className="p-2 text-start">{t("procedure")}</th><th className="p-2 text-end">{t("qty")}</th><th className="p-2 text-end">{t("price")}</th><th className="p-2 text-end">{t("total")}</th></tr>
             </thead>
             <tbody>
               {items.map((rp: any) => (
@@ -1072,7 +1073,7 @@ function InvoicePreviewTab({ record, patient, procs, nav, userId }: any) {
                   <td className="p-2 text-end tabular-nums font-semibold">{formatMoney(rp.procedures.default_price * rp.quantity, lang)}</td>
                 </tr>
               ))}
-              <tr className="border-t border-border"><td colSpan={3} className="p-2 text-end font-semibold">{t("totals" as any) ?? "Total"}</td><td className="p-2 text-end font-bold tabular-nums">{formatMoney(total, lang)}</td></tr>
+              <tr className="border-t border-border"><td colSpan={3} className="p-2 text-end font-semibold">{t("total")}</td><td className="p-2 text-end font-bold tabular-nums">{formatMoney(total, lang)}</td></tr>
             </tbody>
           </table>
         </div>

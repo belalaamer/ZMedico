@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useI18n } from "@/contexts/I18nContext";
 import { enumLabel } from "@/lib/enumLabels";
+import { documentTypeLabel, visitTypeLabel } from "@/lib/enumKeys";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -30,7 +31,7 @@ function calcAge(dob?: string | null) {
 
 export default function ConsultationDashboard() {
   const { recordId } = useParams();
-  const { lang } = useI18n();
+  const { lang, t } = useI18n();
   const { user } = useAuth();
   const nav = useNavigate();
   const isAr = lang === "ar";
@@ -211,7 +212,7 @@ export default function ConsultationDashboard() {
           <Link to="/medical/records"><ArrowLeft className="me-2 size-4"/>{T("Back to records", "العودة للسجلات")}</Link>
         </Button>
         <div className="flex items-center gap-2">
-          <Badge variant="outline">{enumLabel("visit_type", record.visit_type, lang)}</Badge>
+          <Badge variant="outline">{visitTypeLabel(record.visit_type, t)}</Badge>
           <Badge variant="outline">{enumLabel("medical_record_status", record.status, lang)}</Badge>
           <Button asChild variant="outline" size="sm">
             <Link to={`/medical/records/${record.id}`}><FileText className="me-2 size-4"/>{T("Open full record", "السجل الكامل")}</Link>
@@ -420,7 +421,7 @@ export default function ConsultationDashboard() {
                 <li key={d.id} className="py-1.5 flex items-center gap-2">
                   <FileText className="size-3.5 text-primary"/>
                   <span className="flex-1 truncate">{isAr ? d.title_ar : d.title_en}</span>
-                  <Badge variant="outline" className="text-[10px]">{enumLabel("document_type", d.document_type, lang)}</Badge>
+                  <Badge variant="outline" className="text-[10px]">{documentTypeLabel(d.document_type, t)}</Badge>
                 </li>
               ))}
             </ul>

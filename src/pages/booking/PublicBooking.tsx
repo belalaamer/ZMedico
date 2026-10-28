@@ -615,15 +615,35 @@ export default function PublicBooking() {
         ) : (
         <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
           <Card className="overflow-hidden border-primary/10 shadow-lg">
-            <div className="flex items-center gap-2 border-b bg-background/80 px-5 py-4 text-sm font-semibold">
-              <span className={cn("flex size-8 items-center justify-center rounded-full", step >= 1 ? "bg-primary text-primary-foreground" : "bg-muted")}>1</span>
-              <span className={step >= 1 ? "text-foreground" : "text-muted-foreground"}>{isArabic ? "الفرع والخدمة" : "Branch & service"}</span>
-              <span className="mx-1 text-muted-foreground">/</span>
-              <span className={cn("flex size-8 items-center justify-center rounded-full", step >= 2 ? "bg-primary text-primary-foreground" : "bg-muted")}>2</span>
-              <span className={step >= 2 ? "text-foreground" : "text-muted-foreground"}>{isArabic ? "الوقت" : "Time"}</span>
-              <span className="mx-1 text-muted-foreground">/</span>
-              <span className={cn("flex size-8 items-center justify-center rounded-full", step >= 3 ? "bg-primary text-primary-foreground" : "bg-muted")}>3</span>
-              <span className={step >= 3 ? "text-foreground" : "text-muted-foreground"}>{isArabic ? (isPortalPatient ? "تأكيد الحجز" : "بياناتك") : (isPortalPatient ? "Confirm" : "Your details")}</span>
+            {/*
+              A phone does not have room for three step labels and a slash each on one
+              line: at 320px the old row broke "Branch & service" across three lines and
+              the badges drifted onto separate baselines (measured in a browser, not
+              inferred — nothing was clipped, it just stopped reading as steps). Each
+              badge+label pair is therefore one unbreakable group, no label may wrap
+              mid-phrase, and below `sm` the slashes go: they carry no information the
+              numbered badges do not, and an orphaned "/" at a line end is the thing
+              that makes a wrapped list look broken. Desktop (>=640px) renders exactly
+              what it did before.
+            */}
+            <div
+              data-booking-steps
+              className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b bg-background/80 px-5 py-4 text-sm font-semibold"
+            >
+              <span className="flex shrink-0 items-center gap-2">
+                <span className={cn("flex size-8 items-center justify-center rounded-full", step >= 1 ? "bg-primary text-primary-foreground" : "bg-muted")}>1</span>
+                <span data-booking-step-label className={cn("whitespace-nowrap", step >= 1 ? "text-foreground" : "text-muted-foreground")}>{isArabic ? "الفرع والخدمة" : "Branch & service"}</span>
+              </span>
+              <span className="mx-1 hidden text-muted-foreground sm:inline">/</span>
+              <span className="flex shrink-0 items-center gap-2">
+                <span className={cn("flex size-8 items-center justify-center rounded-full", step >= 2 ? "bg-primary text-primary-foreground" : "bg-muted")}>2</span>
+                <span data-booking-step-label className={cn("whitespace-nowrap", step >= 2 ? "text-foreground" : "text-muted-foreground")}>{isArabic ? "الوقت" : "Time"}</span>
+              </span>
+              <span className="mx-1 hidden text-muted-foreground sm:inline">/</span>
+              <span className="flex shrink-0 items-center gap-2">
+                <span className={cn("flex size-8 items-center justify-center rounded-full", step >= 3 ? "bg-primary text-primary-foreground" : "bg-muted")}>3</span>
+                <span data-booking-step-label className={cn("whitespace-nowrap", step >= 3 ? "text-foreground" : "text-muted-foreground")}>{isArabic ? (isPortalPatient ? "تأكيد الحجز" : "بياناتك") : (isPortalPatient ? "Confirm" : "Your details")}</span>
+              </span>
             </div>
 
             <div className="space-y-6 p-5 md:p-7">
@@ -705,7 +725,13 @@ export default function PublicBooking() {
                         </select>
                         {doctors.length > 0 ? <p className="text-xs text-muted-foreground">{isArabic ? `تم العثور على ${doctors.length} طبيب مؤهل لهذه الخدمة.` : `${doctors.length} eligible doctor${doctors.length === 1 ? "" : "s"} found for this service.`}</p> : <p className="text-xs text-muted-foreground">{isArabic ? "لا يوجد تخصيص محدد لطبيب؛ سيبحث النظام عن طبيب متاح." : "No specific doctor assignment is configured; the system will find an available doctor."}</p>}
                       </div>
-                      <Button type="button" variant="outline" disabled={nearestLoading || slotsLoading} onClick={() => void findNearest()}>{nearestLoading ? (isArabic ? "جارٍ البحث…" : "Searching…") : (isArabic ? "أقرب موعد متاح خلال ١٤ يومًا" : "Find earliest availability within 14 days")}</Button>
+                      {/* The shared Button base sets whitespace-nowrap, and this is the
+                          longest label on the screen: at 320 px English the one-line
+                          box measured 289 px wide inside a 246 px content column, so it
+                          crossed its own card and ran 6 px off the device (measured in a
+                          browser). Wrapping costs nothing on desktop, where the label
+                          already fits one line, and min-h keeps the 40 px height it had. */}
+                      <Button type="button" variant="outline" disabled={nearestLoading || slotsLoading} onClick={() => void findNearest()} className="h-auto min-h-[40px] whitespace-normal text-center">{nearestLoading ? (isArabic ? "جارٍ البحث…" : "Searching…") : (isArabic ? "أقرب موعد متاح خلال ١٤ يومًا" : "Find earliest availability within 14 days")}</Button>
                       {slotsLoading ? <div className="py-10 text-center text-sm text-muted-foreground">{isArabic ? "جارٍ البحث عن المواعيد…" : "Finding available times…"}</div> : null}
                       {!slotsLoading && slotsError ? <div role="alert" className="rounded-2xl border border-destructive/40 p-5 space-y-3 text-sm"><p>{isArabic ? "تعذر تحميل المواعيد. تحقق من الاتصال وحاول مجددًا." : "Unable to load availability. Check your connection and retry."}</p><Button type="button" variant="outline" onClick={() => setSlotsRetry(value => value + 1)}>{isArabic ? "إعادة المحاولة" : "Retry"}</Button></div> : null}
                       {!slotsLoading && !slotsError && !slots.length ? <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">{isArabic ? "لا توجد مواعيد متاحة لهذا اليوم. اختر تاريخًا آخر." : "No available times for this day. Please choose another date."}</div> : null}

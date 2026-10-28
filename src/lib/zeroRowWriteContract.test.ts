@@ -183,9 +183,13 @@ describe("zero-row write contract (batches 13-17)", () => {
 
   it("never uses the zero-rows-ok escape hatch where a real proof is possible", () => {
     const marked = all.flatMap((e) => e.writes.filter((w) => w.marker).map((w) => `${e.file}:${w.line} ${w.kind}`));
+    // Batch 23 refreshed three of these line numbers (Schedules ×2, Payroll ×1):
+    // the batch added one import line to each file, which moves everything under
+    // it. The eleven writes themselves, their order, and their markers are the
+    // set batch 17 measured — each of the three still reads the same statement.
     expect(marked).toEqual([
-      "src/pages/hr/Schedules.tsx:137 .delete()",
-      "src/pages/hr/Schedules.tsx:180 .delete()",
+      "src/pages/hr/Schedules.tsx:140 .delete()",
+      "src/pages/hr/Schedules.tsx:183 .delete()",
       "src/pages/reminders/Reminders.tsx:111 .update(",
       "src/components/layout/Topbar.tsx:136 .update(",
       "src/components/layout/Topbar.tsx:143 .update(",
@@ -194,7 +198,7 @@ describe("zero-row write contract (batches 13-17)", () => {
       "src/contexts/I18nContext.tsx:106 .update(",
       "src/pages/branches/Branches.tsx:285 .update(",
       "src/pages/settings/AppointmentSettings.tsx:118 .delete()",
-      "src/pages/hr/Payroll.tsx:213 .delete()",
+      "src/pages/hr/Payroll.tsx:214 .delete()",
     ]);
   });
 

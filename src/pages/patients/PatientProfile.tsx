@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useI18n } from "@/contexts/I18nContext";
 import { enumLabel } from "@/lib/enumLabels";
+import { enumCopy, GENDER_KEY, PAYMENT_METHOD_KEY } from "@/lib/enumKeys";
 import { supabase } from "@/integrations/supabase/client";
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
@@ -293,7 +294,7 @@ export default function PatientProfile() {
           />
           <Card className="p-6 shadow-card mt-4">
             <div className="grid sm:grid-cols-2 gap-4 text-sm">
-              <div><div className="text-muted-foreground text-xs">{t("gender")}</div><div>{patient.gender ? t(patient.gender as any) : "—"}</div></div>
+              <div><div className="text-muted-foreground text-xs">{t("gender")}</div><div>{enumCopy(GENDER_KEY, patient.gender, t)}</div></div>
               <div><div className="text-muted-foreground text-xs">{t("nationality")}</div><div>{patient.nationality ?? "—"}</div></div>
               <div><div className="text-muted-foreground text-xs">{t("address")}</div><div>{patient.address ?? "—"}</div></div>
               <div><div className="text-muted-foreground text-xs">{t("referralSource")}</div><div>{patient.referral_source ?? "—"}</div></div>
@@ -507,7 +508,7 @@ export default function PatientProfile() {
                         <div className="flex-1 min-w-0">
                           <div className="font-medium tabular-nums">{formatMoney(pay.amount, lang)}</div>
                           <div className="text-xs text-muted-foreground">
-                            {formatDateTime(pay.created_at, lang)} · {t(pay.payment_method as any) ?? pay.payment_method}
+                            {formatDateTime(pay.created_at, lang)} · {enumCopy(PAYMENT_METHOD_KEY, pay.payment_method, t)}
                             {pay.invoices?.invoice_number && <> · <Link to={`/invoices/${pay.invoice_id}`} className="text-primary hover:underline">{pay.invoices.invoice_number}</Link></>}
                           </div>
                         </div>

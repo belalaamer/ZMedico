@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { reportClientError } from "@/lib/observability/reportError";
 import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
+import { enumCopy, PAYMENT_METHOD_KEY } from "@/lib/enumKeys";
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 
 type Inv = any;
@@ -377,7 +378,7 @@ export default function InvoiceDetail() {
               <div key={pay.id} className="px-4 py-3 flex items-center justify-between text-sm hover:bg-muted/30 transition-colors">
                 <div>
                   <div className="font-medium tabular-nums">{formatMoney(pay.amount, lang)}</div>
-                  <div className="text-xs text-muted-foreground">{formatDateTime(pay.created_at, lang)} · {t(pay.payment_method as any) ?? pay.payment_method}</div>
+                  <div className="text-xs text-muted-foreground">{formatDateTime(pay.created_at, lang)} · {enumCopy(PAYMENT_METHOD_KEY, pay.payment_method, t)}</div>
                 </div>
                 {pay.reference_number && <Badge variant="outline" className="text-[10px]">{pay.reference_number}</Badge>}
               </div>

@@ -22,6 +22,7 @@ import { useBranch } from "@/contexts/BranchContext";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { supabase } from "@/integrations/supabase/client";
 import { enumLabel } from "@/lib/enumLabels";
+import { STATUS_KEY_BY_PAYROLL_STATUS, enumCopy } from "@/lib/enumKeys";
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
@@ -344,7 +345,7 @@ export default function Payroll() {
             const bonusOnly = commAttached[p.id]
               ? Math.max(0, Number(p.bonuses || 0) - Number(commissions))
               : Number(p.bonuses || 0);
-            const statusLabel = t(`status${p.status.charAt(0).toUpperCase()}${p.status.slice(1)}` as any);
+            const statusLabel = enumCopy(STATUS_KEY_BY_PAYROLL_STATUS, p.status, t);
             const statusTint =
               p.status === "paid"
                 ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"

@@ -1,7 +1,27 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { enumLabel } from "@/lib/enumLabels";
-import { DOCUMENT_TYPE_KEY, VISIT_TYPE_KEY, documentTypeLabel, visitTypeLabel } from "@/lib/enumKeys";
+import {
+  APPOINTMENT_STATUS_KEY,
+  DOCUMENT_TYPE_KEY,
+  EXPENSE_METHOD_KEY,
+  GENDER_KEY,
+  PAYMENT_METHOD_KEY,
+  REASON_KEY_BY_STOCK_ADJUSTMENT,
+  REMINDER_CHANNEL_KEY,
+  REMINDER_STATUS_KEY,
+  REPORT_FREQUENCY_KEY,
+  STATUS_KEY_BY_APPOINTMENT_STATUS,
+  STATUS_KEY_BY_LEAVE_REQUEST_STATUS,
+  STATUS_KEY_BY_PAYROLL_STATUS,
+  TOOTH_STATUS_KEY,
+  TREASURY_TX_TYPE_KEY,
+  VISIT_TYPE_KEY,
+  WALLET_TX_TYPE_KEY,
+  documentTypeLabel,
+  enumCopy,
+  visitTypeLabel,
+} from "@/lib/enumKeys";
 import { dict } from "@/lib/i18n";
 import type { DictKey } from "@/lib/i18n";
 
@@ -26,17 +46,29 @@ import type { DictKey } from "@/lib/i18n";
 // to a Cairo receptionist and to the English desk alike.
 //
 // The other six derive a key that does exist, so they read correctly today and
-// are registered rather than rewritten. Registered sites are still worth
+// were registered rather than rewritten. Registered sites are still worth
 // freezing: their value space is read from the same places the app reads it —
 // the generated enum unions and the local literal array — so the test proves the
 // derivation lands on a real key for every value it can be handed, and fails the
 // day a value is added that it does not.
 //
-// Sites are keyed by file and prefix, never by line number.
+// Batch 23 (C21) rewrote them. The registry that held those five sites is gone:
+// each derivation is now a `Record<domain, DictKey>` in lib/enumKeys read through
+// `enumCopy()`, so no screen composes a key, no call needs a cast, and the
+// totality proof the registry supplied by arithmetic is supplied by the compiler.
+// The two shape detectors below stay, asserted against probes and required to
+// find zero sites — the accounting was replaced by the fix, not relaxed.
 
 const enKeys = new Set(Object.keys(dict.en));
 const arKeys = new Set(Object.keys(dict.ar));
 
+/** A derived site the sweep measured, the shape it derives, and every value it
+ *  can be handed. `values()` is read from disk, not restated from memory.
+ *
+ *  Batch 23 retired the registry: the four domains it held are typed maps in
+ *  lib/enumKeys now, described by `Prefixed` below, and the tree has no site
+ *  that composes a key. `TRANSFORMS` survives because it is how the maps are
+ *  proven to name the keys the derivations computed. */
 type Transform = "upperFirst" | "upperFirstCamel";
 
 const TRANSFORMS: Record<Transform, (v: string) => string> = {
@@ -47,54 +79,55 @@ const TRANSFORMS: Record<Transform, (v: string) => string> = {
     v.charAt(0).toUpperCase() + v.slice(1).replace(/_(.)/g, (_, c: string) => c.toUpperCase()),
 };
 
-/** A derived site the sweep measured, the shape it derives, and every value it
- *  can be handed. `values()` is read from disk, not restated from memory. */
-type Derived = {
-  file: string;
-  prefix: string;
-  sites: number;
-  shape: "concat" | "template";
+/** One of the four replaced derivations: the prefix it built, the transform it
+ *  applied, the map that stands in for it, and where its value space lives. */
+type Prefixed = {
+  screen: string;
+  prefix: "status" | "reason";
   transform: Transform;
+  map: Record<string, DictKey>;
+  /** The Postgres domain the column is typed with, when there is one — `domain`
+   *  is what lets the C19 recount compare this route against `enumLabel()`. */
+  domain?: "appointment_status" | "leave_request_status" | "payroll_status";
   values: () => string[];
   names: string;
 };
 
-const DERIVED: Derived[] = [
+const PREFIXED: Prefixed[] = [
   {
-    file: "src/pages/inventory/StockOverview.tsx",
-    prefix: "reason",
-    sites: 2,
-    shape: "concat",
-    transform: "upperFirst",
-    values: () => constStringArray("src/pages/inventory/StockOverview.tsx", "REASONS"),
-    names: "the REASONS array the adjustment dialog is built from",
+    screen: "src/pages/dashboard/Dashboard.tsx",
+    prefix: "status",
+    transform: "upperFirstCamel",
+    domain: "appointment_status",
+    map: STATUS_KEY_BY_APPOINTMENT_STATUS,
+    values: () => enumValues("appointment_status"),
+    names: "the appointment_status enum",
   },
   {
-    file: "src/pages/hr/Leaves.tsx",
+    screen: "src/pages/hr/Leaves.tsx",
     prefix: "status",
-    sites: 1,
-    shape: "template",
     transform: "upperFirst",
+    domain: "leave_request_status",
+    map: STATUS_KEY_BY_LEAVE_REQUEST_STATUS,
     values: () => enumValues("leave_request_status"),
     names: "the leave_request_status enum",
   },
   {
-    file: "src/pages/hr/Payroll.tsx",
+    screen: "src/pages/hr/Payroll.tsx",
     prefix: "status",
-    sites: 1,
-    shape: "template",
     transform: "upperFirst",
+    domain: "payroll_status",
+    map: STATUS_KEY_BY_PAYROLL_STATUS,
     values: () => enumValues("payroll_status"),
     names: "the payroll_status enum",
   },
   {
-    file: "src/pages/dashboard/Dashboard.tsx",
-    prefix: "status",
-    sites: 1,
-    shape: "template",
-    transform: "upperFirstCamel",
-    values: () => enumValues("appointment_status"),
-    names: "the appointment_status enum",
+    screen: "src/pages/inventory/StockOverview.tsx",
+    prefix: "reason",
+    transform: "upperFirst",
+    map: REASON_KEY_BY_STOCK_ADJUSTMENT,
+    values: () => constStringArray("src/pages/inventory/StockOverview.tsx", "REASONS"),
+    names: "the REASONS array the adjustment dialog is built from",
   },
 ];
 
@@ -216,27 +249,37 @@ describe("no screen derives a translation key the dictionaries do not define (C1
     expect(dict.ar.total).toBe("الإجمالي");
   });
 
-  it("keeps every derived site on the file, prefix and count it was reviewed with", () => {
-    const known = new Set(DERIVED.map((d) => `${d.file} ${d.prefix}`));
+  it("keeps zero screens composing a translation key", () => {
+    // Batch 22 registered five sites that derived a real key and froze them by
+    // file and prefix; batch 23 replaced every one with a typed map, so the rule
+    // is now the stronger one — nothing in the tree builds a key by arithmetic.
+    // The shape detectors above are what make this zero a measurement rather
+    // than a blind spot: they still match the concat and template forms.
     expect(
-      sites.filter((s) => !known.has(`${s.file} ${s.prefix}`)).map((s) => `${s.file}:${s.line} derives its key from "${s.prefix}"`),
-      "a new t() call builds its key from a string — name it in a typed map instead",
+      sites.map((s) => `${s.file}:${s.line} derives its key from "${s.prefix}"`),
+      "a t() call builds its key from a string — name it in a typed map instead"
     ).toEqual([]);
-    for (const d of DERIVED) {
-      const found = sites.filter((s) => s.file === d.file && s.prefix === d.prefix);
-      expect(found.length, `${d.file}: ${found.length} derived t("${d.prefix}…") sites, not ${d.sites}`).toBe(d.sites);
-      expect(found.every((s) => s.shape === d.shape), `${d.file}: the derivation changed shape`).toBe(true);
-    }
+    expect(sourceFiles("src").length, "the derivation sweep read no source files").toBeGreaterThan(150);
   });
 
-  it("proves every registered derivation lands on a real key, for every value", () => {
-    for (const d of DERIVED) {
-      const values = d.values();
-      expect(values.length, `${d.file}: ${d.names} came back empty`).toBeGreaterThan(0);
+  it("names the key each replaced derivation computed, for every value it can hold", () => {
+    // The copy-neutrality proof for the four rewritten derivations: the map has
+    // to hold, for each value, exactly the string the old `` `status${…}` ``
+    // expression produced, and that string has to be a real key in both
+    // dictionaries. Both desks read the word they read before — the arithmetic
+    // left the screen, the words did not change.
+    for (const p of PREFIXED) {
+      const values = p.values();
+      expect(values.length, `${p.screen}: ${p.names} came back empty`).toBeGreaterThan(0);
+      expect(
+        Object.keys(p.map).sort(),
+        `${p.screen}: the map and ${p.names} no longer hold the same values`
+      ).toEqual([...values].sort());
       for (const v of values) {
-        const key = d.prefix + TRANSFORMS[d.transform](v);
-        expect(enKeys.has(key), `${d.file}: ${d.names} can hold "${v}", which derives "${key}" — not in the English dictionary`).toBe(true);
-        expect(arKeys.has(key), `${d.file}: "${key}" has no Arabic entry`).toBe(true);
+        const derived = p.prefix + TRANSFORMS[p.transform](v);
+        expect(p.map[v], `${p.screen}: "${v}" derived "${derived}"; the map names "${p.map[v]}"`).toBe(derived);
+        expect(enKeys.has(derived), `${p.screen}: "${derived}" is not an English key`).toBe(true);
+        expect(arKeys.has(derived), `${p.screen}: "${derived}" has no Arabic entry`).toBe(true);
       }
     }
   });
@@ -341,7 +384,7 @@ describe("no screen derives a translation key the dictionaries do not define (C1
     for (const file of sourceFiles("src")) {
       if (file === "src/lib/enumKeys.ts") continue; // the helpers are declared here
       const src = readFileSync(file, "utf8");
-      if (!/\b(visitTypeLabel|documentTypeLabel)\(/.test(src)) continue;
+      if (!/\b(visitTypeLabel|documentTypeLabel|enumCopy)\(/.test(src)) continue;
       expect(src, `${file} calls a helper from lib/enumKeys without importing it`).toContain('from "@/lib/enumKeys"');
     }
   });
@@ -374,5 +417,345 @@ describe("no screen derives a translation key the dictionaries do not define (C1
     const src = readFileSync("src/lib/globalSearch.ts", "utf8");
     expect(src).not.toMatch(/toISOString\(\)\.slice\(0, ?10\)/);
     expect(src).toContain("const dayKey = localDateOnly(d);");
+  });
+});
+
+// ─── Batch 23 (C21): the cast is the bug, even when the word is right ─────────
+//
+// `t(p.payment_method as any)` showed the receptionist "نقدي" and the English
+// desk "Cash" — and was still a defect. The key it asked for was a string the
+// type system had been told to ignore, `t()` answers a miss with the miss, and
+// the only thing between the two and a raw token on screen was that the
+// dictionaries happen to key most enum values under the token Postgres stores.
+// Twenty-nine calls in seventeen files stood on that coincidence: Payments,
+// InvoiceDetail, PatientProfile, Expenses, FinancialReports, Treasury,
+// ScheduledReminders, ScheduledReports, PatientOverviewSnapshot,
+// MedicalRecordEditor, PatientWalletTab, PatientDental, PatientMedicalTab,
+// Products, Schedules, StaffDetail, Templates.
+//
+// Batch 23 put each of them in a `Record<enum, DictKey>` (or, where the value
+// space is a local `as const` list rather than a Postgres enum, in a structure
+// whose literal types `t()` can check by itself). The tests below prove, in
+// order: the cast cannot come back; every map covers the enum the generated
+// client declares; every key resolves in both dictionaries; the word each desk
+// reads did not move; and the Arabic words a value has more than one of are
+// counted rather than assumed.
+
+const IDENTITY_MAPS: Array<{ domain: string; map: Record<string, DictKey> }> = [
+  { domain: "payment_method", map: PAYMENT_METHOD_KEY },
+  // `expenses.payment_method` is its own enum (types.ts:10291), not
+  // `payment_method` — three values, all spelled the same in the dictionary.
+  { domain: "expense_method", map: EXPENSE_METHOD_KEY },
+  { domain: "gender", map: GENDER_KEY },
+  { domain: "appointment_status", map: APPOINTMENT_STATUS_KEY },
+  { domain: "reminder_channel", map: REMINDER_CHANNEL_KEY },
+  { domain: "reminder_status", map: REMINDER_STATUS_KEY },
+  { domain: "report_frequency", map: REPORT_FREQUENCY_KEY },
+  { domain: "treasury_tx_type", map: TREASURY_TX_TYPE_KEY },
+];
+
+// The two domains whose dictionary key is not the stored value. Written out as
+// the words the screens read before this batch, so "identity" cannot quietly
+// become the rule and retitle `topup` to its own token: these two maps are the
+// translations, not a formality.
+const RENAMED_MAPS: Array<{ domain: string; map: Record<string, DictKey>; words: Record<string, string> }> = [
+  {
+    domain: "wallet_tx_type",
+    map: WALLET_TX_TYPE_KEY,
+    words: {
+      topup: "txTopup",
+      spend: "txSpend",
+      refund: "txRefund",
+      referral_reward: "txReferralReward",
+      adjustment_credit: "txAdjustmentCredit",
+      adjustment_debit: "txAdjustmentDebit",
+    },
+  },
+  {
+    domain: "tooth_status",
+    map: TOOTH_STATUS_KEY,
+    words: {
+      healthy: "chartLegendHealthy",
+      caries: "chartLegendCaries",
+      filled: "chartLegendFilled",
+      crown: "chartLegendCrown",
+      implant: "chartLegendImplant",
+      root_canal: "chartLegendRootCanal",
+      extracted: "chartLegendExtracted",
+      bridge: "chartLegendBridge",
+    },
+  },
+];
+
+const enWords = dict.en as unknown as Record<string, string>;
+const arWords = dict.ar as unknown as Record<string, string>;
+
+// A `t(` call whose argument was cast past DictKey, found by matching the call's
+// own parentheses instead of a fixed nesting depth. The first version of this
+// sweep allowed one level of parens inside the argument and read the file a line
+// at a time, which is how it reported zero while three sites were still cast:
+// Dashboard's `` t(`status${(a.status?.charAt(0)…replace(/_(.)/g, (…, c) => …())}`
+// as any) `` nests four levels deep and spans further than a regex can count. So
+// the argument is now located by walking the text to the call's closing paren and
+// everything at a depth below that is blanked out, which leaves only a cast on
+// the key itself — the nested `as any` inside `PAYMENT_TYPE_KEYS[m.type as keyof
+// …]` at PaymentMethods.tsx:102 is a cast on the *index*, so the lookup stays
+// checked and the site stays legal. Comments are skipped, as they were before.
+const CAST_ON_KEY = /\bas\s+(?:any|unknown|never|DictKey)\b/;
+const COMMENT_LINE = /^\s*(?:\/\/|\*|\/\*)/;
+
+function castArgumentsIn(src: string): Array<{ index: number; call: string }> {
+  const hits: Array<{ index: number; call: string }> = [];
+  for (const m of src.matchAll(/\bt\(/g)) {
+    const start = (m.index ?? 0) + m[0].length;
+    let i = start;
+    let depth = 1;
+    while (i < src.length && depth > 0) {
+      const c = src[i];
+      if (c === "(") depth++;
+      else if (c === ")") depth--;
+      i++;
+    }
+    const arg = src.slice(start, depth === 0 ? i - 1 : src.length);
+    let masked = "";
+    let d = 0;
+    for (const c of arg) {
+      if (c === "(" || c === "[" || c === "{") { d++; masked += " "; }
+      else if (c === ")" || c === "]" || c === "}") { d--; masked += " "; }
+      else masked += d > 0 ? " " : c;
+    }
+    if (CAST_ON_KEY.test(masked)) hits.push({ index: m.index ?? 0, call: src.slice(m.index ?? 0, i) });
+  }
+  return hits;
+}
+
+const findCastArguments = () => {
+  const sites: Array<{ file: string; line: number; text: string }> = [];
+  for (const file of sourceFiles("src")) {
+    const src = readFileSync(file, "utf8");
+    for (const hit of castArgumentsIn(src)) {
+      const line = src.slice(0, hit.index).split("\n");
+      if (COMMENT_LINE.test(line[line.length - 1])) continue;
+      sites.push({ file, line: line.length, text: line[line.length - 1].trim().slice(0, 90) });
+    }
+  }
+  return sites;
+};
+
+describe("no screen hands t() a key it had to cast (C21)", () => {
+  it("keeps the cast census at zero and the detector able to see one", () => {
+    expect(
+      findCastArguments().map((s) => `${s.file}:${s.line} ${s.text}`),
+      "a t() call is asking for a translation the compiler could not check — route it through a Record<domain, DictKey> map"
+    ).toEqual([]);
+    // The detector must still see every shape that survived the sweep, or zero
+    // means the rule was relaxed rather than the code fixed.
+    for (const probe of [
+      "{t(p.payment_method as any)}",
+      "{t(r.reminder_type as any)}",
+      'const m = (t(x.m as any) ?? x.m)',
+      't(("visit_" + r.visit_type) as any)',
+      "t(`status${x}` as any)",
+      "t(typeKey[tx.tx_type] as any)",
+      "t(maybeKey as DictKey)",
+      // The shape the one-level regex was blind to, verbatim from Dashboard.tsx
+      // before batch 23 rewrote it: a template literal whose interpolation
+      // nests a replace() whose callback nests a call.
+      't(`status${a.status?.charAt(0).toUpperCase() + a.status?.slice(1).replace(/_(.)/g, (_: any, c: string) => c.toUpperCase())}` as any) ?? a.status',
+      't(("reason" + adj.reason.charAt(0).toUpperCase() + adj.reason.slice(1)) as any)',
+    ]) {
+      expect(castArgumentsIn(probe).length, `the C21 detector no longer matches ${probe}`).toBe(1);
+    }
+    // …and must not fire on the shapes that are already safe: a checked
+    // literal, a map lookup whose values are DictKeys, and a cast on the
+    // *index* used to pick the key rather than on the key handed to t()
+    // (PaymentMethods.tsx:102 — still type-checked there).
+    for (const probe of [
+      '{t("wallet")}',
+      "t(UNIT_KEY[u])",
+      't(PAYMENT_TYPE_KEYS[m.type as keyof typeof PAYMENT_TYPE_KEYS] ?? "paymentTypeOther")',
+      "enumCopy(PAYMENT_METHOD_KEY, p.payment_method, t)",
+      "t(STATUS_KEY_BY_PAYROLL_STATUS[p.status])",
+    ]) {
+      expect(castArgumentsIn(probe).length, `the C21 detector fires on a checked call: ${probe}`).toBe(0);
+    }
+    expect(sourceFiles("src").length, "the C21 sweep read no source files").toBeGreaterThan(150);
+  });
+
+  it("keeps no stored column going straight into t(), cast or no cast", () => {
+    // A cast at least marked the spot. `t(row.status)` on an `any` row is the
+    // same defect unmarked: it compiles, and reads a word only for as long as the
+    // dictionary happens to key that value under its stored name. Every bare
+    // argument in the tree today is a lookup in a typed map, where the value is
+    // `DictKey` before t() ever sees it — so the rule is a whole-property
+    // argument, and map lookups stay legal.
+    const BARE_COLUMN = /\bt\(\s*[A-Za-z_$][\w$]*\.[\w$?]+\s*\)/;
+    const hits: string[] = [];
+    for (const file of sourceFiles("src")) {
+      readFileSync(file, "utf8").split("\n").forEach((raw, i) => {
+        const trimmed = raw.trim();
+        if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) return;
+        if (BARE_COLUMN.test(raw)) hits.push(`${file}:${i + 1} ${trimmed.slice(0, 80)}`);
+      });
+    }
+    expect(hits, "a screen hands t() a column it never checked against the dictionary").toEqual([]);
+    expect(BARE_COLUMN.test("{t(p.payment_method)}")).toBe(true);
+    expect(BARE_COLUMN.test("{t(a.status)}")).toBe(true);
+    expect(BARE_COLUMN.test("t(STATUS_KEY_BY_PAYROLL_STATUS[p.status])")).toBe(false);
+    expect(BARE_COLUMN.test("t(DAYS[i])")).toBe(false);
+    expect(BARE_COLUMN.test("t(profName(l.staff_id))")).toBe(false);
+  });
+
+  it("covers the whole enum each batch-23 column is typed with", () => {
+    for (const { domain, map } of [...IDENTITY_MAPS, ...RENAMED_MAPS]) {
+      expect(
+        Object.keys(map).sort(),
+        `${domain}: the map and the enum in types.ts no longer hold the same values`
+      ).toEqual(enumValues(domain).sort());
+    }
+  });
+
+  it("resolves every mapped value in both dictionaries", () => {
+    for (const { domain, map } of [...IDENTITY_MAPS, ...RENAMED_MAPS]) {
+      for (const [value, key] of Object.entries(map)) {
+        expect(enKeys.has(key), `${domain}.${value} -> "${key}" is not an English key`).toBe(true);
+        expect(arKeys.has(key), `${domain}.${value} -> "${key}" has no Arabic entry`).toBe(true);
+      }
+    }
+  });
+
+  it("keeps an identity domain's key equal to the value Postgres stores", () => {
+    // This is the coincidence batch 23 wrote down: the reason the cast rendered
+    // a word was that the dictionary keys these values under their stored names.
+    // If a migration renames a value, the identity breaks, the map has to be
+    // renamed with it, and the desk keeps reading a word either way.
+    for (const { domain, map } of IDENTITY_MAPS) {
+      for (const [value, key] of Object.entries(map)) {
+        expect(key, `${domain}: "${value}" is no longer keyed under its own name`).toBe(value);
+      }
+    }
+  });
+
+  it("gives the desk the word the cast gave it, for every stored value", () => {
+    // The copy-neutrality proof, asserted rather than argued: `t(value as any)`
+    // answered `dict[lang][value]`, so an identity map routed through enumCopy()
+    // must answer the same string for every value the column can hold.
+    for (const { domain, map } of IDENTITY_MAPS) {
+      for (const value of enumValues(domain)) {
+        expect(enumCopy(map, value, (k) => dict.en[k]), `${domain}.${value} on the English desk`).toBe(enWords[value]);
+        expect(enumCopy(map, value, (k) => dict.ar[k]), `${domain}.${value} on the Arabic desk`).toBe(arWords[value]);
+      }
+    }
+  });
+
+  it("keeps the two renamed domains on the words their screens used", () => {
+    for (const { domain, map, words } of RENAMED_MAPS) {
+      expect(Object.keys(words).sort(), `${domain}: the frozen word list and the map disagree on values`).toEqual(
+        Object.keys(map).sort()
+      );
+      for (const [value, key] of Object.entries(words)) {
+        expect(map[value], `${domain}.${value}: the badge changed word`).toBe(key);
+      }
+    }
+    // …and the fallbacks that replace a missing word behave: blank is an em
+    // dash, a value outside the enum is the token it stored, never a key.
+    const t = (k: DictKey) => dict.en[k];
+    expect(enumCopy(PAYMENT_METHOD_KEY, null, t)).toBe("—");
+    expect(enumCopy(PAYMENT_METHOD_KEY, "", t)).toBe("—");
+    expect(enumCopy(WALLET_TX_TYPE_KEY, "walk_in", t)).toBe("walk_in");
+    // A number in a string column is outside the domain too. `t(undefined)`
+    // would render nothing, so the helper hands back what it was given — a cell
+    // reading `0` is wrong but visible, an empty cell reads as "no status".
+    expect(String(enumCopy(TOOTH_STATUS_KEY, 0 as unknown as string, t))).toBe("0");
+  });
+
+  it("counts the stored values that have more than one Arabic word (C19 recount)", () => {
+    // Batch 22 froze visit_type/document_type/payment_method to one Arabic word
+    // apiece. The same check on the domains batch 23 routed found six values with
+    // two or three words live on different screens — an existing copy problem,
+    // deliberately not changed by a batch whose promise is that no desk sees a
+    // different word. The list is a ratchet: a seventh value fails here, and so
+    // does silently unifying one of these without updating the register.
+    //
+    // A domain is counted where two *live* routes meet: the dictionary route this
+    // batch wrote down, `enumLabel()`'s Arabic-only maps (enumLabels.ts), and
+    // Dashboard's `status…` route. Six of the ten batch-23 domains have no
+    // dictionary word beside the one map, so there is nothing to compare there.
+    const enumLabelOwns = [
+      "appointment_status",
+      "gender",
+      "payment_method",
+      "reminder_channel",
+      "leave_request_status",
+      "payroll_status",
+    ];
+    const diverging = new Set<string>();
+    const consider = (domain: string, value: string, words: Array<string | undefined>) => {
+      if (new Set(words.filter((w): w is string => typeof w === "string" && w !== "")).size > 1) {
+        diverging.add(`${domain}.${value}`);
+      }
+    };
+    for (const { domain, map } of IDENTITY_MAPS) {
+      for (const value of Object.keys(map)) {
+        const routes: Array<string | undefined> = [arWords[value]];
+        if (enumLabelOwns.includes(domain)) routes.push(enumLabel(domain as never, value, "ar"));
+        if (domain === "appointment_status") routes.push(arWords["status" + TRANSFORMS.upperFirstCamel(value)]);
+        consider(domain, value, routes);
+      }
+    }
+    // The three rewritten derivations that share a column with a StaffDetail
+    // badge: Leaves labels a request `statusPending` (قيد الانتظار) while
+    // StaffDetail labels the same row through enumLabel() (قيد المراجعة), and
+    // Payroll's statusPaid is مدفوعة against StaffDetail's مدفوع.
+    for (const p of PREFIXED) {
+      if (!p.domain || !enumLabelOwns.includes(p.domain)) continue;
+      for (const value of enumValues(p.domain)) {
+        const routes = [arWords[p.prefix + TRANSFORMS[p.transform](value)], enumLabel(p.domain as never, value, "ar")];
+        if (p.domain === "appointment_status") routes.push(arWords[value]);
+        consider(p.domain, value, routes);
+      }
+    }
+    expect([...diverging].sort()).toEqual([
+      "appointment_status.departed", // غادر (badge, palette) vs مغادرة (Dashboard)
+      "appointment_status.in_progress", // قيد التنفيذ / جارٍ / قيد المعالجة
+      "leave_request_status.pending", // قيد الانتظار (Leaves) vs قيد المراجعة (StaffDetail)
+      "payroll_status.paid", // مدفوعة (Payroll) vs مدفوع (StaffDetail)
+      "reminder_channel.email", // البريد الإلكتروني (badges) vs بريد إلكتروني (channel picker)
+      "reminder_channel.push", // إشعار vs إشعار التطبيق
+    ]);
+  });
+
+  it("keeps the local value lists on the domains and words they were measured with", () => {
+    // Three screens hold their own closed list instead of a Postgres enum, so no
+    // map can prove them — the file itself is the contract and is read here.
+    const days = (file: string) => constStringArray(file, "DAYS");
+    expect(days("src/pages/hr/Schedules.tsx"), "Schedules' working-week grid changed").toEqual(
+      days("src/pages/hr/StaffDetail.tsx")
+    );
+    for (const d of days("src/pages/hr/Schedules.tsx")) {
+      expect(enKeys.has(d), `${d} is not an English key — t(d) no longer compiles`).toBe(true);
+      expect(arKeys.has(d)).toBe(true);
+    }
+    // The tooth chart lists the enum's eight values itself; if Postgres gains a
+    // ninth, the map follows (the test above) and this fails until the chart
+    // shows it, so the legend cannot silently drop a status.
+    expect(
+      [...constStringArray("src/pages/patients/PatientDental.tsx", "STATUS")].sort(),
+      "PatientDental's tooth list and the tooth_status enum disagree"
+    ).toEqual(enumValues("tooth_status").sort());
+    // `piece` is the one unit the dictionary does not key under its value — the
+    // reason the Products dropdown needed a ternary instead of `t(u)`.
+    expect(enKeys.has("piece")).toBe(false);
+    expect(enKeys.has("pieces")).toBe(true);
+    const units = constStringArray("src/pages/inventory/Products.tsx", "UNITS");
+    expect(units).toContain("piece");
+    expect(
+      readFileSync("src/pages/inventory/Products.tsx", "utf8"),
+      "Products' UNIT_KEY no longer maps piece to the dictionary's word for it"
+    ).toMatch(/piece:\s*"pieces"/);
+    for (const u of units) {
+      if (u === "piece") continue;
+      expect(enKeys.has(u), `${u} is not an English key — t(UNIT_KEY[u]) no longer compiles`).toBe(true);
+    }
   });
 });

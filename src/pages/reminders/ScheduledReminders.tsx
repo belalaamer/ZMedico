@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
+import { enumCopy, REMINDER_CHANNEL_KEY, REMINDER_STATUS_KEY } from "@/lib/enumKeys";
 import { reminderSendOutcome } from "@/lib/reminderSendOutcome";
 import { localDateTimeInput } from "@/lib/localDate";
 
@@ -296,10 +297,10 @@ export default function ScheduledReminders() {
               {filtered.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell dir={patientDisplayDirection(patients.find((p) => p.id === r.patient_id), lang)}>{patientName(r.patient_id)}</TableCell>
-                  <TableCell><Badge variant="outline">{t(r.reminder_type as any)}</Badge></TableCell>
+                  <TableCell><Badge variant="outline">{enumCopy(REMINDER_CHANNEL_KEY, r.reminder_type, t)}</Badge></TableCell>
                   <TableCell className="text-sm">{new Date(r.scheduled_time).toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}</TableCell>
                   <TableCell className="max-w-sm truncate text-sm text-muted-foreground">{lang === "ar" ? r.message_ar : r.message_en}</TableCell>
-                  <TableCell><Badge className={statusColor[r.status]}>{t(r.status as any)}</Badge></TableCell>
+                  <TableCell><Badge className={statusColor[r.status]}>{enumCopy(REMINDER_STATUS_KEY, r.status, t)}</Badge></TableCell>
                   <TableCell>
                     <div className="flex gap-1">
                       {r.status === "pending" && (
@@ -331,8 +332,8 @@ export default function ScheduledReminders() {
             <AlertDialogTitle>{lang === "ar" ? "حذف التذكير المجدول؟" : "Delete this scheduled reminder?"}</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteTarget && (lang === "ar"
-                ? `سيُحذف تذكير ${t(deleteTarget.reminder_type as any)} المجدول في ${new Date(deleteTarget.scheduled_time).toLocaleString("ar-EG")} لـ «${patientName(deleteTarget.patient_id)}» نهائياً من قائمة التذكيرات. المريض وموعده لا يتأثران${deleteTarget.status === "pending" ? "، ولن يُرسل هذا التذكير أبداً" : ""}، والسطر المحذوف لا يمكن استرجاعه.`
-                : `The ${t(deleteTarget.reminder_type as any)} reminder scheduled for ${new Date(deleteTarget.scheduled_time).toLocaleString("en-US")} for ${patientName(deleteTarget.patient_id)} will be deleted from this list permanently. The patient and their appointment are untouched${deleteTarget.status === "pending" ? ", and this reminder will never be sent" : ""}, and the deleted row cannot be recovered.`)}
+                ? `سيُحذف تذكير ${enumCopy(REMINDER_CHANNEL_KEY, deleteTarget.reminder_type, t)} المجدول في ${new Date(deleteTarget.scheduled_time).toLocaleString("ar-EG")} لـ «${patientName(deleteTarget.patient_id)}» نهائياً من قائمة التذكيرات. المريض وموعده لا يتأثران${deleteTarget.status === "pending" ? "، ولن يُرسل هذا التذكير أبداً" : ""}، والسطر المحذوف لا يمكن استرجاعه.`
+                : `The ${enumCopy(REMINDER_CHANNEL_KEY, deleteTarget.reminder_type, t)} reminder scheduled for ${new Date(deleteTarget.scheduled_time).toLocaleString("en-US")} for ${patientName(deleteTarget.patient_id)} will be deleted from this list permanently. The patient and their appointment are untouched${deleteTarget.status === "pending" ? ", and this reminder will never be sent" : ""}, and the deleted row cannot be recovered.`)}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -360,7 +361,7 @@ export default function ScheduledReminders() {
                   {patientName(rescheduleTarget.patient_id)}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {t(rescheduleTarget.reminder_type as any)} · {new Date(rescheduleTarget.scheduled_time).toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}
+                  {enumCopy(REMINDER_CHANNEL_KEY, rescheduleTarget.reminder_type, t)} · {new Date(rescheduleTarget.scheduled_time).toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}
                 </div>
               </div>
               <div className="space-y-2">

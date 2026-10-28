@@ -16,7 +16,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useI18n } from "@/contexts/I18nContext";
 import { enumLabel } from "@/lib/enumLabels";
-import { documentTypeLabel, visitTypeLabel } from "@/lib/enumKeys";
+import { documentTypeLabel, enumCopy, GENDER_KEY, visitTypeLabel } from "@/lib/enumKeys";
+import type { DictKey } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -180,7 +181,7 @@ export default function MedicalRecordEditor() {
             <Link to={`/patients/${patient.id}`} className="font-bold text-lg hover:underline" dir={patientDirection}>{patientName}</Link>
             <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-1 mt-1">
               {age != null && <span>{age} {t("yearsOld")}</span>}
-              {patient.gender && <span>{t(patient.gender as any)}</span>}
+              {patient.gender && <span>{enumCopy(GENDER_KEY, patient.gender, t)}</span>}
               {patient.phone && <span>{patient.phone}</span>}
             </div>
           </div>
@@ -348,7 +349,7 @@ function VitalsTab({ record, patient, vitals, userId, reload }: any) {
     return w > 0 && h > 0 ? +((w / Math.pow(h/100, 2)).toFixed(2)) : null;
   }, [form.weight, form.height]);
 
-  const fields: Array<[string, string, string, string]> = [
+  const fields: Array<[DictKey, string, string, string]> = [
     ["bloodPressure", "blood_pressure_systolic", "mmHg", "/ blood_pressure_diastolic"],
     ["heartRate", "heart_rate", "bpm", ""],
     ["temperature", "temperature", "°C", ""],
@@ -390,7 +391,7 @@ function VitalsTab({ record, patient, vitals, userId, reload }: any) {
           </div>
           {fields.slice(1).map(([key, prop, unit]) => (
             <div key={prop} className="space-y-1.5">
-              <Label>{t(key as any)} <span className="text-xs text-muted-foreground">({unit})</span></Label>
+              <Label>{t(key)} <span className="text-xs text-muted-foreground">({unit})</span></Label>
               <Input type="number" step="any" value={(form as any)[prop]} onChange={(e) => setForm({ ...form, [prop]: e.target.value } as any)}/>
               {previous?.[prop] != null && <div className="text-xs text-muted-foreground">{t("previousValue")}: {previous[prop]}</div>}
             </div>

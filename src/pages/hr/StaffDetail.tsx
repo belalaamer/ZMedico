@@ -244,7 +244,7 @@ export default function StaffDetail() {
                 const slot = schedule.find((s) => s.day_of_week === i);
                 return (
                   <div key={d} className="border rounded-lg p-3">
-                    <div className="font-semibold text-xs">{t(d as any)}</div>
+                    <div className="font-semibold text-xs">{t(d)}</div>
                     {slot && slot.is_working_day ? (
                       <div className="mt-1 text-xs">{slot.start_time?.slice(0,5)} – {slot.end_time?.slice(0,5)}</div>
                     ) : <div className="mt-1 text-xs text-muted-foreground">{t("off")}</div>}

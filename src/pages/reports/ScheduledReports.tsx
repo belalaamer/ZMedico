@@ -17,6 +17,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatDateTime } from "@/lib/format";
 import { enumLabel } from "@/lib/enumLabels";
+import { enumCopy, REPORT_FREQUENCY_KEY } from "@/lib/enumKeys";
 import { ReportPageHeader } from "./_shared";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -137,7 +138,7 @@ export default function ScheduledReports() {
           <TableRow key={r.id}>
             <TableCell className="font-medium">{r.name}</TableCell>
             <TableCell>{lang === "ar" ? r.report_templates?.name_ar : r.report_templates?.name_en}</TableCell>
-            <TableCell>{t(r.frequency as any)}</TableCell>
+            <TableCell>{enumCopy(REPORT_FREQUENCY_KEY, r.frequency, t)}</TableCell>
             <TableCell className="uppercase text-xs">{enumLabel("report_format", r.format, lang)}</TableCell>
             <TableCell>{formatDateTime(r.next_run_at, lang)}</TableCell>
             <TableCell><Switch checked={r.is_active} onCheckedChange={(v) => toggle(r.id, v)} /></TableCell>
@@ -152,7 +153,7 @@ export default function ScheduledReports() {
             <AlertDialogTitle>{lang === "ar" ? "حذف الجدولة؟" : "Delete this schedule?"}</AlertDialogTitle>
             <AlertDialogDescription>
               {lang === "ar"
-                ? `سيُحذف جدول «${deleteTarget?.name ?? ""}» (${deleteTarget ? t(deleteTarget.frequency as any) : ""} · ${deleteTarget?.format ?? ""}) نهائياً، وتتوقف تقاريره المجدولة عن الإرسال. القالب نفسه يبقى، لكن الجدولة ومن يستلمها لا يمكن استرجاعهما؛ إعادة إنشائها تتطلب ملء النموذج من جديد.`
+                ? `سيُحذف جدول «${deleteTarget?.name ?? ""}» (${deleteTarget ? enumCopy(REPORT_FREQUENCY_KEY, deleteTarget.frequency, t) : ""} · ${deleteTarget?.format ?? ""}) نهائياً، وتتوقف تقاريره المجدولة عن الإرسال. القالب نفسه يبقى، لكن الجدولة ومن يستلمها لا يمكن استرجاعهما؛ إعادة إنشائها تتطلب ملء النموذج من جديد.`
                 : `${deleteTarget?.name ?? ""} (${deleteTarget?.frequency ?? ""} · ${deleteTarget?.format ?? ""}) will be deleted permanently and its recurring reports stop being sent. The template itself is kept, but the schedule and its recipient list cannot be recovered — rebuilding it means filling the form again.`}
             </AlertDialogDescription>
           </AlertDialogHeader>

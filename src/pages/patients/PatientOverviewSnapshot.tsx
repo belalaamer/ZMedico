@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useI18n } from "@/contexts/I18nContext";
-import { documentTypeLabel } from "@/lib/enumKeys";
+import { APPOINTMENT_STATUS_KEY, documentTypeLabel, enumCopy } from "@/lib/enumKeys";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import { doctorDisplayName } from "@/lib/doctorName";
@@ -331,7 +331,7 @@ export default function PatientOverviewSnapshot({
                             {[appointmentLabel(a), branch, a.profiles ? doctorDisplayName(a.profiles, lang) : null].filter(Boolean).join(" · ") || "—"}
                           </div>
                         </div>
-                        <Badge variant="outline" className={statusTone[a.status] ?? ""}>{t(a.status as any) ?? a.status}</Badge>
+                        <Badge variant="outline" className={statusTone[a.status] ?? ""}>{enumCopy(APPOINTMENT_STATUS_KEY, a.status, t)}</Badge>
                       </li>
                     );
                   })}

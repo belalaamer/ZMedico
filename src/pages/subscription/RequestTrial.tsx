@@ -55,16 +55,25 @@ export default function RequestTrial() {
           return;
         }
         setPlansFailed(false);
-        const next = (data ?? []) as Plan[];
-        setPlans(next);
-        // Functional update on purpose: reading `planId` here and listing it
-        // as a dependency made this effect re-run on the value its own
-        // callback had just written, so every mount issued two identical
-        // plans queries.
-        setPlanId(current => current || next[0]?.id || current);
+        setPlans((data ?? []) as Plan[]);
       });
     return () => { cancelled = true; };
   }, [plansRetry]);
+
+  // Written one commit after the read answers, never inside its callback.
+  // Radix keeps a hidden native <select> and, at the 2.3.3 this repo's lockfile
+  // pins, re-syncs it with a bubbling `change` that calls `onValueChange` back
+  // with the option actually mounted. A default set in the same commit as the
+  // items arrive lands before its <option> exists, so Radix echoes "none" and
+  // erases it — every fresh applicant would send a null plan.
+  useEffect(() => {
+    if (plans.length === 0) return;
+    // `planId` stays out of the dependency list on purpose, and the update
+    // stays functional: watching it would re-run this on every echo from the
+    // picker, so an applicant who chose "I will decide with the team" would
+    // have the default written back over their answer.
+    setPlanId((current) => current || plans[0].id);
+  }, [plans]);
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();

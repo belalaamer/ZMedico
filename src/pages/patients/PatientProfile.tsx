@@ -30,6 +30,7 @@ import PatientOverviewSnapshot from "./PatientOverviewSnapshot";
 import { logPhiAccess } from "@/lib/observability/phiAudit";
 import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
 import { doctorDisplayName, type DoctorNameFields } from "@/lib/doctorName";
+import { localDateOnly } from "@/lib/localDate";
 
 const statusClass: Record<string, string> = {
   draft: "status-cancelled", pending: "status-review", paid: "status-completed", partial: "status-progress", cancelled: "status-departed",
@@ -87,7 +88,7 @@ export default function PatientProfile() {
         supabase.from("physio_sessions" as any).select("session_date").in("case_id", allCaseIds).is("deleted_at", null).eq("attendance", "done").order("session_date", { ascending: false }).limit(1),
         supabase.from("physio_reassessments" as any).select("assessment_date").in("case_id", allCaseIds).is("deleted_at", null).order("assessment_date", { ascending: false }).limit(1),
       ]);
-      const today = new Date().toISOString().slice(0, 10);
+      const today = localDateOnly(new Date());
       const activeFollowups = allList
         .filter((c: any) => c.status === "active" && c.followup_enabled && c.followup_due_date)
         .map((c: any) => c.followup_due_date)

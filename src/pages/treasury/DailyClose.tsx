@@ -16,6 +16,7 @@ import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { supabase } from "@/integrations/supabase/client";
 import { formatMoney, formatDateTime } from "@/lib/format";
 import { toast } from "sonner";
+import { localDateOnly } from "@/lib/localDate";
 
 type Summary = {
   opening_cash: number;
@@ -34,7 +35,7 @@ export default function DailyClose() {
   const { authz } = useAuthorization("DailyClose");
   const canClose = authz.hasRoleAny("admin", "manager");
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateOnly(new Date());
   const [businessDate, setBusinessDate] = useState<string>(today);
   const [treasuries, setTreasuries] = useState<any[]>([]);
   const [treasuryId, setTreasuryId] = useState<string>("");

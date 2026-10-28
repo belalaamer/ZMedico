@@ -9,6 +9,7 @@ import { formatMoney } from "@/lib/format";
 import { ReportPageHeader, ReportFilterBar, StatCard } from "./_shared";
 import { exportReportPDF, exportReportExcel } from "@/lib/reportExport";
 import { doctorDisplayName, type DoctorNameFields } from "@/lib/doctorName";
+import { localDateOnly } from "@/lib/localDate";
 
 type Row = {
   doctor_id: string;
@@ -28,8 +29,8 @@ type Row = {
 export default function DoctorPerformance() {
   const { t, lang } = useI18n();
   const { currentBranchId, branchSelectionReady } = useBranch();
-  const [start, setStart] = useState(new Date(new Date().getFullYear(), new Date().getMonth() - 2, 1).toISOString().slice(0, 10));
-  const [end, setEnd] = useState(new Date().toISOString().slice(0, 10));
+  const [start, setStart] = useState(localDateOnly(new Date(new Date().getFullYear(), new Date().getMonth() - 2, 1)));
+  const [end, setEnd] = useState(localDateOnly(new Date()));
   const [rows, setRows] = useState<Row[]>([]);
 
   useEffect(() => {

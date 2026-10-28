@@ -20,6 +20,7 @@ import { patientDisplayName } from "@/lib/patientName";
 import { doctorDisplayName } from "@/lib/doctorName";
 import { enumLabel } from "@/lib/enumLabels";
 import { toast } from "sonner";
+import { localDateOnly } from "@/lib/localDate";
 
 type Patient = { id: string; first_name_en?: string; last_name_en?: string; first_name_ar?: string; last_name_ar?: string; name_language?: "ar" | "en" | null; patient_code?: number };
 type Therapist = {
@@ -46,7 +47,7 @@ export default function PhysioCases() {
   const optionsRequestRef = useRef(0);
   const [form, setForm] = useState<any>({
     patient_id: "", therapist_id: "", diagnosis: "", treatment_goal: "",
-    treatment_plan: "", start_date: new Date().toISOString().slice(0, 10),
+    treatment_plan: "", start_date: localDateOnly(new Date()),
     expected_sessions: 10, notes: "",
   });
 

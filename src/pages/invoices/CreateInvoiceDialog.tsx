@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { patientDisplayName } from "@/lib/patientName";
 import { doctorDisplayName } from "@/lib/doctorName";
 import { rowsWritten } from "@/lib/writeOutcome";
+import { localDateOnly } from "@/lib/localDate";
 
 type Item = {
   item_type: "service" | "product" | "procedure";
@@ -44,7 +45,7 @@ export function CreateInvoiceDialog({
   const [doctorId, setDoctorId] = useState<string>("");
   const [stocks, setStocks] = useState<Record<string, number>>({});
   const [patientId, setPatientId] = useState<string>(presetPatientId ?? "");
-  const [date, setDate] = useState<string>(new Date().toISOString().slice(0,10));
+  const [date, setDate] = useState<string>(localDateOnly(new Date()));
   const [discountPct, setDiscountPct] = useState<number>(0);
   const [taxPct, setTaxPct] = useState<number>(0);
   const [notes, setNotes] = useState("");

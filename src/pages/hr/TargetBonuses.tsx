@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { Fab } from "@/components/ui/fab";
+import { localDateOnly } from "@/lib/localDate";
 
 type StaffOpt = { id: string; full_name: string | null; email: string | null };
 type Target = {
@@ -50,9 +51,9 @@ export default function TargetBonusesPage() {
   const [open, setOpen] = useState(false);
   const [confirmDel, setConfirmDel] = useState<Target | null>(null);
 
-  const today = new Date().toISOString().slice(0, 10);
-  const monthEnd = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().slice(0, 10);
-  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+  const today = localDateOnly(new Date());
+  const monthEnd = localDateOnly(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0));
+  const monthStart = localDateOnly(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
 
   const emptyForm = {
     staff_id: "",

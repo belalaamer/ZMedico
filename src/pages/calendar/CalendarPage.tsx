@@ -35,6 +35,7 @@ import {
   type DeepLinkedPatient, type PatientNameRow,
 } from "@/lib/calendarPatientDeepLink";
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
+import { localDateTimeInput } from "@/lib/localDate";
 
 function statusLabel(s: Appt["status"], t: (k: any) => string) {
   const map: Record<Appt["status"], string> = {
@@ -544,8 +545,7 @@ export default function CalendarPage() {
     // Round up to the next 30-minute mark (e.g. 10:07 -> 10:30, 10:35 -> 11:00).
     const remainder = base.getMinutes() % 30;
     if (remainder !== 0 || base.getSeconds() > 0) base.setMinutes(base.getMinutes() + (30 - remainder), 0, 0);
-    const tz = base.getTimezoneOffset();
-    const local = new Date(base.getTime() - tz * 60000).toISOString().slice(0, 16);
+    const local = localDateTimeInput(base);
     // C3: an arrival from a patient screen carries that patient into the form instead of
     // being discarded, and an unverified id is never prefilled.
     setForm({ patient_id: deepLinkPatientId(deepLink), doctor_id: "", scheduled_at: local, duration_minutes: 30, service_id: "", procedure: "", room: "", resource_id: "", notes: "", status: "scheduled" });
@@ -553,16 +553,14 @@ export default function CalendarPage() {
   };
   const openNewAt = (slot: Date) => {
     setEditId(null);
-    const tz = slot.getTimezoneOffset();
-    const local = new Date(slot.getTime() - tz * 60000).toISOString().slice(0, 16);
+    const local = localDateTimeInput(slot);
     setForm({ patient_id: deepLinkPatientId(deepLink), doctor_id: "", scheduled_at: local, duration_minutes: 30, service_id: "", procedure: "", room: "", resource_id: "", notes: "", status: "scheduled" });
     setOpen(true);
   };
   const openEdit = (a: Appt) => {
     setEditId(a.id);
     const dt = new Date(a.scheduled_at);
-    const tz = dt.getTimezoneOffset();
-    const local = new Date(dt.getTime() - tz * 60000).toISOString().slice(0,16);
+    const local = localDateTimeInput(dt);
     setForm({
       patient_id: a.patient_id,
       doctor_id: a.doctor_id ?? "",

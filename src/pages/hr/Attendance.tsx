@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { MapPin, CheckCircle2, AlertTriangle, UserCheck, UserX, Clock, CalendarRange, LogIn, LogOut } from "lucide-react";
 import GpsCheckDialog from "@/components/attendance/GpsCheckDialog";
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
+import { localDateOnly } from "@/lib/localDate";
 
 export default function Attendance() {
   // UX fix: `lang` is now pulled from useI18n() alongside `t` so the
@@ -22,7 +23,7 @@ export default function Attendance() {
   const { t, lang } = useI18n();
   const { user } = useAuth();
   const { currentBranchId } = useBranch();
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(localDateOnly(new Date()));
   const [staff, setStaff] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
   const [att, setAtt] = useState<any[]>([]);

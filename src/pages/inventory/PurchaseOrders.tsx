@@ -17,6 +17,7 @@ import { formatMoney, formatDate } from "@/lib/format";
 import { RowActions } from "@/components/RowActions";
 import { useNavigate } from "react-router-dom";
 import { Can } from "@/components/Can";
+import { localDateOnly } from "@/lib/localDate";
 
 const statusClass: Record<string, string> = {
   draft: "status-cancelled", pending: "status-review", partial: "status-progress", received: "status-completed", cancelled: "status-departed",
@@ -42,7 +43,7 @@ export default function PurchaseOrders() {
 
   // form
   const [supplierId, setSupplierId] = useState("");
-  const [orderDate, setOrderDate] = useState(new Date().toISOString().slice(0, 10));
+  const [orderDate, setOrderDate] = useState(localDateOnly(new Date()));
   const [expectedDate, setExpectedDate] = useState("");
   const [taxPct, setTaxPct] = useState(0);
   const [notes, setNotes] = useState("");
@@ -124,7 +125,7 @@ export default function PurchaseOrders() {
   const total = +(subtotal + tax).toFixed(2);
 
   const reset = () => {
-    setSupplierId(""); setOrderDate(new Date().toISOString().slice(0, 10)); setExpectedDate("");
+    setSupplierId(""); setOrderDate(localDateOnly(new Date())); setExpectedDate("");
     setTaxPct(0); setNotes(""); setLines([{ product_id: "", quantity_ordered: 1, unit_cost: 0 }]);
   };
 

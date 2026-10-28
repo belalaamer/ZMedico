@@ -23,6 +23,7 @@ import JobRoleSelect from "@/components/JobRoleSelect";
 import { Can } from "@/components/Can";
 import { roleLabel } from "@/lib/roleLabels";
 import { enumLabel } from "@/lib/enumLabels";
+import { localDateOnly } from "@/lib/localDate";
 
 // Operational roles only. Administrative roles (`admin`, `system_owner`) are
 // intentionally excluded — they must be granted exclusively via the User
@@ -54,7 +55,7 @@ export default function Staff() {
   const [pendingDelete, setPendingDelete] = useState<any>(null);
   const [form, setForm] = useState<any>({
     profile_id: "", position_id: "", department_id: "", branch_id: "",
-    hire_date: new Date().toISOString().slice(0, 10), contract_type: "full_time",
+    hire_date: localDateOnly(new Date()), contract_type: "full_time",
     salary: "0", commission_percent: "0", bank_name: "", bank_account: "", working_hours_per_week: 40,
     annual_leave_balance: 21, sick_leave_balance: 10,
     emergency_contact_name: "", emergency_contact_phone: "",
@@ -227,7 +228,7 @@ export default function Staff() {
       position_id: s.position_id ?? "",
       department_id: s.department_id ?? "",
       branch_id: s.branch_id ?? "",
-      hire_date: s.hire_date ?? new Date().toISOString().slice(0, 10),
+      hire_date: s.hire_date ?? localDateOnly(new Date()),
       contract_type: s.contract_type ?? "full_time",
       salary: String(s.salary ?? "0"),
       commission_percent: String(s.commission_percent ?? "0"),

@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { Fab } from "@/components/ui/fab";
+import { localDateOnly } from "@/lib/localDate";
 
 type Coupon = {
   id: string; code: string; description: string | null;
@@ -114,7 +115,7 @@ export default function CouponsPage() {
 
   const statusOf = (c: Coupon): { label: string; tone: string } => {
     if (!c.is_active) return { label: lang === "ar" ? "موقوف" : "Disabled", tone: "bg-muted text-foreground" };
-    const today = new Date().toISOString().slice(0,10);
+    const today = localDateOnly(new Date());
     if (c.ends_at && c.ends_at < today) return { label: lang === "ar" ? "منتهي" : "Expired", tone: "bg-destructive/10 text-destructive" };
     if (c.usage_limit != null && c.usage_count >= c.usage_limit) return { label: lang === "ar" ? "نفد" : "Used up", tone: "bg-destructive/10 text-destructive" };
     if (c.starts_at && c.starts_at > today) return { label: lang === "ar" ? "قادم" : "Scheduled", tone: "bg-amber-500/10 text-amber-700" };

@@ -12,6 +12,7 @@ import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { formatDateTime } from "@/lib/format";
 import { useBranch } from "@/contexts/BranchContext";
 import { describeEdgeFailure, safeEdgeReason } from "@/lib/edgeFailure";
+import { localDateOnly } from "@/lib/localDate";
 
 export default function BackupExport() {
   const { t, lang } = useI18n();
@@ -92,7 +93,7 @@ export default function BackupExport() {
       if (!out || typeof out !== "object" || Array.isArray(out)) throw new Error("Invalid full export response");
       const blob = new Blob([JSON.stringify(out, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a"); a.href = url; a.download = `zmedico-backup-${new Date().toISOString().slice(0,10)}.json`; a.click();
+      const a = document.createElement("a"); a.href = url; a.download = `zmedico-backup-${localDateOnly(new Date())}.json`; a.click();
       URL.revokeObjectURL(url);
       try {
         const tablesCount = Object.keys(out).length;

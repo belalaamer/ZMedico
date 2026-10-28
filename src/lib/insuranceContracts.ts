@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { localDateOnly } from "@/lib/localDate";
 
 export type LineForCoverage = {
   item_type: "service" | "product" | "procedure";
@@ -21,7 +22,7 @@ export type LineCoverage = {
  */
 export async function fetchActiveContract(companyId: string) {
   if (!companyId) return null;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateOnly(new Date());
   const { data } = await supabase
     .from("insurance_contracts" as any)
     .select("id, name_en, name_ar, default_coverage_percent, valid_from, valid_to, is_active")

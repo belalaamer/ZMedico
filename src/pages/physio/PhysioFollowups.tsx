@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatDate } from "@/lib/format";
 import { patientDisplayName } from "@/lib/patientName";
 import { doctorDisplayName } from "@/lib/doctorName";
+import { localDateOnly } from "@/lib/localDate";
 
 export default function PhysioFollowups() {
   const { currentBranchId } = useBranch();
@@ -52,8 +53,8 @@ export default function PhysioFollowups() {
     })();
   }, [currentBranchId]);
 
-  const today = new Date().toISOString().slice(0, 10);
-  const horizonDate = useMemo(() => new Date(Date.now() + horizon * 86400_000).toISOString().slice(0, 10), [horizon]);
+  const today = localDateOnly(new Date());
+  const horizonDate = useMemo(() => localDateOnly(new Date(Date.now() + horizon * 86400_000)), [horizon]);
 
   const filtered = useMemo(() => cases.filter(c =>
     (therapistId === "_all" || (c.therapist_id ?? "_none") === therapistId)

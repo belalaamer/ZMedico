@@ -12,6 +12,7 @@ import { patientDisplayName } from "@/lib/patientName";
 import { ReportPageHeader, ReportFilterBar } from "./_shared";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { Wallet, TrendingUp, Award } from "lucide-react";
+import { localDateOnly } from "@/lib/localDate";
 
 export default function DoctorCommissions() {
   const { t, lang } = useI18n();
@@ -22,8 +23,8 @@ export default function DoctorCommissions() {
   const isDoctorOnly = !authz.isSuperAdmin()
     && authz.holdsAnyRole("doctor")
     && !authz.holdsAnyRole("manager", "hr");
-  const [start, setStart] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10));
-  const [end, setEnd] = useState(new Date().toISOString().slice(0, 10));
+  const [start, setStart] = useState(localDateOnly(new Date(new Date().getFullYear(), new Date().getMonth(), 1)));
+  const [end, setEnd] = useState(localDateOnly(new Date()));
   const [doctorId, setDoctorId] = useState<string>("all");
   const [status, setStatus] = useState<string>("all");
   const [doctors, setDoctors] = useState<any[]>([]);

@@ -1,17 +1,17 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-const api = vi.hoisted(() => ({ getSession: vi.fn(), update: vi.fn(), signOut: vi.fn(), nav: vi.fn(), error: vi.fn(), success: vi.fn(), unsubscribe: vi.fn(), event: null as null | ((event: string, session: unknown) => void) }));
+const api = vi.hoisted(() => ({ getSession: vi.fn(), update: vi.fn(), signOut: vi.fn(), nav: vi.fn(), error: vi.fn(), success: vi.fn(), unsubscribe: vi.fn(), event: null as null | ((event: string, session: unknown) => void), search: "" }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { auth: {
   getSession: api.getSession, updateUser: api.update, signOut: api.signOut,
   onAuthStateChange: (callback: typeof api.event) => { api.event = callback; return { data: { subscription: { unsubscribe: api.unsubscribe } } }; },
 } } }));
-vi.mock("react-router-dom", () => ({ useNavigate: () => api.nav }));
+vi.mock("react-router-dom", () => ({ useNavigate: () => api.nav, useLocation: () => ({ search: api.search }) }));
 vi.mock("@/contexts/I18nContext", () => ({ useI18n: () => ({ lang: "en", t: (key: string) => key }) }));
 vi.mock("sonner", () => ({ toast: { error: api.error, success: api.success } }));
 vi.mock("@/lib/observability/reportError", () => ({ reportClientError: vi.fn() }));
 import ResetPassword from "./ResetPassword";
 const session = { user: { id: "synthetic-a" } };
-beforeEach(() => { vi.clearAllMocks(); api.event = null; api.getSession.mockResolvedValue({ data: { session }, error: null }); api.update.mockResolvedValue({ data: { user: session.user }, error: null }); api.signOut.mockResolvedValue({ error: null }); });
+beforeEach(() => { vi.clearAllMocks(); api.event = null; api.search = ""; api.getSession.mockResolvedValue({ data: { session }, error: null }); api.update.mockResolvedValue({ data: { user: session.user }, error: null }); api.signOut.mockResolvedValue({ error: null }); });
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 async function form() {
   render(<ResetPassword />);
@@ -172,5 +172,34 @@ describe("password recovery screen", () => {
     fireEvent.submit(await form()); act(() => api.event?.("TOKEN_REFRESHED", session));
     await act(async () => { finish({ data: { user: session.user }, error: null }); });
     expect(api.signOut).toHaveBeenCalledTimes(1); expect(api.nav).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns a patient to the portal login once the password is changed", async () => {
+    // The portal's recovery link carries ?from=patient. Before batch 24 every
+    // recovery landed on the staff desk, so a patient who finished the flow was
+    // standing in front of a sign-in form for a role they do not have.
+    api.search = "?from=patient";
+    fireEvent.submit(await form());
+    await waitFor(() => expect(api.nav).toHaveBeenCalledWith("/patient-portal/login", { replace: true }));
+    expect(api.nav).not.toHaveBeenCalledWith("/auth", { replace: true });
+  });
+
+  it("sends an invalid portal link back to the portal login", async () => {
+    api.search = "?from=patient";
+    api.getSession.mockResolvedValue({ data: { session: null }, error: null });
+    render(<ResetPassword />);
+    await screen.findByRole("alert");
+    fireEvent.click(screen.getByRole("button", { name: "backToSignIn" }));
+    expect(api.nav).toHaveBeenCalledWith("/patient-portal/login");
+  });
+
+  it("keeps a link with no origin on the staff desk", async () => {
+    // The staff screen sends redirectTo without a `from`; that path is the one
+    // already in production, and these three assertions are its receipt here.
+    api.search = "";
+    fireEvent.submit(await form());
+    await waitFor(() => expect(api.nav).toHaveBeenCalledWith("/auth", { replace: true }));
+    fireEvent.click(screen.getByRole("button", { name: "backToSignIn" }));
+    expect(api.nav).toHaveBeenLastCalledWith("/auth");
   });
 });

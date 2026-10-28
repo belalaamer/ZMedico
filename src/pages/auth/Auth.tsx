@@ -16,14 +16,11 @@ import { hasPersistedAuthSession, persistAuthSessionForPreview } from "@/lib/aut
 import { resolvePostAuthDestination } from "@/lib/authRedirect";
 import { useTenantBranding } from "@/contexts/TenantBrandingContext";
 import { identifierLoginErrorText, signInWithIdentifier } from "@/lib/signInWithIdentifier";
+import { isValidEmailAddress, requestPasswordRecovery } from "@/lib/passwordRecovery";
 import { reportAuthFailure } from "@/lib/authFailureTelemetry";
 
 function authDebug(message: string, details?: Record<string, unknown>) {
   if (import.meta.env.DEV) console.info("[auth-debug]", message, details ?? {});
-}
-
-function isValidEmailAddress(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 255;
 }
 
 async function getRolesForRedirect(userId: string): Promise<string[]> {
@@ -183,11 +180,17 @@ export default function AuthPage() {
     resetBusy.current = true;
     setResetLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
+      const result = await requestPasswordRecovery(email, "staff");
       if (!mounted.current) return;
-      if (error) { reportAuthFailure("send-recovery-link", "rejected", error); toast.error(lang === "ar" ? "تعذر إرسال رابط الاستعادة. تحقق من الاتصال وحاول لاحقًا." : "Unable to send the recovery link. Check your connection and try again later."); return; }
+      if (result.kind === "rejected") { reportAuthFailure("send-recovery-link", "rejected", result.error); toast.error(lang === "ar" ? "تعذر إرسال رابط الاستعادة. تحقق من الاتصال وحاول لاحقًا." : "Unable to send the recovery link. Check your connection and try again later."); return; }
+      if (result.kind === "transport") {
+        reportAuthFailure("send-recovery-link", "transport");
+        toast.error(lang === "ar" ? "لم يتأكد إرسال الرابط. تحقق من بريدك قبل إعادة المحاولة." : "Sending the link could not be confirmed. Check your inbox before trying again.");
+        return;
+      }
+      // The form validated above, so this cannot fire here; it is here because a
+      // request that was never sent must never be reported as one that was.
+      if (result.kind === "invalid") { toast.error(lang === "ar" ? "أدخل بريداً صالحاً" : "Enter a valid email"); return; }
       // Same response for registered/unregistered email addresses; do not enumerate accounts.
       toast.success(t("resetLinkSent"));
       setResetOpen(false);

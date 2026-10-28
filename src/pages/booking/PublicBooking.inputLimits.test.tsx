@@ -113,6 +113,12 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+// Every case here mounts the whole booking page, and the cold first mount in a
+// fresh fork costs more than vitest's 5s default — which batch 27's added cases
+// made reachable. Named once rather than per test, so a real hang still fails
+// eventually instead of never.
+const RENDER_TIMEOUT = 30_000;
+
 describe("the guest booking form caps each field where the RPC caps it (P6)", () => {
   it("gives every typed field the booking RPC's own length limit", async () => {
     await openDetailsForm();
@@ -134,7 +140,7 @@ describe("the guest booking form caps each field where the RPC caps it (P6)", ()
     // the attribute means the same thing in both.
     expect(screen.getByLabelText("Short reason for visit (optional)")).not.toHaveAttribute("maxlength");
   });
-});
+}, RENDER_TIMEOUT);
 
 describe("the guest booking envelope as the RPC receives it", () => {
   it("clamps a marketing URL the patient cannot edit instead of failing the booking", async () => {
@@ -204,7 +210,7 @@ describe("the guest booking envelope as the RPC receives it", () => {
     });
     expect(state.guestCalls).toHaveLength(0);
   });
-});
+}, RENDER_TIMEOUT);
 
 describe("what the booking screen says when the RPC refuses (P6)", () => {
   const refusals: Array<[string, string]> = [
@@ -212,6 +218,14 @@ describe("what the booking screen says when the RPC refuses (P6)", () => {
     ["invalid_phone", "Enter a valid phone number."],
     ["portal_account_inactive", "Could not verify your patient portal account. Reload the page and try again."],
     ["invalid_booking_input", "One of the details you entered is longer than this clinic accepts. Please shorten it and try again."],
+    // Batch 27: the six codes that used to print the generic sentence, now grouped
+    // by the action the patient can still take.
+    ["rate_limited", "There have been too many booking attempts from this device. Please try again later."],
+    ["branch_unavailable", "This option is no longer bookable online. Choose another service or branch, or contact the clinic."],
+    ["doctor_unavailable", "This option is no longer bookable online. Choose another service or branch, or contact the clinic."],
+    ["service_unavailable", "This option is no longer bookable online. Choose another service or branch, or contact the clinic."],
+    ["online_booking_disabled", "This clinic is not accepting online bookings right now. Contact the clinic to book your appointment."],
+    ["tenant_subscription_inactive", "This clinic is not accepting online bookings right now. Contact the clinic to book your appointment."],
     ["something_else", "We could not complete the booking. Please try again."],
   ];
 
@@ -224,4 +238,56 @@ describe("what the booking screen says when the RPC refuses (P6)", () => {
     const printed = vi.mocked(toast.error).mock.calls.map((call) => String(call[0])).join(" | ");
     expect(printed).not.toContain(code);
   });
-});
+}, RENDER_TIMEOUT);
+
+describe("a refusal that is not about the slot leaves the form alone (P11)", () => {
+  /**
+   * The sentence is only half of the finding. Half of the codes the desk of this
+   * screen answers for are things the patient can fix without losing their place,
+   * and the page resets to the times list for `slot_unavailable` only — so a
+   * throttle or a closed clinic must not erase the name and number just typed.
+   * Both halves are asserted together because either one alone still looks fine.
+   */
+  it.each([
+    "rate_limited",
+    "branch_unavailable",
+    "doctor_unavailable",
+    "service_unavailable",
+    "online_booking_disabled",
+    "tenant_subscription_inactive",
+    "invalid_booking_input",
+  ])("keeps the typed details and the Confirm button after %s", async (code) => {
+    state.guestError = { message: code };
+    await openDetailsForm();
+    fillGuestDetails();
+    fireEvent.change(screen.getByLabelText("Short reason for visit (optional)"), { target: { value: "follow-up" } });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm booking" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+
+    expect(screen.getByLabelText("Full name")).toHaveValue("Salma Mostafa");
+    expect(screen.getByLabelText("Mobile number")).toHaveValue("01000000000");
+    expect(screen.getByLabelText("Short reason for visit (optional)")).toHaveValue("follow-up");
+    // Retryable by editing: the submit control is still there, not a dead card.
+    expect(screen.getByRole("button", { name: "Confirm booking" })).toBeTruthy();
+  });
+
+  it("does reset for slot_unavailable, which is the one refusal the reset serves", async () => {
+    state.guestError = { message: "slot_unavailable" };
+    await openDetailsForm();
+    fillGuestDetails();
+    fireEvent.click(screen.getByRole("button", { name: "Confirm booking" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+
+    // The chosen time is the thing that failed, so the page sends the patient back
+    // to pick another; the details form is gone with it. This is the other half of
+    // the case above — without it, "leaves the form alone" would also pass if the
+    // page reset for every code.
+    expect(screen.queryByLabelText("Full name")).toBeNull();
+    fireEvent.click(await screen.findByRole("button", { name: SLOT_LABEL }));
+    fireEvent.click(await screen.findByRole("button", { name: "Continue with details" }));
+    // Only the slot is discarded, never what the patient typed: `setStep(2)` clears
+    // `selectedSlot` and nothing else, so coming back does not ask them again.
+    expect(screen.getByLabelText("Full name")).toHaveValue("Salma Mostafa");
+    expect(screen.getByLabelText("Mobile number")).toHaveValue("01000000000");
+  });
+}, RENDER_TIMEOUT);

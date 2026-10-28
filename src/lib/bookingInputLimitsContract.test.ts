@@ -145,7 +145,23 @@ describe("the sentences the screen owns live in one place", () => {
     "Could not verify your patient portal account. Reload the page and try again.",
     "تعذر إتمام الحجز. حاول مرة أخرى.",
     "We could not complete the booking. Please try again.",
+    "محاولات الحجز من هذا الجهاز كثيرة جدًا. حاول مرة أخرى لاحقًا.",
+    "There have been too many booking attempts from this device. Please try again later.",
+    "هذا الخيار لم يعد متاحًا للحجز الإلكتروني. اختر خدمة أو فرعًا آخر، أو تواصل مع العيادة.",
+    "This option is no longer bookable online. Choose another service or branch, or contact the clinic.",
+    "هذه العيادة لا تستقبل الحجوزات الإلكترونية الآن. تواصل مع العيادة لحجز الموعد.",
+    "This clinic is not accepting online bookings right now. Contact the clinic to book your appointment.",
   ];
+
+  /** Every code the mapper reads, in the order the chain tests them. */
+  const explainedCodes = () => [...copy.matchAll(/message\.includes\("([a-z_]+)"\)/g)].map((match) => match[1]);
+
+  /**
+   * Codes Production raises on this path that no repo migration versions. An
+   * exemption here is a debt with a name, not a silence: the day a migration
+   * carries the token, the pinning case below fails and says which entry to delete.
+   */
+  const PRODUCTION_ONLY_CODES = ["rate_limited"];
 
   it("keeps the page free of inline failure copy", () => {
     for (const sentence of baseSentences) {
@@ -155,11 +171,18 @@ describe("the sentences the screen owns live in one place", () => {
     expect(booking).toContain("toast.error(bookingFailureCopy(message, isArabic))");
   });
 
-  it("keeps the four branches and the one default the screen has always had", () => {
-    expect((copy.match(/message\.includes\(/g) ?? []).length).toBe(4);
+  it("keeps the seven branches and the one default the screen now has", () => {
+    // Ten token matches, not seven: batch 27 groups three codes into one sentence and
+    // two into another, because the patient's action is the same inside each group.
+    expect((copy.match(/message\.includes\(/g) ?? []).length).toBe(10);
+    expect((copy.match(/\breturn isArabic/g) ?? []).length).toBe(8);
     // Self-probe: a copy file with no branches at all would otherwise pass the
-    // count above as zero-of-nothing.
-    expect((copy.match(/return isArabic/g) ?? []).length).toBe(5);
+    // counts above as zero-of-nothing.
+    expect(explainedCodes()).toEqual([
+      "slot_unavailable", "invalid_phone", "portal_account_inactive", "invalid_booking_input",
+      "rate_limited", "branch_unavailable", "doctor_unavailable", "service_unavailable",
+      "online_booking_disabled", "tenant_subscription_inactive",
+    ]);
   });
 
   it("keeps the slot side effect that only the page can do", () => {
@@ -176,9 +199,44 @@ describe("the sentences the screen owns live in one place", () => {
     }
     // Non-vacuous: the scan has to find a real vocabulary before it can vouch for one.
     expect(raised.size).toBeGreaterThan(20);
-    for (const match of copy.matchAll(/message\.includes\("([a-z_]+)"\)/g)) {
-      expect([...raised].includes(match[1]), `${match[1]} is explained but nothing raises it`).toBe(true);
+    for (const code of explainedCodes()) {
+      expect(raised.has(code) || PRODUCTION_ONLY_CODES.includes(code), `${code} is explained but nothing raises it`).toBe(
+        true,
+      );
     }
+  });
+
+  it("pins the exemption list to exactly the codes still unversioned", () => {
+    const raised = new Set<string>();
+    for (const name of migrations()) {
+      for (const match of sourceAt(`supabase/migrations/${name}`).matchAll(/RAISE EXCEPTION '([a-z_]+)'/g)) {
+        raised.add(match[1]);
+      }
+    }
+    // The other half of the guard above: an exemption that has quietly become
+    // versioned would keep the first case green while hiding stale bookkeeping.
+    for (const code of PRODUCTION_ONLY_CODES) {
+      expect(raised.has(code), `${code} is now in a migration — delete it from PRODUCTION_ONLY_CODES`).toBe(false);
+    }
+    expect(PRODUCTION_ONLY_CODES.length).toBeGreaterThan(0);
+  });
+
+  it("leaves the two required-field codes generic, and pins why that is safe", () => {
+    for (const code of ["full_name_required", "phone_required"]) {
+      expect(explainedCodes(), `${code} needs the exemption it was never given`).not.toContain(code);
+    }
+    // Not an oversight: the page refuses an empty-trim name or phone before it
+    // submits, and sends exactly the trimmed strings the guard measures, so
+    // `NULLIF(trim(p_full_name),'') IS NULL` cannot fire from this form. Delete
+    // either statement below and those codes become reachable again — which is
+    // the moment this test is supposed to fail. (The pre-submit refusal is
+    // `!isPortalPatient &&` because the portal RPC raises neither code; the
+    // patient's name there comes from their own record, not from a field.)
+    expect(booking).toMatch(
+      /if \(!isPortalPatient && \(!form\.fullName\.trim\(\) \|\| !form\.phone\.trim\(\)\)\)\s*\{\s*toast\.error/,
+    );
+    expect(booking).toMatch(/p_full_name:\s*form\.fullName\.trim\(\)/);
+    expect(booking).toMatch(/p_phone:\s*form\.phone\.trim\(\)/);
   });
 });
 

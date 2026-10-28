@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { BOOKING_INPUT_LIMITS } from "./bookingInputLimits";
+import { BOOKING_INPUT_LIMITS, buildGuestBookingMetadata } from "./bookingInputLimits";
 
 /**
  * P6 is a pair of numbers that have to agree across two languages: the booking RPC's
@@ -179,5 +179,61 @@ describe("the sentences the screen owns live in one place", () => {
     for (const match of copy.matchAll(/message\.includes\("([a-z_]+)"\)/g)) {
       expect([...raised].includes(match[1]), `${match[1]} is explained but nothing raises it`).toBe(true);
     }
+  });
+});
+
+describe("the metadata budget is a function of the vocabulary it was measured against", () => {
+  /**
+   * `getStoredAdAttribution()` returns whatever `sessionStorage` holds, cast to
+   * `AdAttribution` — it validates that the value is an object, not which keys it
+   * has. So clamping every *value* at 200 bounds the serialized document only for
+   * the key set the app actually produces. Rather than freeze a private list, this
+   * derives it from the module that owns it: the day `CAPTURED_PARAMS` grows, the
+   * arithmetic below re-runs against the longer list and either still fits or fails
+   * with a stated reason.
+   */
+  const declaredAttributionKeys = () => {
+    const ad = sourceAt("src/lib/adAttribution.ts");
+    const start = ad.indexOf("const CAPTURED_PARAMS = [");
+    expect(start, "adAttribution.ts no longer declares CAPTURED_PARAMS as a literal array").toBeGreaterThan(-1);
+    const end = ad.indexOf("] as const", start);
+    expect(end, "CAPTURED_PARAMS no longer ends with `] as const`").toBeGreaterThan(start);
+    const region = ad.slice(start, end);
+    const captured = [...region.matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+    // The scan has to be as wide as the region. A key it could not name would
+    // shrink the vocabulary the budget case below vouches for while still
+    // reporting success, which is the one way this guard could lie.
+    expect((region.match(/["']/g) ?? []).length, "a string literal in CAPTURED_PARAMS was not picked up by the scan")
+      .toBe(captured.length * 2);
+    expect(captured.length, "the captured-parameter scan found nothing").toBeGreaterThan(10);
+    // The two fields `captureAdAttribution()` writes itself, not read off the URL.
+    expect(ad).toContain("found.landing_page = window.location.pathname;");
+    expect(ad).toContain("found.first_seen_at = new Date().toISOString();");
+    return [...captured, "landing_page", "first_seen_at"];
+  };
+
+  it("keeps every declared attribution key inside the RPC's octet budget when all are maximal", () => {
+    const keys = declaredAttributionKeys();
+    const attribution = Object.fromEntries(keys.map((key) => [key, "x".repeat(5000)]));
+    const metadata = buildGuestBookingMetadata({
+      utmSource: "s".repeat(5000),
+      utmMedium: "m".repeat(5000),
+      utmCampaign: "c".repeat(5000),
+      landingPath: "/".padEnd(5000, "p"),
+      attribution,
+    });
+    expect(Object.keys(metadata.attribution as object)).toEqual(keys);
+    expect(new TextEncoder().encode(JSON.stringify(metadata)).length)
+      .toBeLessThan(BOOKING_INPUT_LIMITS.metadataOctets);
+  });
+
+  it("counts the vocabulary it is vouching for, so a widened one is a decision", () => {
+    // Measured at this base; `declaredAttributionKeys()` is what the budget case
+    // above actually enumerates, and this is the difference between a checked
+    // bound and a remembered one.
+    expect(declaredAttributionKeys()).toEqual([
+      "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "campaign_id",
+      "adset_id", "adset_name", "ad_id", "ad_name", "fbclid", "gclid", "landing_page", "first_seen_at",
+    ]);
   });
 });

@@ -83,9 +83,11 @@ describe("buildGuestBookingMetadata", () => {
   });
 
   it("cannot exceed the RPC's octet budget even with the largest key set it can carry", () => {
-    // adAttribution.ts captures thirteen parameters and adds landing_page and
-    // first_seen_at; this page adds four of its own. Every value is capped at
-    // urlValue, so the worst case is arithmetic rather than hope.
+    // The vocabulary itself is derived from `adAttribution.ts` by
+    // `bookingInputLimitsContract.test.ts`, which re-runs this arithmetic against
+    // whatever that module actually declares. This list is that vocabulary as of
+    // 2026-10-28: twelve captured parameters plus `landing_page` and
+    // `first_seen_at`, which `captureAdAttribution()` adds itself.
     const attribution = Object.fromEntries(
       ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "campaign_id", "adset_id",
         "adset_name", "ad_id", "ad_name", "fbclid", "gclid", "landing_page", "first_seen_at"]

@@ -15,6 +15,8 @@ import { localizedTenantName } from "@/lib/tenantName";
 import { captureAdAttribution, getStoredAdAttribution } from "@/lib/adAttribution";
 import { nearestBookingDay } from "@/lib/nearestBookingDay";
 import { localDateOnly } from "@/lib/localDate";
+import { BOOKING_INPUT_LIMITS, buildGuestBookingMetadata, clampUrlValue } from "@/lib/bookingInputLimits";
+import { bookingFailureCopy } from "@/lib/bookingFailureCopy";
 
  type Lang = "ar" | "en";
 
@@ -509,26 +511,22 @@ export default function PublicBooking() {
           p_doctor_id: doctorId || null,
           p_email: form.email.trim() || null,
           p_complaint: form.complaint.trim() || null,
-          p_source: params.get("utm_source") || "public_booking",
-          p_metadata: {
-            utm_source: params.get("utm_source"),
-            utm_medium: params.get("utm_medium"),
-            utm_campaign: params.get("utm_campaign"),
-            landing_path: window.location.pathname,
-            ...(getStoredAdAttribution() ? { attribution: getStoredAdAttribution() } : {}),
-          },
+          // Every value below is read off the URL, so `maxLength` on a field cannot
+          // reach it: a long `utm_source` in a link somebody else built used to
+          // raise `invalid_booking_input` and block the patient forever.
+          p_source: clampUrlValue(params.get("utm_source"), BOOKING_INPUT_LIMITS.source) || "public_booking",
+          p_metadata: buildGuestBookingMetadata({
+            utmSource: params.get("utm_source"),
+            utmMedium: params.get("utm_medium"),
+            utmCampaign: params.get("utm_campaign"),
+            landingPath: window.location.pathname,
+            attribution: getStoredAdAttribution(),
+          }),
         });
     setSubmitting(false);
     if (error) {
       const message = String(error.message || "");
-      const friendly = message.includes("slot_unavailable")
-        ? (isArabic ? "هذا الموعد حُجز للتو. اختر وقتًا آخر." : "This time was just booked. Please choose another time.")
-        : message.includes("invalid_phone")
-          ? (isArabic ? "اكتب رقم هاتف صحيحًا." : "Enter a valid phone number.")
-          : message.includes("portal_account_inactive")
-            ? (isArabic ? "تعذر التحقق من حساب بوابة المريض. أعد تحميل الصفحة وحاول مرة أخرى." : "Could not verify your patient portal account. Reload the page and try again.")
-            : (isArabic ? "تعذر إتمام الحجز. حاول مرة أخرى." : "We could not complete the booking. Please try again.");
-      toast.error(friendly);
+      toast.error(bookingFailureCopy(message, isArabic));
       if (message.includes("slot_unavailable")) {
         setStep(2);
         setSelectedSlot(null);
@@ -738,14 +736,17 @@ export default function PublicBooking() {
                         </div>
                       ) : (
                         <div className="grid gap-4 sm:grid-cols-2">
-                          <div className="space-y-2"><Label htmlFor="booking-name">{isArabic ? "الاسم بالكامل" : "Full name"}</Label><div className="relative"><UserRound className="pointer-events-none absolute start-3 top-2.5 size-4 text-muted-foreground" /><Input id="booking-name" className="ps-9" value={form.fullName} onChange={(event) => setField("fullName", event.target.value)} autoComplete="name" required /></div></div>
-                          <div className="space-y-2"><Label htmlFor="booking-phone">{isArabic ? "رقم الهاتف" : "Mobile number"}</Label><div className="relative"><Phone className="pointer-events-none absolute start-3 top-2.5 size-4 text-muted-foreground" /><Input id="booking-phone" className="ps-9" value={form.phone} onChange={(event) => setField("phone", event.target.value)} placeholder="01xxxxxxxxx" autoComplete="tel" inputMode="tel" required /></div></div>
+                          <div className="space-y-2"><Label htmlFor="booking-name">{isArabic ? "الاسم بالكامل" : "Full name"}</Label><div className="relative"><UserRound className="pointer-events-none absolute start-3 top-2.5 size-4 text-muted-foreground" /><Input id="booking-name" className="ps-9" value={form.fullName} onChange={(event) => setField("fullName", event.target.value)} maxLength={BOOKING_INPUT_LIMITS.fullName} autoComplete="name" required /></div></div>
+                          <div className="space-y-2"><Label htmlFor="booking-phone">{isArabic ? "رقم الهاتف" : "Mobile number"}</Label><div className="relative"><Phone className="pointer-events-none absolute start-3 top-2.5 size-4 text-muted-foreground" /><Input id="booking-phone" className="ps-9" value={form.phone} onChange={(event) => setField("phone", event.target.value)} maxLength={BOOKING_INPUT_LIMITS.phone} placeholder="01xxxxxxxxx" autoComplete="tel" inputMode="tel" required /></div></div>
                         </div>
                       )}
                       {!isPortalPatient ? (
-                        <div className="space-y-2"><Label htmlFor="booking-email">{isArabic ? "البريد الإلكتروني (اختياري)" : "Email (optional)"}</Label><Input id="booking-email" type="email" value={form.email} onChange={(event) => setField("email", event.target.value)} autoComplete="email" /></div>
+                        <div className="space-y-2"><Label htmlFor="booking-email">{isArabic ? "البريد الإلكتروني (اختياري)" : "Email (optional)"}</Label><Input id="booking-email" type="email" value={form.email} onChange={(event) => setField("email", event.target.value)} maxLength={BOOKING_INPUT_LIMITS.email} autoComplete="email" /></div>
                       ) : null}
-                      <div className="space-y-2"><Label htmlFor="booking-complaint">{isArabic ? "سبب الزيارة باختصار (اختياري)" : "Short reason for visit (optional)"}</Label><Textarea id="booking-complaint" value={form.complaint} onChange={(event) => setField("complaint", event.target.value)} rows={3} /></div>
+                      {/* Capped only on the guest path: `patient_portal_create_booking`
+                          raises no length error at all, so a cap there would refuse a
+                          reason that books successfully today. */}
+                      <div className="space-y-2"><Label htmlFor="booking-complaint">{isArabic ? "سبب الزيارة باختصار (اختياري)" : "Short reason for visit (optional)"}</Label><Textarea id="booking-complaint" value={form.complaint} onChange={(event) => setField("complaint", event.target.value)} maxLength={isPortalPatient ? undefined : BOOKING_INPUT_LIMITS.complaint} rows={3} /></div>
                       <div className="rounded-xl bg-muted/60 p-4 text-xs leading-5 text-muted-foreground"><ShieldCheck className="mb-1 inline-block size-4 text-primary" /> {isArabic ? "نستخدم بياناتك لتنسيق الموعد والتواصل بشأنه فقط." : "We use your details only to coordinate and communicate about this appointment."}</div>
                       <Button type="submit" className="w-full" disabled={submitting}>{submitting ? (isArabic ? "جارٍ تأكيد الحجز…" : "Confirming booking…") : (isArabic ? "تأكيد الحجز" : "Confirm booking")}</Button>
                     </form>

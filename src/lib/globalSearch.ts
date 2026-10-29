@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { sanitizeSearch } from "@/lib/sanitizeSearch";
 import { patientDisplayName } from "@/lib/patientName";
+import { localDateOnly } from "@/lib/localDate";
 
 export type SearchHit = {
   id: string;
@@ -169,7 +170,7 @@ export async function searchAppointments(
   return ((data ?? []) as any[]).map((a) => {
     const d = new Date(a.scheduled_at);
     const dateStr = d.toLocaleString(lang === "ar" ? "ar-EG" : "en-US", { month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" });
-    const dayKey = d.toISOString().slice(0, 10);
+    const dayKey = localDateOnly(d);
     return {
       id: a.id,
       label: `${dateStr} · ${patientName(a.patients, lang)}`,

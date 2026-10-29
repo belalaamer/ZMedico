@@ -23,6 +23,7 @@ import { doctorDisplayName } from "@/lib/doctorName";
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { logPhiAccess } from "@/lib/observability/phiAudit";
+import { localDateOnly } from "@/lib/localDate";
 
 // Arabic-only labels with an English fallback, the shape PhysioCases.tsx uses, so
 // the English desk is untouched and no enum reaches an Arabic screen raw.
@@ -142,7 +143,7 @@ export default function PhysioCaseDetail() {
     return d.length ? d[d.length - 1] : null;
   }, [sessions]);
   const nextPlanned = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateOnly(new Date());
     const upcoming = sessions
       .filter(s => s.attendance === "scheduled" && s.session_date >= today)
       .map(s => s.session_date)
@@ -262,7 +263,7 @@ export default function PhysioCaseDetail() {
           <div className="whitespace-pre-wrap">{c.pause_reason || "—"}</div>
         </Card>
       )}
-      {c.status === "active" && c.followup_enabled && c.followup_due_date && c.followup_due_date < new Date().toISOString().slice(0,10) && (
+      {c.status === "active" && c.followup_enabled && c.followup_due_date && c.followup_due_date < localDateOnly(new Date()) && (
         <Card className="p-3 border-destructive/40 bg-destructive/5 text-sm flex items-center gap-2">
           <AlertCircle className="size-4 text-destructive" />
           <span>
@@ -498,12 +499,16 @@ export default function PhysioCaseDetail() {
                   <div className="flex gap-2 flex-wrap">
                     <Button variant="outline" size="sm" onClick={() => {
                       const d = new Date(); d.setDate(d.getDate() + (c.followup_interval_days ?? 14));
-                      saveFollowup({ followup_enabled: true, followup_due_date: d.toISOString().slice(0,10) });
+                      saveFollowup({ followup_enabled: true, followup_due_date: localDateOnly(d) });
                     }}>{lang === "ar" ? "حسب المدة" : "Suggest from interval"}</Button>
                     {reassessments[0]?.assessment_date && (
                       <Button variant="outline" size="sm" onClick={() => {
-                        const d = new Date(reassessments[0].assessment_date); d.setDate(d.getDate() + (c.followup_interval_days ?? 14));
-                        saveFollowup({ followup_enabled: true, followup_due_date: d.toISOString().slice(0,10) });
+                        // Anchored at local noon because `assessment_date` is a
+                        // `date` column: `new Date("YYYY-MM-DD")` is UTC midnight,
+                        // which the day walk below would read as the previous local
+                        // day in any zone west of Greenwich.
+                        const d = new Date(`${reassessments[0].assessment_date}T12:00:00`); d.setDate(d.getDate() + (c.followup_interval_days ?? 14));
+                        saveFollowup({ followup_enabled: true, followup_due_date: localDateOnly(d) });
                       }}>{lang === "ar" ? "من آخر إعادة تقييم" : "From last reassessment"}</Button>
                     )}
                   </div>
@@ -558,7 +563,7 @@ function Field({ label, value }: { label: string; value?: string | null }) {
 
 function SessionDialog({ open, setOpen, caseId, nextNumber, defaultTherapistId, therapists, lang, appointments, onSaved }: any) {
   const [form, setForm] = useState<any>({
-    session_number: nextNumber, session_date: new Date().toISOString().slice(0, 10),
+    session_number: nextNumber, session_date: localDateOnly(new Date()),
     therapist_id: defaultTherapistId ?? "", attendance: "done", pain_level: "",
     pain_note: "", interventions: "", progress_note: "", symptom_change: "",
     mobility_note: "", strength_note: "", adherence: "", home_exercise: "",
@@ -675,7 +680,7 @@ function SessionDialog({ open, setOpen, caseId, nextNumber, defaultTherapistId, 
                     const appt = (appointments ?? []).find((a: any) => a.id === aid);
                     setForm((f: any) => ({
                       ...f, appointment_id: aid,
-                      session_date: appt ? new Date(appt.scheduled_at).toISOString().slice(0, 10) : f.session_date,
+                      session_date: appt ? localDateOnly(new Date(appt.scheduled_at)) : f.session_date,
                     }));
                   }}>
                     <SelectTrigger><SelectValue placeholder={lang === "ar" ? "جلسة غير مرتبطة بموعد" : "Standalone session"} /></SelectTrigger>
@@ -702,7 +707,7 @@ function SessionDialog({ open, setOpen, caseId, nextNumber, defaultTherapistId, 
 
 function ReassessmentDialog({ open, setOpen, caseId, initialFromCase, therapists, lang, defaultTherapistId, onSaved }: any) {
   const [form, setForm] = useState<any>({
-    assessment_date: new Date().toISOString().slice(0, 10),
+    assessment_date: localDateOnly(new Date()),
     therapist_id: defaultTherapistId ?? "",
     initial_condition: initialFromCase ?? "",
     current_condition: "", trend: "unchanged", plan_update: "", notes: "",

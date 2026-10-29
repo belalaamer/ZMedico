@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useDataSync } from "@/lib/dataSync";
 import { patientDisplayName } from "@/lib/patientName";
+import { localDateOnly } from "@/lib/localDate";
 
 type Method = "cash" | "card" | "bank_transfer" | "insurance" | "wallet";
 
@@ -38,7 +39,7 @@ export function RecordPaymentDialog({
   const [invoices, setInvoices] = useState<{ id: string; label: string; remaining: number }[]>([]);
   const [amount, setAmount] = useState<number>(defaultAmount ?? 0);
   const [method, setMethod] = useState<Method>("cash");
-  const [date, setDate] = useState<string>(new Date().toISOString().slice(0,10));
+  const [date, setDate] = useState<string>(localDateOnly(new Date()));
   const [ref, setRef] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
@@ -57,7 +58,7 @@ export function RecordPaymentDialog({
     setIid(invoiceId ?? "");
     setAmount(defaultAmount ?? 0);
     setMethod("cash"); setRef(""); setNotes("");
-    setDate(new Date().toISOString().slice(0,10));
+    setDate(localDateOnly(new Date()));
     setSplit(false); setMethod2("wallet"); setAmount2(0);
     setRemaining(defaultAmount ?? 0);
     setIsTopup(false);

@@ -12,6 +12,7 @@ import { ReportPageHeader, StatCard, ExportButtons } from "./_shared";
 import { exportReportPDF, exportReportExcel } from "@/lib/reportExport";
 import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { localDateOnly } from "@/lib/localDate";
 
 export default function InventoryReports() {
   const { t, lang } = useI18n();
@@ -129,7 +130,7 @@ function ExpiryTab({ branchId, lang, t }: any) {
   const [days, setDays] = useState(30);
   const [rows, setRows] = useState<any[]>([]);
   useEffect(() => {
-    const end = new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
+    const end = localDateOnly(new Date(Date.now() + days * 86400000));
     let q = supabase.from("inventory_transactions")
       .select("quantity, expiry_date, batch_number, products(name_en, name_ar, expiry_tracking)")
       .not("expiry_date", "is", null).lte("expiry_date", end).eq("transaction_type", "purchase");

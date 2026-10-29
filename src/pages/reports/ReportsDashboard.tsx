@@ -9,6 +9,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { formatMoney } from "@/lib/format";
 import { StatCard, ReportPageHeader } from "./_shared";
 import { DollarSign, Users, CalendarDays, FileWarning, BarChart3, Briefcase, Stethoscope, Boxes, ClipboardList, Percent, Award, Activity } from "lucide-react";
+import { localDateOnly } from "@/lib/localDate";
 
 export default function ReportsDashboard() {
   const { t, lang } = useI18n();
@@ -20,7 +21,7 @@ export default function ReportsDashboard() {
     let active = true;
     if (!branchSelectionReady || !currentBranchId) { setStats({ revenue: 0, patients: 0, appts: 0, pending: 0 }); return; }
     const today = new Date();
-    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
+    const monthStart = localDateOnly(new Date(today.getFullYear(), today.getMonth(), 1));
     (async () => {
       let pq = supabase.from("payments").select("amount").is("deleted_at", null).gte("payment_date", monthStart);
       pq = pq.eq("branch_id", currentBranchId);

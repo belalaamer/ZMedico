@@ -13,6 +13,7 @@ import { formatDate } from "@/lib/format";
 import { patientDisplayName } from "@/lib/patientName";
 import { doctorDisplayName } from "@/lib/doctorName";
 import { Download } from "lucide-react";
+import { localDateOnly } from "@/lib/localDate";
 
 function downloadCsv(filename: string, rows: any[][]) {
   const esc = (v: any) => {
@@ -31,8 +32,8 @@ function downloadCsv(filename: string, rows: any[][]) {
 export default function PhysioReports() {
   const { currentBranchId } = useBranch();
   const { lang } = useI18n();
-  const today = new Date().toISOString().slice(0, 10);
-  const monthAgo = new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10);
+  const today = localDateOnly(new Date());
+  const monthAgo = localDateOnly(new Date(Date.now() - 30 * 86400_000));
   const [from, setFrom] = useState(monthAgo);
   const [to, setTo] = useState(today);
   const [therapistId, setTherapistId] = useState<string>("_all");

@@ -325,11 +325,16 @@ export default {
     const contentType = response.headers.get("content-type") ?? "";
     const isJavaScriptRequest = /\.(?:m?js)$/.test(pathname);
 
-    // Never serve the SPA shell for a missing JavaScript module. A stale HTML
-    // document must fail with a clear 404 instead of trying to evaluate
-    // index.html as JavaScript and producing a misleading dynamic-import error.
-    if (isJavaScriptRequest && (response.status === 404 || contentType.includes("text/html"))) {
-      return new Response("JavaScript asset not found", {
+    // `not_found_handling = "single-page-application"` makes the asset binding
+    // answer every unmatched path with index.html, so a mistyped or already
+    // purged image, font or manifest arrives as HTTP 200 containing markup.
+    // All 117 router paths are dot-free, so a dotted path can only name an
+    // asset; fail it instead of letting an <img>, a font loader or a crawler
+    // read the shell. `.html` is exempt because /index.html is a real file.
+    const isAssetPath = pathname.includes(".") && !/\.html?$/i.test(pathname);
+
+    if (isAssetPath && (response.status === 404 || contentType.includes("text/html"))) {
+      return new Response(isJavaScriptRequest ? "JavaScript asset not found" : "Asset not found", {
         status: 404,
         headers: {
           "Cache-Control": "no-store",

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import worker, { type Env } from "./worker";
 
@@ -171,5 +172,85 @@ describe("custom domain gateway", () => {
     expect(new Headers(forwardedInit.headers).get("Authorization")).toBe("Bearer test-jwt");
     expect(new Headers(forwardedInit.headers).get("apikey")).toBe("public-key");
     expect(await response.text()).toContain("domains");
+  });
+});
+
+describe("missing asset handling", () => {
+  function shellAssets() {
+    return { fetch: vi.fn().mockResolvedValue(new Response("<html><div id='root'></div></html>", { status: 200, headers: { "Content-Type": "text/html" } })) } as unknown as Env["ASSETS"];
+  }
+
+  it("404s a missing image instead of returning the SPA shell", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const assets = shellAssets();
+
+    const response = await worker.fetch(new Request("https://zmedico.com/this-does-not-exist.png"), testEnv(assets));
+
+    expect(response.status).toBe(404);
+    expect(await response.text()).toBe("Asset not found");
+    expect(response.headers.get("Content-Type")).toBe("text/plain; charset=UTF-8");
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it("404s a purged hashed chunk with the JavaScript message", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const response = await worker.fetch(new Request("https://zmedico.com/assets/index-DEADBEEF.js"), testEnv(shellAssets()));
+
+    expect(response.status).toBe(404);
+    expect(await response.text()).toBe("JavaScript asset not found");
+  });
+
+  it("404s a missing stylesheet that the asset binding answers with markup", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const response = await worker.fetch(new Request("https://zmedico.com/assets/index-DEADBEEF.css"), testEnv(shellAssets()));
+
+    expect(response.status).toBe(404);
+    expect(await response.text()).toBe("Asset not found");
+  });
+
+  it("serves a real image unchanged and without a domain lookup", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const assetsFetch = vi.fn().mockResolvedValue(new Response("PNG", { status: 200, headers: { "Content-Type": "image/png" } }));
+
+    const response = await worker.fetch(new Request("https://zmedico.com/og-image.png"), testEnv({ fetch: assetsFetch } as unknown as Env["ASSETS"]));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toBe("image/png");
+    expect(await response.text()).toBe("PNG");
+    expect(assetsFetch).toHaveBeenCalledTimes(1);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it("keeps caching a real hashed chunk immutably", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const assetsFetch = vi.fn().mockResolvedValue(new Response("console.log(1)", { status: 200, headers: { "Content-Type": "text/javascript" } }));
+
+    const response = await worker.fetch(new Request("https://zmedico.com/assets/index-3BEVO31l.js"), testEnv({ fetch: assetsFetch } as unknown as Env["ASSETS"]));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("public, max-age=31536000, immutable");
+  });
+
+  it("never 404s a dot-free deep link, and never intercepts a .html path", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    // On Production the asset router canonicalises /index.html to / with a 307,
+    // so this case pins the Worker's own rule against a stub that answers HTML,
+    // not the redirect.
+    for (const path of ["/queue", "/patients/12", "/index.html"]) {
+      const response = await worker.fetch(new Request(`https://zmedico.com${path}`), testEnv(shellAssets()));
+
+      expect(response.status).toBe(200);
+      expect(await response.text()).toContain("<div id='root'>");
+    }
+  });
+
+  it("routes /assets/* through the Worker so the guard can run there", () => {
+    const config = readFileSync("wrangler.toml", "utf8");
+
+    expect(config).toMatch(/run_worker_first\s*=\s*\["\/\*"\]/);
+    expect(config).not.toContain("!/assets/*");
+    expect(config).toContain('not_found_handling = "single-page-application"');
   });
 });

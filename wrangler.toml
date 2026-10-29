@@ -36,7 +36,13 @@ EMAIL_FROM = "support@zmedico.com"
 directory = "./dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-run_worker_first = ["/*", "!/assets/*"]
+# Measured on Production before this change: with /assets/* excluded from the
+# Worker, a hashed chunk that no longer exists (a stale document pointing at a
+# purged build) was answered with index.html - HTTP 200, text/html - and
+# public/_headers stamped it `max-age=31536000, immutable`, so the browser
+# pinned that HTML as JavaScript for a year and the Worker's missing-asset 404
+# could never run. The Worker has to see the paths it is meant to police.
+run_worker_first = ["/*"]
 
 [observability]
 enabled = true

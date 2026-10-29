@@ -19,6 +19,7 @@ import { formatMoney, formatDate } from "@/lib/format";
 import { RowActions } from "@/components/RowActions";
 import { Can } from "@/components/Can";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
+import { enumCopy, EXPENSE_METHOD_KEY } from "@/lib/enumKeys";
 import { localDateOnly } from "@/lib/localDate";
 
 export default function Expenses() {
@@ -165,7 +166,7 @@ export default function Expenses() {
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">{lang === "ar" ? (x.description_ar || x.description_en) : x.description_en}</div>
                   <div className="text-xs text-muted-foreground">
-                    {formatDate(x.expense_date, lang)} · {t(x.payment_method as any) ?? x.payment_method}
+                    {formatDate(x.expense_date, lang)} · {enumCopy(EXPENSE_METHOD_KEY, x.payment_method, t)}
                   </div>
                 </div>
                 {x.expense_categories && (

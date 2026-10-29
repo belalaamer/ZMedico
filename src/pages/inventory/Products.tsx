@@ -19,6 +19,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useI18n } from "@/contexts/I18nContext";
+import type { DictKey } from "@/lib/i18n";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
@@ -26,7 +27,21 @@ import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
 import { Can } from "@/components/Can";
 
-const UNITS = ["piece", "box", "bottle", "session", "ml", "g"];
+const UNITS = ["piece", "box", "bottle", "session", "ml", "g"] as const;
+
+// `products.unit` is plain text with no CHECK constraint, so this list — not a
+// Postgres enum — is the value space the form can write. Typing the map over the
+// array's own union is what makes `t()` checkable here; the one word the
+// dictionary does not key under its value is `piece`, whose entry is `pieces`.
+type Unit = (typeof UNITS)[number];
+const UNIT_KEY: Record<Unit, DictKey> = {
+  piece: "pieces",
+  box: "box",
+  bottle: "bottle",
+  session: "session",
+  ml: "ml",
+  g: "g",
+};
 
 type Product = any;
 
@@ -268,7 +283,7 @@ export default function Products() {
                     <Select value={form.unit} onValueChange={(v) => setForm({ ...form, unit: v })}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {UNITS.map((u) => <SelectItem key={u} value={u}>{t(u === "piece" ? "pieces" : u as any)}</SelectItem>)}
+                        {UNITS.map((u) => <SelectItem key={u} value={u}>{t(UNIT_KEY[u])}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>

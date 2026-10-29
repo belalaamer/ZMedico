@@ -15,7 +15,11 @@ import { cn } from "@/lib/utils";
 import { Can } from "@/components/Can";
 import { logPhiAccess } from "@/lib/observability/phiAudit";
 import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
+import { TOOTH_STATUS_KEY } from "@/lib/enumKeys";
 
+// The words for these eight values live in lib/enumKeys (TOOTH_STATUS_KEY), next
+// to the enum they name, so a second copy cannot drift from the first. This
+// array only decides the order the legend and the dropdown show them in.
 const STATUS = [
   "healthy", "caries", "filled", "crown", "implant", "extracted", "root_canal", "bridge",
 ] as const;
@@ -29,12 +33,6 @@ const STATUS_COLOR: Record<string, string> = {
   root_canal: "bg-orange-400/40 text-foreground border-orange-500",
   extracted: "bg-muted text-muted-foreground border-border line-through",
   bridge: "bg-pink-400/40 text-foreground border-pink-500",
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  healthy: "chartLegendHealthy", caries: "chartLegendCaries", filled: "chartLegendFilled",
-  crown: "chartLegendCrown", implant: "chartLegendImplant", root_canal: "chartLegendRootCanal",
-  extracted: "chartLegendExtracted", bridge: "chartLegendBridge",
 };
 
 // FDI numbering
@@ -152,7 +150,7 @@ export default function PatientDental() {
             {STATUS.map((s) => (
               <div key={s} className="flex items-center gap-1.5 text-xs">
                 <span className={cn("inline-block size-4 rounded border", STATUS_COLOR[s])} />
-                <span>{t(STATUS_LABEL[s] as any)}</span>
+                <span>{t(TOOTH_STATUS_KEY[s])}</span>
               </div>
             ))}
           </div>
@@ -185,7 +183,7 @@ function ToothEditor({ tooth, row, procs, onSave }: any) {
           <Select value={status} onValueChange={setStatus}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              {STATUS.map((s) => <SelectItem key={s} value={s}>{t(STATUS_LABEL[s] as any)}</SelectItem>)}
+              {STATUS.map((s) => <SelectItem key={s} value={s}>{t(TOOTH_STATUS_KEY[s])}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>

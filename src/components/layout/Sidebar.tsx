@@ -127,6 +127,13 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
         authz.can("leads.view") && isModuleEnabled("marketing") && { to: "/leads", icon: Target, label: lang === "ar" ? "العملاء المحتملون" : "Leads" },
         authz.can("appointments.view") && { to: "/queue", icon: ListChecks, label: t("queue") },
         authz.can("appointments.view") && { to: "/queue/audit", icon: ScrollText, label: lang === "ar" ? "تدقيق الطابور" : "Queue Audit" },
+        // Three /self-audit routes exist in App.tsx behind `adminOnly` and no
+        // control in the whole app linked any of them, while
+        // systemSelfAudit.ts tells the operator to open two of them by name.
+        // Same gate the routes use (PermissionRoute adminOnly =
+        // authz.isSuperAdmin()), plus the module the route also checks through
+        // moduleKeyForPath, so a nav item never opens an Access Denied card.
+        authz.isSuperAdmin() && isModuleEnabled("appointments") && { to: "/queue/self-audit", icon: ScrollText, label: lang === "ar" ? "التدقيق الذاتي للطابور" : "Queue Self-Audit" },
         authz.can("patients.view") && { to: "/patients", icon: Users, label: t("patients") },
         authz.can("appointments.view") && { to: "/reminders", icon: Bell, label: t("notifications") },
         authz.can("medical_records.view") && isModuleEnabled("medical") && { to: "/medical/records", icon: FileText, label: t("medicalRecords") },
@@ -160,6 +167,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
         authz.can("coupons.view") && { to: "/coupons", icon: Ticket, label: lang === "ar" ? "الكوبونات" : "Coupons" },
         authz.can("treasury.view") && { to: "/treasury", icon: Banknote, label: t("treasury") },
         authz.can("treasury.view") && { to: "/expenses", icon: Receipt, label: t("expenses") },
+        authz.isSuperAdmin() && isModuleEnabled("invoices") && { to: "/expenses/self-audit", icon: ScrollText, label: lang === "ar" ? "التدقيق الذاتي للمصروفات والخزينة" : "Expense & Treasury Self-Audit" },
       ].filter(Boolean) as NavItem[],
     },
     {
@@ -216,6 +224,10 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
         // /settings/ai is gated systemOwnerOnly (stricter than the adminOnly
         // /settings above) because it holds the tenant's AI provider API key.
         isSystemOwner && { to: "/settings/ai", icon: Bot, label: lang === "ar" ? "إعدادات الذكاء الاصطناعي" : "AI Settings" },
+        // The third self-audit route from the note above /queue/self-audit.
+        // No module gate: moduleKeyForPath("/system/self-audit") is null, so
+        // PermissionRoute blocks it for admins on no condition at all.
+        authz.isSuperAdmin() && { to: "/system/self-audit", icon: Activity, label: lang === "ar" ? "التدقيق الذاتي الكامل للنظام" : "Full System Self-Audit" },
       ].filter(Boolean) as NavItem[],
     },
   ].filter(g => g.items.length > 0), [t, lang, authz, alertCount, pendingBookingsCount, reportItems, isModuleEnabled, isPlatformSurface, isSystemOwner]);

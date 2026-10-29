@@ -15,6 +15,8 @@ import { localizedTenantName } from "@/lib/tenantName";
 import { captureAdAttribution, getStoredAdAttribution } from "@/lib/adAttribution";
 import { nearestBookingDay } from "@/lib/nearestBookingDay";
 import { localDateOnly } from "@/lib/localDate";
+import { BOOKING_INPUT_LIMITS, buildGuestBookingMetadata, clampUrlValue } from "@/lib/bookingInputLimits";
+import { bookingFailureCopy } from "@/lib/bookingFailureCopy";
 
  type Lang = "ar" | "en";
 
@@ -509,26 +511,22 @@ export default function PublicBooking() {
           p_doctor_id: doctorId || null,
           p_email: form.email.trim() || null,
           p_complaint: form.complaint.trim() || null,
-          p_source: params.get("utm_source") || "public_booking",
-          p_metadata: {
-            utm_source: params.get("utm_source"),
-            utm_medium: params.get("utm_medium"),
-            utm_campaign: params.get("utm_campaign"),
-            landing_path: window.location.pathname,
-            ...(getStoredAdAttribution() ? { attribution: getStoredAdAttribution() } : {}),
-          },
+          // Every value below is read off the URL, so `maxLength` on a field cannot
+          // reach it: a long `utm_source` in a link somebody else built used to
+          // raise `invalid_booking_input` and block the patient forever.
+          p_source: clampUrlValue(params.get("utm_source"), BOOKING_INPUT_LIMITS.source) || "public_booking",
+          p_metadata: buildGuestBookingMetadata({
+            utmSource: params.get("utm_source"),
+            utmMedium: params.get("utm_medium"),
+            utmCampaign: params.get("utm_campaign"),
+            landingPath: window.location.pathname,
+            attribution: getStoredAdAttribution(),
+          }),
         });
     setSubmitting(false);
     if (error) {
       const message = String(error.message || "");
-      const friendly = message.includes("slot_unavailable")
-        ? (isArabic ? "هذا الموعد حُجز للتو. اختر وقتًا آخر." : "This time was just booked. Please choose another time.")
-        : message.includes("invalid_phone")
-          ? (isArabic ? "اكتب رقم هاتف صحيحًا." : "Enter a valid phone number.")
-          : message.includes("portal_account_inactive")
-            ? (isArabic ? "تعذر التحقق من حساب بوابة المريض. أعد تحميل الصفحة وحاول مرة أخرى." : "Could not verify your patient portal account. Reload the page and try again.")
-            : (isArabic ? "تعذر إتمام الحجز. حاول مرة أخرى." : "We could not complete the booking. Please try again.");
-      toast.error(friendly);
+      toast.error(bookingFailureCopy(message, isArabic));
       if (message.includes("slot_unavailable")) {
         setStep(2);
         setSelectedSlot(null);
@@ -617,15 +615,35 @@ export default function PublicBooking() {
         ) : (
         <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
           <Card className="overflow-hidden border-primary/10 shadow-lg">
-            <div className="flex items-center gap-2 border-b bg-background/80 px-5 py-4 text-sm font-semibold">
-              <span className={cn("flex size-8 items-center justify-center rounded-full", step >= 1 ? "bg-primary text-primary-foreground" : "bg-muted")}>1</span>
-              <span className={step >= 1 ? "text-foreground" : "text-muted-foreground"}>{isArabic ? "الفرع والخدمة" : "Branch & service"}</span>
-              <span className="mx-1 text-muted-foreground">/</span>
-              <span className={cn("flex size-8 items-center justify-center rounded-full", step >= 2 ? "bg-primary text-primary-foreground" : "bg-muted")}>2</span>
-              <span className={step >= 2 ? "text-foreground" : "text-muted-foreground"}>{isArabic ? "الوقت" : "Time"}</span>
-              <span className="mx-1 text-muted-foreground">/</span>
-              <span className={cn("flex size-8 items-center justify-center rounded-full", step >= 3 ? "bg-primary text-primary-foreground" : "bg-muted")}>3</span>
-              <span className={step >= 3 ? "text-foreground" : "text-muted-foreground"}>{isArabic ? (isPortalPatient ? "تأكيد الحجز" : "بياناتك") : (isPortalPatient ? "Confirm" : "Your details")}</span>
+            {/*
+              A phone does not have room for three step labels and a slash each on one
+              line: at 320px the old row broke "Branch & service" across three lines and
+              the badges drifted onto separate baselines (measured in a browser, not
+              inferred — nothing was clipped, it just stopped reading as steps). Each
+              badge+label pair is therefore one unbreakable group, no label may wrap
+              mid-phrase, and below `sm` the slashes go: they carry no information the
+              numbered badges do not, and an orphaned "/" at a line end is the thing
+              that makes a wrapped list look broken. Desktop (>=640px) renders exactly
+              what it did before.
+            */}
+            <div
+              data-booking-steps
+              className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b bg-background/80 px-5 py-4 text-sm font-semibold"
+            >
+              <span className="flex shrink-0 items-center gap-2">
+                <span className={cn("flex size-8 items-center justify-center rounded-full", step >= 1 ? "bg-primary text-primary-foreground" : "bg-muted")}>1</span>
+                <span data-booking-step-label className={cn("whitespace-nowrap", step >= 1 ? "text-foreground" : "text-muted-foreground")}>{isArabic ? "الفرع والخدمة" : "Branch & service"}</span>
+              </span>
+              <span className="mx-1 hidden text-muted-foreground sm:inline">/</span>
+              <span className="flex shrink-0 items-center gap-2">
+                <span className={cn("flex size-8 items-center justify-center rounded-full", step >= 2 ? "bg-primary text-primary-foreground" : "bg-muted")}>2</span>
+                <span data-booking-step-label className={cn("whitespace-nowrap", step >= 2 ? "text-foreground" : "text-muted-foreground")}>{isArabic ? "الوقت" : "Time"}</span>
+              </span>
+              <span className="mx-1 hidden text-muted-foreground sm:inline">/</span>
+              <span className="flex shrink-0 items-center gap-2">
+                <span className={cn("flex size-8 items-center justify-center rounded-full", step >= 3 ? "bg-primary text-primary-foreground" : "bg-muted")}>3</span>
+                <span data-booking-step-label className={cn("whitespace-nowrap", step >= 3 ? "text-foreground" : "text-muted-foreground")}>{isArabic ? (isPortalPatient ? "تأكيد الحجز" : "بياناتك") : (isPortalPatient ? "Confirm" : "Your details")}</span>
+              </span>
             </div>
 
             <div className="space-y-6 p-5 md:p-7">
@@ -707,7 +725,13 @@ export default function PublicBooking() {
                         </select>
                         {doctors.length > 0 ? <p className="text-xs text-muted-foreground">{isArabic ? `تم العثور على ${doctors.length} طبيب مؤهل لهذه الخدمة.` : `${doctors.length} eligible doctor${doctors.length === 1 ? "" : "s"} found for this service.`}</p> : <p className="text-xs text-muted-foreground">{isArabic ? "لا يوجد تخصيص محدد لطبيب؛ سيبحث النظام عن طبيب متاح." : "No specific doctor assignment is configured; the system will find an available doctor."}</p>}
                       </div>
-                      <Button type="button" variant="outline" disabled={nearestLoading || slotsLoading} onClick={() => void findNearest()}>{nearestLoading ? (isArabic ? "جارٍ البحث…" : "Searching…") : (isArabic ? "أقرب موعد متاح خلال ١٤ يومًا" : "Find earliest availability within 14 days")}</Button>
+                      {/* The shared Button base sets whitespace-nowrap, and this is the
+                          longest label on the screen: at 320 px English the one-line
+                          box measured 289 px wide inside a 246 px content column, so it
+                          crossed its own card and ran 6 px off the device (measured in a
+                          browser). Wrapping costs nothing on desktop, where the label
+                          already fits one line, and min-h keeps the 40 px height it had. */}
+                      <Button type="button" variant="outline" disabled={nearestLoading || slotsLoading} onClick={() => void findNearest()} className="h-auto min-h-[40px] whitespace-normal text-center">{nearestLoading ? (isArabic ? "جارٍ البحث…" : "Searching…") : (isArabic ? "أقرب موعد متاح خلال ١٤ يومًا" : "Find earliest availability within 14 days")}</Button>
                       {slotsLoading ? <div className="py-10 text-center text-sm text-muted-foreground">{isArabic ? "جارٍ البحث عن المواعيد…" : "Finding available times…"}</div> : null}
                       {!slotsLoading && slotsError ? <div role="alert" className="rounded-2xl border border-destructive/40 p-5 space-y-3 text-sm"><p>{isArabic ? "تعذر تحميل المواعيد. تحقق من الاتصال وحاول مجددًا." : "Unable to load availability. Check your connection and retry."}</p><Button type="button" variant="outline" onClick={() => setSlotsRetry(value => value + 1)}>{isArabic ? "إعادة المحاولة" : "Retry"}</Button></div> : null}
                       {!slotsLoading && !slotsError && !slots.length ? <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">{isArabic ? "لا توجد مواعيد متاحة لهذا اليوم. اختر تاريخًا آخر." : "No available times for this day. Please choose another date."}</div> : null}
@@ -738,14 +762,17 @@ export default function PublicBooking() {
                         </div>
                       ) : (
                         <div className="grid gap-4 sm:grid-cols-2">
-                          <div className="space-y-2"><Label htmlFor="booking-name">{isArabic ? "الاسم بالكامل" : "Full name"}</Label><div className="relative"><UserRound className="pointer-events-none absolute start-3 top-2.5 size-4 text-muted-foreground" /><Input id="booking-name" className="ps-9" value={form.fullName} onChange={(event) => setField("fullName", event.target.value)} autoComplete="name" required /></div></div>
-                          <div className="space-y-2"><Label htmlFor="booking-phone">{isArabic ? "رقم الهاتف" : "Mobile number"}</Label><div className="relative"><Phone className="pointer-events-none absolute start-3 top-2.5 size-4 text-muted-foreground" /><Input id="booking-phone" className="ps-9" value={form.phone} onChange={(event) => setField("phone", event.target.value)} placeholder="01xxxxxxxxx" autoComplete="tel" inputMode="tel" required /></div></div>
+                          <div className="space-y-2"><Label htmlFor="booking-name">{isArabic ? "الاسم بالكامل" : "Full name"}</Label><div className="relative"><UserRound className="pointer-events-none absolute start-3 top-2.5 size-4 text-muted-foreground" /><Input id="booking-name" className="ps-9" value={form.fullName} onChange={(event) => setField("fullName", event.target.value)} maxLength={BOOKING_INPUT_LIMITS.fullName} autoComplete="name" required /></div></div>
+                          <div className="space-y-2"><Label htmlFor="booking-phone">{isArabic ? "رقم الهاتف" : "Mobile number"}</Label><div className="relative"><Phone className="pointer-events-none absolute start-3 top-2.5 size-4 text-muted-foreground" /><Input id="booking-phone" className="ps-9" value={form.phone} onChange={(event) => setField("phone", event.target.value)} maxLength={BOOKING_INPUT_LIMITS.phone} placeholder="01xxxxxxxxx" autoComplete="tel" inputMode="tel" required /></div></div>
                         </div>
                       )}
                       {!isPortalPatient ? (
-                        <div className="space-y-2"><Label htmlFor="booking-email">{isArabic ? "البريد الإلكتروني (اختياري)" : "Email (optional)"}</Label><Input id="booking-email" type="email" value={form.email} onChange={(event) => setField("email", event.target.value)} autoComplete="email" /></div>
+                        <div className="space-y-2"><Label htmlFor="booking-email">{isArabic ? "البريد الإلكتروني (اختياري)" : "Email (optional)"}</Label><Input id="booking-email" type="email" value={form.email} onChange={(event) => setField("email", event.target.value)} maxLength={BOOKING_INPUT_LIMITS.email} autoComplete="email" /></div>
                       ) : null}
-                      <div className="space-y-2"><Label htmlFor="booking-complaint">{isArabic ? "سبب الزيارة باختصار (اختياري)" : "Short reason for visit (optional)"}</Label><Textarea id="booking-complaint" value={form.complaint} onChange={(event) => setField("complaint", event.target.value)} rows={3} /></div>
+                      {/* Capped only on the guest path: `patient_portal_create_booking`
+                          raises no length error at all, so a cap there would refuse a
+                          reason that books successfully today. */}
+                      <div className="space-y-2"><Label htmlFor="booking-complaint">{isArabic ? "سبب الزيارة باختصار (اختياري)" : "Short reason for visit (optional)"}</Label><Textarea id="booking-complaint" value={form.complaint} onChange={(event) => setField("complaint", event.target.value)} maxLength={isPortalPatient ? undefined : BOOKING_INPUT_LIMITS.complaint} rows={3} /></div>
                       <div className="rounded-xl bg-muted/60 p-4 text-xs leading-5 text-muted-foreground"><ShieldCheck className="mb-1 inline-block size-4 text-primary" /> {isArabic ? "نستخدم بياناتك لتنسيق الموعد والتواصل بشأنه فقط." : "We use your details only to coordinate and communicate about this appointment."}</div>
                       <Button type="submit" className="w-full" disabled={submitting}>{submitting ? (isArabic ? "جارٍ تأكيد الحجز…" : "Confirming booking…") : (isArabic ? "تأكيد الحجز" : "Confirm booking")}</Button>
                     </form>

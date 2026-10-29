@@ -17,6 +17,7 @@ import { TablePager } from "@/components/TablePager";
 import { ListSkeleton } from "@/components/ListSkeleton";
 import { Can } from "@/components/Can";
 import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
+import { enumCopy, PAYMENT_METHOD_KEY } from "@/lib/enumKeys";
 
 const PAGE_SIZE = 50;
 
@@ -130,7 +131,7 @@ export default function Payments() {
               const nameDirection = patientDisplayDirection(pt, lang);
               const ms = methodStyle(p.payment_method);
               const MIcon = ms.Icon;
-              const methodLabel = (t(p.payment_method as any) as string) ?? p.payment_method;
+              const methodLabel = enumCopy(PAYMENT_METHOD_KEY, p.payment_method, t);
               return (
                 <div key={p.id} className="flex items-center gap-4 p-4 hover:bg-muted/30 transition-colors">
                   <div className={`size-11 rounded-lg flex items-center justify-center ${ms.icon}`}>

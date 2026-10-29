@@ -6,11 +6,22 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useI18n } from "@/contexts/I18nContext";
 import { hasPersistedAuthSession, persistAuthSessionForPreview } from "@/lib/authSessionPersistence";
+import { reportAuthFailure } from "@/lib/authFailureTelemetry";
 
 const AUTH_DEBUG_PREFIX = "[auth-debug]";
 
 // How long the confirmation stays on screen before the portal handoff.
 const CONFIRMATION_DWELL_MS = 1400;
+
+/**
+ * Which of two sentences the desk gets. P5: this screen used to render whatever
+ * the provider or the URL handed it, so an Arabic patient read English
+ * Postgres/GoTrue text they could not act on, and a link containing
+ * `?error_description=…` printed the sender's words inside the clinic's own card.
+ * The technical detail is not lost — it goes to `reportAuthFailure`, which
+ * forwards a registered code and nothing else.
+ */
+type CallbackFailure = "link" | "connection";
 
 function safeRedirectPath(value?: string | null) {
   if (!value) return "/";
@@ -29,11 +40,14 @@ function safeRedirectPath(value?: string | null) {
 }
 
 export default function AuthCallback() {
-  const { lang } = useI18n();
+  const { lang, t } = useI18n();
   const nav = useNavigate();
   const location = useLocation();
-  const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<CallbackFailure | null>(null);
   const [confirmed, setConfirmed] = useState<{ message: string; next: string } | null>(null);
+  // Whichever desk a failed link goes back to is the one that can help: a patient bounced
+  // to the staff sign-in form cannot ask for a new invitation from there.
+  const [desk, setDesk] = useState("/auth");
 
   useEffect(() => {
     let cancelled = false;
@@ -48,6 +62,7 @@ export default function AuthCallback() {
       const redirectType = params.get("type") || hashParams.get("type");
       const providerError = params.get("error_description") || hashParams.get("error_description") || params.get("error") || hashParams.get("error");
       const next = safeRedirectPath(params.get("next") || hashParams.get("next") || "/");
+      setDesk(next.startsWith("/patient-portal") ? "/patient-portal/login" : "/auth");
 
       console.info(AUTH_DEBUG_PREFIX, "callback redirect received", {
         // The query is not logged: on the PKCE flow it carries the live single-use `?code=`.
@@ -60,8 +75,10 @@ export default function AuthCallback() {
       });
 
       if (providerError) {
-        if (!cancelled) setError(providerError);
-        console.warn(AUTH_DEBUG_PREFIX, "callback provider error", { error: providerError });
+        // The text is URL-supplied, so it is never rendered and never logged: `hasProviderError`
+        // is already in the line above, which is the part an operator can act on.
+        reportAuthFailure("callback-provider-error", "rejected");
+        if (!cancelled) setFailure("link");
         return;
       }
 
@@ -71,10 +88,11 @@ export default function AuthCallback() {
         console.info(AUTH_DEBUG_PREFIX, "callback code exchange completed", {
           hasSession: Boolean(data.session),
           hasUser: Boolean(data.session?.user),
-          error: error?.message ?? null,
+          code: error?.code ?? null,
         });
         if (error) {
-          if (!cancelled) setError(error.message);
+          reportAuthFailure("callback-code-exchange", "rejected", error);
+          if (!cancelled) setFailure("link");
           return;
         }
       }
@@ -85,10 +103,11 @@ export default function AuthCallback() {
         console.info(AUTH_DEBUG_PREFIX, "callback invite token verification completed", {
           hasSession: Boolean(data.session),
           hasUser: Boolean(data.user),
-          error: error?.message ?? null,
+          code: error?.code ?? null,
         });
         if (error) {
-          if (!cancelled) setError(error.message);
+          reportAuthFailure("callback-token-verify", "rejected", error);
+          if (!cancelled) setFailure("link");
           return;
         }
       }
@@ -104,10 +123,11 @@ export default function AuthCallback() {
         console.info(AUTH_DEBUG_PREFIX, "callback hash token session completed", {
           hasSession: Boolean(data.session),
           hasUser: Boolean(data.session?.user),
-          error: error?.message ?? null,
+          code: error?.code ?? null,
         });
         if (error) {
-          if (!cancelled) setError(error.message);
+          reportAuthFailure("callback-session-restore", "rejected", error);
+          if (!cancelled) setFailure("link");
           return;
         }
       }
@@ -117,14 +137,22 @@ export default function AuthCallback() {
       console.info(AUTH_DEBUG_PREFIX, "callback redirect completion", {
         hasSession: Boolean(data.session),
         hasUser: Boolean(data.session?.user),
-        error: error?.message ?? null,
+        code: error?.code ?? null,
         next,
         hasStoredToken: hasPersistedAuthSession(),
       });
 
       if (cancelled) return;
-      if (error || !data.session) {
-        setError(error?.message ?? (lang === "ar" ? "لم تكتمل جلسة تسجيل الدخول." : "Sign-in session was not completed."));
+      // A rejected completion call is the provider refusing to answer, which a retry can fix;
+      // an answered call with no session is the link having nothing left to give.
+      if (error) {
+        reportAuthFailure("callback-completion", "rejected", error);
+        setFailure("connection");
+        return;
+      }
+      if (!data.session) {
+        reportAuthFailure("callback-completion", "identity-mismatch");
+        setFailure("link");
         return;
       }
 
@@ -157,7 +185,12 @@ export default function AuthCallback() {
       }, CONFIRMATION_DWELL_MS);
     };
 
-    void completeCallback();
+    // A thrown provider call used to reject this promise silently: the card stayed on
+    // "Completing sign-in" forever, which is the same no-forward-path state P5 is about.
+    void completeCallback().catch(() => {
+      reportAuthFailure("callback-transport", "transport");
+      if (!cancelled) setFailure("connection");
+    });
 
     return () => {
       cancelled = true;
@@ -168,11 +201,11 @@ export default function AuthCallback() {
   return (
     <main className="min-h-dvh flex items-center justify-center bg-background p-6">
       <Card className="w-full max-w-md p-6 text-center shadow-elegant border-border/60">
-        {error ? (
+        {failure ? (
           <div className="space-y-4">
             <h1 className="text-xl font-bold">{lang === "ar" ? "تعذر إكمال تسجيل الدخول" : "Sign-in could not be completed"}</h1>
-            <p className="text-sm text-muted-foreground">{error}</p>
-            <Button onClick={() => nav("/auth", { replace: true })}>{lang === "ar" ? "العودة لتسجيل الدخول" : "Back to sign in"}</Button>
+            <p className="text-sm text-muted-foreground">{failure === "link" ? t("callbackLinkFailed") : t("callbackTryAgain")}</p>
+            <Button onClick={() => nav(desk, { replace: true })}>{t("backToSignIn")}</Button>
           </div>
         ) : confirmed ? (
           <div className="space-y-4">

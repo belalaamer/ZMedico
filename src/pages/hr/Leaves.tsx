@@ -14,6 +14,7 @@ import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/format";
+import { STATUS_KEY_BY_LEAVE_REQUEST_STATUS, enumCopy } from "@/lib/enumKeys";
 import { Can } from "@/components/Can";
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 
@@ -171,7 +172,7 @@ export default function Leaves() {
                   {l.reason_en && <div className="text-xs text-muted-foreground mt-1">{l.reason_en}</div>}
                 </div>
                 <Badge variant="outline">{l.total_days} {t("totalDays")}</Badge>
-                <Badge variant="outline" className={l.status === "approved" ? "status-completed" : l.status === "rejected" ? "status-departed" : ""}>{t(`status${l.status.charAt(0).toUpperCase()}${l.status.slice(1)}` as any)}</Badge>
+                <Badge variant="outline" className={l.status === "approved" ? "status-completed" : l.status === "rejected" ? "status-departed" : ""}>{enumCopy(STATUS_KEY_BY_LEAVE_REQUEST_STATUS, l.status, t)}</Badge>
                 {l.status === "pending" && (
                   <Can permission="hr.edit">
                     <div className="flex items-center gap-1">

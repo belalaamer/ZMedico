@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
+import { enumLabel } from "@/lib/enumLabels";
 import { useBranch } from "@/contexts/BranchContext";
 import { formatMoney, formatDateTime } from "@/lib/format";
 import { patientDisplayName } from "@/lib/patientName";
@@ -90,7 +91,7 @@ function ApptsTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
           <TableRow key={r.id}>
             <TableCell>{formatDateTime(r.scheduled_at, lang)}</TableCell>
             <TableCell>{patientDisplayName(r.patients, lang)}</TableCell>
-            <TableCell><span className="text-xs px-2 py-0.5 rounded bg-muted">{r.status}</span></TableCell>
+            <TableCell><span className="text-xs px-2 py-0.5 rounded bg-muted">{enumLabel("appointment_status", r.status, lang)}</span></TableCell>
           </TableRow>
         ))}{!rows.length && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">{t("noData")}</TableCell></TableRow>}</TableBody></Table>
       </CardContent></Card>

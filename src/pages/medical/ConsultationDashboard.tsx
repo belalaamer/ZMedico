@@ -12,6 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useI18n } from "@/contexts/I18nContext";
+import { enumLabel } from "@/lib/enumLabels";
+import { documentTypeLabel, visitTypeLabel } from "@/lib/enumKeys";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -29,7 +31,7 @@ function calcAge(dob?: string | null) {
 
 export default function ConsultationDashboard() {
   const { recordId } = useParams();
-  const { lang } = useI18n();
+  const { lang, t } = useI18n();
   const { user } = useAuth();
   const nav = useNavigate();
   const isAr = lang === "ar";
@@ -210,8 +212,8 @@ export default function ConsultationDashboard() {
           <Link to="/medical/records"><ArrowLeft className="me-2 size-4"/>{T("Back to records", "العودة للسجلات")}</Link>
         </Button>
         <div className="flex items-center gap-2">
-          <Badge variant="outline">{record.visit_type}</Badge>
-          <Badge variant="outline">{record.status}</Badge>
+          <Badge variant="outline">{visitTypeLabel(record.visit_type, t)}</Badge>
+          <Badge variant="outline">{enumLabel("medical_record_status", record.status, lang)}</Badge>
           <Button asChild variant="outline" size="sm">
             <Link to={`/medical/records/${record.id}`}><FileText className="me-2 size-4"/>{T("Open full record", "السجل الكامل")}</Link>
           </Button>
@@ -229,7 +231,7 @@ export default function ConsultationDashboard() {
             <div className="text-xs text-muted-foreground">
               #{patient.patient_code}
               {age != null && <> · {age} {T("y/o", "سنة")}</>}
-              {patient.gender && <> · {patient.gender}</>}
+              {patient.gender && <> · {enumLabel("gender", patient.gender, lang)}</>}
               {patient.phone && <> · {patient.phone}</>}
             </div>
             <div className="text-xs text-muted-foreground mt-0.5">
@@ -401,7 +403,7 @@ export default function ConsultationDashboard() {
               {thisRx.map((r) => (
                 <li key={r.id} className="py-1.5 flex items-center gap-2">
                   <Pill className="size-3.5 text-primary"/>
-                  <span className="flex-1">{formatDate(r.prescription_date ?? r.created_at, lang)} · {r.status}</span>
+                  <span className="flex-1">{formatDate(r.prescription_date ?? r.created_at, lang)} · {enumLabel("prescription_status", r.status, lang)}</span>
                   <Button asChild variant="ghost" size="sm">
                     <Link to={`/medical/prescriptions/${r.id}`}><Printer className="me-1 size-3.5"/>{T("Open / Print", "فتح / طباعة")}</Link>
                   </Button>
@@ -419,7 +421,7 @@ export default function ConsultationDashboard() {
                 <li key={d.id} className="py-1.5 flex items-center gap-2">
                   <FileText className="size-3.5 text-primary"/>
                   <span className="flex-1 truncate">{isAr ? d.title_ar : d.title_en}</span>
-                  <Badge variant="outline" className="text-[10px]">{d.document_type}</Badge>
+                  <Badge variant="outline" className="text-[10px]">{documentTypeLabel(d.document_type, t)}</Badge>
                 </li>
               ))}
             </ul>

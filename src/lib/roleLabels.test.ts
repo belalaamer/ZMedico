@@ -7,6 +7,7 @@ describe("role labels", () => {
     expect(roleLabel("admin", "ar")).toBe("مسؤول العيادة");
     expect(roleLabel("system_owner", "en")).toBe("System Owner");
     expect(roleLabel("admin", "en")).toBe("Clinic Admin");
+    expect(roleLabel("staff", "ar")).toBe("موظف");
   });
 
   it("keeps unknown roles visible instead of silently relabeling them", () => {

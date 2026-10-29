@@ -22,6 +22,7 @@ import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { supabase } from "@/integrations/supabase/client";
 import { formatMoney, formatDate, formatDateTime } from "@/lib/format";
 import { localDateOnly } from "@/lib/localDate";
+import { STATUS_KEY_BY_APPOINTMENT_STATUS, enumCopy } from "@/lib/enumKeys";
 import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
 
 type ApptStatus = "scheduled" | "confirmed" | "in_progress" | "completed" | "cancelled" | "no_show" | "departed";
@@ -908,7 +909,7 @@ export default function Dashboard() {
                       </div>
                       <div className="text-end shrink-0">
                         <div className="text-xs text-muted-foreground">{formatDateTime(a.scheduled_at, lang)}</div>
-                        <Badge variant="outline" className="text-[10px] mt-1">{t(`status${a.status?.charAt(0).toUpperCase() + a.status?.slice(1).replace(/_(.)/g, (_: any, c: string) => c.toUpperCase())}` as any) ?? a.status}</Badge>
+                        <Badge variant="outline" className="text-[10px] mt-1">{enumCopy(STATUS_KEY_BY_APPOINTMENT_STATUS, a.status, t)}</Badge>
                       </div>
                     </li>
                   ))}

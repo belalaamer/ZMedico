@@ -23,27 +23,8 @@ import { doctorDisplayName } from "@/lib/doctorName";
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { logPhiAccess } from "@/lib/observability/phiAudit";
+import { enumLabel } from "@/lib/enumLabels";
 import { localDateOnly } from "@/lib/localDate";
-
-// Arabic-only labels with an English fallback, the shape PhysioCases.tsx uses, so
-// the English desk is untouched and no enum reaches an Arabic screen raw.
-function enumLabel(lang: string, map: Record<string, string>, value: string) {
-  return lang === "ar" ? (map[value] ?? value) : value;
-}
-
-const CASE_STATUS_AR: Record<string, string> = {
-  active: "نشطة", completed: "مكتملة", paused: "متوقفة", cancelled: "ملغاة",
-};
-const ATTENDANCE_AR: Record<string, string> = {
-  scheduled: "مجدولة", done: "تمت", missed: "لم تحضر", cancelled: "ملغاة",
-};
-const TREND_AR: Record<string, string> = {
-  improving: "في تحسن", unchanged: "بدون تغيير", worsening: "في تدهور",
-};
-const APPT_STATUS_AR: Record<string, string> = {
-  scheduled: "مجدول", confirmed: "مؤكد", in_progress: "جارٍ", completed: "مكتمل",
-  cancelled: "ملغي", no_show: "لم يحضر", departed: "غادر",
-};
 
 export default function PhysioCaseDetail() {
   const { id } = useParams();
@@ -131,10 +112,10 @@ export default function PhysioCaseDetail() {
 
   const patientName = (p: any) => patientDisplayName(p, lang);
 
-  const statusLabel = (s: string) => enumLabel(lang, CASE_STATUS_AR, s);
-  const attendanceLabel = (s: string) => enumLabel(lang, ATTENDANCE_AR, s);
-  const trendLabel = (s: string) => enumLabel(lang, TREND_AR, s);
-  const appointmentStatusLabel = (s: string) => enumLabel(lang, APPT_STATUS_AR, s);
+  const statusLabel = (s: string) => enumLabel("physio_case_status", s, lang);
+  const attendanceLabel = (s: string) => enumLabel("physio_attendance", s, lang);
+  const trendLabel = (s: string) => enumLabel("physio_trend", s, lang);
+  const appointmentStatusLabel = (s: string) => enumLabel("appointment_status", s, lang);
 
   const done = sessions.filter(s => s.attendance === "done").length;
   const remaining = Math.max(0, (c?.expected_sessions ?? 0) - done);
@@ -687,7 +668,7 @@ function SessionDialog({ open, setOpen, caseId, nextNumber, defaultTherapistId, 
                     <SelectContent>
                       <SelectItem value="_none">{lang === "ar" ? "— بدون موعد —" : "— Standalone —"}</SelectItem>
                       {(appointments ?? []).slice(0, 50).map((a: any) => (
-                        <SelectItem key={a.id} value={a.id}>{formatDateTime(a.scheduled_at, lang)} · {enumLabel(lang, APPT_STATUS_AR, a.status)}</SelectItem>
+                        <SelectItem key={a.id} value={a.id}>{formatDateTime(a.scheduled_at, lang)} · {enumLabel("appointment_status", a.status, lang)}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

@@ -15,6 +15,9 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useI18n } from "@/contexts/I18nContext";
+import { enumLabel } from "@/lib/enumLabels";
+import { documentTypeLabel, enumCopy, GENDER_KEY, visitTypeLabel } from "@/lib/enumKeys";
+import type { DictKey } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -161,7 +164,7 @@ export default function MedicalRecordEditor() {
           <Button asChild variant="outline" size="sm">
             <Link to={`/medical/consultation/${record.id}`}>{lang === "ar" ? "عرض الاستشارة" : "Consultation view"}</Link>
           </Button>
-          <Badge variant="outline">{t(("visit_" + record.visit_type) as any) ?? record.visit_type}</Badge>
+          <Badge variant="outline">{visitTypeLabel(record.visit_type, t)}</Badge>
           <Badge variant="outline" className={record.status === "completed" ? "status-completed" : record.status === "reviewed" ? "status-progress" : "status-cancelled"}>
             {record.status === "draft" ? t("statusDraft") : record.status === "completed" ? t("statusCompleted") : t("statusReviewed")}
           </Badge>
@@ -178,7 +181,7 @@ export default function MedicalRecordEditor() {
             <Link to={`/patients/${patient.id}`} className="font-bold text-lg hover:underline" dir={patientDirection}>{patientName}</Link>
             <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-1 mt-1">
               {age != null && <span>{age} {t("yearsOld")}</span>}
-              {patient.gender && <span>{t(patient.gender as any)}</span>}
+              {patient.gender && <span>{enumCopy(GENDER_KEY, patient.gender, t)}</span>}
               {patient.phone && <span>{patient.phone}</span>}
             </div>
           </div>
@@ -346,7 +349,7 @@ function VitalsTab({ record, patient, vitals, userId, reload }: any) {
     return w > 0 && h > 0 ? +((w / Math.pow(h/100, 2)).toFixed(2)) : null;
   }, [form.weight, form.height]);
 
-  const fields: Array<[string, string, string, string]> = [
+  const fields: Array<[DictKey, string, string, string]> = [
     ["bloodPressure", "blood_pressure_systolic", "mmHg", "/ blood_pressure_diastolic"],
     ["heartRate", "heart_rate", "bpm", ""],
     ["temperature", "temperature", "°C", ""],
@@ -388,7 +391,7 @@ function VitalsTab({ record, patient, vitals, userId, reload }: any) {
           </div>
           {fields.slice(1).map(([key, prop, unit]) => (
             <div key={prop} className="space-y-1.5">
-              <Label>{t(key as any)} <span className="text-xs text-muted-foreground">({unit})</span></Label>
+              <Label>{t(key)} <span className="text-xs text-muted-foreground">({unit})</span></Label>
               <Input type="number" step="any" value={(form as any)[prop]} onChange={(e) => setForm({ ...form, [prop]: e.target.value } as any)}/>
               {previous?.[prop] != null && <div className="text-xs text-muted-foreground">{t("previousValue")}: {previous[prop]}</div>}
             </div>
@@ -936,7 +939,7 @@ function DocumentsTab({ record, patient, docs, reload, userId }: any) {
               <div className="size-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center"><FileText className="size-5"/></div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium truncate">{lang === "ar" ? d.title_ar : d.title_en}</div>
-                <div className="text-xs text-muted-foreground truncate">{t(("doc" + d.document_type.replace(/_/g, "").replace(/(^.)/, (c: string) => c.toUpperCase())) as any) ?? d.document_type}</div>
+                <div className="text-xs text-muted-foreground truncate">{documentTypeLabel(d.document_type, t)}</div>
               </div>
               <Button variant="ghost" size="icon" onClick={() => openDoc(d.file_url)}><Upload className="size-4 rotate-180"/></Button>
               <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(d)}><Trash2 className="size-4 text-destructive"/></Button>
@@ -1041,7 +1044,7 @@ function InvoicePreviewTab({ record, patient, procs, nav, userId }: any) {
                   <tr key={inv.id} className="border-t border-border hover:bg-muted/30 cursor-pointer" onClick={() => nav(`/invoices/${inv.id}`)}>
                     <td className="p-2 font-medium">{inv.invoice_number}</td>
                     <td className="p-2">{formatDate(inv.invoice_date, lang)}</td>
-                    <td className="p-2"><Badge variant="outline">{inv.status}</Badge></td>
+                    <td className="p-2"><Badge variant="outline">{enumLabel("invoice_status", inv.status, lang)}</Badge></td>
                     <td className="p-2 text-end tabular-nums">{formatMoney(inv.total, lang)}</td>
                     <td className="p-2 text-end tabular-nums">{formatMoney(inv.paid_amount, lang)}</td>
                   </tr>
@@ -1060,7 +1063,7 @@ function InvoicePreviewTab({ record, patient, procs, nav, userId }: any) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-muted/40 text-xs uppercase">
-              <tr><th className="p-2 text-start">{t("procedure")}</th><th className="p-2 text-end">{t("qty")}</th><th className="p-2 text-end">{t("price")}</th><th className="p-2 text-end">{t("totals" as any) ?? "Total"}</th></tr>
+              <tr><th className="p-2 text-start">{t("procedure")}</th><th className="p-2 text-end">{t("qty")}</th><th className="p-2 text-end">{t("price")}</th><th className="p-2 text-end">{t("total")}</th></tr>
             </thead>
             <tbody>
               {items.map((rp: any) => (
@@ -1071,7 +1074,7 @@ function InvoicePreviewTab({ record, patient, procs, nav, userId }: any) {
                   <td className="p-2 text-end tabular-nums font-semibold">{formatMoney(rp.procedures.default_price * rp.quantity, lang)}</td>
                 </tr>
               ))}
-              <tr className="border-t border-border"><td colSpan={3} className="p-2 text-end font-semibold">{t("totals" as any) ?? "Total"}</td><td className="p-2 text-end font-bold tabular-nums">{formatMoney(total, lang)}</td></tr>
+              <tr className="border-t border-border"><td colSpan={3} className="p-2 text-end font-semibold">{t("total")}</td><td className="p-2 text-end font-bold tabular-nums">{formatMoney(total, lang)}</td></tr>
             </tbody>
           </table>
         </div>

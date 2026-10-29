@@ -4,6 +4,8 @@ import { Stethoscope, FileText, Pill, Activity } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/contexts/I18nContext";
+import type { DictKey } from "@/lib/i18n";
+import { visitTypeLabel } from "@/lib/enumKeys";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDateTime } from "@/lib/format";
 
@@ -14,6 +16,16 @@ type Item = {
   title: string;
   subtitle?: string;
   href?: string;
+};
+
+// Named keys, not "item" + the kind: the concatenation only compiles because of
+// its `as any`, and a fourth kind added to `Item` would print `itemTherapy`
+// rather than fail the build. Typed here, a missing word is a compile error.
+const ITEM_KIND_KEY: Record<Item["kind"], DictKey> = {
+  visit: "itemVisit",
+  diagnosis: "itemDiagnosis",
+  prescription: "itemPrescription",
+  procedure: "itemProcedure",
 };
 
 export default function PatientTimeline({ patientId }: { patientId: string }) {
@@ -52,7 +64,7 @@ export default function PatientTimeline({ patientId }: { patientId: string }) {
             const meaningful = raw && !/^\d+(\.\d+)?$/.test(raw) && raw.length >= 3;
             return meaningful ? raw : t("consultation");
           })(),
-          subtitle: v.medical_specialties ? (lang === "ar" ? v.medical_specialties.name_ar : v.medical_specialties.name_en) : t(("visit_" + v.visit_type) as any) ?? v.visit_type,
+          subtitle: v.medical_specialties ? (lang === "ar" ? v.medical_specialties.name_ar : v.medical_specialties.name_en) : visitTypeLabel(v.visit_type, t),
           href: `/medical/records/${v.id}`,
         });
         (v.record_diagnoses ?? []).forEach((rd: any) => {
@@ -111,7 +123,7 @@ export default function PatientTimeline({ patientId }: { patientId: string }) {
               <div className="flex items-start gap-2 flex-wrap">
                 <Badge variant="outline" className={`flex items-center gap-1 ${badgeClass(it.kind)}`}>
                   {iconFor(it.kind)}
-                  <span>{t(("item" + cap(it.kind)) as any)}</span>
+                  <span>{t(ITEM_KIND_KEY[it.kind])}</span>
                 </Badge>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">{it.title}</div>
@@ -127,7 +139,6 @@ export default function PatientTimeline({ patientId }: { patientId: string }) {
   );
 }
 
-function cap(s: string) { return s[0].toUpperCase() + s.slice(1); }
 function iconFor(kind: Item["kind"]) {
   if (kind === "visit") return <FileText className="size-3" />;
   if (kind === "diagnosis") return <Stethoscope className="size-3" />;

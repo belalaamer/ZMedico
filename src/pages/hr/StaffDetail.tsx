@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
+import { enumLabel } from "@/lib/enumLabels";
 import { formatMoney, formatDate } from "@/lib/format";
 import { statusLabel } from "./Staff";
 import StaffBranchesTab from "./StaffBranchesTab";
@@ -221,7 +222,7 @@ export default function StaffDetail() {
         <TabsContent value="info">
           <Card className="p-5 shadow-card grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <Field label={t("hireDate")}>{formatDate(staff.hire_date, lang)}</Field>
-            <Field label={t("contractType")}>{staff.contract_type}</Field>
+            <Field label={t("contractType")}>{enumLabel("contract_type", staff.contract_type, lang)}</Field>
             <Field label={t("salary")}>{canSeeSensitive ? formatMoney(staff.salary, lang, staff.salary_currency) : MASK}</Field>
             <Field label={t("commissionPercent")}>{canSeeSensitive ? `${Number(staff.commission_percent ?? 0).toFixed(2)}%` : MASK}</Field>
             <Field label={t("weeklyHours")}>{staff.working_hours_per_week}</Field>
@@ -243,7 +244,7 @@ export default function StaffDetail() {
                 const slot = schedule.find((s) => s.day_of_week === i);
                 return (
                   <div key={d} className="border rounded-lg p-3">
-                    <div className="font-semibold text-xs">{t(d as any)}</div>
+                    <div className="font-semibold text-xs">{t(d)}</div>
                     {slot && slot.is_working_day ? (
                       <div className="mt-1 text-xs">{slot.start_time?.slice(0,5)} – {slot.end_time?.slice(0,5)}</div>
                     ) : <div className="mt-1 text-xs text-muted-foreground">{t("off")}</div>}
@@ -262,7 +263,7 @@ export default function StaffDetail() {
                     <div className="flex-1">{formatDate(a.date, lang)}</div>
                     <div className="text-xs text-muted-foreground">{a.check_in_time ?? "—"} → {a.check_out_time ?? "—"}</div>
                     <Badge variant="outline">{a.working_hours} {t("workingHours")}</Badge>
-                    <Badge variant="outline">{a.status}</Badge>
+                    <Badge variant="outline">{enumLabel("attendance_status", a.status, lang)}</Badge>
                   </div>
                 ))}
               </div>
@@ -278,7 +279,7 @@ export default function StaffDetail() {
                     <div className="flex-1">{lang === "ar" ? l.leave_type?.name_ar : l.leave_type?.name_en}</div>
                     <div className="text-xs text-muted-foreground">{formatDate(l.start_date, lang)} → {formatDate(l.end_date, lang)}</div>
                     <Badge variant="outline">{l.total_days} {t("totalDays")}</Badge>
-                    <Badge variant="outline">{l.status}</Badge>
+                    <Badge variant="outline">{enumLabel("leave_request_status", l.status, lang)}</Badge>
                   </div>
                 ))}
               </div>
@@ -294,7 +295,7 @@ export default function StaffDetail() {
                     <div className="flex-1">{p.period_year}-{String(p.period_month).padStart(2,"0")}</div>
                     <div className="text-xs text-muted-foreground">{t("baseSalary")}: {formatMoney(p.base_salary, lang)}</div>
                     <Badge variant="outline">{formatMoney(p.net_salary, lang)}</Badge>
-                    <Badge variant="outline">{p.status}</Badge>
+                    <Badge variant="outline">{enumLabel("payroll_status", p.status, lang)}</Badge>
                   </div>
                 ))}
               </div>

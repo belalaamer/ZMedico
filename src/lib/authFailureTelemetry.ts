@@ -8,7 +8,11 @@ const safeCodes = new Set([
 
 /** Never forward Auth messages, tokens, response bodies, passwords or email addresses. */
 export function reportAuthFailure(
-  operation: "verify-recovery" | "update-password" | "signout-after-password" | "send-recovery-link" | "patient-portal-login" | "patient-portal-password" | "patient-portal-activation",
+  operation:
+    | "verify-recovery" | "update-password" | "signout-after-password" | "send-recovery-link"
+    | "patient-portal-login" | "patient-portal-password" | "patient-portal-activation"
+    | "callback-provider-error" | "callback-code-exchange" | "callback-token-verify"
+    | "callback-session-restore" | "callback-completion" | "callback-transport",
   outcome: "rejected" | "transport" | "identity-mismatch",
   error?: unknown,
 ) {

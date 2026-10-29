@@ -17,6 +17,7 @@ import { Can } from "@/components/Can";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney, formatDateTime } from "@/lib/format";
+import { WALLET_TX_TYPE_KEY } from "@/lib/enumKeys";
 import { localDateOnly } from "@/lib/localDate";
 
 type Tx = {
@@ -33,15 +34,6 @@ type Tx = {
 };
 
 type TopupMethod = "cash" | "card" | "bank_transfer" | "insurance";
-
-const typeKey: Record<Tx["tx_type"], string> = {
-  topup: "txTopup",
-  spend: "txSpend",
-  refund: "txRefund",
-  referral_reward: "txReferralReward",
-  adjustment_credit: "txAdjustmentCredit",
-  adjustment_debit: "txAdjustmentDebit",
-};
 
 const typeClass: Record<Tx["tx_type"], string> = {
   topup: "bg-success/10 text-success border-success/20",
@@ -125,7 +117,7 @@ export default function PatientWalletTab({ patientId }: { patientId: string }) {
                 <div key={tx.id} className="flex items-center gap-4 p-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Badge variant="outline" className={typeClass[tx.tx_type]}>{t(typeKey[tx.tx_type] as any)}</Badge>
+                      <Badge variant="outline" className={typeClass[tx.tx_type]}>{t(WALLET_TX_TYPE_KEY[tx.tx_type])}</Badge>
                       {tx.reference_type && (
                         <span className="text-xs text-muted-foreground">{tx.reference_type}</span>
                       )}

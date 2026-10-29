@@ -166,7 +166,7 @@ export default function GeneralSettings() {
               <div><Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">{t("email")}</Label><Input value={form.email ?? ""} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
               <div className="md:col-span-2"><Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">{t("address")} (AR)</Label><Textarea dir="rtl" value={form.address_ar ?? ""} onChange={e => setForm({ ...form, address_ar: e.target.value })} /></div>
               <div><Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">{t("city")}</Label><Input value={form.city ?? ""} onChange={e => setForm({ ...form, city: e.target.value })} /></div>
-              <div><Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">Country</Label><Input value={form.country ?? ""} onChange={e => setForm({ ...form, country: e.target.value })} /></div>
+              <div><Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">{lang === "ar" ? "الدولة" : "Country"}</Label><Input value={form.country ?? ""} onChange={e => setForm({ ...form, country: e.target.value })} /></div>
             </div>
           </CardContent>
         </Card>

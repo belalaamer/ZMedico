@@ -586,7 +586,10 @@ export default function PublicBooking() {
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,hsl(var(--primary)/0.15),transparent_36%),linear-gradient(180deg,hsl(var(--muted)/0.45),hsl(var(--background)))] px-4 py-6 md:px-8 md:py-10" dir={isArabic ? "rtl" : "ltr"}>
       <div className="mx-auto max-w-5xl">
-        <header className="mb-8 flex items-start justify-between gap-4">
+        {/* The language button is `shrink-0`, so an unwrapping row lets any font
+            wider than Inter push it past the screen: CI measured it at 320 px
+            before the web font swapped in, and the header spilled 25 px. */}
+        <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/80 px-3 py-1 text-xs font-semibold text-primary shadow-sm">
               <ShieldCheck className="size-3.5" />

@@ -44,17 +44,25 @@ jobs:
       - name: Install Playwright Chromium
         run: bunx playwright install --with-deps chromium
 
-      - name: Start app for public mobile smoke
+      # This step used to serve `bun run dev`, which is not the artifact deploy.yml
+      # publishes. On 2026-10-29 the rollup merge (#236) passed all 52 smoke tests
+      # against the dev server and then failed `every booking step fits the screen
+      # edge to edge (en)` against `bun run preview` on the same commit: the dev
+      # server takes ~700 ms longer to paint, the web font swaps in during that
+      # window, and the Inter metrics fit 320 px while the pre-swap fallback metrics
+      # do not. A gate that runs against a different artifact than the one that
+      # ships cannot see that class of defect, so CI now serves the build itself.
+      - name: Start the built app for public mobile smoke
         shell: bash
         run: |
-          bun run dev -- --host 127.0.0.1 --port 8080 > /tmp/zmedico-vite.log 2>&1 &
+          bun run preview --host 127.0.0.1 --port 8080 > /tmp/zmedico-preview.log 2>&1 &
           for i in {1..30}; do
             if curl -fsS http://127.0.0.1:8080/ >/dev/null; then
               exit 0
             fi
             sleep 1
           done
-          cat /tmp/zmedico-vite.log
+          cat /tmp/zmedico-preview.log
           exit 1
 
       # 360 is here because the booking step indicator was audited at 360 px and

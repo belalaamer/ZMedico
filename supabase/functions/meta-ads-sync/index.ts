@@ -5,6 +5,7 @@
 // admin/system_owner JWT + branch access, AES-GCM token at rest, Graph v20.0.
 // Nothing is ever written back to Meta by this function.
 import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2";
+import { InactiveSessionError, requireActiveSessionOrThrow } from "../_shared/active-session.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -99,6 +100,7 @@ async function requireAdmin(req: Request): Promise<{ userClient: SupabaseClient;
   const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authorization } } });
   const { data: authData, error: authError } = await userClient.auth.getUser();
   if (authError || !authData.user) throw new Error("Authentication required");
+  await requireActiveSessionOrThrow(userClient);
   const { data: roles, error: roleError } = await userClient.from("user_roles").select("role").eq("user_id", authData.user.id).limit(10);
   if (roleError) throw new Error("Unable to verify permissions");
   const allowed = (roles ?? []).some((row) => row.role === "admin" || row.role === "system_owner" || row.role === "manager");
@@ -367,6 +369,6 @@ Deno.serve(async (req) => {
       audit_run_recorded: !runError,
     });
   } catch (error) {
-    return jsonResponse({ error: errorMessage(error) }, 400);
+    return jsonResponse({ error: errorMessage(error) }, error instanceof InactiveSessionError ? error.status : 400);
   }
 });

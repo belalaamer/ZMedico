@@ -95,6 +95,29 @@ jobs:
             --project=admin-desktop \
             --project=admin-mobile
 
+      # These two smoke steps are the only gate between a merge and `Deploy`,
+      # and until now a red one left nothing behind: run 40879482498 failed the
+      # admin /calendar assertion and the only evidence was the step stdout,
+      # which holds neither the Playwright screenshot nor the vite preview log
+      # needed to tell a render bug from a font-metrics race.
+      - name: Collect smoke failure evidence
+        if: failure()
+        run: |
+          mkdir -p test-results
+          cp /tmp/zmedico-preview.log test-results/vite-preview.log 2>/dev/null || true
+          cp /tmp/zmedico-auth-preview.log test-results/vite-auth-preview.log 2>/dev/null || true
+
+      - name: Upload smoke failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-smoke-failures-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Verify build output
         run: |
           test -f dist/index.html || { echo "dist/index.html missing"; exit 1; }

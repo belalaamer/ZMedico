@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useI18n } from "@/contexts/I18nContext";
+import type { DictKey } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -84,7 +85,7 @@ export default function PatientMedicalTab({ patientId }: { patientId: string }) 
         <h3 className="font-semibold mb-3 flex items-center gap-2"><Activity className="size-4"/>{t("latestVitals")}</h3>
         {!vitals ? <div className="text-sm text-muted-foreground">{t("noVitals")}</div> : (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center text-sm">
-            {[
+            {([
               ["bloodPressure", vitals.blood_pressure_systolic ? `${vitals.blood_pressure_systolic}/${vitals.blood_pressure_diastolic}` : "—"],
               ["heartRate", vitals.heart_rate ?? "—"],
               ["temperature", vitals.temperature ?? "—"],
@@ -93,10 +94,10 @@ export default function PatientMedicalTab({ patientId }: { patientId: string }) 
               ["height", vitals.height ?? "—"],
               ["bloodOxygen", vitals.blood_oxygen ?? "—"],
               ["bloodSugar", vitals.blood_sugar ?? "—"],
-            ].map(([k, v]) => (
-              <div key={k as string} className="rounded-lg border border-border p-3">
-                <div className="text-xs text-muted-foreground">{t(k as any)}</div>
-                <div className="font-bold tabular-nums">{v as any}</div>
+            ] as Array<[DictKey, any]>).map(([k, v]) => (
+              <div key={k} className="rounded-lg border border-border p-3">
+                <div className="text-xs text-muted-foreground">{t(k)}</div>
+                <div className="font-bold tabular-nums">{v}</div>
               </div>
             ))}
           </div>
@@ -207,13 +208,13 @@ function HistoryDialog({ open, onOpenChange, patientId, userId, initial, onSaved
         <DialogHeader><DialogTitle>{t("medicalHistory")}</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="grid sm:grid-cols-2 gap-3">
-            {[
+            {([
               ["has_allergies", "allergies"], ["has_diabetes", "diabetes"], ["has_hypertension", "hypertension"],
               ["has_heart_disease", "heartDisease"], ["has_bleeding_disorder", "bleedingDisorder"], ["is_pregnant", "pregnant"],
-            ].map(([k, label]) => (
+            ] as Array<[string, DictKey]>).map(([k, label]) => (
               <label key={k} className="flex items-center gap-2 p-2 rounded-md border border-border">
                 <Checkbox checked={!!f[k]} onCheckedChange={(v) => setF({ ...f, [k]: !!v })} />
-                <span className="text-sm">{t(label as any)}</span>
+                <span className="text-sm">{t(label)}</span>
               </label>
             ))}
           </div>

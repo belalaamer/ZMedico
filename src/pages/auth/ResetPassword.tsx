@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { AuthError } from "@supabase/supabase-js";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Stethoscope } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,12 @@ import { reportAuthFailure } from "@/lib/authFailureTelemetry";
 export default function ResetPassword() {
   const { t, lang } = useI18n();
   const nav = useNavigate();
+  // Whichever login the link came from is the one its buttons go back to. Staff
+  // links carry no `from`, so they keep landing on /auth exactly as before; a
+  // patient who recovered from the portal used to be dropped at the staff desk
+  // with no way back to the screen that sent the request.
+  const { search } = useLocation();
+  const backToSignIn = new URLSearchParams(search).get("from") === "patient" ? "/patient-portal/login" : "/auth";
   const [state, setState] = useState<"checking" | "ready" | "invalid" | "error" | "uncertain">("checking");
   const [verification, setVerification] = useState(0);
   const [updated, setUpdated] = useState(false);
@@ -75,7 +81,8 @@ export default function ResetPassword() {
     // A completion belonging to a previous account must not log out the new one.
     if (!mounted.current || identity.current !== expectedId || generation.current !== operation) return;
     try {
-      // This sign-out is the flow's own step and says so on its way to /auth; without
+      // This sign-out is the flow's own step and says so on its way back to the
+      // login that asked for the link; without
       // the mark, SIGNED_OUT here would look like an unexplained session loss.
       markSignOutReason("password-change");
       const { error } = await supabase.auth.signOut();
@@ -87,7 +94,7 @@ export default function ResetPassword() {
         toast.error(lang === "ar" ? "تم تحديث كلمة المرور، لكن تعذر تسجيل الخروج. حاول تسجيل الخروج مرة أخرى." : "Password updated, but sign out failed. Try signing out again.");
         return;
       }
-      nav("/auth", { replace: true });
+      nav(backToSignIn, { replace: true });
     } catch {
       if (mounted.current && identity.current === expectedId && generation.current === operation) {
         reportAuthFailure("signout-after-password", "transport");
@@ -149,7 +156,7 @@ export default function ResetPassword() {
             )}
           </p>
           {state === "error" ? <Button onClick={() => { setState("checking"); setVerification(value => value + 1); }}>{lang === "ar" ? "إعادة المحاولة" : "Retry"}</Button> : null}
-          {state !== "checking" ? <Button variant="ghost" onClick={() => nav("/auth")}>{t("backToSignIn")}</Button> : null}
+          {state !== "checking" ? <Button variant="ghost" onClick={() => nav(backToSignIn)}>{t("backToSignIn")}</Button> : null}
           </div>
         ) : (
           <form onSubmit={submit} className="space-y-4">
@@ -166,7 +173,7 @@ export default function ResetPassword() {
             <Button type="submit" className="w-full gradient-primary text-primary-foreground" disabled={loading}>
               {updated && !loading ? (lang === "ar" ? "تسجيل الخروج" : "Sign out") : t("resetPassword")}
             </Button>
-            <Button type="button" variant="ghost" className="w-full" disabled={loading} onClick={() => nav("/auth")}>
+            <Button type="button" variant="ghost" className="w-full" disabled={loading} onClick={() => nav(backToSignIn)}>
               {t("backToSignIn")}
             </Button>
           </form>

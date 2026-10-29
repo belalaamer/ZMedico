@@ -15,6 +15,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney, formatDateTime } from "@/lib/format";
+import { enumCopy, TREASURY_TX_TYPE_KEY } from "@/lib/enumKeys";
 import { TransferDialog } from "./TransferDialog";
 import { RowActions } from "@/components/RowActions";
 import { Can } from "@/components/Can";
@@ -302,7 +303,7 @@ export default function Treasury() {
                 return (
                   <div key={x.id} className="flex items-center gap-3 p-3 text-sm">
                     <Badge variant="outline" className={isInc ? "status-completed" : isTrf ? "status-progress" : "status-departed"}>
-                      {t(x.transaction_type as any)}
+                      {enumCopy(TREASURY_TX_TYPE_KEY, x.transaction_type, t)}
                     </Badge>
                     <div className="flex-1 min-w-0">
                       <div className="font-medium truncate">{lang === "ar" ? (x.description_ar || x.description_en) : x.description_en}</div>

@@ -132,7 +132,7 @@ export async function runSystemSelfAudit(opts: {
         });
       }
     } catch (e: any) {
-      checks.push(warn("queue_audit_err", "queue", "Queue self-audit", `Failed: ${e?.message ?? e}`, "Open Queue → Self Audit for details."));
+      checks.push(warn("queue_audit_err", "queue", "Queue self-audit", `Failed: ${e?.message ?? e}`, 'Open "Queue Self-Audit" in the sidebar for details.'));
     }
   }
 
@@ -153,7 +153,7 @@ export async function runSystemSelfAudit(opts: {
       });
     }
   } catch (e: any) {
-    checks.push(warn("fin_rpc", "finance", "Expense/treasury self-audit RPC", `Failed: ${e?.message ?? e}`, "Open Expenses → Self Audit for details."));
+    checks.push(warn("fin_rpc", "finance", "Expense/treasury self-audit RPC", `Failed: ${e?.message ?? e}`, 'Open "Expense & Treasury Self-Audit" in the sidebar for details.'));
   }
 
   // Treasury balances reachable

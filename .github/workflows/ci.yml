@@ -57,10 +57,14 @@ jobs:
           cat /tmp/zmedico-vite.log
           exit 1
 
-      - name: Public mobile smoke (320 / 390 / 430)
+      # 360 is here because the booking step indicator was audited at 360 px and
+      # this list did not contain it: the wrap boundary between one row and two
+      # can sit anywhere in that gap, so 320 does not stand in for 360.
+      - name: Public mobile smoke (320 / 360 / 390 / 430)
         run: >
           bunx playwright test
           --project="public-mobile:compact-320"
+          --project="public-mobile:pixel"
           --project="public-mobile:iphone-14"
           --project="public-mobile:iphone-15-pro-max"
 

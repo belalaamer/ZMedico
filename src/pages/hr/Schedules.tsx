@@ -18,6 +18,9 @@ import { Save, Search, CalendarClock, CheckSquare, XSquare } from "lucide-react"
 import { Can } from "@/components/Can";
 
 const DAYS = ["sun","mon","tue","wed","thu","fri","sat"] as const;
+// `t(d)` needs no map and no cast: `as const` gives the seven values literal
+// types, and `t` only accepts a key the English dictionary holds, so the build
+// already proves all seven words exist on both desks.
 
 type Slot = { day_of_week: number; start_time: string; end_time: string; is_working_day: boolean; room?: string | null };
 
@@ -283,7 +286,7 @@ export default function Schedules() {
                 <tr>
                   <th className="text-start p-2 w-10"></th>
                   <th className="text-start p-2 min-w-[180px]">{lang === "ar" ? "الموظف" : "Staff"}</th>
-                  {DAYS.map((d) => (<th key={d} className="text-start p-2 min-w-[120px]">{t(d as any)}</th>))}
+                  {DAYS.map((d) => (<th key={d} className="text-start p-2 min-w-[120px]">{t(d)}</th>))}
                   <th className="p-2 w-10"></th>
                 </tr>
               </thead>
@@ -428,7 +431,7 @@ export default function Schedules() {
             {slots.map((s, i) => (
               <Card key={i} className="p-4 shadow-card space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="font-semibold">{t(DAYS[i] as any)}</div>
+                  <div className="font-semibold">{t(DAYS[i])}</div>
                   <Switch checked={s.is_working_day} onCheckedChange={(v) => update(i, { is_working_day: v })} />
                 </div>
                 <div className="space-y-2">

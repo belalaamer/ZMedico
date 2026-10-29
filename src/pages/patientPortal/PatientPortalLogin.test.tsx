@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 
 const api = vi.hoisted(() => ({ signIn: vi.fn(), nav: vi.fn(), error: vi.fn() }));
 
-vi.mock("@/contexts/I18nContext", () => ({ useI18n: () => ({ lang: "en", setLang: vi.fn() }) }));
+vi.mock("@/contexts/I18nContext", () => ({ useI18n: () => ({ lang: "en", t: (key: string) => key, setLang: vi.fn() }) }));
 vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ user: null, loading: false, signOut: vi.fn() }) }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { auth: { getUser: async () => ({ data: { user: null } }) } } }));
 vi.mock("react-router-dom", () => ({ Link: ({ children }: { children: ReactNode }) => <span>{children}</span>, useNavigate: () => api.nav }));

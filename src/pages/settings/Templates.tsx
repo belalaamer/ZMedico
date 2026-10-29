@@ -40,7 +40,7 @@ export default function Templates({ kind }: { kind: "email" | "sms" | "whatsapp"
   return (
     <SettingsLayout>
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold">{t(titleKey as any)}</h1>
+        <h1 className="text-2xl font-bold">{t(titleKey)}</h1>
         <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4">
           <Card className="overflow-hidden"><div className="divide-y">
             {items.map(it => (

@@ -5,6 +5,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/contexts/I18nContext";
+import { enumLabel } from "@/lib/enumLabels";
+import { visitTypeLabel } from "@/lib/enumKeys";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
@@ -84,8 +86,8 @@ export default function MedicalRecords() {
                     <div className="font-medium" dir={nameDirection}>{name} <span className="text-xs text-muted-foreground">#{p?.patient_code}</span></div>
                     <div className="text-xs text-muted-foreground">{formatDate(r.visit_date, lang)} · {r.medical_specialties ? (lang === "ar" ? r.medical_specialties.name_ar : r.medical_specialties.name_en) : "—"}</div>
                   </div>
-                  <Badge variant="outline">{t(("visit_" + r.visit_type) as any) ?? r.visit_type}</Badge>
-                  <Badge variant="outline" className={r.status === "completed" ? "status-completed" : r.status === "reviewed" ? "status-progress" : "status-cancelled"}>{r.status}</Badge>
+                  <Badge variant="outline">{visitTypeLabel(r.visit_type, t)}</Badge>
+                  <Badge variant="outline" className={r.status === "completed" ? "status-completed" : r.status === "reviewed" ? "status-progress" : "status-cancelled"}>{enumLabel("medical_record_status", r.status, lang)}</Badge>
                   </Link>
                   <RowActions
                     onEdit={() => navigate(`/medical/records/${r.id}`)}

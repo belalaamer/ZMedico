@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
+import { enumLabel } from "@/lib/enumLabels";
 import { useBranch } from "@/contexts/BranchContext";
 import { formatMoney } from "@/lib/format";
 import { patientDisplayName } from "@/lib/patientName";
@@ -169,7 +170,7 @@ export default function DoctorCommissions() {
                   <td className="p-3 text-end tabular-nums">{formatMoney(r.base_amount, lang)}</td>
                   <td className="p-3 text-end tabular-nums">{formatMoney(r.collected_amount, lang)}</td>
                   <td className="p-3 text-end tabular-nums font-bold text-primary">{formatMoney(r.commission_amount, lang)}</td>
-                  <td className="p-3 text-center"><Badge variant="outline" className={statusColor(r.status)}>{r.status}</Badge></td>
+                  <td className="p-3 text-center"><Badge variant="outline" className={statusColor(r.status)}>{enumLabel("commission_status", r.status, lang)}</Badge></td>
                 </tr>
               ))}
               {rows.length === 0 && (

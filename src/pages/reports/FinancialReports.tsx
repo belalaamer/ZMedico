@@ -4,6 +4,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
+import { enumLabel } from "@/lib/enumLabels";
+import { enumCopy, PAYMENT_METHOD_KEY } from "@/lib/enumKeys";
 import { useBranch } from "@/contexts/BranchContext";
 import { formatMoney, formatDate } from "@/lib/format";
 import { patientDisplayName } from "@/lib/patientName";
@@ -146,7 +148,7 @@ function RevenueTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
               <TableCell>{formatDate(r.invoice_date, lang)}</TableCell>
               <TableCell className="font-mono text-xs">{r.invoice_number}</TableCell>
               <TableCell>{r.patients ? patientDisplayName(r.patients, lang) : "—"}</TableCell>
-              <TableCell><span className="text-xs px-2 py-0.5 rounded bg-muted">{r.status}</span></TableCell>
+              <TableCell><span className="text-xs px-2 py-0.5 rounded bg-muted">{enumLabel("invoice_status", r.status, lang)}</span></TableCell>
               <TableCell className="text-end tabular-nums font-semibold">{formatMoney(r.total, lang)}</TableCell>
             </TableRow>
           ))}
@@ -206,7 +208,7 @@ function CollectionTab({ start, end, setStart, setEnd, branchId, lang, t }: any)
   ];
   const customerRows = byCustomer.map((c) => ({
     patient: `${c.name}${c.code ? ` #${c.code}` : ""}`,
-    methods: c.methodsList.map((x) => `${t(x.m as any) ?? x.m}: ${x.a.toFixed(2)}`).join(" · "),
+    methods: c.methodsList.map((x) => `${enumCopy(PAYMENT_METHOD_KEY, x.m, t)}: ${x.a.toFixed(2)}`).join(" · "),
     total: c.total.toFixed(2),
   }));
 
@@ -231,7 +233,7 @@ function CollectionTab({ start, end, setStart, setEnd, branchId, lang, t }: any)
           <TableHead>{t("method")}</TableHead><TableHead>{t("count")}</TableHead><TableHead className="text-end">{t("amount")}</TableHead>
         </TableRow></TableHeader>
         <TableBody>{grouped.map((g) => (
-          <TableRow key={g.method} className="hover:bg-muted/40 transition-colors"><TableCell className="capitalize font-medium">{(t(g.method as any) ?? g.method)}</TableCell><TableCell className="tabular-nums">{g.count}</TableCell><TableCell className="text-end tabular-nums font-semibold">{formatMoney(g.amount, lang)}</TableCell></TableRow>
+          <TableRow key={g.method} className="hover:bg-muted/40 transition-colors"><TableCell className="capitalize font-medium">{enumCopy(PAYMENT_METHOD_KEY, g.method, t)}</TableCell><TableCell className="tabular-nums">{g.count}</TableCell><TableCell className="text-end tabular-nums font-semibold">{formatMoney(g.amount, lang)}</TableCell></TableRow>
         ))}{!grouped.length && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">{t("noData")}</TableCell></TableRow>}</TableBody></Table>
       </CardContent></Card>
       <Card className="shadow-sm"><CardContent className="pt-6 overflow-x-auto max-h-[560px]">
@@ -245,7 +247,7 @@ function CollectionTab({ start, end, setStart, setEnd, branchId, lang, t }: any)
           <TableRow key={i} className="hover:bg-muted/40 transition-colors">
             <TableCell className="font-medium">{c.name}{c.code ? <span className="text-xs text-muted-foreground ms-1">#{c.code}</span> : null}</TableCell>
             <TableCell className="text-xs">{c.methodsList.map((x, j) => (
-              <span key={j} className="inline-block me-2">{(t(x.m as any) ?? x.m)}: <span className="font-medium tabular-nums">{formatMoney(x.a, lang)}</span></span>
+              <span key={j} className="inline-block me-2">{enumCopy(PAYMENT_METHOD_KEY, x.m, t)}: <span className="font-medium tabular-nums">{formatMoney(x.a, lang)}</span></span>
             ))}</TableCell>
             <TableCell className="text-end font-bold tabular-nums text-primary">{formatMoney(c.total, lang)}</TableCell>
           </TableRow>

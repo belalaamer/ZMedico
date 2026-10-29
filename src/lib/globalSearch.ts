@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { sanitizeSearch } from "@/lib/sanitizeSearch";
 import { patientDisplayName } from "@/lib/patientName";
+import { enumLabel } from "@/lib/enumLabels";
 import { localDateOnly } from "@/lib/localDate";
 
 export type SearchHit = {
@@ -136,7 +137,7 @@ export async function searchInvoices(
       hits.push({
         id: inv.id,
         label: `${inv.invoice_number} · ${patientName(inv.patients, lang)}`,
-        sub: `${inv.status}${due > 0 ? ` · ${lang === "ar" ? "متبقي" : "due"} ${due.toFixed(2)}` : ""}`,
+        sub: `${enumLabel("invoice_status", inv.status, lang)}${due > 0 ? ` · ${lang === "ar" ? "متبقي" : "due"} ${due.toFixed(2)}` : ""}`,
         to: `/invoices/${inv.id}`,
       });
       if (hits.length >= LIMIT) return hits;
@@ -174,7 +175,7 @@ export async function searchAppointments(
     return {
       id: a.id,
       label: `${dateStr} · ${patientName(a.patients, lang)}`,
-      sub: [a.procedure, a.status].filter(Boolean).join(" · "),
+      sub: [a.procedure, a.status && enumLabel("appointment_status", a.status, lang)].filter(Boolean).join(" · "),
       to: `/calendar?date=${dayKey}&appt=${a.id}`,
     };
   });
@@ -200,7 +201,7 @@ export async function searchPayments(
   return ((data ?? []) as any[]).map((p) => ({
     id: p.id,
     label: `${Number(p.amount || 0).toFixed(2)} · ${patientName(p.patients, lang)}`,
-    sub: [p.payment_method, p.invoices?.invoice_number, p.payment_date].filter(Boolean).join(" · "),
+    sub: [p.payment_method && enumLabel("payment_method", p.payment_method, lang), p.invoices?.invoice_number, p.payment_date].filter(Boolean).join(" · "),
     to: p.invoice_id ? `/invoices/${p.invoice_id}` : `/payments`,
   }));
 }
@@ -224,7 +225,7 @@ export async function searchMedicalRecords(
   return ((data ?? []) as any[]).map((r) => ({
     id: r.id,
     label: `${patientName(r.patients, lang)}`,
-    sub: [r.visit_date, r.status].filter(Boolean).join(" · "),
+    sub: [r.visit_date, r.status && enumLabel("medical_record_status", r.status, lang)].filter(Boolean).join(" · "),
     to: `/medical/records/${r.id}`,
   }));
 }

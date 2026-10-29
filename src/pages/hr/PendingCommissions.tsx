@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
+import { enumLabel } from "@/lib/enumLabels";
 import { formatMoney, formatDate } from "@/lib/format";
 
 type Row = {
@@ -111,7 +112,11 @@ export default function PendingCommissions() {
           <Select value={status} onValueChange={(v) => setStatus(v as any)}>
             <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {STATUSES.map((s) => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}
+              {STATUSES.map((s) => (
+                <SelectItem key={s} value={s} className="capitalize">
+                  {s === "all" ? t("all") : enumLabel("commission_status", s, lang)}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -163,7 +168,7 @@ export default function PendingCommissions() {
                   <td className="p-3 text-end tabular-nums">{Number(r.commission_percent).toFixed(2)}%</td>
                   <td className="p-3 text-end tabular-nums">{formatMoney(r.collected_amount, lang)}</td>
                   <td className="p-3 text-end tabular-nums font-medium text-primary">{formatMoney(r.commission_amount, lang)}</td>
-                  <td className="p-3"><Badge variant="outline" className={statusClass(r.status)}>{r.status}</Badge></td>
+                  <td className="p-3"><Badge variant="outline" className={statusClass(r.status)}>{enumLabel("commission_status", r.status, lang)}</Badge></td>
                 </tr>
               ))}
             </tbody>

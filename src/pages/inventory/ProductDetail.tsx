@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatMoney, formatDateTime, formatDate } from "@/lib/format";
+import { enumLabel } from "@/lib/enumLabels";
 import { useBranch } from "@/contexts/BranchContext";
 
 const txClass: Record<string, string> = {
@@ -122,7 +123,7 @@ export default function ProductDetail() {
               <div className="divide-y divide-border">
                 {txs.map((x) => (
                   <div key={x.id} className="flex items-center gap-3 p-3 text-sm">
-                    <Badge variant="outline" className={txClass[x.transaction_type] ?? ""}>{x.transaction_type}</Badge>
+                    <Badge variant="outline" className={txClass[x.transaction_type] ?? ""}>{enumLabel("inventory_tx_type", x.transaction_type, lang)}</Badge>
                     <div className="flex-1 min-w-0">
                       <div className="font-medium truncate">{lang === "ar" ? (x.notes_ar || x.notes_en) : x.notes_en}</div>
                       <div className="text-xs text-muted-foreground">{branchName(x.branch_id)} · {formatDateTime(x.created_at, lang)}</div>

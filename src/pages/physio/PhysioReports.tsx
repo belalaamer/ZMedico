@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { ListSkeleton } from "@/components/ListSkeleton";
 import { useBranch } from "@/contexts/BranchContext";
 import { useI18n } from "@/contexts/I18nContext";
+import { enumLabel } from "@/lib/enumLabels";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate } from "@/lib/format";
 import { patientDisplayName } from "@/lib/patientName";
@@ -217,7 +218,7 @@ export default function PhysioReports() {
               <div key={c.id} className="p-3 flex items-center gap-3 text-sm">
                 <div className="flex-1 truncate" dir="auto">{patientName(c.patients)} · {c.diagnosis || "—"}</div>
                 <div className="text-xs text-muted-foreground">{formatDate(c.start_date, lang)}</div>
-                <Badge variant="outline">{c.status}</Badge>
+                <Badge variant="outline">{enumLabel("physio_case_status", c.status, lang)}</Badge>
               </div>
             ))}
           </div>

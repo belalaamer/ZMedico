@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { subscribeResilient } from "@/lib/realtime";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
+import { REASON_KEY_BY_STOCK_ADJUSTMENT, enumCopy } from "@/lib/enumKeys";
 import { Can } from "@/components/Can";
 import { useInventoryMutation } from './useInventoryMutation';
 
@@ -124,7 +125,7 @@ export default function StockOverview() {
       signed = adj.qty - Number(cur?.quantity ?? 0);
     }
     if (signed === 0) { toast.error(lang === "ar" ? "لا يوجد تغيير" : "No change"); return; }
-    const reasonLabel = t(("reason" + adj.reason.charAt(0).toUpperCase() + adj.reason.slice(1)) as any);
+    const reasonLabel = enumCopy(REASON_KEY_BY_STOCK_ADJUSTMENT, adj.reason, t);
     await mutation.run(() => supabase.rpc("apply_inventory_tx", {
       _product_id: adj.product_id, _branch_id: adj.branch_id,
       _type: "adjustment", _signed_qty: signed,
@@ -310,7 +311,7 @@ export default function StockOverview() {
                 <Select value={adj.reason} onValueChange={(v) => setAdj({ ...adj, reason: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {REASONS.map((r) => <SelectItem key={r} value={r}>{t(("reason" + r.charAt(0).toUpperCase() + r.slice(1)) as any)}</SelectItem>)}
+                    {REASONS.map((r) => <SelectItem key={r} value={r}>{enumCopy(REASON_KEY_BY_STOCK_ADJUSTMENT, r, t)}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

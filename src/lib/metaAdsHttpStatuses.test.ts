@@ -152,7 +152,18 @@ async function call(
   const { outputText } = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.None, target: ts.ScriptTarget.ES2022 },
   });
-  new Function("Deno", "createClient", "crypto", outputText)(deno, (url: string, key: string) => client(key), cryptoStandIn);
+  // The harness strips every `import` line, so a cross-module symbol the shipped
+  // source uses has to arrive as an injected parameter or it is a ReferenceError
+  // -- which this function's own catch would report as a 400. The session guard is
+  // injected as a pass-through here; its own statuses are proven by
+  // edgeSessionGuard.test.ts, and this file's contract test proves the catch
+  // honours any status an error carries, so 401/503 survive into the response.
+  new Function("Deno", "createClient", "crypto", "requireActiveSessionOrThrow", outputText)(
+    deno,
+    (url: string, key: string) => client(key),
+    cryptoStandIn,
+    async () => {},
+  );
 
   if (!handler) throw new Error("the module never registered a Deno.serve handler");
 

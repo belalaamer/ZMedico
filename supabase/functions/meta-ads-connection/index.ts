@@ -79,6 +79,27 @@ function errorMessage(error: unknown): string {
   return raw.replace(/[\x00-\x1f\x7f]+/g, " ").slice(0, 200);
 }
 
+// E12: this handler answered every rejection with `400`, so "you are not signed
+// in", "you are not an admin", "that branch is not yours", "no such connection"
+// and "your body is malformed" were indistinguishable to the caller and to any
+// log. The message strings stay byte-for-byte what they were -- the settings page
+// shows them verbatim -- and only the status becomes true.
+class EdgeHttpError extends Error {
+  readonly status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "EdgeHttpError";
+    this.status = status;
+  }
+}
+
+// Any error carrying a numeric status speaks for itself (this class and the
+// shared session guard's InactiveSessionError); everything else keeps the old 400.
+function statusFrom(error: unknown): number {
+  const carried = (error as { status?: unknown } | null)?.status;
+  return typeof carried === "number" && carried >= 400 && carried <= 599 ? carried : 400;
+}
+
 function toBase64(bytes: Uint8Array): string {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -95,7 +116,7 @@ async function encryptionKey(): Promise<CryptoKey> {
   // server-only fallback so the first tenant setup does not fail before the
   // dedicated secret is provisioned; it is never returned to the client.
   const secret = Deno.env.get("META_ADS_ENCRYPTION_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!secret || secret.length < 16) throw new Error("Meta encryption secret is not configured");
+  if (!secret || secret.length < 16) throw new EdgeHttpError(500, "Meta encryption secret is not configured");
   const digest = await crypto.subtle.digest("SHA-256", encoder.encode(secret));
   return crypto.subtle.importKey("raw", digest, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
 }
@@ -107,8 +128,16 @@ async function encryptToken(token: string): Promise<{ ciphertext: string; iv: st
 }
 
 async function decryptToken(ciphertext: string, iv: string): Promise<string> {
-  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromBase64(iv) }, await encryptionKey(), fromBase64(ciphertext));
-  return new TextDecoder().decode(decrypted);
+  try {
+    const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromBase64(iv) }, await encryptionKey(), fromBase64(ciphertext));
+    return new TextDecoder().decode(decrypted);
+  } catch (error) {
+    // E12: a token this server can no longer unlock is a server-side failure -- the
+    // same function wrote it. As a plain Error it reached the caller as `400` with
+    // WebCrypto's text, which reads as though the admin mistyped their token.
+    console.error(`[meta-ads-connection] stored token could not be decrypted:`, error);
+    throw new EdgeHttpError(500, "Stored Meta token could not be decrypted with the configured encryption secret");
+  }
 }
 
 function publicConnection(connection: Connection) {
@@ -132,35 +161,36 @@ function publicConnection(connection: Connection) {
 
 async function requireAdmin(req: Request): Promise<{ userClient: SupabaseClient; adminClient: SupabaseClient; userId: string }> {
   const authorization = req.headers.get("Authorization");
-  if (!authorization?.startsWith("Bearer ")) throw new Error("Authentication required");
+  if (!authorization?.startsWith("Bearer ")) throw new EdgeHttpError(401, "Authentication required");
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!supabaseUrl || !anonKey || !serviceRoleKey) throw new Error("Supabase function secrets are not configured");
+  if (!supabaseUrl || !anonKey || !serviceRoleKey) throw new EdgeHttpError(500, "Supabase function secrets are not configured");
   const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authorization } } });
   const { data: authData, error: authError } = await userClient.auth.getUser();
-  if (authError || !authData.user) throw new Error("Authentication required");
+  if (authError || !authData.user) throw new EdgeHttpError(401, "Authentication required");
   const { data: roles, error: roleError } = await userClient.from("user_roles").select("role").eq("user_id", authData.user.id).limit(10);
-  if (roleError) throw new Error("Unable to verify permissions");
+  if (roleError) throw new EdgeHttpError(503, "Unable to verify permissions");
   const allowed = (roles ?? []).some((row) => row.role === "admin" || row.role === "system_owner");
-  if (!allowed) throw new Error("Meta Ads connection requires admin access");
+  if (!allowed) throw new EdgeHttpError(403, "Meta Ads connection requires admin access");
   return { userClient, adminClient: createClient(supabaseUrl, serviceRoleKey), userId: authData.user.id };
 }
 
 async function requireBranchAccess(userClient: SupabaseClient, branchId: string) {
   const { data, error } = await userClient.rpc("user_has_branch_access", { _branch: branchId });
-  if (error || data !== true) throw new Error("Branch access denied");
+  if (error || data !== true) throw new EdgeHttpError(403, "Branch access denied");
 }
 
 async function getConnection(adminClient: SupabaseClient, input: Input): Promise<Connection | null> {
   if (input.connection_id) {
     const { data, error } = await adminClient.from("meta_ads_connections").select("id,branch_id,provider,ad_account_id,business_id,currency,timezone,api_version,token_ciphertext,token_iv,token_fingerprint,status,last_tested_at,last_successful_sync_at,last_attempted_sync_at,last_error_code,last_error_message").eq("id", input.connection_id).limit(1).maybeSingle();
-    if (error || !data) throw new Error("Meta Ads connection not found");
+    if (error) throw new EdgeHttpError(500, errorMessage(error.message));
+    if (!data) throw new EdgeHttpError(404, "Meta Ads connection not found");
     return data as Connection;
   }
   if (!input.branch_id) throw new Error("branch_id is required");
   const { data, error } = await adminClient.from("meta_ads_connections").select("id,branch_id,provider,ad_account_id,business_id,currency,timezone,api_version,token_ciphertext,token_iv,token_fingerprint,status,last_tested_at,last_successful_sync_at,last_attempted_sync_at,last_error_code,last_error_message").eq("branch_id", input.branch_id).eq("provider", "meta_ads").order("created_at", { ascending: false }).limit(1).maybeSingle();
-  if (error) throw new Error(errorMessage(error.message));
+  if (error) throw new EdgeHttpError(500, errorMessage(error.message));
   return data ? data as Connection : null;
 }
 
@@ -202,7 +232,7 @@ Deno.serve(async (req) => {
     if (action === "list") {
       if (!branchId) throw new Error("branch_id is required");
       const { data, error } = await adminClient.from("meta_ads_connections").select("id,branch_id,provider,ad_account_id,business_id,currency,timezone,api_version,token_ciphertext,token_iv,token_fingerprint,status,last_tested_at,last_successful_sync_at,last_attempted_sync_at,last_error_code,last_error_message").eq("branch_id", branchId).eq("provider", "meta_ads").order("created_at", { ascending: false });
-      if (error) throw new Error(errorMessage(error.message));
+      if (error) throw new EdgeHttpError(500, errorMessage(error.message));
       return jsonResponse({ connections: (data ?? []).map((row) => publicConnection(row as Connection)) });
     }
 
@@ -243,14 +273,14 @@ Deno.serve(async (req) => {
         updated_by: userId,
       };
       const { data, error } = await adminClient.from("meta_ads_connections").upsert(payload, { onConflict: "branch_id,provider,ad_account_id" }).select("id,branch_id,provider,ad_account_id,business_id,currency,timezone,api_version,token_ciphertext,token_iv,token_fingerprint,status,last_tested_at,last_successful_sync_at,last_attempted_sync_at,last_error_code,last_error_message").single();
-      if (error || !data) throw new Error(errorMessage(error?.message ?? "Unable to save Meta connection"));
+      if (error || !data) throw new EdgeHttpError(500, errorMessage(error?.message ?? "Unable to save Meta connection"));
       return jsonResponse({ connection: publicConnection(data as Connection) });
     }
 
     const connection = connectionForAccess ?? await getConnection(adminClient, input);
-    if (!connection) throw new Error("Meta Ads connection not found");
+    if (!connection) throw new EdgeHttpError(404, "Meta Ads connection not found");
     if (action === "test") {
-      if (!connection.token_ciphertext || !connection.token_iv) throw new Error("No Meta token is configured");
+      if (!connection.token_ciphertext || !connection.token_iv) throw new EdgeHttpError(400, "No Meta token is configured");
       const token = await decryptToken(connection.token_ciphertext, connection.token_iv);
       const testedAt = new Date().toISOString();
       try {
@@ -260,18 +290,18 @@ Deno.serve(async (req) => {
       } catch (error) {
         const message = errorMessage(error);
         await adminClient.from("meta_ads_connections").update({ status: message.startsWith("190") || message.includes("190") ? "needs_reauth" : "error", last_tested_at: testedAt, last_error_code: message.split(":")[0], last_error_message: message, updated_by: userId }).eq("id", connection.id);
-        throw new Error(message);
+        throw new EdgeHttpError(502, message);
       }
     }
 
     if (action === "disconnect") {
       const { error } = await adminClient.from("meta_ads_connections").update({ status: "disconnected", token_ciphertext: null, token_iv: null, token_fingerprint: null, updated_by: userId }).eq("id", connection.id);
-      if (error) throw new Error(errorMessage(error.message));
+      if (error) throw new EdgeHttpError(500, errorMessage(error.message));
       return jsonResponse({ ok: true });
     }
 
     throw new Error("Unsupported action");
   } catch (error) {
-    return jsonResponse({ error: errorMessage(error) }, 400);
+    return jsonResponse({ error: errorMessage(error) }, statusFrom(error));
   }
 });

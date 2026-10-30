@@ -15,3 +15,52 @@ project_id = "cyrsirozfhadonuittrc"
 # verification must stay disabled so pg_cron service-to-service calls can reach it.
 [functions.send-reminder]
 verify_jwt = false
+
+# E11: the rest of the gateway posture, declared instead of assumed.
+#
+# `verify_jwt` defaults to true and is only carried to the platform by
+# `supabase functions deploy`. Until now every function below was deployed from
+# this repo with no block of its own, so Production was running them with
+# `verify_jwt = false` while the repo said nothing -- which means the next
+# `supabase functions deploy <slug>` would have silently flipped the gateway
+# check on and cut the caller off. That is not hypothetical for
+# `whatsapp-webhook`: Meta posts inbound callbacks with no Authorization header
+# at all, so a flip there stops every customer message.
+#
+# Each block restates what was READ from Production on 2026-10-30 (22 functions,
+# 9 with `verify_jwt = false`); it changes no deployed setting by itself.
+# `src/lib/edgeDeployConfig.test.ts` fails if the declared set drifts.
+
+# pg_cron / pg_net dispatchers: authorised inside the function by their own
+# shared secret, exactly like send-reminder.
+[functions.enqueue-winback]
+verify_jwt = false
+
+[functions.detect-queue-alerts]
+verify_jwt = false
+
+[functions.enqueue-physio-followups]
+verify_jwt = false
+
+[functions.enqueue-lead-followups]
+verify_jwt = false
+
+# Meta's webhook callbacks carry an HMAC signature, never a JWT. The function
+# verifies `x-hub-signature-256` itself and answers 401 without it.
+[functions.whatsapp-webhook]
+verify_jwt = false
+
+# Pre-authentication and anonymous public entrypoints: the caller has no session
+# to present, and each one authorises by identifier, rate limit, or its own body.
+[functions.login-by-identifier]
+verify_jwt = false
+
+# Declared as deployed, not as load-bearing: no client artifact invokes this
+# function. The anonymous booking path calls the public_create_booking_for_tenant
+# RPC instead, and that RPC enforces the rate limit itself -- 20 attempts per IP
+# per hour and 6 per phone+IP per 6 hours, through consume_public_booking_rate_limit.
+[functions.public-booking-submit]
+verify_jwt = false
+
+[functions.public-subscription-request]
+verify_jwt = false

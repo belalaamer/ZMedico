@@ -24,6 +24,7 @@ import { doctorDisplayName } from "@/lib/doctorName";
 import { formatDateTime } from "@/lib/format";
 import { buildStatusPatch, type ApptStatus } from "@/lib/appointmentStatus";
 import { updateQueueAppointment } from "@/lib/queueMutation";
+import { deskFailure } from "@/lib/deskFailure";
 import { openQueueConsultation, queueConsultationErrorCode, queueConsultationErrorMessage } from "@/lib/queueConsultation";
 import type { DictKey } from "@/lib/i18n";
 import { getQueueSettings, fetchQueueSettings, type QueueSettings } from "@/lib/queueSettings";
@@ -240,7 +241,8 @@ export default function QueuePage() {
     const { data, error } = await q;
     if (requestId !== loadRequestRef.current) return;
     if (error) {
-      toast.error(error.message);
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تحميل الطابور." : "Could not load the queue.");
+      toast.error(failure.title, { description: failure.description });
       setRows([]);
     } else {
       setRows((data ?? []) as QueueRow[]);
@@ -369,7 +371,8 @@ export default function QueuePage() {
     try {
       updated = await updateQueueAppointment({ appointmentId: id, branchId: currentBranchId, patch, expectedStatus, expectedPriority });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Queue update failed");
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر حفظ هذا التغيير في الطابور." : "This queue change could not be saved.");
+      toast.error(failure.title, { description: failure.description });
       void load();
       return false;
     }
@@ -408,7 +411,8 @@ export default function QueuePage() {
     setSelfCheckinSaving(false);
     if (error) {
       setSelfCheckinRow(null);
-      toast.error(error.message || t("selfCheckinLinkError"));
+      const failure = deskFailure(error, lang, t("selfCheckinLinkError"));
+      toast.error(failure.title, { description: failure.description });
       return;
     }
     const result = (Array.isArray(data) ? data[0] : data) as { token?: string; expires_at?: string } | null;
@@ -498,7 +502,11 @@ export default function QueuePage() {
       ...patch,
     };
     const { error } = await supabase.from("appointments").insert(payload).select("id").single();
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تسجيل الزيارة." : "The walk-in could not be booked.");
+      toast.error(failure.title, { description: failure.description });
+      return;
+    }
     toast.success(t("walkInCreated"));
     setWalkInOpen(false);
     setWalkInPatient(""); setWalkInDoctor(""); setWalkInRoom(""); setWalkInProcedure("");
@@ -591,7 +599,11 @@ export default function QueuePage() {
       : reassignQuery.eq("doctor_id", r.doctor_id)) as typeof reassignQuery;
     const { data: reassigned, error } = await reassignQuery.select("id").maybeSingle();
     setReassignSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تغيير الطبيب المعالج." : "The doctor could not be changed.");
+      toast.error(failure.title, { description: failure.description });
+      return;
+    }
     if (!reassigned) {
       toast.error(lang === "ar" ? "تم تعديل الموعد بواسطة مستخدم آخر؛ أعد تحميل الطابور." : "This appointment was changed by another user. Refresh the queue and try again.");
       setReassignRow(null);
@@ -625,7 +637,11 @@ export default function QueuePage() {
     roomQuery = r.room == null ? roomQuery.is("room", null) : roomQuery.eq("room", r.room);
     const { data: updated, error } = await roomQuery.select("id").maybeSingle();
     setRoomSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تغيير غرفة الموعد." : "The room could not be changed.");
+      toast.error(failure.title, { description: failure.description });
+      return;
+    }
     if (!updated) { toast.error(lang === "ar" ? "تم تغيير الغرفة بواسطة مستخدم آخر؛ أعد تحميل الطابور." : "The room was changed by another user. Refresh the queue."); await load(); return; }
     toast.success(t("saved"));
     setRoomRow(null);

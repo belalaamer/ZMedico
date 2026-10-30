@@ -27,6 +27,7 @@ import { updateQueueAppointment } from "@/lib/queueMutation";
 import { openQueueConsultation, queueConsultationErrorCode, queueConsultationErrorMessage } from "@/lib/queueConsultation";
 import type { DictKey } from "@/lib/i18n";
 import { getQueueSettings, fetchQueueSettings, type QueueSettings } from "@/lib/queueSettings";
+import { showQueueSkeleton } from "@/lib/queueRefresh";
 import { listOpenAlerts, effectiveState, type QueueAlert } from "@/lib/queueAlerts";
 import { Switch } from "@/components/ui/switch";
 import { useOperationScope } from "@/hooks/useOperationScope";
@@ -254,6 +255,11 @@ export default function QueuePage() {
       setLoading(false);
       return;
     }
+    // Clearing the board is what makes the quiet refresh safe: the rows on
+    // screen belong to the branch that was selected before this one, and a
+    // refresh of a different clinic's queue may never be shown as if it were the
+    // current one. With rows empty, the skeleton comes back for this read only.
+    setRows((prev) => (prev.length === 0 ? prev : []));
     void load();
     // Realtime is also scoped strictly to the selected branch.
     const filter = `branch_id=eq.${currentBranchId}`;
@@ -871,7 +877,7 @@ export default function QueuePage() {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {showQueueSkeleton(loading, rows.length) ? (
                 <tr><td colSpan={8} className="p-0"><ListSkeleton rows={6} /></td></tr>
               ) : filtered.length === 0 ? (
                 <tr>
@@ -937,7 +943,7 @@ export default function QueuePage() {
 
       {/* Mobile cards */}
       <div className="md:hidden space-y-2">
-        {loading ? (
+        {showQueueSkeleton(loading, rows.length) ? (
           <Card className="p-0 overflow-hidden"><ListSkeleton rows={5} /></Card>
         ) : filtered.length === 0 ? (
           <Card className="py-10 flex flex-col items-center gap-3 text-center text-muted-foreground">

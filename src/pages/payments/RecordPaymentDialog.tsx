@@ -14,7 +14,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useDataSync } from "@/lib/dataSync";
-import { patientDisplayName } from "@/lib/patientName";
+import { usePatientSearch } from "@/hooks/usePatientSearch";
+import { PATIENT_PICKER_LIMIT, patientPickerCopy, pickedPatientLabel, type PatientOption } from "@/lib/patientSearch";
 import { localDateOnly } from "@/lib/localDate";
 
 type Method = "cash" | "card" | "bank_transfer" | "insurance" | "wallet";
@@ -30,10 +31,18 @@ export function RecordPaymentDialog({
   // file previously only pulled `t`, so those two messages were stuck in
   // English regardless of the active language.
   const { t, lang } = useI18n();
-  const { currentBranchId } = useBranch();
+  const { currentBranchId, branchSelectionReady } = useBranch();
   const { user } = useAuth();
 
-  const [patients, setPatients] = useState<{ id: string; label: string }[]>([]);
+  // C4: who this payment is for is searched on the server, in this branch, by
+  // name or phone -- one page at a time instead of the clinic's newest 500.
+  const patientSearch = usePatientSearch({
+    ready: branchSelectionReady,
+    branchId: currentBranchId,
+    lang,
+  });
+  const pickerCopy = patientPickerCopy(lang);
+  const [patientEcho, setPatientEcho] = useState<PatientOption | null>(null);
   const [pid, setPid] = useState<string>(patientId ?? "");
   const [iid, setIid] = useState<string>(invoiceId ?? "");
   const [invoices, setInvoices] = useState<{ id: string; label: string; remaining: number }[]>([]);
@@ -55,6 +64,7 @@ export function RecordPaymentDialog({
   useEffect(() => {
     if (!open) return;
     setPid(patientId ?? "");
+    setPatientEcho(null);
     setIid(invoiceId ?? "");
     setAmount(defaultAmount ?? 0);
     setMethod("cash"); setRef(""); setNotes("");
@@ -63,7 +73,6 @@ export function RecordPaymentDialog({
     setRemaining(defaultAmount ?? 0);
     setIsTopup(false);
     setWalletBalance(0);
-    if (!patientId) loadPatients();
   }, [open, patientId, invoiceId, defaultAmount]);
 
   // Load open invoices for the selected patient (when not fixed by parent)
@@ -115,28 +124,9 @@ export function RecordPaymentDialog({
     if (found) { setAmount(found.remaining); setRemaining(found.remaining); setAmount2(0); }
   };
 
-  const loadPatients = () => {
-    supabase
-      .from("patients")
-      .select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code,deleted_at")
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(500)
-      .then(({ data }) => {
-        const rows = (data ?? []).filter((p: any) => p.deleted_at == null);
-        // UX fix: this combobox is used to pick who the payment is for --
-        // not to look them up by clinic number -- so show just the name,
-        // matching the fix already applied to the other patient pickers
-        // across the app (invoice/appointment/prescription/etc). The "#N"
-        // numbering stays exclusive to the main Patients list.
-        setPatients(rows.map((p: any) => ({
-          id: p.id,
-          label: patientDisplayName(p, lang),
-        })));
-      });
-  };
-
-  useDataSync(["patients"], () => { if (!patientId) loadPatients(); });
+  // A patient registered in the Patients screen while this dialog is open should
+  // appear on the next keystroke; re-running the current query is enough.
+  useDataSync(["patients"], () => { if (!patientId) patientSearch.reload(); });
 
   const save = async () => {
     if (submittingRef.current) return;
@@ -228,10 +218,28 @@ export function RecordPaymentDialog({
               <Label>{t("patientName")}</Label>
               <Combobox
                 value={pid}
-                onChange={(v) => { setPid(v); loadPatients(); }}
-                options={patients.map((p) => ({ value: p.id, label: p.label }))}
+                onChange={(v) => {
+                  const picked = patientSearch.options.find((p) => p.id === v);
+                  setPatientEcho(picked ? { id: picked.id, label: picked.label } : null);
+                  setPid(v);
+                }}
+                options={patientSearch.options.map((p) => ({
+                  value: p.id,
+                  label: p.label,
+                  // Two patients can share a name; the number they were found by is
+                  // the evidence that says which one the money belongs to.
+                  detail: p.phone ?? undefined,
+                }))}
                 placeholder={t("selectPatient")}
                 searchPlaceholder={lang === "ar" ? "ابحث عن مريض..." : "Search patient..."}
+                emptyText={patientSearch.failed ? pickerCopy.failed : pickerCopy.empty}
+                searchingText={pickerCopy.searching}
+                hintText={
+                  patientSearch.options.length >= PATIENT_PICKER_LIMIT ? pickerCopy.truncated : undefined
+                }
+                selectedLabel={pickedPatientLabel(patientEcho, patientSearch.options, pid)}
+                searching={patientSearch.searching}
+                onSearch={(term) => patientSearch.search(term)}
               />
             </div>
           )}

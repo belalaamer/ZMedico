@@ -2,11 +2,18 @@ import { useEffect, useState } from "react";
 import { useI18n } from "@/contexts/I18nContext";
 import { Combobox } from "@/components/ui/combobox";
 import { supabase } from "@/integrations/supabase/client";
-import { patientDisplayName } from "@/lib/patientName";
+import { usePatientSearch } from "@/hooks/usePatientSearch";
+import {
+  PATIENT_PICKER_LIMIT,
+  fetchPatientOption,
+  patientPickerCopy,
+  pickedPatientLabel,
+  type PatientOption,
+} from "@/lib/patientSearch";
 
 /**
  * Searchable picker for another patient (used as "Referred by").
- * - Loads up to 500 patients from the current branch / non-deleted.
+ * - Asks the branch's patients that match the typed name or phone, a page at a time.
  * - Excludes `excludeId` to enforce the self-referral rule at the UI level.
  */
 export function ReferrerPicker({
@@ -20,45 +27,38 @@ export function ReferrerPicker({
   searchPlaceholder?: string;
 }) {
   const { lang } = useI18n();
-  const [options, setOptions] = useState<{ value: string; label: string }[]>([]);
+  const copy = patientPickerCopy(lang);
+  const patientSearch = usePatientSearch({
+    ready: Boolean(branchId),
+    branchId: branchId ?? null,
+    lang,
+  });
+  const [echo, setEcho] = useState<PatientOption | null>(null);
 
+  // The referrer a form already holds is rarely on the page the search returns,
+  // and the box must still name them. Only for a referral that is allowed in the
+  // first place: echoing the patient themselves would let a self-referral back in
+  // through the label the list deliberately hides.
   useEffect(() => {
+    if (!value || value === excludeId) {
+      setEcho(null);
+      return;
+    }
     let active = true;
-    (async () => {
-      let q = (supabase as any)
-        .from("patients")
-        .select("id,patient_code,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,phone,deleted_at,branch_id")
-        .is("deleted_at", null)
-        .order("created_at", { ascending: false })
-        .limit(500);
-      if (branchId) q = q.eq("branch_id", branchId);
-      const { data } = await q;
-      if (!active) return;
-      const rows = (data ?? [])
-        .filter((p: any) => !excludeId || p.id !== excludeId)
-        .map((p: any) => {
-          const name = patientDisplayName(p, lang);
-          const phone = p.phone ? ` · ${p.phone}` : "";
-          return { value: p.id, label: `${name}${phone}` };
-        });
-      // Keep current value selectable even if it's outside the page window.
-      if (value && !rows.find((r) => r.value === value)) {
-        const { data: cur } = await (supabase as any)
-          .from("patients")
-          .select("id,patient_code,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,phone")
-          .eq("id", value)
-          .maybeSingle();
-        if (cur) {
-          rows.unshift({
-            value: cur.id,
-            label: `${patientDisplayName(cur, lang)}${cur.phone ? " · " + cur.phone : ""}`,
-          });
-        }
-      }
-      setOptions(rows);
-    })();
+    void fetchPatientOption(supabase, { id: value, lang }).then((row) => {
+      if (active) setEcho(row);
+    });
     return () => { active = false; };
-  }, [branchId, excludeId, value, lang]);
+  }, [value, excludeId, lang]);
+
+  const options = patientSearch.options
+    .filter((p) => !excludeId || p.id !== excludeId)
+    .map((p) => ({
+      value: p.id,
+      label: p.label,
+      // Names repeat; the number they were found by tells the desk which one.
+      detail: p.phone ?? undefined,
+    }));
 
   return (
     <Combobox
@@ -67,6 +67,12 @@ export function ReferrerPicker({
       options={options}
       placeholder={placeholder ?? "—"}
       searchPlaceholder={searchPlaceholder ?? (lang === "ar" ? "ابحث عن مريض..." : "Search patient...")}
+      emptyText={patientSearch.failed ? copy.failed : copy.empty}
+      searchingText={copy.searching}
+      hintText={patientSearch.options.length >= PATIENT_PICKER_LIMIT ? copy.truncated : undefined}
+      selectedLabel={pickedPatientLabel(echo, patientSearch.options, value ?? "")}
+      searching={patientSearch.searching}
+      onSearch={patientSearch.search}
     />
   );
 }

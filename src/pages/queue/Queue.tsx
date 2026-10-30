@@ -27,7 +27,7 @@ import { updateQueueAppointment } from "@/lib/queueMutation";
 import { openQueueConsultation, queueConsultationErrorCode, queueConsultationErrorMessage } from "@/lib/queueConsultation";
 import type { DictKey } from "@/lib/i18n";
 import { getQueueSettings, fetchQueueSettings, type QueueSettings } from "@/lib/queueSettings";
-import { showQueueSkeleton } from "@/lib/queueRefresh";
+import { showLoadingPlaceholder } from "@/lib/quietRefresh";
 import { listOpenAlerts, effectiveState, type QueueAlert } from "@/lib/queueAlerts";
 import { Switch } from "@/components/ui/switch";
 import { useOperationScope } from "@/hooks/useOperationScope";
@@ -877,7 +877,7 @@ export default function QueuePage() {
               </tr>
             </thead>
             <tbody>
-              {showQueueSkeleton(loading, rows.length) ? (
+              {showLoadingPlaceholder(loading, rows.length) ? (
                 <tr><td colSpan={8} className="p-0"><ListSkeleton rows={6} /></td></tr>
               ) : filtered.length === 0 ? (
                 <tr>
@@ -943,7 +943,7 @@ export default function QueuePage() {
 
       {/* Mobile cards */}
       <div className="md:hidden space-y-2">
-        {showQueueSkeleton(loading, rows.length) ? (
+        {showLoadingPlaceholder(loading, rows.length) ? (
           <Card className="p-0 overflow-hidden"><ListSkeleton rows={5} /></Card>
         ) : filtered.length === 0 ? (
           <Card className="py-10 flex flex-col items-center gap-3 text-center text-muted-foreground">

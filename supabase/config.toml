@@ -55,6 +55,10 @@ verify_jwt = false
 [functions.login-by-identifier]
 verify_jwt = false
 
+# Declared as deployed, not as load-bearing: no client artifact invokes this
+# function. The anonymous booking path calls the public_create_booking_for_tenant
+# RPC instead, and that RPC enforces the rate limit itself -- 20 attempts per IP
+# per hour and 6 per phone+IP per 6 hours, through consume_public_booking_rate_limit.
 [functions.public-booking-submit]
 verify_jwt = false
 

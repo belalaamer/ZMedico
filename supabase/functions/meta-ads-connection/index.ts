@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2";
-import { InactiveSessionError, requireActiveSessionOrThrow } from "../_shared/active-session.ts";
+import { requireActiveSessionOrThrow } from "../_shared/active-session.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -304,6 +304,6 @@ Deno.serve(async (req) => {
 
     throw new Error("Unsupported action");
   } catch (error) {
-    return jsonResponse({ error: errorMessage(error) }, error instanceof InactiveSessionError ? error.status : statusFrom(error));
+    return jsonResponse({ error: errorMessage(error) }, statusFrom(error));
   }
 });

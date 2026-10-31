@@ -111,6 +111,10 @@ const sourceFiles = (dir: string): string[] => {
   return out.sort();
 };
 
+// The scan is textual, so a sink written inside a comment would count too. Measured
+// over `src`: none exists today, so the ledger is real call sites; a comment parser
+// here could hide a live line and buys nothing while that stays true.
+//
 // The first argument of a call, quote-aware so a string containing a bracket or a
 // comma cannot end the scan early, and stopping at the first top-level comma.
 function firstArgument(src: string, open: number): string {

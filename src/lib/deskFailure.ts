@@ -17,7 +17,10 @@
 // security policies behind them). `booking_request_expired`, `slot_unavailable` and
 // the rejection-reason raises are deliberately absent: CalendarPage and
 // PendingBookings already carry their own bilingual copy for those two tokens, and
-// a second voice for the same raise would only drift.
+// a second voice for the same raise would only drift. In-app sentinels are absent
+// for the same kind of reason: `branch_required` is refused at every call site
+// before the call (Queue.tsx shows `selectBranch` instead), and the consultation
+// sentinels already have bilingual copy in `queueConsultation.ts`.
 
 export type DeskFailureCopy = { title: string; description?: string };
 

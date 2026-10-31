@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 import { corsPreflight, jsonResponse } from "../_shared/cors.ts";
 import { requireActiveSession } from "../_shared/active-session.ts";
+import { isAdministrator, readUserRoles } from "../_shared/staff-roles.ts";
 const MAX_BODY_BYTES = 8 * 1024;
 
 function genTemporaryPassword(len = 32) {
@@ -42,11 +43,11 @@ Deno.serve(async (req) => {
     if (sessionFailure) return sessionFailure;
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
-    const { data: isAdmin, error: roleErr } = await admin.rpc("has_role", {
-      _user_id: userData.user.id,
-      _role: "admin",
-    });
-    if (roleErr || !isAdmin) {
+    const callerRoles = await readUserRoles(admin, userData.user.id);
+    if (callerRoles.roles === null) {
+      return jsonResponse({ error: "Unable to verify administrator access" }, 503);
+    }
+    if (!isAdministrator(callerRoles.roles)) {
       return jsonResponse({ error: "Forbidden: admin only" }, 403);
     }
 
@@ -65,21 +66,13 @@ Deno.serve(async (req) => {
       : null;
     const nextPassword = suppliedPassword ?? genTemporaryPassword(32);
 
-    const { data: callerIsSystemOwner, error: callerOwnerErr } = await admin.rpc("has_role", {
-      _user_id: userData.user.id,
-      _role: "system_owner",
-    });
-    if (callerOwnerErr) {
-      return jsonResponse({ error: "Unable to verify caller scope" }, 500);
-    }
+    const callerIsSystemOwner = callerRoles.roles.includes("system_owner");
 
-    const { data: targetIsSystemOwner, error: targetOwnerErr } = await admin.rpc("has_role", {
-      _user_id: user_id,
-      _role: "system_owner",
-    });
-    if (targetOwnerErr) {
+    const targetRoles = await readUserRoles(admin, user_id);
+    if (targetRoles.roles === null) {
       return jsonResponse({ error: "Unable to verify target role" }, 500);
     }
+    const targetIsSystemOwner = targetRoles.roles.includes("system_owner");
 
     if (targetIsSystemOwner && !callerIsSystemOwner) {
       return jsonResponse({ error: "Only the System Owner may reset another System Owner password" }, 403);

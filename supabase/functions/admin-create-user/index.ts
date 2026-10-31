@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 import { allocateEmployeeId } from "../_shared/employee-id.ts";
 import { requireActiveSession } from "../_shared/active-session.ts";
+import { isAdministrator, readUserRoles } from "../_shared/staff-roles.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
@@ -54,11 +55,11 @@ Deno.serve(async (req) => {
     if (sessionFailure) return sessionFailure;
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
-    const { data: isAdmin, error: roleErr } = await admin.rpc("has_role", {
-      _user_id: userData.user.id,
-      _role: "admin",
-    });
-    if (roleErr || !isAdmin) {
+    const callerRoles = await readUserRoles(admin, userData.user.id);
+    if (callerRoles.roles === null) {
+      return jsonResponse({ error: "Unable to verify administrator access" }, 503);
+    }
+    if (!isAdministrator(callerRoles.roles)) {
       return jsonResponse({ error: "Forbidden: admin only" }, 403);
     }
 
@@ -100,14 +101,8 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Invalid role" }, 400);
     }
 
-    if (role === "system_owner") {
-      const { data: isSystemOwner, error: ownerRoleErr } = await admin.rpc("has_role", {
-        _user_id: userData.user.id,
-        _role: "system_owner",
-      });
-      if (ownerRoleErr || !isSystemOwner) {
-        return jsonResponse({ error: "Only the System Owner may create another System Owner" }, 403);
-      }
+    if (role === "system_owner" && !callerRoles.roles.includes("system_owner")) {
+      return jsonResponse({ error: "Only the System Owner may create another System Owner" }, 403);
     }
 
     // RBAC-08 fix: "hr" was missing from this list even though every

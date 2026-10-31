@@ -2,6 +2,14 @@ import {readFileSync} from 'node:fs';
 import ts from 'typescript';
 import {expect,it,vi} from 'vitest';
 
+function loadStaffRoles(){
+ const source=readFileSync('supabase/functions/_shared/staff-roles.ts','utf8');
+ const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+ const mod:{exports:Record<string,unknown>}={exports:{}};
+ new Function('module','exports',compiled)(mod,mod.exports);
+ return mod.exports as {readUserRoles:(client:unknown,userId:string)=>Promise<{roles:string[]|null;error:unknown}>;isAdministrator:(roles:string[])=>boolean};
+}
+
 async function run(failingTable:string|null=null,code='PT409',authError=false){
  let handler!:(request:Request)=>Promise<Response>;
  const deletes:string[]=[];
@@ -10,7 +18,10 @@ async function run(failingTable:string|null=null,code='PT409',authError=false){
  const service={
   rpc:async()=>({data:true,error:null}),
   from:(table:string)=>({
-   select:()=>({eq:async()=>({count:2,error:null})}),
+   select:(columns?:string)=>({eq:async(column:string,value:string)=>{
+    if(columns==='role') return {data:value==='actor'?[{role:'system_owner'}]:[],error:null};
+    return {count:2,error:null};
+   }}),
    insert:async(row:unknown)=>{audits.push(row);return {error:null};},
    delete:()=>({eq:async()=>{deletes.push(table);return {error:table===failingTable?{code,message:'private database details'}:null};}}),
   }),
@@ -21,7 +32,8 @@ async function run(failingTable:string|null=null,code='PT409',authError=false){
  const source=readFileSync('supabase/functions/admin-delete-user/index.ts','utf8').replace(/^import .*;\r?\n/gm,'');
  const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.None,target:ts.ScriptTarget.ES2022}}).outputText;
  const jsonResponse=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status});
- new Function('Deno','createClient','corsPreflight','jsonResponse','requireActiveSession',compiled)(deno,(_url:string,key:string)=>key==='anon'?user:service,()=>new Response('ok'),jsonResponse,async()=>null);
+ const roles=loadStaffRoles();
+ new Function('Deno','createClient','corsPreflight','jsonResponse','requireActiveSession','readUserRoles','isAdministrator',compiled)(deno,(_url:string,key:string)=>key==='anon'?user:service,()=>new Response('ok'),jsonResponse,async()=>null,roles.readUserRoles,roles.isAdministrator);
  const response=await handler(new Request('https://local.invalid',{method:'POST',headers:{Authorization:'Bearer test-only'},body:JSON.stringify({user_id:'target'})}));
  return {response,body:await response.json(),deletes,deleteUser,audits};
 }

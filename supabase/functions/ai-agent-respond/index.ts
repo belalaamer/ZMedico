@@ -34,8 +34,8 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2";
-import { getAIProvider, type ProviderMessage } from "./_shared/ai-provider.ts";
-import { dispatchTool, TOOL_DEFINITIONS, type TrustedContext } from "./_shared/ai-tools.ts";
+import { getAIProvider, type ProviderMessage } from "../_shared/ai-provider.ts";
+import { dispatchTool, TOOL_DEFINITIONS, type TrustedContext } from "../_shared/ai-tools.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

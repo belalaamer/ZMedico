@@ -36,6 +36,7 @@ import {
 } from "@/lib/calendarPatientDeepLink";
 import { PATIENT_PICKER_LIMIT, patientPickerCopy, pickedPatientLabel } from "@/lib/patientSearch";
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
+import { deskFailure } from "@/lib/deskFailure";
 import { localDateTimeInput } from "@/lib/localDate";
 
 function statusLabel(s: Appt["status"], t: (k: any) => string) {
@@ -323,7 +324,11 @@ export default function CalendarPage() {
     q = q.eq("branch_id", branchId);
     const { data, error } = await q;
     if (requestId !== loadRequestRef.current) return;
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تحميل التقويم." : "Could not load the calendar.");
+      toast.error(failure.title, { description: failure.description });
+      return;
+    }
     setItems((data ?? []) as any);
   };
 
@@ -380,7 +385,8 @@ export default function CalendarPage() {
       });
       if (cancelled) return;
       if (error) {
-        toast.error(error.message);
+        const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تحميل أطباء هذه الخدمة." : "Could not load the doctors for this service.");
+        toast.error(failure.title, { description: failure.description });
         setServiceDoctors([]);
         return;
       }
@@ -604,7 +610,11 @@ export default function CalendarPage() {
       started_at: (a as any).started_at ?? null,
     });
     const { data, error } = await supabase.from("appointments").update(patch as any).eq("id", a.id).select("id");
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر إلغاء الموعد." : "The appointment could not be cancelled.");
+      toast.error(failure.title, { description: failure.description });
+      return;
+    }
     if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); load(); return; }
     toast.success(lang === "ar" ? "تم إلغاء الموعد" : "Appointment cancelled");
     load();
@@ -617,7 +627,11 @@ export default function CalendarPage() {
       started_at: (a as any).started_at ?? null,
     });
     const { data, error } = await supabase.from("appointments").update(patch as any).eq("id", a.id).select("id");
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تحديث حالة الموعد." : "The appointment status could not be changed.");
+      toast.error(failure.title, { description: failure.description });
+      return;
+    }
     if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); load(); return; }
     toast.success(t("saved"));
     load();
@@ -715,7 +729,11 @@ export default function CalendarPage() {
         message_ar: `مرحبا ${nameAr}، تذكير بموعدك في ${when}.`,
         status: "pending",
       } as any).select("id").single();
-      if (insErr) { toast.error(insErr.message); return; }
+      if (insErr) {
+        const failure = deskFailure(insErr, lang, lang === "ar" ? "تعذر جدولة التذكير." : "The reminder could not be scheduled.");
+        toast.error(failure.title, { description: failure.description });
+        return;
+      }
       reminderId = ins!.id as string;
     }
     const { data, error } = await supabase.functions.invoke("send-reminder", { body: { reminder_id: reminderId } });
@@ -773,7 +791,11 @@ export default function CalendarPage() {
     const { data, error } = editId
       ? await supabase.from("appointments").update(payload).eq("id", editId).select("id")
       : await supabase.from("appointments").insert({ ...payload, branch_id: currentBranchId, status: "scheduled" });
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر حفظ الموعد." : "The appointment could not be saved.");
+      toast.error(failure.title, { description: failure.description });
+      return;
+    }
     if (editId && rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); load(); return; }
     toast.success(lang === "ar" ? "تم حفظ الموعد" : "Appointment saved");
     setOpen(false); setEditId(null);

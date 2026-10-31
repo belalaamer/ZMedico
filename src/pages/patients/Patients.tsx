@@ -31,6 +31,7 @@ import { CreateInvoiceDialog } from "../invoices/CreateInvoiceDialog";
 import { containsArabicScript, patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
 import { describeEdgeFailure, safeEdgeReason } from "@/lib/edgeFailure";
 import { portalFailureReason } from "@/lib/portalMutationFailure";
+import { deskFailure } from "@/lib/deskFailure";
 import { sanitizeSearch } from "@/lib/sanitizeSearch";
 
 const PAGE_SIZE = 50;
@@ -178,7 +179,11 @@ export default function PatientsPage() {
     const { data, error, count } = await query;
     if (requestId !== loadRequestRef.current) return;
     setLoading(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تحميل قائمة المرضى." : "Could not load the patient list.");
+      toast.error(failure.title, { description: failure.description });
+      return;
+    }
     setItems((data ?? []) as Patient[]);
         setTotal(count ?? 0);
   }, [branchSelectionReady, currentBranchId, searchTerm, page]);
@@ -329,7 +334,11 @@ export default function PatientsPage() {
       whatsapp_opt_in_source: form.whatsapp_opt_in ? "clinic_staff" : null,
     };
     const { data: createdPatient, error } = await supabase.from("patients").insert(payload).select("id").single();
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر إضافة المريض." : "The patient could not be added.");
+      toast.error(failure.title, { description: failure.description });
+      return;
+    }
     toast.success(lang === "ar" ? "تمت إضافة المريض" : "Patient added");
     if (createdPatient?.id && d.email) {
       const { data: portalResult, error: portalError } = await supabase.functions.invoke("patient-portal-invite", { body: { patient_id: createdPatient.id, auto_credentials: autoCreatePortalCredentials } });
@@ -360,7 +369,11 @@ export default function PatientsPage() {
 
   const handleDelete = async (p: Patient) => {
     const { data, error } = await supabase.from("patients").update({ deleted_at: new Date().toISOString() }).eq("id", p.id).select("id");
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر حذف المريض." : "The patient could not be deleted.");
+      toast.error(failure.title, { description: failure.description });
+      return;
+    }
     if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); setConfirmDel(null); load(); return; }
     toast.success(lang === "ar" ? "تم حذف المريض" : "Patient deleted");
     setConfirmDel(null);

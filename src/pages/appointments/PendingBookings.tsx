@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { subscribeResilient } from "@/lib/realtime";
 import { Can } from "@/components/Can";
 import { toast } from "sonner";
+import { showLoadingPlaceholder } from "@/lib/quietRefresh";
 
 // This page is the fix for "we have no easy way to track pending booking
 // requests" -- before it existed, a pending online-booking request
@@ -88,6 +89,9 @@ export default function PendingBookings() {
 
   useEffect(() => {
     if (!branchSelectionReady) return;
+    // The requests on screen belong to the branch that was selected before this
+    // one; a quiet refresh must never pass them off as the new branch's.
+    setRows((prev) => (prev.length === 0 ? prev : []));
     void load();
     if (!currentBranchId) return;
     return subscribeResilient({
@@ -150,7 +154,7 @@ export default function PendingBookings() {
         <Button variant="outline" size="sm" onClick={() => void load()}><RefreshCw className="me-2 size-4" />{lang === "ar" ? "تحديث" : "Refresh"}</Button>
       </div>
 
-      {loading ? (
+      {showLoadingPlaceholder(loading, rows.length) ? (
         <Card className="p-8 text-center text-sm text-muted-foreground">{lang === "ar" ? "جارٍ التحميل…" : "Loading…"}</Card>
       ) : !rows.length ? (
         <Card className="p-10 text-center">

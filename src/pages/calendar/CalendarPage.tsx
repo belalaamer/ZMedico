@@ -7,7 +7,7 @@ import { Fab } from "@/components/ui/fab";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft, ChevronRight, Plus, Send, CalendarDays, LayoutGrid, Clock, Filter, X, CalendarRange, Check, ChevronsUpDown, ArrowRight, Wallet as WalletIcon, AlertCircle, History } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Send, CalendarDays, LayoutGrid, Clock, Filter, X, CalendarRange, Check, ArrowRight, Wallet as WalletIcon, AlertCircle, History } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Can } from "@/components/Can";
 import { doctorDisplayName } from "@/lib/doctorName";
@@ -15,9 +15,9 @@ import { patientDisplayName } from "@/lib/patientName";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Combobox } from "@/components/ui/combobox";
+import { usePatientSearch } from "@/hooks/usePatientSearch";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
@@ -31,10 +31,12 @@ import { buildStatusPatch } from "@/lib/appointmentStatus";
 import { matchesStatusFilter, nextStatusFilter } from "@/lib/appointmentStatusFilter";
 import { reminderSendOutcome } from "@/lib/reminderSendOutcome";
 import {
-  deepLinkBanner, deepLinkPatientId, deepLinkPickerLabel, patientDeepLinkId, withoutPatientParam,
+  deepLinkBanner, deepLinkPatientId, patientDeepLinkId, withoutPatientParam,
   type DeepLinkedPatient, type PatientNameRow,
 } from "@/lib/calendarPatientDeepLink";
+import { PATIENT_PICKER_LIMIT, patientPickerCopy, pickedPatientLabel } from "@/lib/patientSearch";
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
+import { deskFailure } from "@/lib/deskFailure";
 import { localDateTimeInput } from "@/lib/localDate";
 
 function statusLabel(s: Appt["status"], t: (k: any) => string) {
@@ -146,7 +148,6 @@ export default function CalendarPage() {
   const navigate = useNavigate();
   const [date, setDate] = useState<Date>(startOfDay(new Date()));
   const [view, setView] = useState<"day" | "week" | "month">("day");
-  const [patientPickerOpen, setPatientPickerOpen] = useState(false);
   const [miniOpen, setMiniOpen] = useState(false);
   const [monthCursor, setMonthCursor] = useState<Date>(startOfMonth(new Date()));
   const [items, setItems] = useState<Appt[]>([]);
@@ -170,9 +171,14 @@ export default function CalendarPage() {
   const [roomBoard, setRoomBoard] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [monthDots, setMonthDots] = useState<Record<string, number>>({});
-  const [patients, setPatients] = useState<{ id: string; label: string }[]>([]);
-  const [services, setServices] = useState<{ id: string; name_en: string; name_ar: string; duration: number }[]>([]);
+  // C4: the booking picker holds one page of server matches, not the clinic. It used to
+  // load the newest 200 patients and filter them in the browser, so a patient past #200
+  // could not be booked from the calendar at all -- and a name list could never be found
+  // by phone.
+  const patientSearch = usePatientSearch({ ready: branchSelectionReady, branchId: currentBranchId, lang });
+  const patients = patientSearch.options;
   const [rooms, setRooms] = useState<string[]>([]);
+  const [services, setServices] = useState<{ id: string; name_en: string; name_ar: string; duration: number }[]>([]);
   const [resources, setResources] = useState<{ id: string; name_en: string; name_ar: string; capacity: number; is_active: boolean }[]>([]);
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -318,7 +324,11 @@ export default function CalendarPage() {
     q = q.eq("branch_id", branchId);
     const { data, error } = await q;
     if (requestId !== loadRequestRef.current) return;
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تحميل التقويم." : "Could not load the calendar.");
+      toast.error(failure.title, { description: failure.description });
+      return;
+    }
     setItems((data ?? []) as any);
   };
 
@@ -375,7 +385,8 @@ export default function CalendarPage() {
       });
       if (cancelled) return;
       if (error) {
-        toast.error(error.message);
+        const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تحميل أطباء هذه الخدمة." : "Could not load the doctors for this service.");
+        toast.error(failure.title, { description: failure.description });
         setServiceDoctors([]);
         return;
       }
@@ -447,9 +458,28 @@ export default function CalendarPage() {
   const deepLinkCopy = deepLinkBanner(lang, deepLink);
 
   const clearPatientDeepLink = () => {
+    if (deepLinkId) {
+      // "Clear patient" means the form too, not only the banner: the id it just
+      // removed was the one the picker was holding.
+      setForm((current) => (current.patient_id === deepLinkId ? { ...current, patient_id: "" } : current));
+      setPatientEcho((current) => (current?.id === deepLinkId ? null : current));
+      setSearchParams(withoutPatientParam(searchParams), { replace: true });
+    }
     setDeepLinkRow(null);
-    if (deepLinkId) setSearchParams(withoutPatientParam(searchParams), { replace: true });
   };
+
+  // The page of matches is bounded, so the chosen patient is often legitimately absent
+  // from it. The row the desk picked -- or the appointment being edited -- names them.
+  const [patientEcho, setPatientEcho] = useState<{ id: string; label: string } | null>(null);
+  const bookingPatientLabel = (patientId: string): string | null =>
+    pickedPatientLabel(patientEcho, patients, patientId)
+    ?? (patientId && deepLinkPatientId(deepLink) === patientId ? deepLink?.name ?? null : null);
+
+  const pickerCopy = patientPickerCopy(lang);
+  const loadPatientOptions = (term: string) => {
+    void patientSearch.search(term);
+  };
+  useDataSync(["patients"], () => patientSearch.reload());
 
   // Month dots
   const loadMonthDots = async () => {
@@ -475,17 +505,6 @@ export default function CalendarPage() {
   };
   useEffect(() => { void loadMonthDots(); /* eslint-disable-next-line */ }, [monthCursor.getTime(), branchSelectionReady, currentBranchId]);
   useDataSync(["appointments"], () => { void loadMonthDots(); });
-
-  const loadPatientOptions = () => {
-    if (!branchSelectionReady || !currentBranchId) {
-      setPatients([]);
-      return;
-    }
-    supabase.from("patients").select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language").eq("branch_id", currentBranchId).is("deleted_at", null).order("created_at", { ascending: false }).limit(200)
-      .then(({ data }) => setPatients((data ?? []).map((p: any) => ({ id: p.id, label: patientDisplayName(p, lang) }))));
-  };
-  useEffect(() => { loadPatientOptions(); }, [lang, branchSelectionReady, currentBranchId]);
-  useDataSync(["patients"], () => { loadPatientOptions(); });
 
   // Booking uses tenant-scoped services/visit types. Clinical procedures remain
   // part of the medical record rather than the receptionist-facing booking list.
@@ -548,19 +567,24 @@ export default function CalendarPage() {
     const local = localDateTimeInput(base);
     // C3: an arrival from a patient screen carries that patient into the form instead of
     // being discarded, and an unverified id is never prefilled.
-    setForm({ patient_id: deepLinkPatientId(deepLink), doctor_id: "", scheduled_at: local, duration_minutes: 30, service_id: "", procedure: "", room: "", resource_id: "", notes: "", status: "scheduled" });
+    const linked = deepLinkPatientId(deepLink);
+    setPatientEcho(linked && deepLink?.name ? { id: linked, label: deepLink.name } : null);
+    setForm({ patient_id: linked, doctor_id: "", scheduled_at: local, duration_minutes: 30, service_id: "", procedure: "", room: "", resource_id: "", notes: "", status: "scheduled" });
     setOpen(true);
   };
   const openNewAt = (slot: Date) => {
     setEditId(null);
     const local = localDateTimeInput(slot);
-    setForm({ patient_id: deepLinkPatientId(deepLink), doctor_id: "", scheduled_at: local, duration_minutes: 30, service_id: "", procedure: "", room: "", resource_id: "", notes: "", status: "scheduled" });
+    const linked = deepLinkPatientId(deepLink);
+    setPatientEcho(linked && deepLink?.name ? { id: linked, label: deepLink.name } : null);
+    setForm({ patient_id: linked, doctor_id: "", scheduled_at: local, duration_minutes: 30, service_id: "", procedure: "", room: "", resource_id: "", notes: "", status: "scheduled" });
     setOpen(true);
   };
   const openEdit = (a: Appt) => {
     setEditId(a.id);
     const dt = new Date(a.scheduled_at);
     const local = localDateTimeInput(dt);
+    setPatientEcho(a.patient_id && a.patients ? { id: a.patient_id, label: patientDisplayName(a.patients, lang) } : null);
     setForm({
       patient_id: a.patient_id,
       doctor_id: a.doctor_id ?? "",
@@ -586,7 +610,11 @@ export default function CalendarPage() {
       started_at: (a as any).started_at ?? null,
     });
     const { data, error } = await supabase.from("appointments").update(patch as any).eq("id", a.id).select("id");
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر إلغاء الموعد." : "The appointment could not be cancelled.");
+      toast.error(failure.title, { description: failure.description });
+      return;
+    }
     if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); load(); return; }
     toast.success(lang === "ar" ? "تم إلغاء الموعد" : "Appointment cancelled");
     load();
@@ -599,7 +627,11 @@ export default function CalendarPage() {
       started_at: (a as any).started_at ?? null,
     });
     const { data, error } = await supabase.from("appointments").update(patch as any).eq("id", a.id).select("id");
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تحديث حالة الموعد." : "The appointment status could not be changed.");
+      toast.error(failure.title, { description: failure.description });
+      return;
+    }
     if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); load(); return; }
     toast.success(t("saved"));
     load();
@@ -697,7 +729,11 @@ export default function CalendarPage() {
         message_ar: `مرحبا ${nameAr}، تذكير بموعدك في ${when}.`,
         status: "pending",
       } as any).select("id").single();
-      if (insErr) { toast.error(insErr.message); return; }
+      if (insErr) {
+        const failure = deskFailure(insErr, lang, lang === "ar" ? "تعذر جدولة التذكير." : "The reminder could not be scheduled.");
+        toast.error(failure.title, { description: failure.description });
+        return;
+      }
       reminderId = ins!.id as string;
     }
     const { data, error } = await supabase.functions.invoke("send-reminder", { body: { reminder_id: reminderId } });
@@ -755,13 +791,18 @@ export default function CalendarPage() {
     const { data, error } = editId
       ? await supabase.from("appointments").update(payload).eq("id", editId).select("id")
       : await supabase.from("appointments").insert({ ...payload, branch_id: currentBranchId, status: "scheduled" });
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر حفظ الموعد." : "The appointment could not be saved.");
+      toast.error(failure.title, { description: failure.description });
+      return;
+    }
     if (editId && rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); load(); return; }
     toast.success(lang === "ar" ? "تم حفظ الموعد" : "Appointment saved");
     setOpen(false); setEditId(null);
     // C3: the link asked for one booking; keeping it would prefill the next form with the
     // patient who was just saved.
     clearPatientDeepLink();
+    setPatientEcho(null);
     setForm({ patient_id: "", doctor_id: "", scheduled_at: "", duration_minutes: 30, service_id: "", procedure: "", room: "", resource_id: "", notes: "", status: "scheduled" });
     load();
     } finally {
@@ -1100,50 +1141,29 @@ export default function CalendarPage() {
               <form onSubmit={handleSave} className="space-y-4">
                 <div className="space-y-2">
                   <Label>{t("patientName")}</Label>
-                  <Popover open={patientPickerOpen} onOpenChange={setPatientPickerOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={patientPickerOpen}
-                        className="w-full justify-between font-normal"
-                      >
-                        <span className={cn("truncate", !form.patient_id && "text-muted-foreground")}>
-                          {form.patient_id
-                            ? deepLinkPickerLabel(patients, form.patient_id, deepLink)
-                            : (lang === "ar" ? "ابحث عن مريض..." : "Search patient...")}
-                        </span>
-                        <ChevronsUpDown className="ms-2 size-4 opacity-50 shrink-0" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      className="p-0 w-[--radix-popover-trigger-width] max-w-[calc(100vw-2rem)]"
-                      align="start"
-                    >
-                      <Command>
-                        <CommandInput placeholder={lang === "ar" ? "ابحث بالاسم..." : "Search by name..."} />
-                        <CommandList className="max-h-[260px]">
-                          <CommandEmpty>{lang === "ar" ? "لا يوجد مرضى" : "No patients found"}</CommandEmpty>
-                          <CommandGroup>
-                            {patients.map((p) => (
-                              <CommandItem
-                                key={p.id}
-                                value={`${p.label} ${p.id}`}
-                                onSelect={() => {
-                                  setForm({ ...form, patient_id: p.id });
-                                  setPatientPickerOpen(false);
-                                }}
-                              >
-                                <Check className={cn("me-2 size-4", form.patient_id === p.id ? "opacity-100" : "opacity-0")} />
-                                {p.label}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                  <Combobox
+                    options={patients.map((p) => ({
+                      value: p.id,
+                      label: p.label,
+                      // Two patients can share a name; the number they were found by is
+                      // the one piece of evidence that says which one this is.
+                      detail: p.phone ?? undefined,
+                    }))}
+                    value={form.patient_id}
+                    onChange={(next) => {
+                      const picked = patients.find((p) => p.id === next);
+                      setPatientEcho(picked ? { id: picked.id, label: picked.label } : null);
+                      setForm((current) => ({ ...current, patient_id: next }));
+                    }}
+                    placeholder={lang === "ar" ? "ابحث عن مريض..." : "Search patient..."}
+                    searchPlaceholder={pickerCopy.searchPlaceholder}
+                    emptyText={patientSearch.failed ? pickerCopy.failed : pickerCopy.empty}
+                    searchingText={pickerCopy.searching}
+                    hintText={patients.length >= PATIENT_PICKER_LIMIT ? pickerCopy.truncated : undefined}
+                    selectedLabel={bookingPatientLabel(form.patient_id)}
+                    searching={patientSearch.searching}
+                    onSearch={loadPatientOptions}
+                  />
                   {form.patient_id && (
                     <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs flex flex-wrap items-center gap-x-4 gap-y-1">
                       {patientCtxLoading || !patientCtx ? (

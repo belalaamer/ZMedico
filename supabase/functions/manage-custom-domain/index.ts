@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { InactiveSessionError, requireActiveSessionOrThrow } from "../_shared/active-session.ts";
 
 // The Cloudflare account subdomain still reads "belalaamer", so this preview
 // origin survives the retirement of that marketing domain: it is the CORS
@@ -203,6 +204,7 @@ async function requireSystemOwner(req: Request): Promise<{ userId: string; db: S
   const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authorization } } });
   const { data, error } = await userClient.auth.getUser();
   if (error || !data.user) throw new Error("Authentication required");
+  await requireActiveSessionOrThrow(userClient);
   const { data: allowed, error: roleError } = await userClient.rpc("has_role", { _user_id: data.user.id, _role: "system_owner" });
   if (roleError || allowed !== true) throw new Error("Custom Domains require System Owner access");
   return { userId: data.user.id, db: createClient(supabaseUrl, serviceRoleKey) };
@@ -495,7 +497,9 @@ Deno.serve(async (req) => {
     throw new Error("Unsupported action");
   } catch (error) {
     const message = cleanError(error);
-    const status = message === "Authentication required" || message.includes("access") || message.includes("require") ? 403 : 400;
+    const status = error instanceof InactiveSessionError
+      ? error.status
+      : message === "Authentication required" || message.includes("access") || message.includes("require") ? 403 : 400;
     return json({ error: message }, status, req);
   }
 });

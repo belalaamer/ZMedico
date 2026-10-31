@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { sanitizeSearch } from "@/lib/sanitizeSearch";
+import { searchPatientRows } from "@/lib/patientSearch";
 import { patientDisplayName } from "@/lib/patientName";
 import { enumLabel } from "@/lib/enumLabels";
 import { localDateOnly } from "@/lib/localDate";
@@ -39,29 +40,10 @@ export async function searchPatients(
   branchId: string | null,
   lang: "en" | "ar",
 ): Promise<SearchHit[]> {
-  if (!branchId) return [];
-  const eq = esc(q);
-  const ors = [
-    `first_name_en.ilike.%${eq}%`,
-    `last_name_en.ilike.%${eq}%`,
-    `first_name_ar.ilike.%${eq}%`,
-    `last_name_ar.ilike.%${eq}%`,
-    `phone.ilike.%${eq}%`,
-    `phone2.ilike.%${eq}%`,
-    `email.ilike.%${eq}%`,
-  ];
-  if (isDigits(q)) ors.push(`patient_code.eq.${q}`);
-
-  let query = supabase
-    .from("patients")
-    .select("id,patient_code,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,phone,email")
-    .is("deleted_at", null)
-    .or(ors.join(","))
-    .limit(LIMIT);
-  if (branchId) query = query.eq("branch_id", branchId);
-  const { data, error } = await query;
-  if (error || !data) return [];
-  return (data as any[]).map((p) => ({
+  // One predicate for every patient surface (src/lib/patientSearch.ts), so the
+  // ⌘K result and the booking picker answer "who matches this" identically.
+  const { rows } = await searchPatientRows(supabase, { q, branchId, limit: LIMIT });
+  return rows.map((p) => ({
     id: p.id,
     label: `${patientName(p, lang)}  #${p.patient_code}`,
     sub: [p.phone, p.email].filter(Boolean).join(" · "),

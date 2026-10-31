@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -45,22 +45,67 @@ async function verifySignature(rawBody: string, req: Request): Promise<boolean> 
   return timingSafeEqual(digest, hexToBytes(signature));
 }
 
+// E10: the orchestrator's HTTP status and body are now read. A turn that was
+// deliberately skipped (AI off, no provider configured) is still a 200 and stays
+// quiet; a turn that failed -- non-200, `ok:false`, an errored invoke, or no
+// answer at all -- moves the conversation to the human queue so a person sees the
+// message the assistant could not answer.
+const AI_AGENT_INVOKE_TIMEOUT_MS = 30_000;
+
+async function reportUnansweredTurn(
+  supabase: SupabaseClient,
+  conversationId: string,
+  detail: string,
+) {
+  const { error } = await supabase
+    .from("conversations")
+    .update({
+      status: "human_active",
+      handoff_reason: `ai_turn_failed: ${detail}`.slice(0, 500),
+      handoff_at: new Date().toISOString(),
+    })
+    .eq("id", conversationId);
+  if (error) {
+    console.error(`[whatsapp-webhook] could not hand off unanswered turn for conversation_id=${conversationId}:`, error);
+  }
+}
+
 // Fires the AI agent orchestrator for a conversation without blocking (or
 // failing) the webhook's own response to Meta. Uses EdgeRuntime.waitUntil
 // when available (keeps the function instance alive long enough for the
 // background fetch to complete) and falls back to a plain un-awaited fetch
 // with a .catch otherwise.
-function triggerAIAgentRespond(supabaseUrl: string, serviceRoleKey: string, conversationId: string) {
-  const task = fetch(`${supabaseUrl}/functions/v1/ai-agent-respond`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${serviceRoleKey}`,
-    },
-    body: JSON.stringify({ conversation_id: conversationId }),
-  }).catch((err) => {
-    console.error(`[whatsapp-webhook] failed to invoke ai-agent-respond for conversation_id=${conversationId}:`, err);
-  });
+function triggerAIAgentRespond(
+  supabase: SupabaseClient,
+  supabaseUrl: string,
+  serviceRoleKey: string,
+  conversationId: string,
+) {
+  const task = (async () => {
+    let detail: string;
+    try {
+      const res = await fetch(`${supabaseUrl}/functions/v1/ai-agent-respond`, {
+        method: "POST",
+        signal: AbortSignal.timeout(AI_AGENT_INVOKE_TIMEOUT_MS),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${serviceRoleKey}`,
+        },
+        body: JSON.stringify({ conversation_id: conversationId }),
+      });
+      const reply = await res.json().catch(() => null) as { ok?: boolean; skipped?: boolean; reason?: string; handed_off?: boolean } | null;
+      if (res.ok && reply?.ok !== false) return;
+      // The orchestrator hands off its own failures; only step in when it could
+      // not (or would have told us), so a more specific reason is not overwritten.
+      if (reply?.handed_off === true) return;
+      detail = `status=${res.status} reason=${reply?.reason ?? "unparsable_response"}`;
+      console.error(`[whatsapp-webhook] ai-agent-respond left the turn unanswered for conversation_id=${conversationId}: ${detail}`);
+    } catch (err) {
+      detail = `invoke_error=${err instanceof Error ? err.name : String(err)}`;
+      console.error(`[whatsapp-webhook] failed to invoke ai-agent-respond for conversation_id=${conversationId}:`, err);
+    }
+    await reportUnansweredTurn(supabase, conversationId, detail);
+  })();
 
   const rt = (globalThis as any).EdgeRuntime;
   if (rt && typeof rt.waitUntil === "function") {
@@ -178,8 +223,9 @@ async function handleInboundMessage(
     }
 
     // AI agent hook (Phase 2). Fire-and-forget: a failure here must never
-    // fail this webhook's response to Meta.
-    triggerAIAgentRespond(supabaseUrl, serviceRoleKey, conversationId);
+    // fail this webhook's response to Meta. The result is still read -- an
+    // unanswered turn has to reach the human queue (E10).
+    triggerAIAgentRespond(supabase, supabaseUrl, serviceRoleKey, conversationId);
   } catch (err) {
     console.error(`[whatsapp-webhook] unexpected error handling inbound message id=${message?.id}:`, err);
   }
@@ -253,7 +299,10 @@ Deno.serve(async (req: Request) => {
             .update({ status: portalStatus, error_message: portalStatus === "failed" ? patch.error_message : null })
             .eq("provider_message_id", providerMessageId)
           : { error: null };
-        if (!error || !portalError) updated++;
+        // E12: `updated` is a delivery claim, so it has to mean "both writes
+        // landed". With `||` a status counted as updated when one of them errored,
+        // which reported delivery the desk never actually has.
+        if (!error && !portalError) updated++;
       }
 
       // Inbound customer messages (Phase 1 multi-tenant AI messaging platform).

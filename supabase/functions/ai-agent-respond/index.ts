@@ -17,6 +17,15 @@
 // without redeploying secrets. See supabase/functions/ai-admin-settings for
 // the admin API that writes this config.
 //
+// TURN OUTCOMES (E10): a turn has three honest shapes.
+//   - answered ............. 200 {ok:true, text, send_result}
+//   - deliberately skipped . 200 {ok:true, skipped:true, reason}
+//     (the clinic turned AI off, or has no provider row -- a configuration
+//     state the webhook must not treat as an incident)
+//   - failed ................ non-200 {ok:false, reason, handed_off}
+//     and the conversation is moved to `human_active`, because the patient's
+//     message was accepted and nothing answered it.
+//
 // TODO (Level 2 / tenant override): once per-tenant AI provider config is
 // needed, look up ai_provider_config WHERE scope='tenant' AND tenant_id=<this
 // conversation's tenant_id> first, and fall back to the platform row only if
@@ -24,7 +33,7 @@
 // function always uses the platform-scope row.
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2";
 import { getAIProvider, type ProviderMessage } from "./_shared/ai-provider.ts";
 import { dispatchTool, TOOL_DEFINITIONS, type TrustedContext } from "./_shared/ai-tools.ts";
 
@@ -43,6 +52,34 @@ function response(body: unknown, status = 200) {
 
 const MAX_TOOL_ROUNDS = 4;
 const MAX_HISTORY_MESSAGES = 20;
+
+// E10: a turn that could not be produced used to answer `200` with `{ok:false}`,
+// which the only caller (whatsapp-webhook) never read. A turn that failed for a
+// technical reason is now a non-200, and the conversation is handed to a human so
+// it appears in the staff inbox instead of going silent. The three handoff columns
+// are the same ones `handoff_to_human` writes in _shared/ai-tools.ts, and the
+// reason keeps an `ai_turn_failed:` prefix so a staff member can tell an AI
+// failure apart from a customer asking for a person.
+const HANDOFF_REASON_PREFIX = "ai_turn_failed:";
+
+async function handOffFailedTurn(
+  client: SupabaseClient,
+  conversationId: string,
+): Promise<boolean> {
+  const { error } = await client
+    .from("conversations")
+    .update({
+      status: "human_active",
+      handoff_reason: `${HANDOFF_REASON_PREFIX} the assistant could not process this message`,
+      handoff_at: new Date().toISOString(),
+    })
+    .eq("id", conversationId);
+  if (error) {
+    console.error(`[ai-agent-respond] handoff after a failed turn errored for conversation_id=${conversationId}:`, error);
+    return false;
+  }
+  return true;
+}
 
 function buildSystemInstruction(settings: any): string {
   const language = settings.language === "en" ? "English" : settings.language === "ar" ? "Arabic" : settings.language;
@@ -99,6 +136,14 @@ Deno.serve(async (req: Request) => {
 
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
+  // Every technical failure after the conversation is loaded ends here: the turn
+  // is answered as a failure and the conversation is left in the human queue, so
+  // silence is never reported to the caller as a normal turn.
+  const failTurn = async (reason: string, status: number, extra?: Record<string, unknown>) => {
+    const handedOff = await handOffFailedTurn(supabase, conversationId);
+    return response({ ok: false, reason, handed_off: handedOff, ...(extra ?? {}) }, status);
+  };
+
   // 1. Load conversation + trusted context.
   const { data: conversation, error: convError } = await supabase
     .from("conversations")
@@ -106,9 +151,13 @@ Deno.serve(async (req: Request) => {
     .eq("id", conversationId)
     .maybeSingle();
 
-  if (convError || !conversation) {
-    console.error(`[ai-agent-respond] conversation not found id=${conversationId}:`, convError);
-    return response({ ok: false, reason: "conversation_not_found" });
+  if (convError) {
+    console.error(`[ai-agent-respond] error loading conversation id=${conversationId}:`, convError);
+    return response({ ok: false, reason: "conversation_load_error" }, 500);
+  }
+  if (!conversation) {
+    console.error(`[ai-agent-respond] conversation not found id=${conversationId}`);
+    return response({ ok: false, reason: "conversation_not_found" }, 404);
   }
 
   if (conversation.status !== "ai_active") {
@@ -124,7 +173,7 @@ Deno.serve(async (req: Request) => {
 
   if (settingsError) {
     console.error(`[ai-agent-respond] error loading ai_tenant_settings for tenant_id=${conversation.tenant_id}:`, settingsError);
-    return response({ ok: false, reason: "settings_load_error" });
+    return await failTurn("settings_load_error", 500);
   }
   if (!settings || settings.ai_enabled !== true) {
     return response({ ok: true, skipped: true, reason: "ai_disabled_or_not_configured" });
@@ -142,7 +191,7 @@ Deno.serve(async (req: Request) => {
 
   if (providerConfigError) {
     console.error(`[ai-agent-respond] error loading ai_provider_config for conversation_id=${conversationId}:`, providerConfigError);
-    return response({ ok: false, reason: "provider_config_load_error" });
+    return await failTurn("provider_config_load_error", 500);
   }
 
   if (!providerConfig || !providerConfig.secret_id) {
@@ -154,8 +203,13 @@ Deno.serve(async (req: Request) => {
     p_secret_id: providerConfig.secret_id,
   });
 
-  if (secretError || !resolvedApiKey) {
-    console.error(`[ai-agent-respond] failed to resolve AI provider secret for conversation_id=${conversationId}:`, secretError?.message ?? "empty secret value");
+  if (secretError) {
+    console.error(`[ai-agent-respond] failed to resolve AI provider secret for conversation_id=${conversationId}:`, secretError);
+    return await failTurn("provider_secret_load_error", 500);
+  }
+
+  if (!resolvedApiKey) {
+    console.error(`[ai-agent-respond] AI provider secret resolved to an empty value -- skipping AI reply for conversation_id=${conversationId}`);
     return response({ ok: true, skipped: true, reason: "ai_provider_secret_unavailable" });
   }
 
@@ -177,7 +231,7 @@ Deno.serve(async (req: Request) => {
 
   if (historyError) {
     console.error(`[ai-agent-respond] error loading message history for conversation_id=${conversationId}:`, historyError);
-    return response({ ok: false, reason: "history_load_error" });
+    return await failTurn("history_load_error", 500);
   }
 
   const history: ProviderMessage[] = (recentMessages ?? [])
@@ -239,7 +293,7 @@ Deno.serve(async (req: Request) => {
     }
   } catch (err) {
     console.error(`[ai-agent-respond] provider error for conversation_id=${conversationId}:`, err);
-    return response({ ok: false, reason: "provider_error", error: err instanceof Error ? err.message : String(err) }, 500);
+    return await failTurn("provider_error", 500, { error: err instanceof Error ? err.message : String(err) });
   }
 
   // Human handoff: stop here, no AI reply this turn.
@@ -322,6 +376,13 @@ Deno.serve(async (req: Request) => {
     .from("conversations")
     .update({ last_message_at: new Date().toISOString() })
     .eq("id", conversationId);
+
+  if (!sendResult.ok) {
+    // E10: a reply the patient never received is the same outcome as no reply.
+    // The stored AI message stays as the audit trail; the turn is still reported
+    // as failed and the conversation goes to the human queue.
+    return await failTurn("whatsapp_send_failed", 502, { send_result: sendResult });
+  }
 
   return response({ ok: true, text: finalText, send_result: sendResult });
 });

@@ -24,22 +24,21 @@ import { doctorDisplayName } from "@/lib/doctorName";
 import { formatDateTime } from "@/lib/format";
 import { buildStatusPatch, type ApptStatus } from "@/lib/appointmentStatus";
 import { updateQueueAppointment } from "@/lib/queueMutation";
+import { deskFailure } from "@/lib/deskFailure";
 import { openQueueConsultation, queueConsultationErrorCode, queueConsultationErrorMessage } from "@/lib/queueConsultation";
 import type { DictKey } from "@/lib/i18n";
 import { getQueueSettings, fetchQueueSettings, type QueueSettings } from "@/lib/queueSettings";
+import { showLoadingPlaceholder } from "@/lib/quietRefresh";
 import { listOpenAlerts, effectiveState, type QueueAlert } from "@/lib/queueAlerts";
 import { Switch } from "@/components/ui/switch";
 import { useOperationScope } from "@/hooks/useOperationScope";
-
-type PatientOption = {
-  id: string;
-  first_name_en: string;
-  last_name_en: string | null;
-  first_name_ar: string | null;
-  last_name_ar: string | null;
-  patient_code: number;
-  phone: string | null;
-};
+import { usePatientSearch } from "@/hooks/usePatientSearch";
+import {
+  PATIENT_PICKER_LIMIT,
+  patientPickerCopy,
+  pickedPatientLabel,
+  type PatientOption,
+} from "@/lib/patientSearch";
 
 type QueueDoctor = {
   id: string;
@@ -160,7 +159,16 @@ export default function QueuePage() {
   const [selfCheckinUrl, setSelfCheckinUrl] = useState<string | null>(null);
   const [selfCheckinExpiresAt, setSelfCheckinExpiresAt] = useState<string | null>(null);
   const [selfCheckinSaving, setSelfCheckinSaving] = useState(false);
-  const [patientOptions, setPatientOptions] = useState<PatientOption[]>([]);
+  // C4: the walk-in picker is one bounded page of server-side matches, not the
+  // newest 500 patients of the clinic. `walkInEcho` remembers the row the desk
+  // chose so the button keeps naming that patient after the list moves on.
+  const walkInPatientSearch = usePatientSearch({
+    ready: branchSelectionReady,
+    branchId: currentBranchId,
+    lang,
+  });
+  const [walkInEcho, setWalkInEcho] = useState<PatientOption | null>(null);
+  const walkInPickerCopy = patientPickerCopy(lang);
   // Reassign doctor dialog state
   const [reassignRow, setReassignRow] = useState<QueueRow | null>(null);
   const [reassignDoctor, setReassignDoctor] = useState<string>("");
@@ -177,7 +185,6 @@ export default function QueuePage() {
   // On branch change: paint from local cache instantly, then hydrate from server.
   useEffect(() => {
     setSettings(getQueueSettings(currentBranchId));
-    setPatientOptions([]);
     let active = true;
     void fetchQueueSettings(currentBranchId).then((s) => { if (active) setSettings(s); });
     return () => { active = false; };
@@ -240,7 +247,8 @@ export default function QueuePage() {
     const { data, error } = await q;
     if (requestId !== loadRequestRef.current) return;
     if (error) {
-      toast.error(error.message);
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تحميل الطابور." : "Could not load the queue.");
+      toast.error(failure.title, { description: failure.description });
       setRows([]);
     } else {
       setRows((data ?? []) as QueueRow[]);
@@ -254,6 +262,11 @@ export default function QueuePage() {
       setLoading(false);
       return;
     }
+    // Clearing the board is what makes the quiet refresh safe: the rows on
+    // screen belong to the branch that was selected before this one, and a
+    // refresh of a different clinic's queue may never be shown as if it were the
+    // current one. With rows empty, the skeleton comes back for this read only.
+    setRows((prev) => (prev.length === 0 ? prev : []));
     void load();
     // Realtime is also scoped strictly to the selected branch.
     const filter = `branch_id=eq.${currentBranchId}`;
@@ -307,28 +320,12 @@ export default function QueuePage() {
     return Array.from(set).sort();
   }, [rows]);
 
-  // lightweight patient list for walk-in picker (loaded on dialog open)
-  useEffect(() => {
-    if (!walkInOpen || patientOptions.length > 0 || !branchSelectionReady || !currentBranchId) return;
-    supabase
-      .from("patients")
-      .select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code,phone")
-      .is("deleted_at", null)
-      .eq("branch_id", currentBranchId)
-      .order("created_at", { ascending: false })
-      .limit(500)
-      .then(({ data }) => setPatientOptions((data ?? []) as PatientOption[]));
-  }, [walkInOpen, patientOptions.length, branchSelectionReady, currentBranchId]);
-
   const patientName = (r: QueueRow) => patientDisplayName(r.patients, lang);
 
   const doctorName = (id: string | null) => {
     const doctor = doctors.find((d) => d.id === id);
     return doctor ? doctorDisplayName(doctor, lang) : "—";
   };
-
-  const patientDisplay = (p: { first_name_en: string; last_name_en: string | null; first_name_ar: string | null; last_name_ar: string | null; name_language?: "ar" | "en" | null }) =>
-    patientDisplayName(p, lang);
 
   const filtered = useMemo(() => {
     const ACTIVE: ApptStatus[] = settings.showNoShowsInDefault
@@ -369,7 +366,8 @@ export default function QueuePage() {
     try {
       updated = await updateQueueAppointment({ appointmentId: id, branchId: currentBranchId, patch, expectedStatus, expectedPriority });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Queue update failed");
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر حفظ هذا التغيير في الطابور." : "This queue change could not be saved.");
+      toast.error(failure.title, { description: failure.description });
       void load();
       return false;
     }
@@ -408,7 +406,8 @@ export default function QueuePage() {
     setSelfCheckinSaving(false);
     if (error) {
       setSelfCheckinRow(null);
-      toast.error(error.message || t("selfCheckinLinkError"));
+      const failure = deskFailure(error, lang, t("selfCheckinLinkError"));
+      toast.error(failure.title, { description: failure.description });
       return;
     }
     const result = (Array.isArray(data) ? data[0] : data) as { token?: string; expires_at?: string } | null;
@@ -498,10 +497,15 @@ export default function QueuePage() {
       ...patch,
     };
     const { error } = await supabase.from("appointments").insert(payload).select("id").single();
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تسجيل الزيارة." : "The walk-in could not be booked.");
+      toast.error(failure.title, { description: failure.description });
+      return;
+    }
     toast.success(t("walkInCreated"));
     setWalkInOpen(false);
     setWalkInPatient(""); setWalkInDoctor(""); setWalkInRoom(""); setWalkInProcedure("");
+    setWalkInEcho(null);
     load();
     } catch (error) {
       console.error("[Queue] walk-in outcome needs review", error);
@@ -591,7 +595,11 @@ export default function QueuePage() {
       : reassignQuery.eq("doctor_id", r.doctor_id)) as typeof reassignQuery;
     const { data: reassigned, error } = await reassignQuery.select("id").maybeSingle();
     setReassignSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تغيير الطبيب المعالج." : "The doctor could not be changed.");
+      toast.error(failure.title, { description: failure.description });
+      return;
+    }
     if (!reassigned) {
       toast.error(lang === "ar" ? "تم تعديل الموعد بواسطة مستخدم آخر؛ أعد تحميل الطابور." : "This appointment was changed by another user. Refresh the queue and try again.");
       setReassignRow(null);
@@ -625,7 +633,11 @@ export default function QueuePage() {
     roomQuery = r.room == null ? roomQuery.is("room", null) : roomQuery.eq("room", r.room);
     const { data: updated, error } = await roomQuery.select("id").maybeSingle();
     setRoomSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تغيير غرفة الموعد." : "The room could not be changed.");
+      toast.error(failure.title, { description: failure.description });
+      return;
+    }
     if (!updated) { toast.error(lang === "ar" ? "تم تغيير الغرفة بواسطة مستخدم آخر؛ أعد تحميل الطابور." : "The room was changed by another user. Refresh the queue."); await load(); return; }
     toast.success(t("saved"));
     setRoomRow(null);
@@ -871,7 +883,7 @@ export default function QueuePage() {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {showLoadingPlaceholder(loading, rows.length) ? (
                 <tr><td colSpan={8} className="p-0"><ListSkeleton rows={6} /></td></tr>
               ) : filtered.length === 0 ? (
                 <tr>
@@ -937,7 +949,7 @@ export default function QueuePage() {
 
       {/* Mobile cards */}
       <div className="md:hidden space-y-2">
-        {loading ? (
+        {showLoadingPlaceholder(loading, rows.length) ? (
           <Card className="p-0 overflow-hidden"><ListSkeleton rows={5} /></Card>
         ) : filtered.length === 0 ? (
           <Card className="py-10 flex flex-col items-center gap-3 text-center text-muted-foreground">
@@ -1039,17 +1051,34 @@ export default function QueuePage() {
             <div className="space-y-1.5">
               <Label>{t("selectPatient")}</Label>
               <Combobox
-                options={patientOptions.map((p) => ({
+                options={walkInPatientSearch.options.map((p) => ({
                   value: p.id,
-                  // UX fix: only show the patient's name here; the "#N" clinic
-                  // number stays exclusive to the main Patients list. It's kept
-                  // in `keywords` below so searching by number still works.
-                  label: `${patientDisplay(p)}`,
-                  keywords: `${p.first_name_en} ${p.last_name_en ?? ""} ${p.first_name_ar ?? ""} ${p.last_name_ar ?? ""} ${p.phone ?? ""} ${p.patient_code}`,
+                  // Only the patient's name; the "#N" clinic number stays exclusive
+                  // to the main Patients list. Typing the number still finds them --
+                  // the server matches it -- it is just not printed here.
+                  label: p.label,
+                  // Two patients can share a name; the number they were found by is
+                  // the one piece of evidence that says which one this is.
+                  detail: p.phone ?? undefined,
                 }))}
                 value={walkInPatient}
-                onChange={setWalkInPatient}
+                onChange={(next) => {
+                  const picked = walkInPatientSearch.options.find((p) => p.id === next);
+                  setWalkInEcho(picked ? { id: picked.id, label: picked.label } : null);
+                  setWalkInPatient(next);
+                }}
                 placeholder={t("selectPatient")}
+                searchPlaceholder={walkInPickerCopy.searchPlaceholder}
+                emptyText={walkInPatientSearch.failed ? walkInPickerCopy.failed : walkInPickerCopy.empty}
+                searchingText={walkInPickerCopy.searching}
+                hintText={
+                  walkInPatientSearch.options.length >= PATIENT_PICKER_LIMIT
+                    ? walkInPickerCopy.truncated
+                    : undefined
+                }
+                selectedLabel={pickedPatientLabel(walkInEcho, walkInPatientSearch.options, walkInPatient)}
+                searching={walkInPatientSearch.searching}
+                onSearch={(term) => walkInPatientSearch.search(term)}
               />
             </div>
             <div className="space-y-1.5">

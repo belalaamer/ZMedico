@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -126,14 +126,23 @@ export default function BranchDashboard() {
   const [openAlerts, setOpenAlerts] = useState<QueueAlert[]>([]);
   const [alertHistory, setAlertHistory] = useState<QueueAlert[]>([]);
   const [detectorRun, setDetectorRun] = useState<{ last_run_at: string; last_status: string; last_error: string | null } | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Which branch the numbers on screen belong to. The KPIs render "—" until this
+  // matches the selected branch, and a realtime re-read keeps the numbers it
+  // already has instead of blanking them for the length of five queries.
+  const [metricsBranch, setMetricsBranch] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
 
   useEffect(() => { const i = setInterval(() => setTick((x) => x + 1), 60_000); return () => clearInterval(i); }, []);
 
+  const loadRequestRef = useRef(0);
+
   const load = async () => {
-    if (!currentBranchId) { setToday([]); setYesterday([]); setLoading(false); return; }
-    setLoading(true);
+    if (!currentBranchId) { setToday([]); setYesterday([]); setWeek([]); setMetricsBranch(null); return; }
+    const requestId = ++loadRequestRef.current;
+    // A refresh of the branch already on screen keeps its numbers; a first read
+    // for a newly selected branch must not, or one clinic's day would sit under
+    // another clinic's name for as long as this read takes.
+    if (metricsBranch !== currentBranchId) { setToday([]); setYesterday([]); setWeek([]); }
     const now = new Date();
     const tStart = startOfDay(now).toISOString();
     const tEnd = endOfDay(now).toISOString();
@@ -151,12 +160,13 @@ export default function BranchDashboard() {
       supabase.from("branches").select("name_en, name_ar").eq("id", currentBranchId).maybeSingle(),
       fetchQueueSettings(currentBranchId).catch(() => null),
     ]);
+    if (requestId !== loadRequestRef.current) return;
     setToday((tData ?? []) as any);
     setYesterday((yData ?? []) as any);
     setWeek((wData ?? []) as any);
     setSettings(qs as QueueSettings | null);
     setBranchName((br as any) ? (lang === "ar" ? (br as any).name_ar : (br as any).name_en) : "");
-    setLoading(false);
+    setMetricsBranch(currentBranchId);
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [currentBranchId, lang]);
   useDataSync(["appointments", "branches"], () => { load(); });
@@ -166,6 +176,7 @@ export default function BranchDashboard() {
   const p = useMemo(() => computeMetrics(yesterday, lang, now), [yesterday, lang]);
   const w = useMemo(() => computeMetrics(week, lang, now), [week, lang]);
   const isAr = lang === "ar";
+  const pendingMetrics = metricsBranch !== currentBranchId;
 
   const noShowRate = m.total ? Math.round((m.noShow / m.total) * 100) : 0;
   const prevNoShowRate = p.total ? Math.round((p.noShow / p.total) * 100) : 0;
@@ -340,11 +351,11 @@ export default function BranchDashboard() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                 <div>
                   <div className="text-xs text-muted-foreground">{isAr ? "مواعيد اليوم" : "Appointments"}</div>
-                  <div className="text-xl font-semibold">{loading ? "—" : m.total}</div>
+                  <div className="text-xl font-semibold">{pendingMetrics ? "—" : m.total}</div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">{isAr ? "في الانتظار الآن" : "Waiting now"}</div>
-                  <div className="text-xl font-semibold">{loading ? "—" : m.waiting}</div>
+                  <div className="text-xl font-semibold">{pendingMetrics ? "—" : m.waiting}</div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">{isAr ? "أطول انتظار" : "Longest wait"}</div>
@@ -352,7 +363,7 @@ export default function BranchDashboard() {
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">{isAr ? "لم يحضر" : "No-shows"}</div>
-                  <div className="text-xl font-semibold">{loading ? "—" : m.noShow} <span className="text-xs text-muted-foreground">({noShowRate}%)</span></div>
+                  <div className="text-xl font-semibold">{pendingMetrics ? "—" : m.noShow} <span className="text-xs text-muted-foreground">({noShowRate}%)</span></div>
                 </div>
               </div>
               {alertsEnabled && (bannerAlerts.length > 0 || snoozedCount > 0 || ackCount > 0) && (
@@ -448,30 +459,30 @@ export default function BranchDashboard() {
             <Stat
               icon={<Activity className="size-3.5" />}
               label={isAr ? "إجمالي اليوم" : "Total today"}
-              value={loading ? "—" : m.total}
+              value={pendingMetrics ? "—" : m.total}
               sub={<>vs {isAr ? "أمس" : "yesterday"}: <Delta today={m.total} prev={p.total} /></>}
             />
             <Stat
               icon={<Users className="size-3.5" />}
               label={isAr ? "في الانتظار" : "Waiting"}
-              value={loading ? "—" : m.waiting}
+              value={pendingMetrics ? "—" : m.waiting}
               sub={<>vs {isAr ? "أمس" : "yesterday"}: <Delta today={m.waiting} prev={p.waiting} /></>}
             />
             <Stat
               icon={<Play className="size-3.5" />}
               label={isAr ? "في الجلسة" : "In session"}
-              value={loading ? "—" : m.inSession}
+              value={pendingMetrics ? "—" : m.inSession}
             />
             <Stat
               icon={<CheckCheck className="size-3.5" />}
               label={isAr ? "مكتمل" : "Completed"}
-              value={loading ? "—" : m.completed}
+              value={pendingMetrics ? "—" : m.completed}
               sub={<>vs {isAr ? "أمس" : "yesterday"}: <Delta today={m.completed} prev={p.completed} /></>}
             />
             <Stat
               icon={<UserX className="size-3.5" />}
               label={isAr ? "لم يحضر" : "No-shows"}
-              value={loading ? "—" : <>{m.noShow} <span className="text-sm text-muted-foreground">({noShowRate}%)</span></>}
+              value={pendingMetrics ? "—" : <>{m.noShow} <span className="text-sm text-muted-foreground">({noShowRate}%)</span></>}
               sub={<>vs {isAr ? "أمس" : "yesterday"}: <Delta today={noShowRate} prev={prevNoShowRate} invert suffix="%" /></>}
             />
           </div>

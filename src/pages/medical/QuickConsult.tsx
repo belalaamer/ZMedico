@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,14 +14,31 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useDataSync, notifyDataChange } from "@/lib/dataSync";
+import { usePatientSearch } from "@/hooks/usePatientSearch";
+import {
+  PATIENT_PICKER_LIMIT,
+  patientPickerCopy,
+  pickedPatientLabel,
+  type PatientOption,
+} from "@/lib/patientSearch";
 import { formatDate } from "@/lib/format";
 
 export default function QuickConsult() {
   const { t, lang } = useI18n();
-  const { currentBranchId } = useBranch();
+  const { currentBranchId, branchSelectionReady } = useBranch();
   const { user } = useAuth();
   const nav = useNavigate();
-  const [patients, setPatients] = useState<any[]>([]);
+  // C4: the branch's patients are searched on the server by name or phone, one
+  // page at a time. The record created below always saves with
+  // branch_id = currentBranchId, so a picker that listed every branch would let
+  // a multi-branch user open a record in branch A for a patient of branch B.
+  const patientSearch = usePatientSearch({
+    ready: branchSelectionReady,
+    branchId: currentBranchId,
+    lang,
+  });
+  const [patientEcho, setPatientEcho] = useState<PatientOption | null>(null);
+  const pickerCopy = patientPickerCopy(lang);
   const [specs, setSpecs] = useState<any[]>([]);
   const [form, setForm] = useState({
     patient_id: "", specialty_id: "", visit_type: "consultation",
@@ -32,25 +49,13 @@ export default function QuickConsult() {
   const [saving, setSaving] = useState(false);
   const [ctx, setCtx] = useState<{ lastVisit: any | null; diagnoses: any[] }>({ lastVisit: null, diagnoses: [] });
 
-  const loadPatients = useCallback(() => {
-    // The record created below is always saved with branch_id = currentBranchId,
-    // so the picker must offer this branch's patients only — otherwise a
-    // multi-branch user could open a record in branch A for a patient of
-    // branch B.
-    let q = supabase.from("patients")
-      .select("id,first_name_en,last_name_en,patient_code")
-      .is("deleted_at", null);
-    if (currentBranchId) q = q.eq("branch_id", currentBranchId);
-    q.order("created_at", { ascending: false }).limit(500)
-      .then(({ data }) => setPatients(data ?? []));
-  }, [currentBranchId]);
-
   useEffect(() => {
-    loadPatients();
     supabase.from("medical_specialties").select("*").eq("is_active", true).order("name_en").then(({ data }) => setSpecs(data ?? []));
-  }, [loadPatients]);
+  }, []);
 
-  useDataSync(["patients"], () => loadPatients());
+  // The patient box asks for its own first page when it mounts; a new patient
+  // registered elsewhere in the app only has to re-run the current query.
+  useDataSync(["patients"], patientSearch.reload);
 
   // Load read-only context when a patient is picked
   useEffect(() => {
@@ -153,15 +158,27 @@ export default function QuickConsult() {
           <div className="space-y-2"><Label>{t("patientName")}</Label>
             <Combobox
               value={form.patient_id}
-              onChange={(v) => setForm({ ...form, patient_id: v })}
-              options={patients.map((p) => ({
+              onChange={(v) => {
+                const picked = patientSearch.options.find((p) => p.id === v);
+                setPatientEcho(picked ? { id: picked.id, label: picked.label } : null);
+                setForm({ ...form, patient_id: v });
+              }}
+              options={patientSearch.options.map((p) => ({
                 value: p.id,
-                // UX fix: only show the patient's name here -- the "#N" clinic
-                // number stays exclusive to the main Patients list.
-                label: `${p.first_name_en} ${p.last_name_en ?? ""}`.trim(),
+                // Only the patient's name -- the "#N" clinic number stays
+                // exclusive to the main Patients list. Typing the number still
+                // finds them, because the server matches on it.
+                label: p.label,
+                detail: p.phone ?? undefined,
               }))}
               placeholder={t("selectPatient")}
-              searchPlaceholder={lang === "ar" ? "ابحث عن مريض..." : "Search patient..."}
+              searchPlaceholder={pickerCopy.searchPlaceholder}
+              emptyText={patientSearch.failed ? pickerCopy.failed : pickerCopy.empty}
+              searchingText={pickerCopy.searching}
+              hintText={patientSearch.options.length >= PATIENT_PICKER_LIMIT ? pickerCopy.truncated : undefined}
+              selectedLabel={pickedPatientLabel(patientEcho, patientSearch.options, form.patient_id)}
+              searching={patientSearch.searching}
+              onSearch={patientSearch.search}
             />
             {!form.patient_id && (
               <p className="text-xs text-destructive" role="status">{t("selectPatient")}</p>

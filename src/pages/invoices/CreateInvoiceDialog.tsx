@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Trash2, Plus } from "lucide-react";
 import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,7 +18,14 @@ import { formatMoney } from "@/lib/format";
 import { useDataSync, notifyDataChange } from "@/lib/dataSync";
 import { fetchActiveContract, resolveAllLines, distributeClaim, type LineCoverage, type LineForCoverage } from "@/lib/insuranceContracts";
 import { Badge } from "@/components/ui/badge";
-import { patientDisplayName } from "@/lib/patientName";
+import { usePatientSearch } from "@/hooks/usePatientSearch";
+import {
+  PATIENT_PICKER_LIMIT,
+  fetchPatientOption,
+  patientPickerCopy,
+  pickedPatientLabel,
+  type PatientOption,
+} from "@/lib/patientSearch";
 import { doctorDisplayName } from "@/lib/doctorName";
 import { rowsWritten } from "@/lib/writeOutcome";
 import { localDateOnly } from "@/lib/localDate";
@@ -73,44 +79,30 @@ export function CreateInvoiceDialog({
 
   useEffect(() => { setPatientId(presetPatientId ?? ""); setDoctorId(""); }, [presetPatientId, open]);
 
-  const { data: patientRows = [], refetch: refetchPatients } = useQuery({
-    queryKey: ["patients-for-invoice", currentBranchId],
-    queryFn: async () => {
-      if (!branchSelectionReady || !currentBranchId) return [];
-      const { data, error } = await supabase
-        .from("patients")
-        .select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code,phone,deleted_at")
-        .is("deleted_at", null)
-        .eq("branch_id", currentBranchId)
-        .order("first_name_en", { ascending: true })
-        .order("last_name_en", { ascending: true })
-        .limit(500);
-
-      if (error) {
-        console.error("[CreateInvoiceDialog] patient query failed", error);
-        throw error;
-      }
-
-      const rows = (data ?? []).filter((p: any) => p.deleted_at == null);
-      return rows;
-    },
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
-    enabled: open && branchSelectionReady && Boolean(currentBranchId),
-    staleTime: 0,
+  // C4: the invoice is issued to whoever the desk can find. This searched the
+  // branch's newest 500 patients and filtered the rest in the browser, so a
+  // patient outside that page could not be invoiced at all.
+  const patientSearch = usePatientSearch({
+    ready: branchSelectionReady,
+    branchId: currentBranchId,
+    lang,
   });
+  const pickerCopy = patientPickerCopy(lang);
+  const [patientEcho, setPatientEcho] = useState<PatientOption | null>(null);
 
-  // UX fix: the patient picker here is used to identify who the invoice is
-  // for, not to look them up by their clinic number -- show just the name
-  // (matching the "referred by" and appointment-booking pickers), the
-  // "#N" numbering stays exclusively on the main Patients list.
-  const patients = useMemo(
-    () => patientRows.map((p: any) => ({
-      id: p.id,
-      label: patientDisplayName(p, lang),
-    })),
-    [patientRows, lang],
-  );
+  // Opened from a patient's own row, profile, or an appointment, the dialog is
+  // handed an id and nothing else, so ask for that one row to label it.
+  useEffect(() => {
+    if (!open || !presetPatientId) {
+      setPatientEcho(null);
+      return;
+    }
+    let active = true;
+    void fetchPatientOption(supabase, { id: presetPatientId, lang }).then((hit) => {
+      if (active && hit) setPatientEcho({ id: hit.id, label: hit.label });
+    });
+    return () => { active = false; };
+  }, [open, presetPatientId, lang]);
 
   useEffect(() => {
     if (!open) return;
@@ -118,7 +110,6 @@ export function CreateInvoiceDialog({
       setProducts([]); setProcedures([]); setDoctors([]); setStocks({});
       return;
     }
-    void refetchPatients();
     supabase.from("products").select("id,sku,name_en,name_ar,selling_price,min_stock_level").eq("tenant_id", subscription.tenant_id).eq("is_active", true).is("deleted_at", null).order("name_en").limit(1000)
       .then(({ data }) => setProducts(data ?? []));
     supabase.from("procedures").select("id,name_en,name_ar,default_price,is_active,deleted_at").eq("is_active", true).is("deleted_at", null).eq("tenant_id", subscription.tenant_id).order("name_en").limit(1000)
@@ -128,10 +119,10 @@ export function CreateInvoiceDialog({
     // Strict doctor list via SECURITY DEFINER RPC so non-admin staff (e.g. Front Desk)
     // can see doctors without needing SELECT on other users' user_roles rows.
     supabase.rpc("list_doctors_for_branch", { _branch_id: currentBranchId }).then(({ data }) => setDoctors((data ?? []) as any));
-  }, [open, refetchPatients, branchSelectionReady, currentBranchId, subscription?.tenant_id]);
+  }, [open, branchSelectionReady, currentBranchId, subscription?.tenant_id]);
 
   useDataSync(["patients"], () => {
-    void refetchPatients();
+    if (open) patientSearch.reload();
   });
 
   useEffect(() => {
@@ -481,11 +472,31 @@ export function CreateInvoiceDialog({
             <Label>{t("patientName")}</Label>
             <Combobox
               value={patientId}
-              onChange={(v) => { setPatientId(v); void refetchPatients(); }}
-              options={patients.map((p) => ({ value: p.id, label: p.label }))}
+              onChange={(v) => {
+                const picked = patientSearch.options.find((p) => p.id === v);
+                setPatientEcho(picked ? { id: picked.id, label: picked.label } : null);
+                setPatientId(v);
+              }}
+              options={patientSearch.options.map((p) => ({
+                // UX fix: this picker identifies who the invoice is for, not where
+                // they sit in the clinic numbering -- show just the name, matching the
+                // "referred by" and appointment-booking pickers; "#N" stays on Patients.
+                value: p.id,
+                label: p.label,
+                // Two patients can share a name; the number they were found by says
+                // which one this invoice is about to charge.
+                detail: p.phone ?? undefined,
+              }))}
               placeholder={t("selectPatient")}
               searchPlaceholder={lang === "ar" ? "ابحث عن مريض..." : "Search patient..."}
-              emptyText={lang === "ar" ? "لا يوجد مرضى" : "No patients found"}
+              emptyText={patientSearch.failed ? pickerCopy.failed : pickerCopy.empty}
+              searchingText={pickerCopy.searching}
+              hintText={
+                patientSearch.options.length >= PATIENT_PICKER_LIMIT ? pickerCopy.truncated : undefined
+              }
+              selectedLabel={pickedPatientLabel(patientEcho, patientSearch.options, patientId)}
+              searching={patientSearch.searching}
+              onSearch={(term) => patientSearch.search(term)}
             />
           </div>
           <div className="space-y-2">

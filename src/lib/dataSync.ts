@@ -151,10 +151,25 @@ patchSupabase();
 
 let globalListenersAttached = false;
 
+// A tab return fires both `focus` and `visibilitychange`, and a burst of
+// mutations can emit several wildcard events. Coalesce them into one
+// background refresh so subscribers never revalidate more than once per
+// window (and never in a loop).
+const GLOBAL_REFRESH_COALESCE_MS = 750;
+let globalRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleGlobalRefresh() {
+  if (globalRefreshTimer !== null) return;
+  globalRefreshTimer = setTimeout(() => {
+    globalRefreshTimer = null;
+    emit("*");
+  }, GLOBAL_REFRESH_COALESCE_MS);
+}
+
 export function attachGlobalRefreshListeners() {
   if (globalListenersAttached || typeof window === "undefined") return;
   globalListenersAttached = true;
-  const fire = () => emit("*");
+  const fire = () => scheduleGlobalRefresh();
   window.addEventListener("focus", fire);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") fire();

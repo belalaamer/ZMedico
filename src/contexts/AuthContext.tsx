@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
@@ -56,6 +57,28 @@ function describeSession(s: Session | null) {
 function isDeletedUserError(error: unknown) {
   const message = error instanceof Error ? error.message : String((error as any)?.message ?? error ?? "");
   return /user.*not.*found|user.*deleted|sub claim/i.test(message);
+}
+
+// TOKEN_REFRESHED and repeated SIGNED_IN events carry a new Session object for
+// the same person. Replacing the User object on each of those churns every
+// consumer derived from useAuth(); keep the previous identity when the id is
+// unchanged so background revalidation cannot cascade into a re-gate.
+function applyAuthState(
+  setSession: Dispatch<SetStateAction<Session | null>>,
+  setUser: Dispatch<SetStateAction<User | null>>,
+  next: Session | null,
+) {
+  setSession((prev) => {
+    if (prev === next) return prev;
+    if (prev && next && prev.access_token === next.access_token && prev.refresh_token === next.refresh_token) return prev;
+    return next;
+  });
+  setUser((prev) => {
+    const user = next?.user ?? null;
+    if (prev === user) return prev;
+    if (prev && user && prev.id === user.id) return prev;
+    return user;
+  });
 }
 
 // Auto-logout after this many ms of user inactivity (no mouse/keyboard/touch).
@@ -149,8 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (event === "INITIAL_SESSION") {
         persistAuthSessionForPreview(s, "initial-session-event");
-        setSession(s);
-        setUser(s?.user ?? null);
+        applyAuthState(setSession, setUser, s);
         if (s) hadSession = true;
         setLoading(false);
         return;
@@ -176,8 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       persistAuthSessionForPreview(s, `auth-event:${event}`);
-      setSession(s);
-      setUser(s?.user ?? null);
+      applyAuthState(setSession, setUser, s);
       setLoading(false);
       if (s) hadSession = true;
     });
@@ -196,8 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         authDebug("auth.getSession completed", { ...describeSession(s), ...getAuthStorageSnapshot(), error: error?.message ?? null });
         persistAuthSessionForPreview(s, "get-session-bootstrap");
-        setSession(s);
-        setUser(s?.user ?? null);
+        applyAuthState(setSession, setUser, s);
         // Validate that the user behind this session still exists in Auth.
         if (s) {
           hadSession = true;

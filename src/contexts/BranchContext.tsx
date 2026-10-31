@@ -50,6 +50,30 @@ type Ctx = {
 
 const BranchContext = createContext<Ctx | null>(null);
 
+// Snapshots are re-fetched on focus; identical content must not produce a new
+// object, because downstream effects (modules) key on the snapshot identity.
+function sameSubscriptionSnapshot(a: TenantSubscriptionSnapshot | null, b: TenantSubscriptionSnapshot | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    a.tenant_id === b.tenant_id &&
+    a.plan_id === b.plan_id &&
+    a.subscription_status === b.subscription_status &&
+    a.billing_cycle === b.billing_cycle &&
+    a.trial_ends_at === b.trial_ends_at &&
+    a.subscription_ends_at === b.subscription_ends_at &&
+    a.current_period_end === b.current_period_end &&
+    a.is_active === b.is_active &&
+    a.access_allowed === b.access_allowed &&
+    a.access_reason === b.access_reason &&
+    JSON.stringify(a.plan_features ?? {}) === JSON.stringify(b.plan_features ?? {})
+  );
+}
+
+function sameModuleList(a: ClinicModuleKey[], b: ClinicModuleKey[]): boolean {
+  return a.length === b.length && a.every((key, index) => key === b[index]);
+}
+
 export function BranchProvider({ children }: { children: ReactNode }) {
   const location = useLocation();
   const { user } = useAuth();
@@ -65,6 +89,13 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   const [subscriptionLoading, setSubscriptionLoading] = useState(() => Boolean(currentBranchId));
   const [domainTenantId, setDomainTenantId] = useState<string | null>(null);
   const branchLoadVersion = useRef(0);
+  const branchSelectionReadyRef = useRef(false);
+  const subscriptionBranchRef = useRef<string | null>(null);
+  const modulesBranchRef = useRef<string | null>(null);
+  const applyBranchSelectionReady = (ready: boolean) => {
+    branchSelectionReadyRef.current = ready;
+    setBranchSelectionReady(ready);
+  };
   const requestedBranchId = new URLSearchParams(location.search).get("branch");
   const requestedBranchKnown = !requestedBranchId || branches.length === 0 || branches.some((branch) => branch.id === requestedBranchId);
   const routeBranchPending = requestedBranchKnown && Boolean(requestedBranchId) && requestedBranchId !== currentBranchId;
@@ -92,10 +123,13 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     return () => { active = false; };
   }, [user?.id]);
 
-  const loadBranches = async () => {
+  // A background refresh (tab return, data sync) revalidates the list without
+  // dropping the last known branch, so the shell never unmounts the page.
+  const loadBranches = async (options?: { background?: boolean }) => {
+    const background = options?.background === true && branchSelectionReadyRef.current;
     const requestVersion = ++branchLoadVersion.current;
-    if (!user) { setBranches([]); setBranchSelectionReady(false); return; }
-    setBranchSelectionReady(false);
+    if (!user) { setBranches([]); applyBranchSelectionReady(false); return; }
+    if (!background) applyBranchSelectionReady(false);
     let tenantScopeId = domainTenantId;
     // System Owner is global only on /platform. During a workspace handoff,
     // resolve the selected branch first and restrict the context to its tenant
@@ -104,8 +138,9 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     if (isSystemOwner && !platformRoute) {
       const handoffBranchId = requestedBranchId ?? getPlatformWorkspaceBranch();
       if (!handoffBranchId) {
+        if (background) return;
         setBranches([]);
-        setBranchSelectionReady(false);
+        applyBranchSelectionReady(false);
         return;
       }
       const { data: handoffBranch } = await supabase
@@ -114,7 +149,9 @@ export function BranchProvider({ children }: { children: ReactNode }) {
         .eq("id", handoffBranchId)
         .maybeSingle();
       if (requestVersion !== branchLoadVersion.current) return;
-      tenantScopeId = (handoffBranch as { tenant_id?: string | null } | null)?.tenant_id ?? "__no_workspace__";
+      const handoffTenantId = (handoffBranch as { tenant_id?: string | null } | null)?.tenant_id;
+      if (!handoffTenantId && background) return;
+      tenantScopeId = handoffTenantId ?? "__no_workspace__";
     }
     let branchQuery = supabase.from("branches").select("id,name_en,name_ar").order("name_en");
     if (tenantScopeId) branchQuery = branchQuery.eq("tenant_id", tenantScopeId);
@@ -125,12 +162,16 @@ export function BranchProvider({ children }: { children: ReactNode }) {
         fallback: { data: [], error: null, count: null, status: 200, statusText: "timeout-fallback", success: true },
         label: "branches.bootstrap",
       }
-    ).then(({ data }) => {
+    ).then(({ data, error, statusText }) => {
       if (requestVersion !== branchLoadVersion.current) return;
+      // A timed-out or failed background poll keeps the last known list; the
+      // foreground path still clears and blocks so a broken tenant never
+      // silently operates on stale branches.
+      if (background && (error || statusText === "timeout-fallback")) return;
       const list = (data ?? []) as Branch[];
       setBranches(list);
       if (roleLoading) {
-        setBranchSelectionReady(false);
+        applyBranchSelectionReady(false);
         return;
       }
       setCurrentBranchIdState((prev) => {
@@ -167,11 +208,12 @@ export function BranchProvider({ children }: { children: ReactNode }) {
         }
         return prev;
       });
-      setBranchSelectionReady(true);
+      applyBranchSelectionReady(true);
     }).catch(() => {
       if (requestVersion !== branchLoadVersion.current) return;
+      if (background) return;
       setBranches([]);
-      setBranchSelectionReady(false);
+      applyBranchSelectionReady(false);
     });
   };
 
@@ -185,14 +227,27 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     let active = true;
     const loadSubscription = async () => {
       if (!activeBranchSelectionReady || !activeBranchId) {
+        subscriptionBranchRef.current = null;
         setSubscription(null);
         setSubscriptionLoading(false);
         return;
       }
-      setSubscriptionLoading(true);
+      // Revalidating the branch whose snapshot is already on screen must not
+      // re-enter the blocking "Checking subscription…" gate.
+      const sameBranch = subscriptionBranchRef.current === activeBranchId;
+      if (!sameBranch) setSubscriptionLoading(true);
       const { data, error } = await supabase.rpc("tenant_subscription_for_branch", { _branch_id: activeBranchId });
       if (!active) return;
-      setSubscription(error ? null : (data as TenantSubscriptionSnapshot | null));
+      if (error) {
+        if (sameBranch) return;
+        subscriptionBranchRef.current = null;
+        setSubscription(null);
+        setSubscriptionLoading(false);
+        return;
+      }
+      subscriptionBranchRef.current = activeBranchId;
+      const next = data as TenantSubscriptionSnapshot | null;
+      setSubscription((prev) => (sameSubscriptionSnapshot(prev, next) ? prev : next));
       setSubscriptionLoading(false);
     };
     void loadSubscription();
@@ -203,11 +258,15 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     let active = true;
     const loadModules = async () => {
       if (!activeBranchSelectionReady || !activeBranchId) {
+        modulesBranchRef.current = null;
         setEnabledModules(DEFAULT_ENABLED_MODULES);
         setModulesLoading(false);
         return;
       }
-      setModulesLoading(true);
+      // Only a real branch change blocks the permission gate; revalidating the
+      // same branch swaps the module list silently once it arrives.
+      const sameBranch = modulesBranchRef.current === activeBranchId;
+      if (!sameBranch) setModulesLoading(true);
       try {
         const { data: branch } = await supabase
           .from("branches")
@@ -216,7 +275,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
           .maybeSingle();
         const tenantId = (branch as { tenant_id?: string | null } | null)?.tenant_id;
         if (!tenantId) {
-          if (active) setEnabledModules(DEFAULT_ENABLED_MODULES);
+          if (active && !sameBranch) setEnabledModules(DEFAULT_ENABLED_MODULES);
           return;
         }
         const { data, error } = await supabase
@@ -228,7 +287,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
         if (error) {
           // The feature is fail-open until the SaaS migration is available so
           // existing clinics do not lose navigation during rollout.
-          setEnabledModules(DEFAULT_ENABLED_MODULES);
+          if (!sameBranch) setEnabledModules(DEFAULT_ENABLED_MODULES);
           return;
         }
         const planFeatures = subscription?.plan_features ?? {};
@@ -237,7 +296,9 @@ export function BranchProvider({ children }: { children: ReactNode }) {
           .filter((key): key is ClinicModuleKey => DEFAULT_ENABLED_MODULES.includes(key as ClinicModuleKey))
           .filter((key) => planAllowsModule(key, planFeatures));
         const fallback = filterModulesByPlan(DEFAULT_ENABLED_MODULES, planFeatures);
-        setEnabledModules(configured.length > 0 ? configured : fallback);
+        modulesBranchRef.current = activeBranchId;
+        const next = configured.length > 0 ? configured : fallback;
+        setEnabledModules((prev) => (sameModuleList(prev, next) ? prev : next));
       } finally {
         // Always release the loading gate, including when the branch lookup
         // returns no tenant_id or exits early. Otherwise protected pages can
@@ -251,9 +312,10 @@ export function BranchProvider({ children }: { children: ReactNode }) {
 
   // Refetch whenever any branches mutation happens elsewhere in the app
   // (create / update / delete) so sidebar, switcher and branch-scoped UI
-  // immediately reflect the change.
+  // immediately reflect the change. These are background refreshes: the
+  // current branch stays usable while the list revalidates.
   useEffect(() => {
-    const unsub = subscribeDataSync(["branches"], () => loadBranches());
+    const unsub = subscribeDataSync(["branches"], () => loadBranches({ background: true }));
     return unsub;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, isSystemOwner, roleLoading, domainTenantId, platformRoute, requestedBranchId]);

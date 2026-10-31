@@ -8,6 +8,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
+import { usePatientSearch } from "@/hooks/usePatientSearch";
+import {
+  PATIENT_PICKER_LIMIT,
+  fetchPatientOption,
+  patientPickerCopy,
+  pickedPatientLabel,
+  type PatientOption,
+} from "@/lib/patientSearch";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ListSkeleton } from "@/components/ListSkeleton";
 import { Can } from "@/components/Can";
@@ -21,6 +30,7 @@ import { doctorDisplayName } from "@/lib/doctorName";
 import { enumLabel } from "@/lib/enumLabels";
 import { toast } from "sonner";
 import { localDateOnly } from "@/lib/localDate";
+import { useDataSync } from "@/lib/dataSync";
 
 type Patient = { id: string; first_name_en?: string; last_name_en?: string; first_name_ar?: string; last_name_ar?: string; name_language?: "ar" | "en" | null; patient_code?: number };
 type Therapist = {
@@ -40,7 +50,9 @@ export default function PhysioCases() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [patients, setPatients] = useState<Patient[]>([]);
+  const patientSearch = usePatientSearch({ ready: branchSelectionReady, branchId: currentBranchId, lang });
+  const pickerCopy = patientPickerCopy(lang);
+  const [patientEcho, setPatientEcho] = useState<PatientOption | null>(null);
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [open, setOpen] = useState(false);
   const loadRequestRef = useRef(0);
@@ -80,14 +92,10 @@ export default function PhysioCases() {
     const requestId = ++optionsRequestRef.current;
     const branchId = currentBranchId;
     if (!branchSelectionReady || !branchId) {
-      setPatients([]);
       setTherapists([]);
       return;
     }
     let active = true;
-    supabase.from("patients").select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code")
-      .is("deleted_at", null).eq("branch_id", branchId).order("created_at", { ascending: false }).limit(500)
-      .then(({ data }) => { if (active && requestId === optionsRequestRef.current) setPatients((data as any) ?? []); });
     (async () => {
       const { data } = await supabase.from("staff_profiles")
         .select("id,employee_id,profile:profiles!staff_profiles_id_fkey(full_name,email),position:staff_positions(title_en,title_ar)")
@@ -123,6 +131,19 @@ export default function PhysioCases() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  // The case can be opened with ?patient=<id>, and one page of search results will
+  // usually not contain that row; the picker still has to name it.
+  useEffect(() => {
+    if (!form.patient_id) { setPatientEcho(null); return; }
+    let active = true;
+    void fetchPatientOption(supabase, { id: form.patient_id, lang }).then((row) => {
+      if (active) setPatientEcho(row);
+    });
+    return () => { active = false; };
+  }, [form.patient_id, lang]);
+
+  useDataSync(["patients"], () => patientSearch.reload());
 
   const patientName = (p: Patient | null | undefined) => patientDisplayName(p, lang);
 
@@ -188,12 +209,23 @@ export default function PhysioCases() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="md:col-span-2">
                 <Label>{lang === "ar" ? "المريض" : "Patient"}</Label>
-                <Select value={form.patient_id} onValueChange={(v) => setForm({ ...form, patient_id: v })}>
-                  <SelectTrigger><SelectValue placeholder={lang === "ar" ? "اختر المريض" : "Select patient"} /></SelectTrigger>
-                  <SelectContent>{patients.map(p => (
-                    <SelectItem key={p.id} value={p.id}>{patientName(p)}</SelectItem>
-                  ))}</SelectContent>
-                </Select>
+                <Combobox
+                  options={patientSearch.options.map((p) => ({
+                    value: p.id,
+                    label: p.label,
+                    detail: p.phone ?? undefined,
+                  }))}
+                  value={form.patient_id}
+                  onChange={(next) => setForm({ ...form, patient_id: next })}
+                  placeholder={lang === "ar" ? "اختر المريض" : "Select patient"}
+                  searchPlaceholder={pickerCopy.searchPlaceholder}
+                  emptyText={patientSearch.failed ? pickerCopy.failed : pickerCopy.empty}
+                  searchingText={pickerCopy.searching}
+                  hintText={patientSearch.options.length >= PATIENT_PICKER_LIMIT ? pickerCopy.truncated : undefined}
+                  selectedLabel={pickedPatientLabel(patientEcho, patientSearch.options, form.patient_id)}
+                  searching={patientSearch.searching}
+                  onSearch={patientSearch.search}
+                />
               </div>
               <div>
                 <Label>{lang === "ar" ? "المعالج" : "Therapist"}</Label>

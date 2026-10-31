@@ -51,6 +51,45 @@ function maxBatchSize(): number {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : DEFAULT_MAX_BATCH;
 }
 
+// E9: a provider that stops answering used to hold the whole tick open. The
+// invocation then died on the platform's wall clock, possibly between the
+// accepted request and the row update, so the next tick sent the same message
+// twice. Every outbound provider call now carries its own deadline, and the
+// loop stops between rows before the platform can stop it mid-pair.
+const DEFAULT_PROVIDER_TIMEOUT_MS = 10_000;
+const DEFAULT_TICK_DEADLINE_MS = 120_000;
+
+function positiveIntEnv(name: string, fallback: number): number {
+  const raw = Deno.env.get(name);
+  const parsed = raw ? Number(raw) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+}
+
+function providerTimeoutMs(): number {
+  return positiveIntEnv("SEND_REMINDER_PROVIDER_TIMEOUT_MS", DEFAULT_PROVIDER_TIMEOUT_MS);
+}
+
+function tickDeadlineMs(): number {
+  return positiveIntEnv("SEND_REMINDER_TICK_DEADLINE_MS", DEFAULT_TICK_DEADLINE_MS);
+}
+
+// A request that was cut off has no answer at all: the provider may have
+// accepted the message and lost the response. That is not a permanent failure,
+// and it is not a send - the row has to stay retryable and say so.
+function isProviderTimeout(error: unknown): boolean {
+  const name = error && typeof error === "object" && "name" in error
+    ? String((error as { name?: unknown }).name)
+    : "";
+  return name === "TimeoutError" || name === "AbortError";
+}
+
+function providerFailure(provider: string, error: unknown):
+  { ok: false; error: string; deferred?: boolean } {
+  return isProviderTimeout(error)
+    ? { ok: false, deferred: true, error: `${provider} request timed out` }
+    : { ok: false, error: `${provider} request failed` };
+}
+
 // Per-admin rate-limit hook. Kept as a small in-memory token bucket so the
 // function stays self-contained; swap for a durable store when scale demands.
 // Cron and service-role calls bypass this by design.
@@ -194,7 +233,7 @@ async function sendOne(
   patientEmail: string | null,
   patientWhatsappOptIn: boolean | null,
   cfg: NotifySettings | null,
-): Promise<{ ok: boolean; error?: string; provider_message_id?: string; provider_response?: Record<string, string>; cancelled?: boolean }> {
+): Promise<{ ok: boolean; error?: string; deferred?: boolean; provider_message_id?: string; provider_response?: Record<string, string>; cancelled?: boolean }> {
   const message = reminder.message_en || reminder.message_ar;
 
   const consent = consentBlockReason(reminder.event_type, cfg);
@@ -229,6 +268,7 @@ async function sendOne(
       try {
         const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(sid)}/Messages.json`, {
           method: "POST",
+          signal: AbortSignal.timeout(providerTimeoutMs()),
           headers: {
             "Authorization": "Basic " + btoa(`${sid}:${token}`),
             "Content-Type": "application/x-www-form-urlencoded",
@@ -247,8 +287,8 @@ async function sendOne(
           provider_message_id: providerMessageId || undefined,
           provider_response: { provider: "twilio", message_id: providerMessageId, status: String(parsed?.status ?? "accepted") },
         };
-      } catch {
-        return { ok: false, error: "Twilio request failed" };
+      } catch (e) {
+        return providerFailure("Twilio", e);
       }
     }
 
@@ -287,6 +327,7 @@ async function sendOne(
       try {
         const res = await fetch(`https://graph.facebook.com/v23.0/${encodeURIComponent(phoneId)}/messages`, {
           method: "POST",
+          signal: AbortSignal.timeout(providerTimeoutMs()),
           headers: {
             "Authorization": `Bearer ${token}`,
             "Content-Type": "application/json",
@@ -309,8 +350,8 @@ async function sendOne(
             messaging_product: String(parsed?.messaging_product ?? "whatsapp"),
           },
         };
-      } catch {
-        return { ok: false, error: "Meta request failed" };
+      } catch (e) {
+        return providerFailure("Meta", e);
       }
     }
 
@@ -337,6 +378,7 @@ async function sendOne(
       try {
         const res = await fetch(v.url.toString(), {
           method: "POST",
+          signal: AbortSignal.timeout(providerTimeoutMs()),
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: new URLSearchParams({
             environment: String(environment),
@@ -367,8 +409,8 @@ async function sendOne(
             Cost: String(parsed?.Cost ?? ""),
           },
         };
-      } catch {
-        return { ok: false, error: "SMS Misr request failed" };
+      } catch (e) {
+        return providerFailure("SMS Misr", e);
       }
     }
 
@@ -383,6 +425,7 @@ async function sendOne(
     try {
       const res = await fetch(v.url.toString(), {
         method: "POST",
+        signal: AbortSignal.timeout(providerTimeoutMs()),
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${key}`,
@@ -400,7 +443,7 @@ async function sendOne(
       }
       return { ok: true };
     } catch (e) {
-      return { ok: false, error: "Provider request failed" };
+      return providerFailure("Provider", e);
     }
   }
 
@@ -520,6 +563,9 @@ Deno.serve(async (req) => {
   let sent = 0;
   let failed = 0;
   let deferred = 0;
+  let attempted = 0;
+  let stoppedEarly = false;
+  const deadlineAt = Date.now() + tickDeadlineMs();
   const results: Array<{ id: string; ok: boolean; error?: string; deferred?: boolean; provider_message_id?: string; provider_response?: Record<string, string> }> = [];
   const sentUnconfirmed: Array<{ id: string; provider_message_id: string | null; error: string }> = [];
 
@@ -527,7 +573,17 @@ Deno.serve(async (req) => {
   const cfgCache = new Map<string, NotifySettings | null>();
   const patientCache = new Map<string, { phone: string | null; email: string | null; whatsappOptIn: boolean | null }>();
 
-  for (const r of list) {
+  for (let index = 0; index < list.length; index++) {
+    const r = list[index];
+    if (Date.now() >= deadlineAt) {
+      // Stop between rows, never inside a send-and-record pair. A tick killed by
+      // the platform's own wall clock can leave a message accepted while its row
+      // is still pending, and the next tick then sends it a second time.
+      deferred += list.length - index;
+      stoppedEarly = true;
+      break;
+    }
+    attempted++;
     let cfg: NotifySettings | null = null;
     if (r.branch_id) {
       if (!cfgCache.has(r.branch_id)) {
@@ -577,7 +633,7 @@ Deno.serve(async (req) => {
     }
 
     const res = await sendOne(r, phone, email, whatsappOptIn, cfg);
-    results.push({ id: r.id, ok: res.ok, error: res.error, provider_message_id: res.provider_message_id, provider_response: res.provider_response });
+    results.push({ id: r.id, ok: res.ok, error: res.error, deferred: res.deferred, provider_message_id: res.provider_message_id, provider_response: res.provider_response });
 
     if (res.ok) {
       sent++;
@@ -614,6 +670,22 @@ Deno.serve(async (req) => {
           destination_phone: phone,
         })
         .eq("id", r.id));
+    } else if (res.deferred) {
+      // The provider's answer is unknown - the request may have been accepted and
+      // the response lost. Recording `failed` would retire the reminder forever on
+      // an assumption, so the row stays pending and retryable, and the attempt is
+      // still counted so a chronically timing-out branch is visible.
+      deferred++;
+      await withTransientRetry(() => supabase
+        .from("reminders")
+        .update({
+          error_message: res.error ?? "provider request timed out",
+          destination_phone: phone,
+          provider_status: "unknown",
+          attempt_count: (r as any).attempt_count ? (r as any).attempt_count + 1 : 1,
+          last_attempt_at: new Date().toISOString(),
+        })
+        .eq("id", r.id));
     } else {
       failed++;
       await withTransientRetry(() => supabase
@@ -630,8 +702,12 @@ Deno.serve(async (req) => {
     }
   }
 
-  const outcome: Record<string, unknown> = { processed: list.length, sent, failed, results };
+  const outcome: Record<string, unknown> = { processed: attempted, sent, failed, results };
   if (deferred > 0) outcome.deferred = deferred;
+  if (stoppedEarly) {
+    outcome.stopped_early = true;
+    outcome.not_attempted = list.length - attempted;
+  }
   if (sentUnconfirmed.length > 0) outcome.sent_unconfirmed = sentUnconfirmed;
   // 500 only when a completed send could not be recorded: the row is still pending
   // and the next tick can duplicate it, so the failure must be retained visibly.

@@ -14,6 +14,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsPreflight, jsonResponse } from "./_shared/cors.ts";
+import { sessionGuardResponse } from "./_shared/active-session.ts";
 import { getAIProvider } from "./_shared/ai-provider.ts";
 
 const DEFAULT_MODEL = "gemini-3.6-flash";
@@ -178,6 +179,11 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: "Unauthorized" }, 401);
   }
   const userId = userData.user.id;
+
+  // A JWT that still validates is not an active session: deleted or banned
+  // callers must lose service-role access before any config row is touched.
+  const sessionGuard = await sessionGuardResponse(userClient, jsonResponse);
+  if (sessionGuard) return sessionGuard;
 
   // 2. system_owner check, via service-role client (RLS-independent, exact
   // role row lookup) -- BEFORE any config data is touched.

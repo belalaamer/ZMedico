@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { sessionGuardResponse } from "../_shared/active-session.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -148,6 +149,9 @@ Deno.serve(async (req) => {
   const caller = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authorization } } });
   const { data: userData, error: userError } = await caller.auth.getUser(token);
   if (userError || !userData.user) return jsonResponse({ error: "Unauthorized" }, 401);
+
+  const guard = await sessionGuardResponse(caller, jsonResponse);
+  if (guard) return guard;
 
   const service = createClient(supabaseUrl, serviceKey);
   const { data: roles } = await service.from("user_roles").select("role").eq("user_id", userData.user.id);

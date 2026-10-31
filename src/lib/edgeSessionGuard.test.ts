@@ -23,7 +23,9 @@ const GUARDED_FUNCTIONS = [
   "send-patient-portal-message",
 ];
 
-const PRIVILEGE_MARKER = /from\("user_roles"\)|rpc\("has_role"/;
+// admin-reset-password resolves roles through _shared/staff-roles.ts (#248),
+// so the read itself no longer appears in that function's index.ts.
+const PRIVILEGE_MARKER = /from\("user_roles"\)|rpc\("has_role"|readUserRoles\(/;
 const GUARD_CALL = /await\s+(?:requireActiveSessionOrThrow|requireActiveSession|sessionGuardResponse)\s*\(/;
 
 function source(name: string) {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
 import { defaultActionsFor, MODULES } from "@/lib/rolePermissions";
@@ -19,6 +19,8 @@ export function usePermissions() {
   // the pre-existing dependencies (roles/isAdmin), preserving byte-
   // identical legacy behavior.
   const { fingerprint } = useAuthzState();
+  const identityRef = useRef<string | null | undefined>(undefined);
+  const resolvedRef = useRef(false);
 
   // Access gate: a user must be linked to an active staff_profile to have
   // module access. Admins bypass to prevent bootstrap lockout.
@@ -58,9 +60,19 @@ export function usePermissions() {
   useEffect(() => {
     let active = true;
     if (rolesLoading) return;
-    if (isAdmin) { setPerms({}); setLoading(false); return; }
-    if (!roles.length) { setPerms({}); setLoading(false); return; }
-    setLoading(true);
+    const identity = user?.id ?? null;
+    const identityChanged = identityRef.current !== identity;
+    if (identityChanged) {
+      identityRef.current = identity;
+      resolvedRef.current = false;
+    }
+    // A token refresh or an authz-fingerprint change for the same identity
+    // revalidates in the background: the last known permission map stays in
+    // effect and the blocking "Checking permissions…" gate is not re-entered.
+    const silent = !identityChanged && resolvedRef.current;
+    if (isAdmin) { setPerms({}); setLoading(false); resolvedRef.current = true; return; }
+    if (!roles.length) { setPerms({}); setLoading(false); resolvedRef.current = true; return; }
+    if (!silent) setLoading(true);
     // Phase B — Canonical runtime path. When the flag is on, source the
     // effective permission set from the caller-only RPC rather than the
     // owner-only catalog view. A denied/missing/stale response must not fall
@@ -75,6 +87,7 @@ export function usePermissions() {
             });
           }
           setPerms(map);
+          resolvedRef.current = true;
           setLoading(false);
         })
         .catch((error) => {
@@ -84,7 +97,11 @@ export function usePermissions() {
               code: typeof error?.code === "string" ? error.code : "unconfirmed_permissions",
             });
           }
+          // A failed background refresh keeps the last canonical decision; a
+          // failed first load still denies (never legacy defaults).
+          if (silent) { setLoading(false); return; }
           setPerms({});
+          resolvedRef.current = true;
           setLoading(false);
         });
       return () => { active = false; };
@@ -130,6 +147,7 @@ export function usePermissions() {
             map[mod] = s;
           });
         });
+        resolvedRef.current = true;
         setPerms(map);
       })
       .catch((error) => {
@@ -150,7 +168,9 @@ export function usePermissions() {
         setPerms(map);
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (!active) return;
+        resolvedRef.current = true;
+        setLoading(false);
       });
     }
   }, [roles.join(","), isAdmin, rolesLoading, fingerprint, user?.id]);

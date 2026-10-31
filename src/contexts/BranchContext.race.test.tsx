@@ -12,7 +12,7 @@ vi.mock('@/integrations/supabase/client',()=>({supabase:{
   rpc:async()=>({data:{access_allowed:true,plan_features:{}},error:null}),
 }}));
 import {BranchProvider,useBranch} from './BranchContext';
-function Probe(){const branch=useBranch();return <><span data-testid="ready">{String(branch.branchSelectionReady)}</span><span data-testid="branches">{branch.branches.map(b=>b.id).join(',')}</span></>;}
+function Probe(){const branch=useBranch();return <><span data-testid="ready">{String(branch.branchSelectionReady)}</span><span data-testid="sub-loading">{String(branch.subscriptionLoading)}</span><span data-testid="branches">{branch.branches.map(b=>b.id).join(',')}</span></>;}
 const tree=()=> <MemoryRouter initialEntries={['/patients']}><BranchProvider><Probe/></BranchProvider></MemoryRouter>;
 describe('branch bootstrap response ordering',()=>{
   beforeEach(()=>{state.loading=true;state.owner=false;state.user={id:'qa-user'};state.queries=[];state.rejects=[];state.handoffs=[];state.filters=[];state.sync=null;localStorage.clear();sessionStorage.clear();});
@@ -39,6 +39,34 @@ describe('branch bootstrap response ordering',()=>{
     await waitFor(()=>expect(state.queries).toHaveLength(3));
     await act(async()=>{state.queries[2](response);});
     expect(screen.getByTestId('ready')).toHaveTextContent('true');
+  });
+  it('a data-sync refresh never drops readiness or the blocking subscription gate',async()=>{
+    state.loading=false;const view=render(tree());
+    await waitFor(()=>expect(state.queries).toHaveLength(1));
+    const response={data:[{id:'qa-branch',name_en:'QA',name_ar:'اختبار'}],error:null};
+    await act(async()=>{state.queries[0](response);});
+    await waitFor(()=>expect(screen.getByTestId('ready')).toHaveTextContent('true'));
+    await waitFor(()=>expect(screen.getByTestId('sub-loading')).toHaveTextContent('false'));
+    await act(async()=>{state.sync?.();});
+    expect(screen.getByTestId('ready')).toHaveTextContent('true');
+    expect(screen.getByTestId('sub-loading')).toHaveTextContent('false');
+    await waitFor(()=>expect(state.queries).toHaveLength(2));
+    await act(async()=>{state.queries[1](response);});
+    expect(screen.getByTestId('ready')).toHaveTextContent('true');
+    expect(screen.getByTestId('sub-loading')).toHaveTextContent('false');
+    expect(screen.getByTestId('branches')).toHaveTextContent('qa-branch');
+  });
+  it('a failed background refresh keeps the last valid branch instead of blanking it',async()=>{
+    state.loading=false;const view=render(tree());
+    await waitFor(()=>expect(state.queries).toHaveLength(1));
+    await act(async()=>{state.queries[0]({data:[{id:'qa-branch',name_en:'QA',name_ar:'اختبار'}],error:null});});
+    await waitFor(()=>expect(screen.getByTestId('ready')).toHaveTextContent('true'));
+    await act(async()=>{state.sync?.();});
+    await waitFor(()=>expect(state.queries).toHaveLength(2));
+    await act(async()=>{state.rejects[1](new Error('Controlled background failure'));});
+    expect(screen.getByTestId('ready')).toHaveTextContent('true');
+    expect(screen.getByTestId('branches')).toHaveTextContent('qa-branch');
+    expect(screen.getByTestId('sub-loading')).toHaveTextContent('false');
   });
   it('ignores a previous user response after the next user branches load',async()=>{
     state.loading=false;const view=render(tree());

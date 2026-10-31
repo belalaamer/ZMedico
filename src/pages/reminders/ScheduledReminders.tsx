@@ -15,6 +15,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
+import { usePatientSearch } from "@/hooks/usePatientSearch";
+import { PATIENT_PICKER_LIMIT, patientPickerCopy, pickedPatientLabel } from "@/lib/patientSearch";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -50,7 +53,14 @@ export default function ScheduledReminders() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [items, setItems] = useState<Reminder[]>([]);
-  const [patients, setPatients] = useState<Patient[]>([]);
+  // C4: the picker asks the database for a page of matches instead of holding the
+  // clinic's newest 500 patients -- past that ceiling a patient could not be sent a
+  // reminder at all. The names shown on the reminder rows are a targeted lookup of
+  // the ids those rows reference, not a page of the clinic.
+  const patientSearch = usePatientSearch({ ready: branchSelectionReady, branchId: currentBranchId, lang });
+  const pickerCopy = patientPickerCopy(lang);
+  const [patientEcho, setPatientEcho] = useState<{ id: string; label: string } | null>(null);
+  const [patientNames, setPatientNames] = useState<Record<string, Patient>>({});
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -73,17 +83,22 @@ export default function ScheduledReminders() {
   const load = async () => {
     const requestId = ++loadRequestRef.current;
     const branchId = currentBranchId;
-    if (!branchSelectionReady || !branchId) { setItems([]); setPatients([]); return; }
+    if (!branchSelectionReady || !branchId) { setItems([]); setPatientNames({}); return; }
     const q = supabase.from("reminders").select("*").eq("branch_id", branchId).order("scheduled_time", { ascending: false }).limit(300);
     const { data } = await q;
     if (requestId !== loadRequestRef.current) return;
-    setItems((data ?? []) as Reminder[]);
-    const { data: p } = await supabase.from("patients").select("id, first_name_en, last_name_en, first_name_ar, last_name_ar, name_language, phone")
-      .eq("branch_id", branchId).is("deleted_at", null).order("created_at", { ascending: false }).limit(500);
-    if (requestId === loadRequestRef.current) setPatients((p ?? []) as Patient[]);
+    const rows = (data ?? []) as Reminder[];
+    setItems(rows);
+    const ids = [...new Set(rows.map((r) => r.patient_id).filter((id): id is string => Boolean(id)))];
+    if (ids.length === 0) { setPatientNames({}); return; }
+    const { data: p } = await supabase.from("patients")
+      .select("id, first_name_en, last_name_en, first_name_ar, last_name_ar, name_language, phone")
+      .in("id", ids).is("deleted_at", null);
+    if (requestId !== loadRequestRef.current) return;
+    setPatientNames(Object.fromEntries(((p ?? []) as Patient[]).map((row) => [row.id, row])));
   };
   useEffect(() => { void load(); }, [branchSelectionReady, currentBranchId]);
-  useDataSync(["patients", "reminders"], () => { void load(); });
+  useDataSync(["patients", "reminders"], () => { void load(); patientSearch.reload(); });
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -102,10 +117,7 @@ export default function ScheduledReminders() {
   const upcomingCount = items.filter((r) => new Date(r.scheduled_time) > new Date() && r.status === "pending").length;
   const pendingCount = items.filter((r) => r.status === "pending").length;
 
-  const patientName = (id: string | null) => {
-    const p = id ? patients.find((x) => x.id === id) : null;
-    return patientDisplayName(p, lang);
-  };
+  const patientName = (id: string | null) => patientDisplayName(id ? patientNames[id] : null, lang);
 
   const create = async () => {
     if (!branchSelectionReady || !currentBranchId) { toast({ title: t("selectBranch"), variant: "destructive" }); return; }
@@ -236,17 +248,27 @@ export default function ScheduledReminders() {
               <div className="space-y-3">
                 <div>
                   <Label>{t("patients")}</Label>
-                  <Select value={form.patient_id} onValueChange={(v) => setForm({ ...form, patient_id: v })}>
-                    <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                    <SelectContent>
-                      {patients.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          <span dir={patientDisplayDirection(p, lang)}>{patientDisplayName(p, lang)}</span>
-                          {p.phone ? ` — ${p.phone}` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Combobox
+                    options={patientSearch.options.map((p) => ({
+                      value: p.id,
+                      label: p.label,
+                      detail: p.phone ?? undefined,
+                    }))}
+                    value={form.patient_id}
+                    onChange={(next) => {
+                      const picked = patientSearch.options.find((p) => p.id === next);
+                      setPatientEcho(picked ? { id: picked.id, label: picked.label } : null);
+                      setForm({ ...form, patient_id: next });
+                    }}
+                    placeholder={lang === "ar" ? "ابحث عن مريض..." : "Search patient..."}
+                    searchPlaceholder={pickerCopy.searchPlaceholder}
+                    emptyText={patientSearch.failed ? pickerCopy.failed : pickerCopy.empty}
+                    searchingText={pickerCopy.searching}
+                    hintText={patientSearch.options.length >= PATIENT_PICKER_LIMIT ? pickerCopy.truncated : undefined}
+                    selectedLabel={pickedPatientLabel(patientEcho, patientSearch.options, form.patient_id)}
+                    searching={patientSearch.searching}
+                    onSearch={patientSearch.search}
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -296,7 +318,7 @@ export default function ScheduledReminders() {
             <TableBody>
               {filtered.map((r) => (
                 <TableRow key={r.id}>
-                  <TableCell dir={patientDisplayDirection(patients.find((p) => p.id === r.patient_id), lang)}>{patientName(r.patient_id)}</TableCell>
+                  <TableCell dir={patientDisplayDirection(patientNames[r.patient_id ?? ""], lang)}>{patientName(r.patient_id)}</TableCell>
                   <TableCell><Badge variant="outline">{enumCopy(REMINDER_CHANNEL_KEY, r.reminder_type, t)}</Badge></TableCell>
                   <TableCell className="text-sm">{new Date(r.scheduled_time).toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}</TableCell>
                   <TableCell className="max-w-sm truncate text-sm text-muted-foreground">{lang === "ar" ? r.message_ar : r.message_en}</TableCell>
@@ -357,7 +379,7 @@ export default function ScheduledReminders() {
           {rescheduleTarget && (
             <div className="space-y-3">
               <div className="text-sm">
-                <div dir={patientDisplayDirection(patients.find((p) => p.id === rescheduleTarget.patient_id), lang)} className="font-medium">
+                <div dir={patientDisplayDirection(patientNames[rescheduleTarget.patient_id ?? ""], lang)} className="font-medium">
                   {patientName(rescheduleTarget.patient_id)}
                 </div>
                 <div className="text-xs text-muted-foreground">

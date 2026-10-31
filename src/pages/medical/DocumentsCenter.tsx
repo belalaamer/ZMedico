@@ -5,6 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { usePatientSearch } from "@/hooks/usePatientSearch";
+import {
+  PATIENT_PICKER_LIMIT,
+  fetchPatientOption,
+  patientPickerCopy,
+  pickedPatientLabel,
+  type PatientOption,
+} from "@/lib/patientSearch";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -20,12 +29,67 @@ import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
 import { Link } from "react-router-dom";
 import { useDataSync } from "@/lib/dataSync";
 
+/**
+ * A patient picker that asks the branch's patients for one page of name or phone
+ * matches. The documents screen has two of them -- the upload target and the list
+ * filter -- and neither may hold the clinic's first 500 rows.
+ */
+function PatientPicker({
+  value, onChange, branchId, lang, placeholder, allLabel, className,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  branchId: string | null;
+  lang: "ar" | "en";
+  placeholder: string;
+  allLabel?: string;
+  className?: string;
+}) {
+  const copy = patientPickerCopy(lang);
+  const search = usePatientSearch({ ready: Boolean(branchId), branchId, lang });
+  const [echo, setEcho] = useState<PatientOption | null>(null);
+  const id = allLabel && value === "all" ? "" : value;
+
+  // The chosen row is usually one page behind the next search; the box still names it.
+  useEffect(() => {
+    if (!id) { setEcho(null); return; }
+    let active = true;
+    void fetchPatientOption(supabase, { id, lang }).then((row) => {
+      if (active) setEcho(row);
+    });
+    return () => { active = false; };
+  }, [id, lang]);
+
+  const options: ComboboxOption[] = search.options.map((p) => ({
+    value: p.id,
+    label: p.label,
+    detail: p.phone ?? undefined,
+  }));
+  if (allLabel) options.unshift({ value: "all", label: allLabel });
+
+  return (
+    <Combobox
+      className={className}
+      options={options}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      searchPlaceholder={copy.searchPlaceholder}
+      emptyText={search.failed ? copy.failed : copy.empty}
+      searchingText={copy.searching}
+      hintText={search.options.length >= PATIENT_PICKER_LIMIT ? copy.truncated : undefined}
+      selectedLabel={allLabel && !id ? allLabel : pickedPatientLabel(echo, search.options, id)}
+      searching={search.searching}
+      onSearch={search.search}
+    />
+  );
+}
+
 export default function DocumentsCenter() {
   const { t, lang } = useI18n();
   const { user } = useAuth();
   const { currentBranchId } = useBranch();
   const [docs, setDocs] = useState<any[]>([]);
-  const [patients, setPatients] = useState<any[]>([]);
   const [filterType, setFilterType] = useState("all");
   const [filterPatient, setFilterPatient] = useState("all");
   const [search, setSearch] = useState("");
@@ -45,18 +109,10 @@ export default function DocumentsCenter() {
     const { data } = await q.order("created_at", { ascending: false }).limit(300);
     setDocs(data ?? []);
   };
-  const loadPatients = () => {
-    let q = supabase.from("patients").select("id,first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code").is("deleted_at", null);
-    if (currentBranchId) q = q.eq("branch_id", currentBranchId);
-    q.order("created_at", { ascending: false }).limit(500)
-      .then(({ data }) => setPatients(data ?? []));
-  };
   useEffect(() => {
     load();
-    loadPatients();
     // eslint-disable-next-line
   }, [currentBranchId]);
-  useDataSync(["patients"], () => loadPatients());
   useDataSync(["patient_documents"], () => load());
 
   const filtered = docs.filter((d) => {
@@ -140,10 +196,13 @@ export default function DocumentsCenter() {
       <Card className="p-4 shadow-card space-y-3">
         <div className="grid sm:grid-cols-3 gap-3">
           <div className="space-y-1.5"><Label>{t("filterByPatient")}</Label>
-            <Select value={uploadPatient} onValueChange={setUploadPatient}>
-              <SelectTrigger><SelectValue placeholder={t("selectPatient")}/></SelectTrigger>
-              <SelectContent>{patients.map((p) => <SelectItem key={p.id} value={p.id}>#{p.patient_code} · {patientDisplayName(p, lang)}</SelectItem>)}</SelectContent>
-            </Select>
+            <PatientPicker
+              value={uploadPatient}
+              onChange={setUploadPatient}
+              branchId={currentBranchId}
+              lang={lang}
+              placeholder={t("selectPatient")}
+            />
           </div>
           <div className="space-y-1.5"><Label>{t("documentType")}</Label>
             <Select value={uploadType} onValueChange={setUploadType}>
@@ -181,13 +240,15 @@ export default function DocumentsCenter() {
             <SelectItem value="other">{t("docOther")}</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={filterPatient} onValueChange={setFilterPatient}>
-          <SelectTrigger className="w-56"><SelectValue/></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("filterAll")}</SelectItem>
-            {patients.map((p) => <SelectItem key={p.id} value={p.id}>#{p.patient_code} · {patientDisplayName(p, lang)}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <PatientPicker
+          value={filterPatient}
+          onChange={setFilterPatient}
+          branchId={currentBranchId}
+          lang={lang}
+          className="w-56"
+          placeholder={t("filterAll")}
+          allLabel={lang === "ar" ? "كل المرضى" : "All patients"}
+        />
       </div>
 
       {filtered.length === 0 ? <div className="p-10 text-center text-muted-foreground">{t("noDocuments")}</div> : (

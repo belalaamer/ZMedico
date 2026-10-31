@@ -19,6 +19,9 @@ const PICKER_SURFACES = [
   "src/pages/patients/ReferrerPicker.tsx",
   "src/pages/payments/RecordPaymentDialog.tsx",
   "src/pages/invoices/CreateInvoiceDialog.tsx",
+  "src/pages/reminders/ScheduledReminders.tsx",
+  "src/pages/physio/PhysioCases.tsx",
+  "src/pages/medical/DocumentsCenter.tsx",
 ];
 
 // A page window on the patients table, however large, is the defect. `.range()`

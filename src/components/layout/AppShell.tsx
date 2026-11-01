@@ -65,7 +65,10 @@ export default function AppShell() {
   // Resolve the platform/workspace boundary before mounting any workspace chrome.
   // This prevents a system owner from seeing a one-frame clinic dashboard/sidebar
   // while the role query is still loading.
-  if (authzLoading || !branchSelectionReady || rolesLoading || !patientPortalCheck.done) return <SubscriptionState loading lang={lang} />;
+  // Only a roleless session needs the patient-portal probe before rendering.
+  // A staff session must not wait for that probe on every shell remount.
+  const needsPatientPortalProbe = roles.length === 0;
+  if (authzLoading || !branchSelectionReady || rolesLoading || (needsPatientPortalProbe && !patientPortalCheck.done)) return <SubscriptionState loading lang={lang} />;
   if (authz.holdsAnyRole("system_owner") && !workspaceHandoff) return <Navigate to="/platform" replace />;
   if (roles.length === 0) {
     if (patientPortalCheck.active) return <Navigate to="/patient-portal" replace />;

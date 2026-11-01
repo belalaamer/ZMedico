@@ -1,59 +1,23 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { withTimeout } from "@/lib/withTimeout";
+import { ensureRoles, useAuthzSnapshot } from "@/lib/authz/sharedAuthzStore";
 
 export type AppRole = "system_owner" | "admin" | "manager" | "doctor" | "receptionist" | "hr" | "accountant" | "staff" | string;
 
+// Reads the shared per-user authorization store instead of owning a private
+// query. A second mount for the same user must not re-enter the loading gate.
 export function useUserRole() {
   const { user } = useAuth();
-  const [roles, setRoles] = useState<AppRole[]>([]);
-  const [loading, setLoading] = useState(true);
+  const userId = user?.id ?? null;
+  const snapshot = useAuthzSnapshot(userId);
 
   useEffect(() => {
-    let active = true;
-    if (!user) { setRoles([]); setLoading(false); return; }
-    setLoading(true);
-    withTimeout(
-      supabase.from("user_roles").select("role").eq("user_id", user.id),
-      {
-        ms: 8000,
-        fallback: { data: [], error: null, count: null, status: 200, statusText: "timeout-fallback" } as any,
-        label: "user_roles.bootstrap",
-      }
-    )
-      .then(({ data, error }: any) => {
-        if (!active) return;
-        if (import.meta.env.DEV) {
-          if (error) {
-            console.warn("[auth-debug] user_roles fetch error", {
-              message: error.message,
-              code: error.code,
-            });
-          } else {
-            console.info("[auth-debug] user_roles fetch completed", {
-              rows: data?.length ?? 0,
-            });
-          }
-        }
-        setRoles((data ?? []).map((r: any) => r.role as AppRole));
-      })
-      .catch((error) => {
-        if (!active) return;
-        if (import.meta.env.DEV) {
-          console.warn("[auth-debug] user_roles fetch threw", { message: error instanceof Error ? error.message : String(error) });
-        }
-        setRoles([]);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+    if (userId) void ensureRoles(userId);
+  }, [userId]);
 
-    return () => { active = false; };
-  }, [user?.id]);
-
+  const roles = snapshot.roles;
   const isSystemOwner = roles.includes("system_owner");
   // System owners have god-mode and implicitly satisfy every admin gate.
   const isAdmin = isSystemOwner || roles.includes("admin");
-  return { roles, isAdmin, isSystemOwner, loading };
+  return { roles, isAdmin, isSystemOwner, loading: Boolean(userId) && !snapshot.rolesResolved };
 }

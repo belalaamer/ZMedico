@@ -90,6 +90,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   const [domainTenantId, setDomainTenantId] = useState<string | null>(null);
   const branchLoadVersion = useRef(0);
   const branchSelectionReadyRef = useRef(false);
+  const loadedUserIdRef = useRef<string | null | undefined>(undefined);
   const subscriptionBranchRef = useRef<string | null>(null);
   const modulesBranchRef = useRef<string | null>(null);
   const applyBranchSelectionReady = (ready: boolean) => {
@@ -171,7 +172,9 @@ export function BranchProvider({ children }: { children: ReactNode }) {
       const list = (data ?? []) as Branch[];
       setBranches(list);
       if (roleLoading) {
-        applyBranchSelectionReady(false);
+        // A same-identity revalidation must not revoke readiness just because a
+        // role read is still in flight; the cold-load path still blocks.
+        if (!background) applyBranchSelectionReady(false);
         return;
       }
       setCurrentBranchIdState((prev) => {
@@ -218,7 +221,14 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    void loadBranches();
+    const identity = user?.id ?? null;
+    const identityChanged = loadedUserIdRef.current !== identity;
+    loadedUserIdRef.current = identity;
+    // Branch-aware links re-add ?branch=<current> on every navigation, and the
+    // role read flips loading on boot. Both re-run this effect; neither is a
+    // cold load, so revalidate in place and keep the page mounted. Only a real
+    // identity change may drop readiness and re-gate the shell.
+    void loadBranches({ background: !identityChanged && branchSelectionReadyRef.current });
     return () => { branchLoadVersion.current += 1; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, isSystemOwner, roleLoading, domainTenantId, location.search, platformRoute]);

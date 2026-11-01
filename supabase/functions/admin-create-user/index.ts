@@ -12,6 +12,10 @@ function jsonResponse(body: unknown, status = 200) {
 }
 function corsPreflight() { return new Response("ok", { headers: corsHeaders }); }
 const MAX_BODY_BYTES = 8 * 1024;
+// Mirrors MIN_STAFF_PASSWORD_LENGTH in src/lib/staffPassword.ts. The patient
+// password surfaces already require 8; leaving this at 6 would make the
+// screen's floor cosmetic for anything calling the function directly.
+const MIN_STAFF_PASSWORD_LENGTH = 8;
 
 // Generates a cryptographically strong temporary password. It is only returned
 // once in the admin response so the admin can hand it to the new staff member.
@@ -78,10 +82,13 @@ Deno.serve(async (req) => {
     const branch_id = body.branch_id ? String(body.branch_id) : null;
     // If the admin supplied an explicit password, use it. Otherwise generate a
     // temporary password. In both cases the account can sign in immediately.
-    const suppliedPassword = typeof body.password === "string" && body.password.trim().length >= 6
-      ? body.password.trim()
-      : null;
-    const initialPassword = suppliedPassword ?? genInternalPassword(32);
+    // A non-empty value below the floor is refused instead of silently being
+    // replaced by a generated password the caller did not ask for.
+    const suppliedPassword = typeof body.password === "string" ? body.password.trim() : "";
+    if (suppliedPassword && suppliedPassword.length < MIN_STAFF_PASSWORD_LENGTH) {
+      return jsonResponse({ error: `Password must be at least ${MIN_STAFF_PASSWORD_LENGTH} characters` }, 400);
+    }
+    const initialPassword = suppliedPassword || genInternalPassword(32);
 
     if (!email || !email.includes("@")) {
       return jsonResponse({ error: "Invalid email" }, 400);

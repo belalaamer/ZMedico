@@ -3,6 +3,10 @@ import { corsPreflight, jsonResponse } from "../_shared/cors.ts";
 import { requireActiveSession } from "../_shared/active-session.ts";
 import { isAdministrator, readUserRoles } from "../_shared/staff-roles.ts";
 const MAX_BODY_BYTES = 8 * 1024;
+// Mirrors MIN_STAFF_PASSWORD_LENGTH in src/lib/staffPassword.ts. The patient
+// password surfaces already require 8; leaving this at 6 would make the
+// screen's floor cosmetic for anything calling the function directly.
+const MIN_STAFF_PASSWORD_LENGTH = 8;
 
 function genTemporaryPassword(len = 32) {
   const chars =
@@ -61,10 +65,13 @@ Deno.serve(async (req) => {
     if (!user_id) {
       return jsonResponse({ error: "user_id required" }, 400);
     }
-    const suppliedPassword = typeof body.password === "string" && body.password.trim().length >= 6
-      ? body.password.trim()
-      : null;
-    const nextPassword = suppliedPassword ?? genTemporaryPassword(32);
+    // A non-empty value below the floor is refused instead of silently being
+    // replaced by a generated password the caller did not ask for.
+    const suppliedPassword = typeof body.password === "string" ? body.password.trim() : "";
+    if (suppliedPassword && suppliedPassword.length < MIN_STAFF_PASSWORD_LENGTH) {
+      return jsonResponse({ error: `Password must be at least ${MIN_STAFF_PASSWORD_LENGTH} characters` }, 400);
+    }
+    const nextPassword = suppliedPassword || genTemporaryPassword(32);
 
     const callerIsSystemOwner = callerRoles.roles.includes("system_owner");
 

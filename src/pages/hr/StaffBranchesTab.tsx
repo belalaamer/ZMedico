@@ -11,6 +11,7 @@ import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { toast } from "@/hooks/use-toast";
 import { useBranch } from "@/contexts/BranchContext";
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
+import { deskFailure } from "@/lib/deskFailure";
 
 type Branch = { id: string; name_en: string; name_ar: string };
 
@@ -75,7 +76,11 @@ export default function StaffBranchesTab({ userId }: { userId: string }) {
       .from("staff_branches")
       .insert({ user_id: userId, branch_id: pick });
     setSaving(false);
-    if (error) { toast({ title: error.message, variant: "destructive" }); return; }
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر إضافة الفرع للموظف." : "The branch could not be assigned.");
+      toast({ title: failure.title, description: failure.description, variant: "destructive" });
+      return;
+    }
     setPick("");
     toast({ title: lang === "ar" ? "تمت إضافة الفرع" : "Branch added" });
     load();
@@ -90,7 +95,11 @@ export default function StaffBranchesTab({ userId }: { userId: string }) {
       .eq("branch_id", branchId)
       .select("id");
     setSaving(false);
-    if (error) { toast({ title: error.message, variant: "destructive" }); return; }
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر إزالة الفرع من الموظف." : "The branch could not be removed.");
+      toast({ title: failure.title, description: failure.description, variant: "destructive" });
+      return;
+    }
     if (rowsWritten(data) === 0) { toast({ title: notConfirmedCopy(lang, "delete"), variant: "destructive" }); load(); return; }
     toast({ title: lang === "ar" ? "تمت الإزالة" : "Branch removed" });
     load();

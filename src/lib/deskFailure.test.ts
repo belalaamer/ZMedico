@@ -55,6 +55,28 @@ describe("deskFailure answers the failure the desk can act on", () => {
     expect(ar({ code: "P0001", message: "plan_limit_patients_reached" }).description).toContain("الباقة");
   });
 
+  it("does not let 42501 turn a cross-branch position merge into a permission problem", () => {
+    const english = en({ code: "42501", message: "Cannot merge positions across branches" });
+    const arabic = ar({ code: "42501", message: "Cannot merge positions across branches" });
+    expect(english.title).toBe("These two positions belong to different branches.");
+    expect(arabic.title).toBe("هذان المنصبان يخصان فرعين مختلفين.");
+    expect(english.description).toContain("branch you are working in");
+  });
+
+  it("says who can merge a shared position, instead of quoting the raise", () => {
+    const result = en({ code: "42501", message: "Only system owners may merge global positions" });
+    expect(result.title).toBe("Only the workspace owner can merge shared positions.");
+    expect(result.description).toContain("Ask the workspace owner");
+    expect(JSON.stringify(result)).not.toContain("system owners");
+  });
+
+  it("explains the cross-branch assignment that blocks a merge", () => {
+    const result = en({ code: "23514", message: "Source position has cross-branch staff assignments" });
+    expect(result.title).toBe("This position is used by staff in another branch.");
+    expect(result.description).toContain("Remove those assignments");
+    expect(JSON.stringify(result)).not.toContain("staff assignments");
+  });
+
   it("hides the branch UUID the cross-branch trigger interpolates", () => {
     const result = en({
       code: "23514",

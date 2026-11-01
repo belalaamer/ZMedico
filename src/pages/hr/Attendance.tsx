@@ -13,6 +13,7 @@ import { MapPin, CheckCircle2, AlertTriangle, UserCheck, UserX, Clock, CalendarR
 import GpsCheckDialog from "@/components/attendance/GpsCheckDialog";
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { localDateOnly } from "@/lib/localDate";
+import { deskFailure } from "@/lib/deskFailure";
 
 export default function Attendance() {
   // UX fix: `lang` is now pulled from useI18n() alongside `t` so the
@@ -81,11 +82,17 @@ export default function Attendance() {
     };
     if (existing) {
       const { data, error } = await supabase.from("attendance").update({ check_in_time: time, check_in_method: "gps", status: "present", ...baseLoc } as any).eq("id", existing.id).select("id");
-      if (error) return toast.error(error.message);
+      if (error) {
+        const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تسجيل الحضور." : "The check-in could not be recorded.");
+        return toast.error(failure.title, { description: failure.description });
+      }
       if (rowsWritten(data) === 0) return toast.error(notConfirmedCopy(lang, "save"));
     } else {
       const { error } = await supabase.from("attendance").insert({ staff_id: sid, branch_id: currentBranchId, date, check_in_time: time, check_in_method: "gps", status: "present", created_by: user?.id, ...baseLoc } as any);
-      if (error) return toast.error(error.message);
+      if (error) {
+        const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تسجيل الحضور." : "The check-in could not be recorded.");
+        return toast.error(failure.title, { description: failure.description });
+      }
     }
     if (!payload.within) toast.warning(t("outsideAllowedZone"));
     else toast.success(t("checkIn"));
@@ -104,7 +111,10 @@ export default function Attendance() {
       check_out_longitude: payload.coords.lon,
       check_out_accuracy: payload.coords.accuracy ?? null,
     } as any).eq("id", existing.id).select("id");
-    if (error) return toast.error(error.message);
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تسجيل الانصراف." : "The check-out could not be recorded.");
+      return toast.error(failure.title, { description: failure.description });
+    }
     if (rowsWritten(data) === 0) return toast.error(notConfirmedCopy(lang, "save"));
     toast.success(t("checkOut"));
     load();
@@ -113,11 +123,19 @@ export default function Attendance() {
     const existing = recOf(sid);
     if (existing) {
       const { data, error } = await supabase.from("attendance").update({ status }).eq("id", existing.id).select("id");
-      if (error) { toast.error(error.message); return; }
+      if (error) {
+        const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تحديث حالة الحضور." : "The attendance status could not be changed.");
+        toast.error(failure.title, { description: failure.description });
+        return;
+      }
       if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); return; }
     } else {
       const { error } = await supabase.from("attendance").insert({ staff_id: sid, branch_id: currentBranchId, date, status, created_by: user?.id } as any);
-      if (error) { toast.error(error.message); return; }
+      if (error) {
+        const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تحديث حالة الحضور." : "The attendance status could not be changed.");
+        toast.error(failure.title, { description: failure.description });
+        return;
+      }
     }
     load();
   };

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { useBranch } from "@/contexts/BranchContext";
@@ -101,10 +101,28 @@ export default function AppShell() {
         <Topbar />
         <main ref={mainRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 sm:p-4 md:p-6 pb-[calc(6rem+env(safe-area-inset-bottom,0px))] md:pb-6">
           <ErrorBoundary>
-            <Outlet />
+            {/* The shell's own chunk is loaded by the route-level Suspense in
+                App.tsx. Once mounted, a page chunk that is still loading must
+                replace only this area: without this boundary React unwinds to
+                the full-screen route loader and unmounts the sidebar, topbar
+                and navigation on the first visit to every lazy route. */}
+            <Suspense fallback={<ContentLoading lang={lang} />}>
+              <Outlet />
+            </Suspense>
           </ErrorBoundary>
         </main>
         <MobileBottomNav />
+      </div>
+    </div>
+  );
+}
+
+function ContentLoading({ lang }: { lang: "ar" | "en" }) {
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center" role="status" aria-live="polite">
+      <div className="flex flex-col items-center gap-3 text-muted-foreground">
+        <div className="size-8 animate-spin rounded-full border-4 border-primary/20 border-t-primary" aria-hidden="true" />
+        <span className="text-sm">{lang === "ar" ? "جارٍ تحميل الصفحة…" : "Loading page…"}</span>
       </div>
     </div>
   );

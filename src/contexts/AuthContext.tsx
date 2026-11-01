@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
 import { withTimeout } from "@/lib/withTimeout";
 import { markSignOutReason, takeSignOutReason, type SignOutReason } from "@/lib/authSignOutReason";
+import { resetAuthzStore } from "@/lib/authz/sharedAuthzStore";
 import { toast } from "@/hooks/use-toast";
 import {
   clearPersistedAuthSessions,
@@ -86,6 +87,9 @@ const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
 // Clear any app-level cached state tied to the signed-in user.
 function clearLocalAppState() {
+  // Sign-out ends the identity, so cached authz must not survive into the next
+  // session (roles or grants may have changed while it was signed out).
+  resetAuthzStore();
   try {
     localStorage.removeItem("zmedico.branch");
   } catch {
@@ -167,12 +171,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         persistAuthSessionForPreview(data.session, "canonical-storage-bootstrap");
       });
     }
+    // A different identity in this tab must not inherit the previous
+    // identity's cached authorization. A same-id event (TOKEN_REFRESHED,
+    // repeated SIGNED_IN) keeps the cache and stays silent.
+    let appliedUserId = readPersistedAuthSession()?.user?.id ?? null;
+    const applyAppAuthState = (next: Session | null) => {
+      const nextUserId = next?.user?.id ?? null;
+      if (nextUserId !== appliedUserId) {
+        appliedUserId = nextUserId;
+        resetAuthzStore();
+      }
+      applyAuthState(setSession, setUser, next);
+    };
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
       authDebug("auth state change", { event, ...describeSession(s) });
 
       if (event === "INITIAL_SESSION") {
         persistAuthSessionForPreview(s, "initial-session-event");
-        applyAuthState(setSession, setUser, s);
+        applyAppAuthState(s);
         if (s) hadSession = true;
         setLoading(false);
         return;
@@ -198,7 +214,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       persistAuthSessionForPreview(s, `auth-event:${event}`);
-      applyAuthState(setSession, setUser, s);
+      applyAppAuthState(s);
       setLoading(false);
       if (s) hadSession = true;
     });
@@ -217,7 +233,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         authDebug("auth.getSession completed", { ...describeSession(s), ...getAuthStorageSnapshot(), error: error?.message ?? null });
         persistAuthSessionForPreview(s, "get-session-bootstrap");
-        applyAuthState(setSession, setUser, s);
+        applyAppAuthState(s);
         // Validate that the user behind this session still exists in Auth.
         if (s) {
           hadSession = true;

@@ -31,6 +31,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 import { usePermissions } from "./usePermissions";
+import { resetAuthzStore } from "@/lib/authz/sharedAuthzStore";
 
 let info: ReturnType<typeof vi.spyOn>;
 let warn: ReturnType<typeof vi.spyOn>;
@@ -42,6 +43,7 @@ function authDebugLogs() {
 }
 
 beforeEach(() => {
+  resetAuthzStore();
   vi.clearAllMocks();
   vi.stubEnv("DEV", false);
   mocks.actor = "actor-one";

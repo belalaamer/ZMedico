@@ -79,8 +79,12 @@ describe("project-scoped session persistence", () => {
     sessionStorage.setItem(canonical, JSON.stringify(own));
     const body = authContextSource.match(/function clearLocalAppState\(\) \{([\s\S]*?)\n\}/)?.[1];
     expect(body).toBeTruthy();
-    const run = new Function("localStorage", "clearPersistedAuthSessions", body!);
-    run({ removeItem: () => { throw new DOMException("Blocked", "SecurityError"); } }, clearPersistedAuthSessions);
+    const run = new Function("localStorage", "clearPersistedAuthSessions", "resetAuthzStore", body!);
+    run(
+      { removeItem: () => { throw new DOMException("Blocked", "SecurityError"); } },
+      clearPersistedAuthSessions,
+      () => undefined,
+    );
     expect(sessionStorage.getItem(canonical)).toBeNull();
   });
 });

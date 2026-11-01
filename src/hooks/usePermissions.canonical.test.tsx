@@ -11,7 +11,8 @@ vi.mock('@/integrations/supabase/client',()=>({supabase:{from:(table:string)=>{
  mocks.legacy(table);throw Error('Legacy catalog must not be queried');
 }}}));
 import {usePermissions} from './usePermissions';
-beforeEach(()=>{vi.clearAllMocks();mocks.actor='actor';mocks.fingerprint=null;mocks.fetch.mockResolvedValue({appointments:new Set(['view'])});});
+import {resetAuthzStore} from '@/lib/authz/sharedAuthzStore';
+beforeEach(()=>{resetAuthzStore();vi.clearAllMocks();mocks.actor='actor';mocks.fingerprint=null;mocks.fetch.mockResolvedValue({appointments:new Set(['view'])});});
 afterEach(cleanup);
 it('accepts actual canonical grants for the current actor',async()=>{const{result}=renderHook(usePermissions);await waitFor(()=>expect(result.current.loading).toBe(false));expect(result.current.can('appointments')).toBe(true);expect(mocks.legacy).not.toHaveBeenCalled();});
 it.each(['42501','PGRST202','503'])('canonical %s denial never grants legacy defaults',async code=>{mocks.fetch.mockRejectedValue({code,message:'private'});const{result}=renderHook(usePermissions);await waitFor(()=>expect(result.current.loading).toBe(false));expect(result.current.can('appointments')).toBe(false);expect(mocks.legacy).not.toHaveBeenCalled();});

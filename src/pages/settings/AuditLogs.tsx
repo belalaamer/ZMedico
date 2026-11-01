@@ -18,6 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useBranch } from "@/contexts/BranchContext";
 import { formatMoney } from "@/lib/format";
 import { patientDisplayName } from "@/lib/patientName";
+import { auditActionLabel, auditActionTone, sortAuditActions } from "@/lib/auditActionLabels";
 import { Info, AlertTriangle, ExternalLink } from "lucide-react";
 
 const PAGE_SIZE = 10;
@@ -73,6 +74,16 @@ const ENTITY_LABELS: Record<string, { ar: string; en: string }> = {
   staff_profiles: { ar: "موظف", en: "Staff" },
   medical_record: { ar: "سجل طبي", en: "Medical record" },
   medical_records: { ar: "سجل طبي", en: "Medical record" },
+  appointment: { ar: "موعد", en: "Appointment" },
+  tenant_domain: { ar: "نطاق مخصص", en: "Custom domain" },
+  profile: { ar: "ملف مستخدم", en: "User profile" },
+  physio_case: { ar: "حالة علاج طبيعي", en: "Physio case" },
+  physio_session: { ar: "جلسة علاج طبيعي", en: "Physio session" },
+  prescription: { ar: "روشتة", en: "Prescription" },
+  branch: { ar: "فرع", en: "Branch" },
+  staff_position: { ar: "وظيفة", en: "Staff position" },
+  role_permissions: { ar: "صلاحيات دور", en: "Role permissions" },
+  purchase_order: { ar: "أمر شراء", en: "Purchase order" },
   products: { ar: "منتج", en: "Product" },
   // Written by StaffDetail.tsx when a staff record is linked/unlinked from a
   // login account. entity_id there is not consistently one table's primary
@@ -231,18 +242,15 @@ function resolveRecordLabel(row: AuditRow, lang: "ar" | "en" | string, maps: Rec
   }
 }
 
+const ACTION_TONE_CLASSES: Record<string, string> = {
+  success: "bg-success/15 text-success border-success/30",
+  info: "bg-info/15 text-info border-info/30",
+  destructive: "bg-destructive/15 text-destructive border-destructive/30",
+};
+
 function actionTone(action: string | null) {
-  const a = (action ?? "").toLowerCase();
-  if (a === "create" || a === "insert") {
-    return "bg-success/15 text-success border-success/30";
-  }
-  if (a === "update") {
-    return "bg-info/15 text-info border-info/30";
-  }
-  if (a === "delete") {
-    return "bg-destructive/15 text-destructive border-destructive/30";
-  }
-  return "";
+  const tone = auditActionTone(action);
+  return tone ? ACTION_TONE_CLASSES[tone] : "";
 }
 
 function initials(name?: string | null, fallback?: string | null) {
@@ -459,19 +467,30 @@ export default function AuditLogs() {
     return Array.from(s).sort();
   }, [items]);
 
+  // Derived from the rows actually on screen, never a hardcoded list: the
+  // vocabulary is written by many call sites and grows, and a fixed set of
+  // filters left every non-generic action (e.g. admin_delete_user) visible
+  // but unfilterable.
+  const actionTypes = useMemo(
+    () => sortAuditActions(items.map(i => i.action).filter((a): a is string => !!a), lang),
+    [items, lang],
+  );
+
   const filtered = useMemo(() => items.filter(i => {
-    if (actionFilter !== "all" && (i.action ?? "").toLowerCase() !== actionFilter) return false;
+    if (actionFilter !== "all" && (i.action ?? "") !== actionFilter) return false;
     if (entityFilter !== "all" && (i.entity_type ?? "") !== entityFilter) return false;
     if (q) {
       const needle = q.toLowerCase();
       const hay = [
-        i.entity_type, i.action, i.entity_id, i.user_id,
+        i.entity_type, entityLabel(i.entity_type, lang),
+        i.action, auditActionLabel(i.action, lang),
+        i.entity_id, i.user_id,
         i.actor?.full_name, i.actor?.email,
       ].filter(Boolean).join(" ").toLowerCase();
       if (!hay.includes(needle)) return false;
     }
     return true;
-  }), [items, q, actionFilter, entityFilter]);
+  }), [items, q, actionFilter, entityFilter, lang]);
 
   useEffect(() => { setPage(0); }, [q, actionFilter, entityFilter]);
 
@@ -514,17 +533,20 @@ export default function AuditLogs() {
             onChange={e => setQ(e.target.value)}
           />
           <Select value={actionFilter} onValueChange={setActionFilter}>
-            <SelectTrigger className="w-full md:w-40"><SelectValue placeholder="Action" /></SelectTrigger>
+            <SelectTrigger className="w-full md:w-48">
+              <SelectValue placeholder={lang === "ar" ? "الإجراء" : "Action"} />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">{lang === "ar" ? "كل الإجراءات" : "All actions"}</SelectItem>
-              <SelectItem value="create">Create</SelectItem>
-              <SelectItem value="insert">Insert</SelectItem>
-              <SelectItem value="update">Update</SelectItem>
-              <SelectItem value="delete">Delete</SelectItem>
+              {actionTypes.map(a => (
+                <SelectItem key={a} value={a}>{auditActionLabel(a, lang)}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Select value={entityFilter} onValueChange={setEntityFilter}>
-            <SelectTrigger className="w-full md:w-48"><SelectValue placeholder="Entity" /></SelectTrigger>
+            <SelectTrigger className="w-full md:w-48">
+              <SelectValue placeholder={lang === "ar" ? "الكيان" : "Entity"} />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">{lang === "ar" ? "كل الكيانات" : "All entities"}</SelectItem>
               {entityTypes.map(e => (
@@ -592,8 +614,12 @@ export default function AuditLogs() {
                             </div>
                           </TableCell>
                           <TableCell className="align-top">
-                            <Badge variant="outline" className={`capitalize ${actionTone(i.action)}`}>
-                              {i.action ?? "—"}
+                            <Badge
+                              variant="outline"
+                              className={actionTone(i.action)}
+                              title={i.action ?? undefined}
+                            >
+                              {auditActionLabel(i.action, lang)}
                             </Badge>
                           </TableCell>
                           <TableCell className="align-top">

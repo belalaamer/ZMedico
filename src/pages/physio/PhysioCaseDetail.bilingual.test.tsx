@@ -1,9 +1,11 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   lang: "en" as "en" | "ar",
   visible: true,
+  fail: null as null | { code?: string; message: string },
   cases: [] as Array<Record<string, any>>,
   sessions: [] as Array<Record<string, any>>,
   reassessments: [] as Array<Record<string, any>>,
@@ -52,6 +54,7 @@ vi.mock("@/integrations/supabase/client", () => ({
       };
       async function settle() {
         if (q._patch === null) return { data: rows(), error: null };
+        if (state.fail) return { data: null, error: state.fail };
         const touched = rows();
         touched.forEach((r) => Object.assign(r, q._patch));
         return { data: q._selected ? touched.map((r) => ({ id: r.id })) : null, error: null };
@@ -61,10 +64,12 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
+import { toast } from "sonner";
 import PhysioCaseDetail from "./PhysioCaseDetail";
 
 function seed() {
   state.visible = true;
+  state.fail = null;
   state.writes.length = 0;
   state.cases = [{
     id: "case-1", branch_id: "branch-a", patient_id: "patient-1", status: "active",
@@ -118,4 +123,26 @@ it("leaves the English desk exactly as it was", async () => {
   expect(screen.getByText("done")).toBeInTheDocument();
   expect(screen.getByText("missed")).toBeInTheDocument();
   expect(screen.getByText("Active")).toBeInTheDocument();
+});
+
+// C15's tail: the screen itself was already bilingual, but every refused write
+// still printed PostgREST's own English sentence into the toast.
+it("replaces a refused write with a bilingual sentence, never Postgres'", async () => {
+  state.lang = "ar";
+  state.fail = { code: "42501", message: 'new row violates row-level security policy for table "physio_cases"' };
+  vi.spyOn(window, "confirm").mockReturnValue(true);
+  render(<PhysioCaseDetail />);
+  await screen.findByText("منى صالح");
+  fireEvent.click(screen.getByTitle("حذف الحالة"));
+  await waitFor(() => expect(toast.error).toHaveBeenCalled());
+  const [title, options] = vi.mocked(toast.error).mock.calls[0] as [string, { description?: string }];
+  expect(title).toBe("حسابك لا يملك صلاحية إجراء هذا التغيير.");
+  expect(options?.description).toMatch(/تأكد من الفرع/);
+  expect(JSON.stringify(vi.mocked(toast.error).mock.calls)).not.toContain("row-level security");
+});
+
+it("routes all five physiotherapy write failures through the desk copy", () => {
+  const source = readFileSync("src/pages/physio/PhysioCaseDetail.tsx", "utf8");
+  expect(source).not.toContain("toast.error(error.message)");
+  expect(source.match(/deskFailure\(error, lang,/g)).toHaveLength(5);
 });

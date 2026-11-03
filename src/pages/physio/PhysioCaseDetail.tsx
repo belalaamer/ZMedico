@@ -21,6 +21,7 @@ import { formatDate, formatDateTime } from "@/lib/format";
 import { patientDisplayName } from "@/lib/patientName";
 import { doctorDisplayName } from "@/lib/doctorName";
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
+import { deskFailure } from "@/lib/deskFailure";
 import { toast } from "sonner";
 import { logPhiAccess } from "@/lib/observability/phiAudit";
 import { enumLabel } from "@/lib/enumLabels";
@@ -162,7 +163,10 @@ export default function PhysioCaseDetail() {
       patch.completed_at = null;
     }
     const { data, error } = await supabase.from("physio_cases" as any).update(patch).eq("id", id!).select("id");
-    if (error) return toast.error(error.message);
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تحديث حالة الحالة العلاجية." : "The case status could not be updated.");
+      return toast.error(failure.title, { description: failure.description });
+    }
     // physio_cases_update_clinical only admits admin and same-branch doctors,
     // while this dialog is gated on medical_records.edit — a wider set.
     if (rowsWritten(data) === 0) return toast.error(notConfirmedCopy(lang, "save"));
@@ -171,7 +175,10 @@ export default function PhysioCaseDetail() {
 
   const saveFollowup = async (patch: any) => {
     const { data, error } = await supabase.from("physio_cases" as any).update(patch).eq("id", id!).select("id");
-    if (error) return toast.error(error.message);
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر حفظ متابعة الحالة." : "The follow-up could not be saved.");
+      return toast.error(failure.title, { description: failure.description });
+    }
     if (rowsWritten(data) === 0) return toast.error(notConfirmedCopy(lang, "save"));
     toast.success(lang === "ar" ? "تم التحديث" : "Updated"); loadAll();
   };
@@ -179,7 +186,10 @@ export default function PhysioCaseDetail() {
   const softDeleteCase = async () => {
     if (!confirm(lang === "ar" ? "حذف هذه الحالة العلاجية (ناعم)؟" : "Soft-delete this physiotherapy case?")) return;
     const { data, error } = await supabase.from("physio_cases" as any).update({ deleted_at: new Date().toISOString() } as any).eq("id", id!).select("id");
-    if (error) return toast.error(error.message);
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر حذف الحالة." : "The case could not be deleted.");
+      return toast.error(failure.title, { description: failure.description });
+    }
     if (rowsWritten(data) === 0) return toast.error(notConfirmedCopy(lang, "delete"));
     toast.success(lang === "ar" ? "تم الحذف" : "Deleted");
     window.history.back();
@@ -570,7 +580,10 @@ function SessionDialog({ open, setOpen, caseId, nextNumber, defaultTherapistId, 
       created_by: u.user?.id ?? null,
     };
     const { error } = await supabase.from("physio_sessions" as any).insert(payload);
-    if (error) return toast.error(error.message);
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر حفظ الجلسة." : "The session could not be saved.");
+      return toast.error(failure.title, { description: failure.description });
+    }
     toast.success(lang === "ar" ? "تم الحفظ" : "Saved"); setOpen(false); onSaved();
   };
 
@@ -701,7 +714,10 @@ function ReassessmentDialog({ open, setOpen, caseId, initialFromCase, therapists
     const { data: u } = await supabase.auth.getUser();
     const payload: any = { ...form, case_id: caseId, therapist_id: form.therapist_id || null, created_by: u.user?.id ?? null };
     const { error } = await supabase.from("physio_reassessments" as any).insert(payload);
-    if (error) return toast.error(error.message);
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر حفظ إعادة التقييم." : "The reassessment could not be saved.");
+      return toast.error(failure.title, { description: failure.description });
+    }
     toast.success(lang === "ar" ? "تم الحفظ" : "Saved"); setOpen(false); onSaved();
   };
 

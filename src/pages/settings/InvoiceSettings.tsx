@@ -43,7 +43,7 @@ export default function InvoiceSettings() {
     numberingDesc: isArabic
       ? "تُمنح أرقام الفواتير تلقائيًا عند إصدار الفاتورة، ولا يمكن تعديلها من هنا."
       : "Invoice numbers are assigned by the system when an invoice is issued. They cannot be edited here.",
-    format: isArabic ? "الصيغة" : "Format",
+    formatLabel: isArabic ? "الصيغة" : "Format",
     example: isArabic ? "مثال" : "Example",
     branchRule: isArabic ? "رمز الفرع في الترقيم" : "The branch's invoice code",
     branchKnown: isArabic ? "هذا الفرع" : "this branch",
@@ -77,7 +77,7 @@ export default function InvoiceSettings() {
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">{copy.format}</p>
+              <p className="text-xs font-medium text-muted-foreground">{copy.formatLabel}</p>
               <code dir="ltr" className="block rounded-lg border bg-muted/30 px-4 py-3 font-mono text-sm sm:text-base">INV-&lt;BRANCH&gt;-&lt;YEAR&gt;-&lt;SEQ&gt;</code>
             </div>
             <div className="space-y-2">

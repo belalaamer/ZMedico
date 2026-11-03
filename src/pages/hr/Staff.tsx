@@ -24,6 +24,7 @@ import { Can } from "@/components/Can";
 import { roleLabel } from "@/lib/roleLabels";
 import { enumLabel } from "@/lib/enumLabels";
 import { localDateOnly } from "@/lib/localDate";
+import { MIN_STAFF_PASSWORD_LENGTH, staffPasswordMinimumCopy, staffPasswordTooShort, staffPasswordTooShortCopy } from "@/lib/staffPassword";
 
 // Operational roles only. Administrative roles (`admin`, `system_owner`) are
 // intentionally excluded — they must be granted exclusively via the User
@@ -136,6 +137,10 @@ export default function Staff() {
       // message an Arabic-mode user would find jarring. Fully localized now.
       if (!newUser.email || !newUser.full_name || !newUser.role) {
         toast.error(lang === "ar" ? "الاسم الكامل / البريد الإلكتروني / الدور مطلوبة" : "Full name / Email / Role are required");
+        return;
+      }
+      if (staffPasswordTooShort(newUser.password)) {
+        toast.error(staffPasswordTooShortCopy(lang));
         return;
       }
       setCreatingUser(true);
@@ -340,7 +345,8 @@ export default function Staff() {
                             </Select>
                           </div>
                           <div className="space-y-2"><Label>{lang === "ar" ? "كلمة المرور (اختياري)" : "Password (optional)"}</Label>
-                            <Input value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} placeholder={lang === "ar" ? "تُولَّد تلقائياً إن تُركت فارغة" : "Auto-generated if empty"} />
+                            <Input value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} placeholder={lang === "ar" ? "تُولَّد تلقائياً إن تُركت فارغة" : "Auto-generated if empty"} minLength={MIN_STAFF_PASSWORD_LENGTH} />
+                            <p className="text-xs text-muted-foreground">{staffPasswordMinimumCopy(lang)}</p>
                           </div>
                         </>
                       )}

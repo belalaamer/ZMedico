@@ -126,6 +126,35 @@ const TEXTS: Array<{ has: string; rule: Rule }> = [
       hintAr: "اختر مريضًا من الفرع الذي تعمل عليه.",
     },
   },
+  // merge_staff_position raises all three with 42501 or 23514, so the code tables
+  // alone would call a cross-branch refusal a missing permission.
+  {
+    has: "cannot merge positions across branches", // 20260923083500:189
+    rule: {
+      en: "These two positions belong to different branches.",
+      ar: "هذان المنصبان يخصان فرعين مختلفين.",
+      hintEn: "Choose a position from the branch you are working in.",
+      hintAr: "اختر منصبًا من الفرع الذي تعمل عليه.",
+    },
+  },
+  {
+    has: "only system owners may merge global positions", // 20260923083500:195
+    rule: {
+      en: "Only the workspace owner can merge shared positions.",
+      ar: "مالك مساحة العمل وحده يمكنه دمج المناصب المشتركة.",
+      hintEn: "Ask the workspace owner to do it.",
+      hintAr: "اطلب من مالك مساحة العمل تنفيذ الدمج.",
+    },
+  },
+  {
+    has: "cross-branch staff assignments", // 20260923083500:210
+    rule: {
+      en: "This position is used by staff in another branch.",
+      ar: "هذا المنصب مرتبط بموظفين في فرع آخر.",
+      hintEn: "Remove those assignments first, or ask the workspace owner.",
+      hintAr: "أزل تلك الارتباطات أولًا، أو اطلب من مالك مساحة العمل.",
+    },
+  },
 ];
 
 const CODES: Record<string, Rule> = {

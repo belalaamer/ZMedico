@@ -185,11 +185,13 @@ describe("zero-row write contract (batches 13-17)", () => {
     const marked = all.flatMap((e) => e.writes.filter((w) => w.marker).map((w) => `${e.file}:${w.line} ${w.kind}`));
     // Batch 23 refreshed three of these line numbers (Schedules ×2, Payroll ×1):
     // the batch added one import line to each file, which moves everything under
-    // it. The eleven writes themselves, their order, and their markers are the
-    // set batch 17 measured — each of the three still reads the same statement.
+    // it. Batch 33 moved the second Schedules write again, by the comment and
+    // the async refactor of saveStaffSchedule. The eleven writes themselves,
+    // their order, and their markers are the set batch 17 measured — the two
+    // Schedules entries still read the same scoped delete statements.
     expect(marked).toEqual([
-      "src/pages/hr/Schedules.tsx:140 .delete()",
-      "src/pages/hr/Schedules.tsx:183 .delete()",
+      "src/pages/hr/Schedules.tsx:141 .delete()",
+      "src/pages/hr/Schedules.tsx:188 .delete()",
       "src/pages/reminders/Reminders.tsx:111 .update(",
       "src/components/layout/Topbar.tsx:136 .update(",
       "src/components/layout/Topbar.tsx:143 .update(",

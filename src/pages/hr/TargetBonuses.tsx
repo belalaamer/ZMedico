@@ -17,6 +17,7 @@ import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { Fab } from "@/components/ui/fab";
 import { localDateOnly } from "@/lib/localDate";
+import { deskFailure } from "@/lib/deskFailure";
 
 type StaffOpt = { id: string; full_name: string | null; email: string | null };
 type Target = {
@@ -87,7 +88,11 @@ export default function TargetBonusesPage() {
       sp = (profs ?? []) as StaffOpt[];
     }
     setLoading(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تحميل الأهداف." : "The targets could not be loaded.");
+      toast.error(failure.title, { description: failure.description });
+      return;
+    }
     setItems((ts ?? []) as Target[]);
     setStaff(sp);
 
@@ -134,7 +139,11 @@ export default function TargetBonusesPage() {
       notes: form.notes || null,
     };
     const { error } = await supabase.from("staff_targets").insert(payload as any);
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر حفظ الهدف." : "The target could not be saved.");
+      toast.error(failure.title, { description: failure.description });
+      return;
+    }
     toast.success(lang === "ar" ? "تم حفظ الهدف" : "Target saved");
     setOpen(false);
     setForm(emptyForm);
@@ -143,7 +152,11 @@ export default function TargetBonusesPage() {
 
   const handleDelete = async (t: Target) => {
     const { data, error } = await supabase.from("staff_targets").delete().eq("id", t.id).select("id");
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر حذف الهدف." : "The target could not be deleted.");
+      toast.error(failure.title, { description: failure.description });
+      return;
+    }
     if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); setConfirmDel(null); load(); return; }
     toast.success(lang === "ar" ? "تم الحذف" : "Deleted");
     setConfirmDel(null);

@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Save, Search, CalendarClock, CheckSquare, XSquare } from "lucide-react";
 import { Can } from "@/components/Can";
+import { deskFailure } from "@/lib/deskFailure";
 
 const DAYS = ["sun","mon","tue","wed","thu","fri","sat"] as const;
 // `t(d)` needs no map and no cast: `as const` gives the seven values literal
@@ -128,7 +129,7 @@ export default function Schedules() {
   };
 
   const save = async () => {
-    if (!staffId) { toast.error("Select staff"); return; }
+    if (!staffId) { toast.error(t("selectStaff")); return; }
     if (!currentBranchId) { toast.error(t("errSelectBranchFirst")); return; }
     const bad = slots.find(invalidShift);
     if (bad) { toast.error(lang === "ar" ? "وقت البدء يجب أن يكون قبل وقت الانتهاء" : "Start time must be before end time"); return; }
@@ -148,7 +149,10 @@ export default function Schedules() {
       room: s.room ?? null,
     }));
     const { error } = await supabase.from("work_schedules").insert(rows);
-    if (error) return toast.error(error.message);
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر حفظ جدول العمل." : "The work schedule could not be saved.");
+      return toast.error(failure.title, { description: failure.description });
+    }
     toast.success(t("save"));
     // refresh planner cache
     setAllSchedules((prev) => ({ ...prev, [staffId]: slots.map((s) => ({ ...s })) }));
@@ -173,29 +177,36 @@ export default function Schedules() {
     setDirtyStaff((p) => ({ ...p, [sid]: true }));
   };
 
-  const saveStaffSchedule = async (sid: string, rows: Slot[]) => {
-    if (!currentBranchId) {
-      return { error: { message: t("errSelectBranchFirst") } } as any;
-    }
+  // The two local refusals already carry translated copy, so they return as
+  // `localCopy` rather than a fake error object. Folding them into `error` made
+  // the callers print `error.message` and hid which sentence was the server's.
+  const saveStaffSchedule = async (sid: string, rows: Slot[]): Promise<{ error?: unknown; localCopy?: string }> => {
+    if (!currentBranchId) return { localCopy: t("errSelectBranchFirst") };
     // zero-rows-ok: Same rationale as save() — the delete is strictly bounded by
     // the non-null currentBranchId guarded above, and zero rows here is a staff
     // member's first week, so only a real error counts as a failure.
     const { error: clearError } = await supabase.from("work_schedules").delete().eq("staff_id", sid).eq("branch_id", currentBranchId);
-    if (clearError) return { error: { message: clearNotSaved } } as any;
+    if (clearError) return { localCopy: clearNotSaved };
     const payload = rows.map((s) => ({
       staff_id: sid, branch_id: currentBranchId,
       day_of_week: s.day_of_week, start_time: s.start_time, end_time: s.end_time,
       is_working_day: s.is_working_day, room: s.room ?? null,
     }));
-    return supabase.from("work_schedules").insert(payload);
+    const { error } = await supabase.from("work_schedules").insert(payload);
+    return { error };
   };
 
   const saveCell = async (sid: string) => {
     const rows = allSchedules[sid] ?? blank(branchHours.start, branchHours.end);
     const bad = rows.find(invalidShift);
     if (bad) { toast.error(lang === "ar" ? "وقت البدء يجب أن يكون قبل وقت الانتهاء" : "Start time must be before end time"); return; }
-    const { error } = await saveStaffSchedule(sid, rows);
-    if (error) { toast.error(error.message); return; }
+    const result = await saveStaffSchedule(sid, rows);
+    if (result.localCopy) { toast.error(result.localCopy); return; }
+    if (result.error) {
+      const failure = deskFailure(result.error, lang, lang === "ar" ? "تعذر حفظ جدول العمل." : "The work schedule could not be saved.");
+      toast.error(failure.title, { description: failure.description });
+      return;
+    }
     toast.success(t("save"));
     setDirtyStaff((p) => { const n = { ...p }; delete n[sid]; return n; });
   };
@@ -221,8 +232,13 @@ export default function Schedules() {
       const next = { ...allSchedules };
       for (const sid of selectedIds) {
         next[sid] = template.map((s) => ({ ...s }));
-        const { error } = await saveStaffSchedule(sid, template);
-        if (error) { toast.error(error.message); return; }
+        const result = await saveStaffSchedule(sid, template);
+        if (result.localCopy) { toast.error(result.localCopy); return; }
+        if (result.error) {
+          const failure = deskFailure(result.error, lang, lang === "ar" ? "تعذر حفظ جدول العمل." : "The work schedule could not be saved.");
+          toast.error(failure.title, { description: failure.description });
+          return;
+        }
       }
       setAllSchedules(next);
       setDirtyStaff((p) => { const n = { ...p }; selectedIds.forEach((id) => delete n[id]); return n; });

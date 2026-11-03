@@ -9973,6 +9973,7 @@ export type Database = {
           branch_name_en: string
           expires_at: string
           procedure_name: string
+          reason: string
           scheduled_at: string
           status: string
           tenant_name_ar: string

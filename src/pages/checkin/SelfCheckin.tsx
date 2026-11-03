@@ -11,6 +11,7 @@ import {
   localizedClinicName,
   mapSelfCheckinDetailsState,
   mapSelfCheckinResultState,
+  selfCheckinUnavailableReason,
   type PublicSelfCheckinDetails,
 } from "@/lib/selfCheckin";
 import { toast } from "sonner";
@@ -88,7 +89,9 @@ export default function SelfCheckin() {
     missingTitle: isArabic ? "رابط تسجيل الوصول غير مكتمل" : "This check-in link is incomplete",
     missingBody: isArabic ? "لم يجد هاتفك رمز تسجيل الوصول داخل الرابط. افتح الرسالة كاملة أو اطلب من موظف الاستقبال إرسال رابط جديد." : "Your phone did not find a check-in code inside this link. Open the full message, or ask the front desk to send a new link.",
     rejectedTitle: isArabic ? "رابط تسجيل الوصول لم يعد مقبولًا" : "This check-in link is no longer accepted",
-    rejectedBody: isArabic ? "ربما انتهت صلاحية الرابط، أو أن تسجيل الوصول الذاتي لهذا الموعد لم يفتح بعد أو أُغلق. إذا كنت داخل العيادة، توجّه إلى الاستقبال ليسجّلوا وصولك ويرسلوا رابطًا جديدًا." : "The link may have expired, or self check-in for this appointment may not be open yet or may have closed. If you are at the clinic, go to the front desk — they can check you in and send a new link.",
+    rejectedBody: isArabic ? "ربما انتهت صلاحية الرابط أو حلّ محله رابط أحدث. اطلب من الاستقبال إرسال رابط جديد، أو سجّل وصولك معهم مباشرة." : "The link may have expired or been replaced by a newer one. Ask the front desk to send a new link, or check in with them directly.",
+    unavailableTitle: isArabic ? "تسجيل الوصول الإلكتروني غير متاح حاليًا" : "Online check-in is unavailable right now",
+    unavailableBody: isArabic ? "يرجى تسجيل وصولك مع فريق الاستقبال عند وصولك — يمكنهم مساعدتك مباشرة." : "Please check in with the front desk when you arrive — they can help you directly.",
     errorTitle: isArabic ? "تعذر تحميل الرابط" : "We could not load this link",
     errorBody: isArabic ? "تحقق من اتصال الإنترنت وحاول مرة أخرى." : "Check your internet connection and try again.",
     readyTitle: isArabic ? "موعدك جاهز لتسجيل الوصول" : "Your appointment is ready",
@@ -99,7 +102,7 @@ export default function SelfCheckin() {
     successTitle: isArabic ? "تم تسجيل الوصول" : "You are checked in",
     successBody: isArabic ? "تم إبلاغ فريق الاستقبال بوصولك. يمكنك التوجه إلى منطقة الانتظار." : "The front desk has been notified. You can proceed to the waiting area.",
     closedTitle: isArabic ? "تسجيل الوصول مغلق" : "Check-in is closed",
-    closedBody: isArabic ? "هذا الموعد لم يعد متاحًا لتسجيل الوصول الذاتي. تواصل مع العيادة إذا احتجت مساعدة." : "This appointment is no longer available for self check-in. Contact the clinic if you need help.",
+    closedBody: isArabic ? "تسجيل الوصول الذاتي غير متاح لهذا الموعد حاليًا. إذا كنت في العيادة، يمكن لفريق الاستقبال تسجيل وصولك." : "Self check-in is not open for this appointment right now. If you are at the clinic, the front desk can check you in.",
     retry: isArabic ? "إعادة المحاولة" : "Try again",
     privacy: isArabic ? "لا نطلب اسمك أو رقم هاتفك أو أي تفاصيل طبية عبر هذا الرابط." : "We do not ask for your name, phone number, or medical details through this link.",
   };
@@ -137,15 +140,21 @@ export default function SelfCheckin() {
       );
     }
     if (resultState === "invalid" || detailsState !== "ready" || !details) {
-      // Two causes are observable here, and only two: no usable token ever left the URL,
-      // or the clinic returned nothing for a real token. The RPC collapses expiry, the
-      // appointment window, an ineligible status and a lapsed plan into that same answer.
-      const rejectedByClinic = token !== null;
+      // Four causes are observable here: no usable token ever left the URL, and the
+      // three reasons the RPC can now name for a real token (invalid / closed /
+      // clinic_unavailable). A missing or unknown reason stays "invalid" so an RPC
+      // that predates the reason column degrades to the old single card.
+      const reason = token === null ? null : selfCheckinUnavailableReason(details);
+      const [title, message] =
+        reason === null ? [copy.missingTitle, copy.missingBody]
+        : reason === "closed" ? [copy.closedTitle, copy.closedBody]
+        : reason === "clinic_unavailable" ? [copy.unavailableTitle, copy.unavailableBody]
+        : [copy.rejectedTitle, copy.rejectedBody];
       return (
         <div className="py-5 text-center" role="alert">
           <Link2Off className="mx-auto size-12 text-muted-foreground" aria-hidden="true" />
-          <h2 className="mt-4 text-xl font-semibold">{rejectedByClinic ? copy.rejectedTitle : copy.missingTitle}</h2>
-          <p className="mt-2 text-sm text-muted-foreground">{rejectedByClinic ? copy.rejectedBody : copy.missingBody}</p>
+          <h2 className="mt-4 text-xl font-semibold">{title}</h2>
+          <p className="mt-2 text-sm text-muted-foreground">{message}</p>
         </div>
       );
     }

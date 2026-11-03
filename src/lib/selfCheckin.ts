@@ -3,6 +3,7 @@ const SELF_CHECKIN_TOKEN_PATTERN = /^[0-9a-fA-F]{64}$/;
 
 export type SelfCheckinDetailsState = "ready" | "closed" | "invalid";
 export type SelfCheckinResultState = "success" | "closed" | "invalid" | "error";
+export type SelfCheckinUnavailableReason = "invalid" | "closed" | "clinic_unavailable";
 
 export interface PublicSelfCheckinDetails {
   valid: boolean;
@@ -14,6 +15,7 @@ export interface PublicSelfCheckinDetails {
   scheduled_at: string | null;
   procedure_name: string | null;
   expires_at: string | null;
+  reason?: string | null;
 }
 
 export interface PublicSelfCheckinResult {
@@ -42,6 +44,16 @@ export function mapSelfCheckinDetailsState(details: Partial<PublicSelfCheckinDet
   if (!details?.valid) return "invalid";
   if (details.status === "scheduled" || details.status === "confirmed") return "ready";
   return "closed";
+}
+
+// An absent or unknown reason falls back to "invalid": that is what the
+// pre-reason RPC could express, and every refusal looked like an expired link.
+export function selfCheckinUnavailableReason(
+  details: Partial<PublicSelfCheckinDetails> | null | undefined,
+): SelfCheckinUnavailableReason | null {
+  if (details?.valid) return null;
+  if (details?.reason === "closed" || details?.reason === "clinic_unavailable") return details.reason;
+  return "invalid";
 }
 
 export function mapSelfCheckinResultState(result: Partial<PublicSelfCheckinResult> | null | undefined, hasNetworkError = false): SelfCheckinResultState {

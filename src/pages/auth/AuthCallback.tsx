@@ -10,6 +10,15 @@ import { reportAuthFailure } from "@/lib/authFailureTelemetry";
 
 const AUTH_DEBUG_PREFIX = "[auth-debug]";
 
+// S12: the six callback lines below are an operator's tool. In a Production
+// build they were still printing on every invite link, sign-in and reset, so the
+// console carried a stream nobody there can act on. `reportAuthFailure` is not
+// part of this gate: it is the supported diagnostic path and keeps reporting.
+function authDebug(message: string, details: Record<string, unknown>) {
+  if (!import.meta.env.DEV) return;
+  console.info(AUTH_DEBUG_PREFIX, message, details);
+}
+
 // How long the confirmation stays on screen before the portal handoff.
 const CONFIRMATION_DWELL_MS = 1400;
 
@@ -64,7 +73,7 @@ export default function AuthCallback() {
       const next = safeRedirectPath(params.get("next") || hashParams.get("next") || "/");
       setDesk(next.startsWith("/patient-portal") ? "/patient-portal/login" : "/auth");
 
-      console.info(AUTH_DEBUG_PREFIX, "callback redirect received", {
+      authDebug("callback redirect received", {
         // The query is not logged: on the PKCE flow it carries the live single-use `?code=`.
         path: window.location.pathname,
         type: redirectType ?? null,
@@ -85,7 +94,7 @@ export default function AuthCallback() {
       if (code) {
         const { data, error } = await supabase.auth.exchangeCodeForSession(code);
         persistAuthSessionForPreview(data.session, "callback-code-exchange");
-        console.info(AUTH_DEBUG_PREFIX, "callback code exchange completed", {
+        authDebug("callback code exchange completed", {
           hasSession: Boolean(data.session),
           hasUser: Boolean(data.session?.user),
           code: error?.code ?? null,
@@ -100,7 +109,7 @@ export default function AuthCallback() {
       if (!code && tokenHash) {
         const { data, error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: tokenType as "invite" | "recovery" | "email" | "magiclink" });
         persistAuthSessionForPreview(data.session, "callback-token-hash-verification");
-        console.info(AUTH_DEBUG_PREFIX, "callback invite token verification completed", {
+        authDebug("callback invite token verification completed", {
           hasSession: Boolean(data.session),
           hasUser: Boolean(data.user),
           code: error?.code ?? null,
@@ -120,7 +129,7 @@ export default function AuthCallback() {
           refresh_token: hashRefreshToken,
         });
         persistAuthSessionForPreview(data.session, "callback-hash-token-set-session");
-        console.info(AUTH_DEBUG_PREFIX, "callback hash token session completed", {
+        authDebug("callback hash token session completed", {
           hasSession: Boolean(data.session),
           hasUser: Boolean(data.session?.user),
           code: error?.code ?? null,
@@ -134,7 +143,7 @@ export default function AuthCallback() {
 
       const { data, error } = await supabase.auth.getSession();
       persistAuthSessionForPreview(data.session, "callback-get-session");
-      console.info(AUTH_DEBUG_PREFIX, "callback redirect completion", {
+      authDebug("callback redirect completion", {
         hasSession: Boolean(data.session),
         hasUser: Boolean(data.session?.user),
         code: error?.code ?? null,
@@ -172,7 +181,7 @@ export default function AuthCallback() {
               ? "Password reset confirmed. Continuing…"
               : "Signed in successfully. Continuing…";
 
-      console.info(AUTH_DEBUG_PREFIX, "callback confirmed, handing off", {
+      authDebug("callback confirmed, handing off", {
         next,
         redirectType: redirectType ?? null,
         userIdPrefix: data.session.user.id.slice(0, 8),

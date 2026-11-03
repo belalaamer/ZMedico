@@ -3,6 +3,7 @@
 import invoiceArabicRegularUrl from "@/assets/fonts/NotoNaskhArabic-Regular.ttf";
 import invoiceArabicBoldUrl from "@/assets/fonts/NotoNaskhArabic-Bold.ttf";
 import { patientDisplayName } from "@/lib/patientName";
+import { enumLabel } from "@/lib/enumLabels";
 
 type Lang = "en" | "ar";
 
@@ -169,7 +170,7 @@ export async function generateInvoicePdf(opts: {
   const paymentRows = payments.map((p) => `
     <tr>
       <td>${esc(fmtDate(p.payment_date || p.created_at, lang))}</td>
-      <td>${esc(String(p.payment_method).replace("_", " "))}</td>
+      <td>${esc(enumLabel("payment_method", p.payment_method, lang).replace(/_/g, " "))}</td>
       <td>${esc(p.reference_number || "—")}</td>
       <td style="text-align:${isAr ? "left" : "right"};">${esc(money(p.amount, lang))}</td>
     </tr>`).join("");
@@ -217,7 +218,7 @@ export async function generateInvoicePdf(opts: {
       </div>
       <div style="text-align:${isAr ? "left" : "right"};">
         <div style="font-size:10px;font-weight:700;color:#666;letter-spacing:${isAr ? 0 : 1}px;">${L.status}</div>
-        <div style="margin-top:4px;text-transform:uppercase;">${esc(invoice.status)}</div>
+        <div style="margin-top:4px;text-transform:uppercase;">${esc(enumLabel("invoice_status", invoice.status, lang))}</div>
       </div>
     </div>
 

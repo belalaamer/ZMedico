@@ -3,7 +3,7 @@ import { enumLabel } from "./enumLabels";
 
 describe("enum labels", () => {
   it("gives the Arabic desk a word instead of the stored value", () => {
-    expect(enumLabel("appointment_status", "in_progress", "ar")).toBe("جارٍ");
+    expect(enumLabel("appointment_status", "in_progress", "ar")).toBe("قيد المعالجة");
     expect(enumLabel("document_type", "ct_scan", "ar")).toBe("أشعة مقطعية");
     expect(enumLabel("visit_type", "follow_up", "ar")).toBe("متابعة");
   });

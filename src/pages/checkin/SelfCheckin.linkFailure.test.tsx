@@ -76,14 +76,15 @@ describe("self check-in link failures", () => {
     expect(screen.queryByText("This check-in link is incomplete")).not.toBeInTheDocument();
   });
 
-  it("does not name expiry as the cause, because the reply cannot tell them apart", async () => {
+  it("names only expiry or replacement when the clinic rejects the token", async () => {
     openAt(`?token=${token}`);
     const card = (await screen.findByText("This check-in link is no longer accepted")).closest("div");
     expect(card?.getAttribute("role")).toBe("alert");
     const body = card?.textContent ?? "";
     expect(body).toContain("may have expired");
-    expect(body).toContain("may not be open yet");
+    expect(body).toContain("replaced");
     expect(body).toContain("front desk");
+    expect(body).not.toContain("not open for this appointment");
   });
 
   it("keeps the two cards distinct in Arabic", async () => {

@@ -69,7 +69,6 @@ const LEDGER: string[] = [
   "src/pages/patients/Patients.tsx=1",
   "src/pages/payments/Payments.tsx=2",
   "src/pages/payments/RecordPaymentDialog.tsx=1",
-  "src/pages/physio/PhysioCaseDetail.tsx=5",
   "src/pages/physio/PhysioCases.tsx=1",
   "src/pages/platform/PlanCatalogPanel.tsx=1",
   "src/pages/platform/PlatformConsole.tsx=4",

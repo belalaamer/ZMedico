@@ -80,7 +80,6 @@ const LEDGER: string[] = [
   "src/pages/settings/GeneralSettings.tsx=3",
   "src/pages/settings/InsuranceCompanies.tsx=2",
   "src/pages/settings/InsuranceContracts.tsx=4",
-  "src/pages/settings/InvoiceSettings.tsx=1",
   "src/pages/settings/NotificationSettings.tsx=1",
   "src/pages/settings/PaymentMethods.tsx=1",
   "src/pages/settings/QAIdentities.tsx=3",

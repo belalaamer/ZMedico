@@ -78,16 +78,16 @@ export default function InvoiceSettings() {
           <CardContent className="space-y-5">
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground">{copy.formatLabel}</p>
-              <code dir="ltr" className="block rounded-lg border bg-muted/30 px-4 py-3 font-mono text-sm sm:text-base">INV-&lt;BRANCH&gt;-&lt;YEAR&gt;-&lt;SEQ&gt;</code>
+              <code dir="ltr" className="block rounded-lg border bg-muted/30 px-4 py-3 font-mono text-sm sm:text-base">INV-&lt;CODE&gt;-&lt;YEAR&gt;-&lt;NNNN&gt;</code>
             </div>
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground">{copy.example}</p>
               <code dir="ltr" className="block rounded-lg border bg-muted/30 px-4 py-3 font-mono text-sm sm:text-base">{example}</code>
             </div>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><span className="font-medium text-foreground">BRANCH</span> — {copy.branchRule} ({code ? `${copy.branchKnown}: ${code}` : copy.branchUnknown}).</li>
+              <li><span className="font-medium text-foreground">CODE</span> — {copy.branchRule} ({code ? `${copy.branchKnown}: ${code}` : copy.branchUnknown}).</li>
               <li><span className="font-medium text-foreground">YEAR</span> — {copy.yearRule}.</li>
-              <li><span className="font-medium text-foreground">SEQ</span> — {copy.seqRule}.</li>
+              <li><span className="font-medium text-foreground">NNNN</span> — {copy.seqRule}.</li>
             </ul>
             <p className="text-xs text-muted-foreground">{copy.autoNote}</p>
           </CardContent>

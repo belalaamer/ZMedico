@@ -56,14 +56,14 @@ const year = new Date().getFullYear();
 describe("invoice settings are read-only", () => {
   it("shows the format the database actually generates, with this branch's code", async () => {
     renderPage();
-    expect(await screen.findByText("INV-<BRANCH>-<YEAR>-<SEQ>")).toBeInTheDocument();
+    expect(await screen.findByText("INV-<CODE>-<YEAR>-<NNNN>")).toBeInTheDocument();
     expect(await screen.findByText(`INV-MAIN-${year}-0001`)).toBeInTheDocument();
     expect(screen.getByText(/this branch: MAIN/)).toBeInTheDocument();
   });
 
   it("offers no editable control and no save path", async () => {
     const { container } = renderPage();
-    await screen.findByText("INV-<BRANCH>-<YEAR>-<SEQ>");
+    await screen.findByText("INV-<CODE>-<YEAR>-<NNNN>");
     expect(container.querySelectorAll("input, textarea")).toHaveLength(0);
     expect(screen.queryByRole("switch")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "save" })).not.toBeInTheDocument();
@@ -72,7 +72,7 @@ describe("invoice settings are read-only", () => {
 
   it("never reads or writes the inert invoice_settings table", async () => {
     renderPage();
-    await screen.findByText("INV-<BRANCH>-<YEAR>-<SEQ>");
+    await screen.findByText("INV-<CODE>-<YEAR>-<NNNN>");
     expect(api.tables.length).toBeGreaterThan(0);
     expect(api.tables.every((table) => table === "branches")).toBe(true);
     expect(api.upsert).not.toHaveBeenCalled();

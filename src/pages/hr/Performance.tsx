@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/format";
+import { deskFailure } from "@/lib/deskFailure";
 
 export default function Performance() {
   const { t, lang } = useI18n();
@@ -36,9 +37,12 @@ export default function Performance() {
   const profName = (id: string) => profiles.find((p) => p.id === id)?.full_name ?? id;
 
   const save = async () => {
-    if (!form.staff_id || !form.review_period_start || !form.review_period_end) { toast.error("Fill all fields"); return; }
+    if (!form.staff_id || !form.review_period_start || !form.review_period_end) { toast.error(t("fillAllFields")); return; }
     const { error } = await supabase.from("performance_reviews").insert({ ...form, reviewer_id: user?.id });
-    if (error) return toast.error(error.message);
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر حفظ تقييم الأداء." : "The performance review could not be saved.");
+      return toast.error(failure.title, { description: failure.description });
+    }
     toast.success(t("save")); setOpen(false); load();
   };
 

@@ -38,6 +38,7 @@ import {manageStaffAccount, staffAccountError, indexStaffAccountRows, type Staff
 import {useOperationScope} from '@/hooks/useOperationScope';
 import {useAuth} from '@/contexts/AuthContext';
 import {notConfirmedCopy, rowsWritten} from '@/lib/writeOutcome';
+import {MIN_STAFF_PASSWORD_LENGTH, staffPasswordMinimumCopy, staffPasswordTooShort, staffPasswordTooShortCopy} from '@/lib/staffPassword';
 
 const ROLES = ["system_owner", "admin", "manager", "doctor", "nurse", "receptionist", "accountant", "hr"] as const;
 const ADMIN_PASSWORD_RESET_ENABLED = false;
@@ -417,6 +418,10 @@ export default function UserManagement() {
       toast.error(lang === "ar" ? "أدخل بريداً صالحاً" : "Enter a valid email");
       return;
     }
+    if (staffPasswordTooShort(cPassword)) {
+      toast.error(staffPasswordTooShortCopy(lang));
+      return;
+    }
     setCreating(true);
     if (ROLES_REQUIRING_BRANCH.includes(cRole) && !cBranch) {
       setCreating(false);
@@ -484,8 +489,8 @@ export default function UserManagement() {
   const resetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!resetTarget) return;
-    if (rPassword && rPassword.length < 6) {
-      toast.error(lang === "ar" ? "كلمة المرور يجب أن تكون 6 أحرف على الأقل" : "Password must be at least 6 characters");
+    if (staffPasswordTooShort(rPassword)) {
+      toast.error(staffPasswordTooShortCopy(lang));
       return;
     }
     setResetting(true);
@@ -962,7 +967,9 @@ export default function UserManagement() {
                   placeholder={lang === "ar" ? "اتركه فارغاً لتوليد كلمة مرور" : "Leave empty to auto-generate"}
                   value={cPassword}
                   onChange={(e) => setCPassword(e.target.value)}
+                  minLength={MIN_STAFF_PASSWORD_LENGTH}
                 />
+                <p className="text-xs text-muted-foreground">{staffPasswordMinimumCopy(lang)}</p>
               </div>
               )}
               <DialogFooter>
@@ -1151,10 +1158,10 @@ export default function UserManagement() {
                   placeholder={lang === "ar" ? "اتركه فارغاً لتوليد كلمة مرور" : "Leave empty to auto-generate"}
                   value={rPassword}
                   onChange={(e) => setRPassword(e.target.value)}
-                  minLength={6}
+                  minLength={MIN_STAFF_PASSWORD_LENGTH}
                 />
                 <p className="text-xs text-muted-foreground">
-                  {lang === "ar" ? "الحد الأدنى 6 أحرف" : "Minimum 6 characters"}
+                  {staffPasswordMinimumCopy(lang)}
                 </p>
               </div>
               <DialogFooter>

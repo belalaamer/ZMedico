@@ -17,6 +17,7 @@ import { formatDate } from "@/lib/format";
 import { STATUS_KEY_BY_LEAVE_REQUEST_STATUS, enumCopy } from "@/lib/enumKeys";
 import { Can } from "@/components/Can";
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
+import { deskFailure } from "@/lib/deskFailure";
 
 function diffDays(a: string, b: string) {
   const d1 = new Date(a), d2 = new Date(b);
@@ -84,7 +85,10 @@ export default function Leaves() {
       return;
     }
     const { error } = await supabase.from("leave_requests").insert({ staff_id: form.staff_id, leave_type_id: form.leave_type_id, start_date: form.start_date, end_date: form.end_date, total_days: totalDays, reason_en: form.reason_en || null });
-    if (error) return toast.error(error.message);
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر إرسال طلب الإجازة." : "The leave request could not be submitted.");
+      return toast.error(failure.title, { description: failure.description });
+    }
     toast.success(t("save")); setOpen(false); setForm({ staff_id: "", leave_type_id: "", start_date: "", end_date: "", reason_en: "" }); load();
   };
 
@@ -95,7 +99,10 @@ export default function Leaves() {
     const allowedStaffIds = staff.map((row: any) => row.id).filter(Boolean);
     if (!allowedStaffIds.length) return;
     const { data, error } = await supabase.from("leave_requests").update({ status, approved_by: user?.id, approved_at: new Date().toISOString(), rejection_reason: reason ?? null }).eq("id", id).in("staff_id", allowedStaffIds).select("id");
-    if (error) return toast.error(error.message);
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تحديث طلب الإجازة." : "The leave request could not be updated.");
+      return toast.error(failure.title, { description: failure.description });
+    }
     // A request outside this branch filters to zero rows and answers 2xx, and the
     // list used to reload onto the same pending row with nothing said.
     if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); load(); return; }

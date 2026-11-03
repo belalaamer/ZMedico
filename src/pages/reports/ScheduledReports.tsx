@@ -153,8 +153,8 @@ export default function ScheduledReports() {
             <AlertDialogTitle>{lang === "ar" ? "حذف الجدولة؟" : "Delete this schedule?"}</AlertDialogTitle>
             <AlertDialogDescription>
               {lang === "ar"
-                ? `سيُحذف جدول «${deleteTarget?.name ?? ""}» (${deleteTarget ? enumCopy(REPORT_FREQUENCY_KEY, deleteTarget.frequency, t) : ""} · ${deleteTarget?.format ?? ""}) نهائياً، وتتوقف تقاريره المجدولة عن الإرسال. القالب نفسه يبقى، لكن الجدولة ومن يستلمها لا يمكن استرجاعهما؛ إعادة إنشائها تتطلب ملء النموذج من جديد.`
-                : `${deleteTarget?.name ?? ""} (${deleteTarget?.frequency ?? ""} · ${deleteTarget?.format ?? ""}) will be deleted permanently and its recurring reports stop being sent. The template itself is kept, but the schedule and its recipient list cannot be recovered — rebuilding it means filling the form again.`}
+                ? `سيُحذف جدول «${deleteTarget?.name ?? ""}» (${deleteTarget ? enumCopy(REPORT_FREQUENCY_KEY, deleteTarget.frequency, t) : ""} · ${deleteTarget ? enumLabel("report_format", deleteTarget.format, lang) : ""}) نهائياً، وتتوقف تقاريره المجدولة عن الإرسال. القالب نفسه يبقى، لكن الجدولة ومن يستلمها لا يمكن استرجاعهما؛ إعادة إنشائها تتطلب ملء النموذج من جديد.`
+                : `${deleteTarget?.name ?? ""} (${deleteTarget?.frequency ?? ""} · ${deleteTarget ? enumLabel("report_format", deleteTarget.format, lang) : ""}) will be deleted permanently and its recurring reports stop being sent. The template itself is kept, but the schedule and its recipient list cannot be recovered — rebuilding it means filling the form again.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

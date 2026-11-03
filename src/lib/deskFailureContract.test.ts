@@ -3,9 +3,10 @@ import { describe, expect, it } from "vitest";
 
 // S1 ratchet. A screen that hands `error.message` to a toast is printing whatever
 // the database said: English, untranslated, and usually carrying a table name, a
-// constraint name, or a row UUID. Batch A (this PR) moved the queue, the calendar
-// and the patient list onto `deskFailure`; the counts below pin that those fifteen
-// paths stay mediated, and the ledger names every screen still waiting.
+// constraint name, or a row UUID. Batch A moved the queue, the calendar and the
+// patient list onto `deskFailure`; batch 33 moved the eight HR screens that do not
+// sit behind #254 or the payroll screen. The counts below pin that those paths stay
+// mediated, and the ledger names every screen still waiting.
 //
 // The ledger is a ledger, not a threshold: each file and its exact count are named,
 // so a new raw sink fails wherever it appears, and a converted file has to leave the
@@ -25,17 +26,9 @@ const LEDGER: string[] = [
   "src/pages/branches/Branches.tsx=4",
   "src/pages/coupons/Coupons.tsx=4",
   "src/pages/expenses/Expenses.tsx=3",
-  "src/pages/hr/Attendance.tsx=5",
-  "src/pages/hr/Departments.tsx=2",
   "src/pages/hr/DoctorServicesTab.tsx=3",
-  "src/pages/hr/Leaves.tsx=2",
   "src/pages/hr/Payroll.tsx=6",
-  "src/pages/hr/Performance.tsx=1",
-  "src/pages/hr/Positions.tsx=3",
-  "src/pages/hr/Schedules.tsx=3",
   "src/pages/hr/Staff.tsx=3",
-  "src/pages/hr/StaffBranchesTab.tsx=2",
-  "src/pages/hr/TargetBonuses.tsx=3",
   "src/pages/inventory/Alerts.tsx=1",
   "src/pages/inventory/Categories.tsx=2",
   "src/pages/inventory/Products.tsx=5",
@@ -69,7 +62,6 @@ const LEDGER: string[] = [
   "src/pages/patients/Patients.tsx=1",
   "src/pages/payments/Payments.tsx=2",
   "src/pages/payments/RecordPaymentDialog.tsx=1",
-  "src/pages/physio/PhysioCaseDetail.tsx=5",
   "src/pages/physio/PhysioCases.tsx=1",
   "src/pages/platform/PlanCatalogPanel.tsx=1",
   "src/pages/platform/PlatformConsole.tsx=4",
@@ -87,7 +79,6 @@ const LEDGER: string[] = [
   "src/pages/settings/GeneralSettings.tsx=3",
   "src/pages/settings/InsuranceCompanies.tsx=2",
   "src/pages/settings/InsuranceContracts.tsx=4",
-  "src/pages/settings/InvoiceSettings.tsx=1",
   "src/pages/settings/NotificationSettings.tsx=1",
   "src/pages/settings/PaymentMethods.tsx=1",
   "src/pages/settings/QAIdentities.tsx=3",
@@ -168,13 +159,23 @@ function rawSinks(): Array<{ file: string; line: number; arg: string }> {
 
 const ledgerEntry = (file: string, count: number) => `${file}=${count}`;
 
-// What batch A claims about the three screens it converted: this many error paths go
+// What each batch claims about the screens it converted: this many error paths go
 // through the rule, and no other raw sink is left except the patient form's zod
-// message, named in the header above.
+// message, named in the header above. Batch 33's three HR leftovers stay in the
+// ledger above (DoctorServicesTab, Payroll, Staff), so "the HR module is clean" is
+// not a sentence this file lets anyone write.
 const CONVERTED = [
   { file: "src/pages/queue/Queue.tsx", ruleCalls: 6, remainingRaw: 0 },
   { file: "src/pages/calendar/CalendarPage.tsx", ruleCalls: 6, remainingRaw: 0 },
   { file: "src/pages/patients/Patients.tsx", ruleCalls: 3, remainingRaw: 1 },
+  { file: "src/pages/hr/Attendance.tsx", ruleCalls: 5, remainingRaw: 0 },
+  { file: "src/pages/hr/Departments.tsx", ruleCalls: 2, remainingRaw: 0 },
+  { file: "src/pages/hr/Leaves.tsx", ruleCalls: 2, remainingRaw: 0 },
+  { file: "src/pages/hr/Performance.tsx", ruleCalls: 1, remainingRaw: 0 },
+  { file: "src/pages/hr/Positions.tsx", ruleCalls: 3, remainingRaw: 0 },
+  { file: "src/pages/hr/Schedules.tsx", ruleCalls: 3, remainingRaw: 0 },
+  { file: "src/pages/hr/StaffBranchesTab.tsx", ruleCalls: 2, remainingRaw: 0 },
+  { file: "src/pages/hr/TargetBonuses.tsx", ruleCalls: 3, remainingRaw: 0 },
 ];
 
 describe("screens stop quoting the database (S1)", () => {

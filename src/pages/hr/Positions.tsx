@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { RowActions } from "@/components/RowActions";
 import { Can } from "@/components/Can";
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
+import { deskFailure } from "@/lib/deskFailure";
 
 export default function Positions() {
   const { t, lang } = useI18n();
@@ -86,7 +87,10 @@ export default function Positions() {
     const { data, error } = edit
       ? await supabase.from("staff_positions").update(payload).eq("id", edit.id).select("id")
       : await supabase.from("staff_positions").insert(payload);
-    if (error) return toast.error(error.message);
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر حفظ المنصب." : "The position could not be saved.");
+      return toast.error(failure.title, { description: failure.description });
+    }
     if (edit && rowsWritten(data) === 0) return toast.error(notConfirmedCopy(lang, "save"));
     toast.success(t("save")); setOpen(false); load();
   };
@@ -97,7 +101,11 @@ export default function Positions() {
     const { count } = await supabase.from("staff_profiles").select("id", { count: "exact", head: true }).eq("position_id", p.id);
     if ((count ?? 0) > 0) { toast.error(lang === "ar" ? "لا يمكن الحذف: مرتبط بموظفين" : "Cannot delete: in use by staff"); return; }
     const { data, error } = await supabase.from("staff_positions").update({ deleted_at: new Date().toISOString() } as any).eq("id", p.id).select("id");
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر حذف المنصب." : "The position could not be deleted.");
+      toast.error(failure.title, { description: failure.description });
+      return;
+    }
     if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); load(); return; }
     toast.success(t("delete")); load();
   };
@@ -127,7 +135,11 @@ export default function Positions() {
     setMerging(true);
     const { error } = await supabase.rpc("merge_staff_position" as any, { source_id: mergeSrc, target_id: mergeTgt });
     setMerging(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر دمج المنصبين." : "The two positions could not be merged.");
+      toast.error(failure.title, { description: failure.description });
+      return;
+    }
     toast.success(lang === "ar" ? "تم الدمج" : "Merged");
     setMergeOpen(false); setMergeSrc(""); setMergeTgt(""); load();
   };

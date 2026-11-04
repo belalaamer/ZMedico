@@ -16,6 +16,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { formatClinicTimestamp } from "@/lib/clinicTime";
 import { cn } from "@/lib/utils";
 
 type Notif = {
@@ -201,7 +202,7 @@ export default function Reminders() {
                             {!n.is_read && <span className="size-2 rounded-full bg-primary shrink-0" />}
                           </div>
                           {message && <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">{message}</p>}
-                          <p className="text-xs text-muted-foreground mt-1">{new Date(n.created_at).toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{formatClinicTimestamp(n.created_at, lang)}</p>
                         </Wrapper>
                         <div className="flex items-start gap-1">
                           {!n.is_read && (

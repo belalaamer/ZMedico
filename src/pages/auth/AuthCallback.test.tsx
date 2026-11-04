@@ -79,6 +79,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.resetModules();
+  vi.unstubAllEnvs();
 });
 
 describe("auth callback confirmation handoff", () => {
@@ -207,5 +208,27 @@ describe("auth callback failure copy (P5)", () => {
     for (const key of ["callbackLinkFailed", "callbackTryAgain", "invalidSignInFields"] as const) {
       expect(dict.ar[key], `${key} still holds its English text`).not.toBe(dict.en[key]);
     }
+  });
+});
+
+describe("S12: the callback's debug stream is a development tool only", () => {
+  it("prints no [auth-debug] line in a production build, and still completes", async () => {
+    vi.stubEnv("DEV", false);
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await mountAt("https://zmedico.com/auth/callback?code=PKCE-CODE&next=/dashboard");
+    const lines = [...info.mock.calls, ...warn.mock.calls].map((args) => args.join(" "));
+    expect(lines.filter((line) => line.includes("[auth-debug]"))).toEqual([]);
+    // The gate is on the log, not on the work: the exchange still runs and the
+    // failure reporting path (`reportAuthFailure`) is not part of it.
+    expect(api.exchangeCodeForSession).toHaveBeenCalledWith("PKCE-CODE");
+  });
+
+  it("still logs in a development build, so the tool is not dead", async () => {
+    vi.stubEnv("DEV", true);
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    await mountAt("https://zmedico.com/auth/callback?code=PKCE-CODE&next=/dashboard");
+    const lines = info.mock.calls.map((args) => args.join(" "));
+    expect(lines.some((line) => line.includes("[auth-debug]"))).toBe(true);
   });
 });

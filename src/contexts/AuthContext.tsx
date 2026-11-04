@@ -36,6 +36,7 @@ function authDebugFields() {
 }
 
 function authDebug(message: string, details?: Record<string, unknown>) {
+  if (!import.meta.env.DEV) return;
   console.info(AUTH_DEBUG_PREFIX, message, {
     ...authDebugFields(),
     ...details,
@@ -247,16 +248,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               if (isDeletedUserError(error)) {
                 await forceLocalLogout(true);
               } else {
-                console.warn(AUTH_DEBUG_PREFIX, "auth.getUser validation failed; keeping stored session for auth retry", {
-                  ...authDebugFields(),
-                  error: error?.message ?? "missing user",
-                });
+                if (import.meta.env.DEV) {
+                  console.warn(AUTH_DEBUG_PREFIX, "auth.getUser validation failed; keeping stored session for auth retry", {
+                    ...authDebugFields(),
+                    error: error?.message ?? "missing user",
+                  });
+                }
               }
             }
           } catch {
-            console.warn(AUTH_DEBUG_PREFIX, "auth.getUser validation threw; keeping stored session for auth retry", {
-              ...authDebugFields(),
-            });
+            if (import.meta.env.DEV) {
+              console.warn(AUTH_DEBUG_PREFIX, "auth.getUser validation threw; keeping stored session for auth retry", {
+                ...authDebugFields(),
+              });
+            }
           }
         }
       })

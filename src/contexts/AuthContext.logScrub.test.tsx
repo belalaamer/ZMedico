@@ -109,3 +109,17 @@ describe('S17: auth-debug logs must not carry the query string', () => {
     expect(payloads(warns).some((p) => p.hasQuery === true)).toBe(true);
   });
 });
+
+describe('S12: the provider debug stream is a development tool only', () => {
+  it('prints no [auth-debug] line in a production build, and still boots the stored session', async () => {
+    vi.stubEnv('DEV', false);
+    state.session = session;
+    await mountAt('/settings/security');
+    const lines = [...infos, ...warns]
+      .map((args) => args.join(' '))
+      .filter((line) => line.includes('[auth-debug]'));
+    expect(lines).toEqual([]);
+    // The gate is on the log, not the bootstrap: the stored session is still read.
+    expect(infos.length + warns.length).toBe(0);
+  });
+});

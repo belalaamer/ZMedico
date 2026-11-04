@@ -267,9 +267,10 @@ describe("no screen renders a stored enum value to the Arabic desk (C17)", () =>
 // The exemption list only shrinks, exactly like the one above. Two kinds of entry
 // are written down, and they are deliberately separate lists:
 //   - EXEMPT: a site reviewed and judged not to be copy;
-//   - OPEN:   a shipped defect this batch must not fix (an invoice document is
-//             the owner's red line), recorded as register C26. When it is fixed
-//             its site disappears and this list fails until the entry is deleted.
+//   - OPEN:   a shipped defect the batch that found it must not fix (an invoice
+//             document is the owner's red line). C26 was the one entry; the
+//             closing audit PR labelled it, so the list is empty and the tests
+//             below still fail an entry whose site disappears.
 
 type CompositionExemption = {
   file: string;
@@ -305,15 +306,11 @@ const COMPOSE_EXEMPT: CompositionExemption[] = [
   },
 ];
 
-const COMPOSE_OPEN: CompositionExemption[] = [
-  {
-    file: "src/lib/invoicePdf.ts",
-    shape: "template",
-    sites: 2,
-    owner: "OPEN DEFECT C26 — the customer PDF prints the stored invoice_status and payment_method tokens (esc(invoice.status) in the header, String(p.payment_method).replace(\"_\", \" \") in the payments table). An invoice/payment document is the owner's red line: reported in the audit register, not edited by this batch. Fixing it must delete this entry — the site counts make the list fail until then.",
-    premise: /esc\(invoice\.status\)/,
-  },
-];
+// Empty since the closing audit PR: C26 was the only shipped defect in this
+// class, and `invoicePdf.ts` now routes both of its sites through `enumLabel()`.
+// The list stays so the next open defect has a named shelf, and the tests below
+// keep failing an entry without a site or a site without an entry.
+const COMPOSE_OPEN: CompositionExemption[] = [];
 
 describe("no module composes a stored enum value into copy (C22)", () => {
   const files = moduleFiles("src");

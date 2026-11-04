@@ -703,10 +703,10 @@ describe("no screen hands t() a key it had to cast (C21)", () => {
         consider(domain, value, routes);
       }
     }
-    // The three rewritten derivations that share a column with a StaffDetail
-    // badge: Leaves labels a request `statusPending` (قيد الانتظار) while
-    // StaffDetail labels the same row through enumLabel() (قيد المراجعة), and
-    // Payroll's statusPaid is مدفوعة against StaffDetail's مدفوع.
+    // The three rewritten derivations whose badge sits beside a StaffDetail one:
+    // Leaves' `statusPending` and StaffDetail's enumLabel() used to say two words
+    // for one request, and Payroll's `statusPaid` says مدفوعة against StaffDetail's
+    // مدفوع.
     for (const p of PREFIXED) {
       if (!p.domain || !enumLabelOwns.includes(p.domain)) continue;
       for (const value of enumValues(p.domain)) {
@@ -715,13 +715,18 @@ describe("no screen hands t() a key it had to cast (C21)", () => {
         consider(p.domain, value, routes);
       }
     }
+    // The closing audit PR unified five of the six on the dictionary's word:
+    // appointment_status.in_progress (قيد المعالجة), appointment_status.departed
+    // (غادر), leave_request_status.pending (قيد الانتظار), reminder_channel.email
+    // (البريد الإلكتروني) and reminder_channel.push (إشعار التطبيق). One stays
+    // because its two routes are not the same domain: Payroll reads `statusPaid`,
+    // and that dictionary key is the *invoice* word (فاتورة مدفوعة) used by three
+    // invoice screens; the payroll row's noun is راتب, which takes مدفوع. Making
+    // it agree needs a payroll-only key, not a copy edit here — owner decision
+    // recorded in the register. It is frozen rather than fixed so this list keeps
+    // failing if a seventh value appears.
     expect([...diverging].sort()).toEqual([
-      "appointment_status.departed", // غادر (badge, palette) vs مغادرة (Dashboard)
-      "appointment_status.in_progress", // قيد التنفيذ / جارٍ / قيد المعالجة
-      "leave_request_status.pending", // قيد الانتظار (Leaves) vs قيد المراجعة (StaffDetail)
-      "payroll_status.paid", // مدفوعة (Payroll) vs مدفوع (StaffDetail)
-      "reminder_channel.email", // البريد الإلكتروني (badges) vs بريد إلكتروني (channel picker)
-      "reminder_channel.push", // إشعار vs إشعار التطبيق
+      "payroll_status.paid", // مدفوعة (Payroll, via the invoice key) vs مدفوع (StaffDetail)
     ]);
   });
 

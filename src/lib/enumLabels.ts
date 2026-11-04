@@ -22,7 +22,7 @@ type E<K extends keyof Database["public"]["Enums"]> = Database["public"]["Enums"
 const APPOINTMENT_STATUS: Record<E<"appointment_status">, string> = {
   scheduled: "مجدول",
   confirmed: "مؤكد",
-  in_progress: "جارٍ",
+  in_progress: "قيد المعالجة",
   completed: "مكتمل",
   cancelled: "ملغي",
   no_show: "لم يحضر",
@@ -90,7 +90,7 @@ const PAYMENT_METHOD: Record<E<"payment_method">, string> = {
 };
 
 const LEAVE_REQUEST_STATUS: Record<E<"leave_request_status">, string> = {
-  pending: "قيد المراجعة",
+  pending: "قيد الانتظار",
   approved: "مقبول",
   rejected: "مرفوض",
   cancelled: "ملغي",
@@ -136,7 +136,7 @@ const PRESCRIPTION_STATUS: Record<E<"prescription_status">, string> = {
 
 const REMINDER_CHANNEL: Record<E<"reminder_channel">, string> = {
   sms: "رسالة نصية",
-  email: "بريد إلكتروني",
+  email: "البريد الإلكتروني",
   whatsapp: "واتساب",
   push: "إشعار التطبيق",
 };

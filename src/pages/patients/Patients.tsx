@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Phone, Mail, MapPin, MoreHorizontal, Calendar as CalendarIcon, FileText, Eye, Trash2, UserRound, Copy } from "lucide-react";
+import { Plus, Search, Phone, Mail, MapPin, MoreHorizontal, Calendar as CalendarIcon, FileText, Eye, Trash2, UserRound, Copy, ChevronDown } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -127,6 +127,42 @@ export default function PatientsPage() {
     blood_type: "", address: "", notes: "",
     referred_by_patient_id: null as string | null,
   });
+
+  // A busy desk registers a patient in the name and the phone number; the rest
+  // is filled when it exists. Keeping the optional fields behind one disclosure
+  // removes eight controls from the screen without removing any of them.
+  const [showDetails, setShowDetails] = useState(false);
+  const [duplicateHint, setDuplicateHint] = useState<string | null>(null);
+  useEffect(() => {
+    if (form.phone2 || form.dob || form.gender || form.blood_type || form.address || form.notes || form.referred_by_patient_id) {
+      setShowDetails(true);
+    }
+  }, [form.phone2, form.dob, form.gender, form.blood_type, form.address, form.notes, form.referred_by_patient_id]);
+
+  // One typed digit can create a second chart for the same person. Asking while
+  // the desk is still typing turns a duplicate into a question, not a cleanup job.
+  useEffect(() => {
+    const phone = form.phone.trim();
+    if (phone.length < 8 || !currentBranchId) { setDuplicateHint(null); return; }
+    const timer = window.setTimeout(() => {
+      supabase
+        .from("patients")
+        .select("first_name_en,first_name_ar")
+        .eq("branch_id", currentBranchId)
+        .eq("phone", phone)
+        .is("deleted_at", null)
+        .limit(1)
+        .then(({ data }) => {
+          const hit = (data ?? [])[0] as { first_name_en: string | null; first_name_ar: string | null } | undefined;
+          setDuplicateHint(hit
+            ? (lang === "ar"
+                ? `هذا الرقم مسجّل بالفعل باسم ${hit.first_name_ar || hit.first_name_en || ""}`
+                : `This number is already on file for ${hit.first_name_en || hit.first_name_ar || ""}`)
+            : null);
+        });
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [form.phone, currentBranchId, lang]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setSearchTerm(q.trim()), 250);
@@ -397,7 +433,11 @@ export default function PatientsPage() {
           </div>
           <Can permission="patients.create">
             {/* Dismissing mid-write left the outcome unknown; the walk-in dialog already guarded this way. */}
-            <Dialog open={open} onOpenChange={(o) => { if (!creatingRef.current) setOpen(o); }}>
+            <Dialog open={open} onOpenChange={(o) => {
+              if (creatingRef.current) return;
+              setOpen(o);
+              if (!o) { setShowDetails(false); setDuplicateHint(null); }
+            }}>
               <DialogTrigger asChild>
                 <Button
                   className="gradient-primary text-primary-foreground min-h-11"
@@ -423,10 +463,7 @@ export default function PatientsPage() {
                 <div className="space-y-2">
                   <Label>{t("phone")} *</Label>
                   <Input dir="ltr" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required placeholder="+20..." maxLength={30} />
-                </div>
-                <div className="space-y-2">
-                  <Label>{t("phone2")}</Label>
-                  <Input dir="ltr" value={form.phone2} onChange={(e) => setForm({ ...form, phone2: e.target.value })} maxLength={30} />
+                  {duplicateHint && <p role="status" className="text-xs text-warning">{duplicateHint}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label>{t("email")}</Label>
@@ -445,6 +482,20 @@ export default function PatientsPage() {
                     <p className="text-xs text-muted-foreground mt-1">{lang === "ar" ? "لا تُرسل الرسائل التلقائية إلا بعد موافقة المريض." : "Automated messages are sent only after the patient opts in."}</p>
                   </div>
                   <Switch checked={form.whatsapp_opt_in} onCheckedChange={(v) => setForm({ ...form, whatsapp_opt_in: v })} />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowDetails((v) => !v)}
+                  aria-expanded={showDetails}
+                  className="sm:col-span-2 flex items-center justify-between text-xs text-primary hover:underline"
+                >
+                  <span>{lang === "ar" ? "تفاصيل إضافية (اختياري)" : "More details (optional)"}</span>
+                  <ChevronDown className={`size-4 transition-transform ${showDetails ? "rotate-180" : ""}`} />
+                </button>
+                {showDetails && (<>
+                <div className="space-y-2">
+                  <Label>{t("phone2")}</Label>
+                  <Input dir="ltr" value={form.phone2} onChange={(e) => setForm({ ...form, phone2: e.target.value })} maxLength={30} />
                 </div>
                 <div className="space-y-2">
                   <Label>{t("dob")}</Label>
@@ -486,6 +537,7 @@ export default function PatientsPage() {
                   <Label>{t("notes")}</Label>
                   <Textarea dir="auto" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} maxLength={1000} />
                 </div>
+                </>)}
                 <DialogFooter className="sm:col-span-2">
                   <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={creating}>{t("cancel")}</Button>
                   <Button type="submit" className="gradient-primary text-primary-foreground" disabled={creating}>{t("save")}</Button>

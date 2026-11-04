@@ -62,7 +62,7 @@ export default function InvoiceDetail() {
     const [{ data: i }, { data: it }, { data: ps }] = await Promise.all([
       supabase.from("invoices").select("*, patients(*)").eq("id", id).maybeSingle(),
       supabase.from("invoice_items").select("*").eq("invoice_id", id).order("created_at"),
-      supabase.from("payments").select("*").eq("invoice_id", id).order("created_at", { ascending: false }),
+      supabase.from("payments").select("*").eq("invoice_id", id).is("deleted_at", null).order("created_at", { ascending: false }),
     ]);
     setInv(i); setItems(it ?? []); setPays(ps ?? []);
     const { data: cr } = await (supabase as any)

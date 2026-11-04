@@ -17,6 +17,7 @@ import { useDataSync } from "@/lib/dataSync";
 import { usePatientSearch } from "@/hooks/usePatientSearch";
 import { PATIENT_PICKER_LIMIT, patientPickerCopy, pickedPatientLabel, type PatientOption } from "@/lib/patientSearch";
 import { localDateOnly } from "@/lib/localDate";
+import { buildPaymentRow, isWalletShortfall } from "@/lib/collectPayment";
 
 type Method = "cash" | "card" | "bank_transfer" | "insurance" | "wallet";
 
@@ -156,34 +157,27 @@ export function RecordPaymentDialog({
       if (cap > 0 && sum > cap + 0.009) { toast.error(t("splitSumExceeds")); submittingRef.current = false; return; }
     }
     setSaving(true);
-    const base = {
-      patient_id: pid,
-      invoice_id: isTopup ? null : (iid || null),
-      branch_id: currentBranchId,
-      payment_date: date,
-      reference_number: ref || null,
-      notes: notes || null,
-      received_by: user?.id ?? null,
-      ...(isTopup ? { is_wallet_topup: true } : {}),
+    const common = {
+      patientId: pid,
+      invoiceId: iid || null,
+      branchId: currentBranchId,
+      date,
+      reference: ref,
+      notes,
+      receivedBy: user?.id ?? null,
+      walletTopup: isTopup,
     };
-    const rows: any[] = [{ ...base, amount, payment_method: method }];
-    if (split) rows.push({ ...base, amount: amount2, payment_method: method2 });
+    const rows: Record<string, unknown>[] = [buildPaymentRow({ ...common, amount, method })];
+    if (split) rows.push(buildPaymentRow({ ...common, amount: amount2, method: method2 }));
     const { error } = await supabase.from("payments").insert(rows as any);
     setSaving(false);
     submittingRef.current = false;
     if (error) {
       const walletInvolved = method === "wallet" || (split && method2 === "wallet");
-      const code = (error as any).code as string | undefined;
-      const raw = `${error.message ?? ""} ${(error as any).details ?? ""} ${(error as any).hint ?? ""}`.toLowerCase();
       // Prefer Postgres SQLSTATE for CHECK violations (23514) — the wallet
       // balance constraint surfaces this code. Fall back to a heuristic string
       // match for older drivers that don't propagate `code`.
-      const isInsufficient =
-        !isTopup && walletInvolved && (
-          code === "23514" ||
-          raw.includes("insufficient") ||
-          (raw.includes("balance") && (raw.includes("check") || raw.includes("negative") || raw.includes(">= 0") || raw.includes(">=0")))
-        );
+      const isInsufficient = !isTopup && walletInvolved && isWalletShortfall(error as any);
       toast.error(isInsufficient ? t("walletInsufficient") : (error.message ?? (lang === "ar" ? "خطأ" : "Error")));
       return;
     }

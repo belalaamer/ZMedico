@@ -186,13 +186,14 @@ describe("zero-row write contract (batches 13-17)", () => {
     // Batch 23 refreshed three of these line numbers (Schedules ×2, Payroll ×1):
     // the batch added one import line to each file, which moves everything under
     // it. Batch 33 moved the second Schedules write again, by the comment and
-    // the async refactor of saveStaffSchedule. The eleven writes themselves,
+    // the async refactor of saveStaffSchedule. The notification clinic-time
+    // import moved Reminders.tsx by one line. The eleven writes themselves,
     // their order, and their markers are the set batch 17 measured — the two
     // Schedules entries still read the same scoped delete statements.
     expect(marked).toEqual([
       "src/pages/hr/Schedules.tsx:141 .delete()",
       "src/pages/hr/Schedules.tsx:188 .delete()",
-      "src/pages/reminders/Reminders.tsx:111 .update(",
+      "src/pages/reminders/Reminders.tsx:112 .update(",
       "src/components/layout/Topbar.tsx:136 .update(",
       "src/components/layout/Topbar.tsx:143 .update(",
       "src/lib/queueAlerts.ts:112 .update(",

@@ -90,8 +90,8 @@ Every row must read `PASS`. A `FAIL` is a real regression. It covers the guard
 rails (overpayment, payment on a cancelled invoice, negative totals,
 zero-quantity items, ledger immutability), the happy paths (payment settles the
 invoice and posts to treasury, voiding reverses it, an appointment enqueues
-exactly 2 reminders, invoice numbers carry the branch code) and reconciliation of
-the real books.
+the reminders the branch is configured to send, invoice numbers carry the
+branch code) and reconciliation of the real books.
 
 ### Who changed a patient record
 

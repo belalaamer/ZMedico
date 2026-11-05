@@ -28,6 +28,7 @@ import {
 } from "@/lib/patientSearch";
 import { doctorDisplayName } from "@/lib/doctorName";
 import { rowsWritten } from "@/lib/writeOutcome";
+import { buildPaymentRow, type PaymentMethod } from "@/lib/collectPayment";
 import { localDateOnly } from "@/lib/localDate";
 
 type Item = {
@@ -70,6 +71,16 @@ export function CreateInvoiceDialog({
   const [couponCode, setCouponCode] = useState("");
   const [couponInfo, setCouponInfo] = useState<{ id: string; code: string; amount: number } | null>(null);
   const [couponLoading, setCouponLoading] = useState(false);
+  // Collecting at the desk used to mean closing this screen, opening the
+  // payments page and re-typing who the money is from. The strip below writes
+  // the same `payments` row the standalone dialog writes, once the invoice
+  // exists -- a draft never collects, because a draft is not a bill yet.
+  const [collectNow, setCollectNow] = useState(false);
+  const [collectAmount, setCollectAmount] = useState<number>(0);
+  const [collectMethod, setCollectMethod] = useState<PaymentMethod>("cash");
+  const [collectRef, setCollectRef] = useState("");
+  const [collectWalletBalance, setCollectWalletBalance] = useState<number | null>(null);
+  const collectAmountEdited = useRef(false);
   // Progressive disclosure: hide insurance, coupon, and tax behind an
   // "Advanced options" section. Auto-expand if any advanced value is in use.
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -78,6 +89,12 @@ export function CreateInvoiceDialog({
   }, [insuranceCompanyId, couponInfo, taxPct]);
 
   useEffect(() => { setPatientId(presetPatientId ?? ""); setDoctorId(""); }, [presetPatientId, open]);
+
+  useEffect(() => {
+    if (open) return;
+    setCollectNow(false); setCollectAmount(0); setCollectMethod("cash"); setCollectRef("");
+    setCollectWalletBalance(null); collectAmountEdited.current = false;
+  }, [open]);
 
   // C4: the invoice is issued to whoever the desk can find. This searched the
   // branch's newest 500 patients and filtered the rest in the browser, so a
@@ -249,6 +266,23 @@ export function CreateInvoiceDialog({
   // coverage decision bills the patient for care the contract does cover.
   const coverageUnresolved = claimSource === "contract" && lineCoverage.some((r) => r.unresolved);
 
+  // The desk collects what the patient owes, not what the invoice totals: with a
+  // claim on it, the covered part is billed to the insurer. Once the desk types an
+  // amount the strip stops following the calculation, so editing a line cannot
+  // silently rewrite the money they are about to take.
+  useEffect(() => {
+    if (collectAmountEdited.current) return;
+    setCollectAmount(+Math.max(0, patientShare).toFixed(2));
+  }, [patientShare]);
+
+  useEffect(() => {
+    if (!collectNow || collectMethod !== "wallet" || !patientId) { setCollectWalletBalance(null); return; }
+    let active = true;
+    supabase.from("patient_wallets").select("balance").eq("patient_id", patientId).maybeSingle()
+      .then(({ data }) => { if (active) setCollectWalletBalance(Number((data as { balance?: number } | null)?.balance ?? 0)); });
+    return () => { active = false; };
+  }, [collectNow, collectMethod, patientId]);
+
   const updateItem = (idx: number, patch: Partial<Item>) =>
     setItems((arr) => arr.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
 
@@ -309,6 +343,15 @@ export function CreateInvoiceDialog({
     if (!patientInBranch) { toast.error(t("selectPatient")); submittingRef.current = false; return; }
     if (!patientId) { toast.error(t("selectPatient")); submittingRef.current = false; return; }
     if (items.length === 0 || items.every((it) => !it.description_en)) { toast.error(t("addAtLeastOneItem")); submittingRef.current = false; return; }
+    const collectAmountValue = +(Number(collectAmount) || 0).toFixed(2);
+    const willCollect = collectNow && status === "pending";
+    if (willCollect) {
+      if (collectAmountValue <= 0) { toast.error(t("amountRequired")); submittingRef.current = false; return; }
+      if (collectMethod === "wallet") {
+        if (collectWalletBalance === null) { toast.error(t("walletBalanceLoading")); submittingRef.current = false; return; }
+        if (collectAmountValue > collectWalletBalance + 0.009) { toast.error(t("walletInsufficient")); submittingRef.current = false; return; }
+      }
+    }
     setSaving(true);
     const invoicePayload: Record<string, unknown> = {
       patient_id: patientId,
@@ -443,8 +486,28 @@ export function CreateInvoiceDialog({
       }
     }
 
+    // The invoice exists, so the collection can point at it. A rejected payment
+    // leaves the invoice standing -- reporting that as one red toast, or as a
+    // success, would hide money the desk still has to take.
+    let paymentFailed = false;
+    if (willCollect) {
+      const { error: paymentError } = await supabase.from("payments").insert([buildPaymentRow({
+        patientId,
+        invoiceId: inv.id,
+        branchId: currentBranchId,
+        date,
+        amount: collectAmountValue,
+        method: collectMethod,
+        reference: collectRef,
+        receivedBy: user?.id ?? null,
+      })] as any);
+      if (paymentError) paymentFailed = true;
+      else notifyDataChange("payments");
+    }
+
     setSaving(false);
     submittingRef.current = false;
+    if (collectNow && status === "draft") toast.info(t("draftSavedNoPayment"));
     {
       const num = String(inv.invoice_number ?? "");
       const isTemp = !num || /^TMP[-_]/i.test(num);
@@ -454,7 +517,10 @@ export function CreateInvoiceDialog({
           : `${t("invoice")} ${num}`,
       );
     }
+    if (paymentFailed) toast.error(t("paymentNotRecorded"));
     setItems([{ item_type: "service", description_en: "", description_ar: "", quantity: 1, unit_price: 0 }]);
+    setCollectNow(false); setCollectRef(""); setCollectMethod("cash"); setCollectWalletBalance(null);
+    collectAmountEdited.current = false;
     setDiscountPct(0); setTaxPct(0); setNotes(""); setPatientId(""); setDoctorId("");
     setInsuranceCompanyId(""); setCoverageRatio(0);
     setActiveContract(null); setLineCoverage([]); setManualOverride(false); setManualClaim(0);
@@ -808,10 +874,61 @@ export function CreateInvoiceDialog({
           </div>
         </div>
 
+        <div className="rounded-lg border border-border">
+          <label className="flex flex-wrap items-center gap-2 px-3 py-2 cursor-pointer">
+            <input type="checkbox" className="size-4" checked={collectNow} onChange={(e) => setCollectNow(e.target.checked)} />
+            <span className="text-sm font-medium">{t("collectNow")}</span>
+            <span className="text-xs text-muted-foreground">{t("collectNowHint")}</span>
+          </label>
+          {collectNow && (
+            <div className="grid sm:grid-cols-3 gap-3 border-t border-border px-3 pb-3 pt-3">
+              <div className="space-y-2">
+                <Label>{t("amount")}</Label>
+                <NumberInput
+                  value={collectAmount}
+                  onChange={(v) => { collectAmountEdited.current = true; setCollectAmount(Number(v) || 0); }}
+                />
+                <p className="text-[11px] text-muted-foreground tabular-nums">
+                  {t("patientShare")}: {formatMoney(Math.max(0, patientShare), lang)}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>{t("method")}</Label>
+                <Select value={collectMethod} onValueChange={(v) => setCollectMethod(v as PaymentMethod)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">{t("cash")}</SelectItem>
+                    <SelectItem value="card">{t("card")}</SelectItem>
+                    <SelectItem value="bank_transfer">{t("bankTransfer")}</SelectItem>
+                    <SelectItem value="insurance">{t("insurance")}</SelectItem>
+                    <SelectItem value="wallet">{t("wallet")}</SelectItem>
+                  </SelectContent>
+                </Select>
+                {collectMethod === "wallet" && (
+                  <p className={`text-[11px] tabular-nums ${
+                    collectWalletBalance !== null && collectAmount > collectWalletBalance + 0.009 ? "text-destructive" : "text-muted-foreground"
+                  }`}>
+                    {t("walletBalanceLabel")}: {collectWalletBalance === null ? t("walletBalanceLoading") : collectWalletBalance.toFixed(2)}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>{t("referenceNumber")}</Label>
+                <Input dir="auto" value={collectRef} onChange={(e) => setCollectRef(e.target.value)} maxLength={60} />
+              </div>
+            </div>
+          )}
+        </div>
+
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>{t("cancel")}</Button>
           <Button type="button" variant="outline" onClick={() => save("draft")} disabled={saving}>{t("saveDraft")}</Button>
-          <Button type="button" className="gradient-primary text-primary-foreground" onClick={() => save("pending")} disabled={saving}>{t("save")}</Button>
+          <Button
+            type="button"
+            className="gradient-primary text-primary-foreground"
+            onClick={() => save("pending")}
+            disabled={saving || (collectNow && collectMethod === "wallet" && collectWalletBalance === null)}
+          >{collectNow ? t("saveAndCollect") : t("save")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

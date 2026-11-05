@@ -14,6 +14,7 @@ import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { toast } from "sonner";
 import { formatMoney, formatDate, invoiceCountLabel } from "@/lib/format";
 import { CreateInvoiceDialog } from "./CreateInvoiceDialog";
+import { RecordPaymentDialog } from "@/pages/payments/RecordPaymentDialog";
 import { Fab } from "@/components/ui/fab";
 import { RowActions } from "@/components/RowActions";
 import { useNavigate } from "react-router-dom";
@@ -61,6 +62,7 @@ export default function Invoices() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [open, setOpen] = useState(false);
+  const [payTarget, setPayTarget] = useState<Inv | null>(null);
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
   const loadRequestRef = useRef(0);
@@ -272,6 +274,11 @@ export default function Invoices() {
                   </div>
                   <Badge variant="outline" className={`${statusClass[i.status]} shrink-0`}>{statusLabel(i.status)}</Badge>
                   </Link>
+                  {showRemaining && authz.can("invoices.create") && (
+                    <Button size="sm" variant="outline" className="shrink-0" onClick={() => setPayTarget(i)}>
+                      <CreditCard className="me-1 size-4" />{t("collect")}
+                    </Button>
+                  )}
                   <RowActions
                     onEdit={() => navigate(`/invoices/${i.id}`)}
                     onDelete={() => softDelete(i)}
@@ -282,7 +289,7 @@ export default function Invoices() {
                         ? [{
                             label: t("recordPayment"),
                             icon: <CreditCard className="size-4" />,
-                            onClick: () => navigate(`/payments?invoice=${i.id}&patient=${i.patient_id}&amount=${(Number(i.total) - Number(i.paid_amount)).toFixed(2)}`),
+                            onClick: () => setPayTarget(i),
                           }]
                         : undefined
                     }
@@ -296,6 +303,16 @@ export default function Invoices() {
       </Card>
 
       <CreateInvoiceDialog open={open} onOpenChange={setOpen} onSaved={() => { setOpen(false); load(); }} />
+      {payTarget && (
+        <RecordPaymentDialog
+          open
+          onOpenChange={(v) => { if (!v) setPayTarget(null); }}
+          invoiceId={payTarget.id}
+          patientId={payTarget.patient_id}
+          defaultAmount={+(Number(payTarget.total) - Number(payTarget.paid_amount)).toFixed(2)}
+          onSaved={() => { setPayTarget(null); load(); }}
+        />
+      )}
       <Can permission="invoices.create">
         <Fab ariaLabel={t("newInvoice")} onClick={() => setOpen(true)}>
           <Plus className="size-6" />

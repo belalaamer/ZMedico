@@ -55,6 +55,7 @@ export default function PatientProfile() {
   const [delOpen, setDelOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
+  const [showVoided, setShowVoided] = useState(false);
   const [clinicalView, setClinicalView] = useState<"medical" | "plans">("medical");
   const [reloadKey, setReloadKey] = useState(0);
   const [physioCases, setPhysioCases] = useState<any[]>([]);
@@ -118,8 +119,8 @@ export default function PatientProfile() {
     if (!id) return;
     const [{ data: p, error: pe }, { data: invs }, { data: pays }] = await Promise.all([
       supabase.from("patients").select("*").eq("id", id).maybeSingle(),
-      supabase.from("invoices").select("*").eq("patient_id", id).order("invoice_date", { ascending: false }),
-      supabase.from("payments").select("*, invoices(invoice_number)").eq("patient_id", id).order("created_at", { ascending: false }),
+      supabase.from("invoices").select("*").eq("patient_id", id).is("deleted_at", null).order("invoice_date", { ascending: false }),
+      supabase.from("payments").select("*, invoices(invoice_number)").eq("patient_id", id).is("deleted_at", null).order("created_at", { ascending: false }),
     ]);
     if (pe) toast.error(pe.message);
     setPatient(p); setInvoices(invs ?? []); setPayments(pays ?? []);
@@ -147,6 +148,12 @@ export default function PatientProfile() {
   const nameDir = patientDisplayDirection(patient, lang);
 
   const totalPaid = payments.reduce((s, p) => s + Number(p.amount), 0);
+
+  // A cancelled invoice is a supervisory fact, not a daily work item. It leaves
+  // the desk's list and comes back only when someone asks for it here.
+  const liveInvoices = invoices.filter((i: any) => i.status !== "cancelled");
+  const voidedCount = invoices.length - liveInvoices.length;
+  const visibleInvoices = showVoided ? invoices : liveInvoices;
   const totalOutstanding = invoices
     .filter((i) => i.status !== "cancelled")
     .reduce((s, i) => s + (Number(i.total) - Number(i.paid_amount)), 0);
@@ -464,13 +471,20 @@ export default function PatientProfile() {
             <PatientWalletTab key={reloadKey} patientId={patient.id} />
 
             <section className="space-y-2">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{t("invoices")}</h3>
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{t("invoices")}</h3>
+                {voidedCount > 0 && (
+                  <Button type="button" size="sm" variant="ghost" onClick={() => setShowVoided((v) => !v)}>
+                    {showVoided ? t("hideCancelled") : `${t("showCancelled")} (${voidedCount})`}
+                  </Button>
+                )}
+              </div>
               <Card className="shadow-card overflow-hidden">
-                {invoices.length === 0 ? (
+                {visibleInvoices.length === 0 ? (
                   <div className="p-10 text-center text-muted-foreground">{t("noInvoices")}</div>
                 ) : (
                   <div className="divide-y divide-border">
-                    {invoices.map((inv) => {
+                    {visibleInvoices.map((inv) => {
                       const remaining = +(Number(inv.total) - Number(inv.paid_amount)).toFixed(2);
                       const statusLabel = ({ draft: t("statusDraft"), pending: t("statusPending"), paid: t("statusPaid"), partial: t("statusPartial"), cancelled: t("statusCancelled") } as any)[inv.status];
                       return (

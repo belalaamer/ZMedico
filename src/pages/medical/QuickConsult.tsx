@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,7 @@ import { useDataSync, notifyDataChange } from "@/lib/dataSync";
 import { usePatientSearch } from "@/hooks/usePatientSearch";
 import {
   PATIENT_PICKER_LIMIT,
+  fetchPatientOption,
   patientPickerCopy,
   pickedPatientLabel,
   type PatientOption,
@@ -28,6 +29,7 @@ export default function QuickConsult() {
   const { currentBranchId, branchSelectionReady } = useBranch();
   const { user } = useAuth();
   const nav = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   // C4: the branch's patients are searched on the server by name or phone, one
   // page at a time. The record created below always saves with
   // branch_id = currentBranchId, so a picker that listed every branch would let
@@ -47,6 +49,8 @@ export default function QuickConsult() {
     bp_sys: "", bp_dia: "", pulse: "", temp: "", weight: "", height: "",
   });
   const [saving, setSaving] = useState(false);
+  const [strandedHandoff, setStrandedHandoff] = useState(false);
+  const handoffConsumed = useRef(false);
   const [ctx, setCtx] = useState<{ lastVisit: any | null; diagnoses: any[] }>({ lastVisit: null, diagnoses: [] });
 
   useEffect(() => {
@@ -56,6 +60,30 @@ export default function QuickConsult() {
   // The patient box asks for its own first page when it mounts; a new patient
   // registered elsewhere in the app only has to re-run the current query.
   useDataSync(["patients"], patientSearch.reload);
+
+  // P5: the visit arrives with its patient. The profile's "Add record" hands over
+  // `?patient=<id>` so the doctor does not re-type a name they were just looking
+  // at. The id is resolved inside this branch -- the record below is written with
+  // branch_id = currentBranchId, so an id from another clinic is refused rather
+  // than silently filed in the wrong place -- and the param is dropped once read,
+  // so a refresh cannot re-open a patient the doctor deliberately cleared.
+  useEffect(() => {
+    const handedOver = searchParams.get("patient");
+    if (!handedOver || handoffConsumed.current) return;
+    if (!branchSelectionReady || !currentBranchId) return;
+    handoffConsumed.current = true;
+    void fetchPatientOption(supabase, { id: handedOver, lang, branchId: currentBranchId }).then((hit) => {
+      if (hit) {
+        setPatientEcho({ id: hit.id, label: hit.label });
+        setForm((f) => ({ ...f, patient_id: hit.id }));
+      } else {
+        setStrandedHandoff(true);
+      }
+      const next = new URLSearchParams(searchParams);
+      next.delete("patient");
+      setSearchParams(next, { replace: true });
+    });
+  }, [searchParams, branchSelectionReady, currentBranchId, lang, setSearchParams]);
 
   // Load read-only context when a patient is picked
   useEffect(() => {
@@ -180,7 +208,14 @@ export default function QuickConsult() {
               searching={patientSearch.searching}
               onSearch={patientSearch.search}
             />
-            {!form.patient_id && (
+            {strandedHandoff && !form.patient_id && (
+              <p className="text-xs text-destructive" role="status">
+                {lang === "ar"
+                  ? "هذا المريض غير مسجّل في الفرع الحالي. اختر مريضًا من هذا الفرع."
+                  : "This patient is not registered in the current branch. Pick a patient of this branch."}
+              </p>
+            )}
+            {!strandedHandoff && !form.patient_id && (
               <p className="text-xs text-destructive" role="status">{t("selectPatient")}</p>
             )}
           </div>

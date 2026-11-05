@@ -68,7 +68,9 @@ export default function PhysioCaseDetail() {
     }
     const branchId = (caseRes.data as any).branch_id;
     const patientId = (caseRes.data as any).patient_id;
-    // Load patient's appointments at this branch for linking + display.
+    // Load patient's appointments at this branch for linking + display. Cancelled
+    // rows stay in this read because a session already linked to one must still
+    // render its label; they are dropped from the link options below.
     if (branchId && patientId) {
       const { data: appts } = await supabase.from("appointments")
         .select("id,scheduled_at,status,doctor_id,duration_minutes")
@@ -680,7 +682,7 @@ function SessionDialog({ open, setOpen, caseId, nextNumber, defaultTherapistId, 
                     <SelectTrigger><SelectValue placeholder={lang === "ar" ? "جلسة غير مرتبطة بموعد" : "Standalone session"} /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="_none">{lang === "ar" ? "— بدون موعد —" : "— Standalone —"}</SelectItem>
-                      {(appointments ?? []).slice(0, 50).map((a: any) => (
+                      {(appointments ?? []).filter((a: any) => a.status !== "cancelled").slice(0, 50).map((a: any) => (
                         <SelectItem key={a.id} value={a.id}>{formatDateTime(a.scheduled_at, lang)} · {enumLabel("appointment_status", a.status, lang)}</SelectItem>
                       ))}
                     </SelectContent>

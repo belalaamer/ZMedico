@@ -15,6 +15,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney, formatDateTime } from "@/lib/format";
+import { dropReversedPairs } from "@/lib/treasuryVisibility";
 import { enumCopy, TREASURY_TX_TYPE_KEY } from "@/lib/enumKeys";
 import { TransferDialog } from "./TransferDialog";
 import { RowActions } from "@/components/RowActions";
@@ -65,33 +66,17 @@ export default function Treasury() {
       // treasury_transactions is scoped through its parent treasury; it has no branch_id column.
       const { data: tx, error: txError } = await supabase.from("treasury_transactions").select("*").in("treasury_id", ids).order("created_at", { ascending: false }).limit(100);
       if (txError) { toast.error(txError.message); return; }
-      // Hide expense rows that have been reversed, and hide the reversal rows themselves
-      const reversedIds = new Set(
-        (tx ?? [])
-          .filter((r: any) => r.reference_type === "expense_reversal" && r.reference_id)
-          .map((r: any) => r.reference_id as string)
-      );
-      const visible = (tx ?? []).filter((r: any) => {
-        if (r.reference_type === "expense_reversal") return false;
-        if (r.reference_type === "expense" && r.reference_id && reversedIds.has(r.reference_id)) return false;
-        return true;
-      });
+      // Hide reversed rows and the rows they reverse, for expenses and payments
+      // alike: voiding an invoice posts a payment_reversal next to the original
+      // cash-in, and both used to sit on the desk inflating each card.
+      const visible = dropReversedPairs(tx ?? []);
       if (requestId !== loadRequestRef.current) return;
       setTxs(visible);
 
       const startISO = new Date(new Date().setHours(0,0,0,0)).toISOString();
       const { data: tt, error: ttError } = await supabase.from("treasury_transactions").select("transaction_type,amount,reference_type,reference_id,created_at,treasury_id").in("treasury_id", ids).gte("created_at", startISO);
       if (ttError) { toast.error(ttError.message); return; }
-      const reversedToday = new Set(
-        (tt ?? [])
-          .filter((r: any) => r.reference_type === "expense_reversal" && r.reference_id)
-          .map((r: any) => r.reference_id as string)
-      );
-      const ttVisible = (tt ?? []).filter((r: any) => {
-        if (r.reference_type === "expense_reversal") return false;
-        if (r.reference_type === "expense" && r.reference_id && reversedToday.has(r.reference_id)) return false;
-        return true;
-      });
+      const ttVisible = dropReversedPairs(tt ?? []);
       const currencyOfTreasury = new Map((trs ?? []).map((tr: any) => [tr.id as string, String(tr.currency || "EGP")]));
       const inc: MoneyByCurrency = {};
       const exp: MoneyByCurrency = {};

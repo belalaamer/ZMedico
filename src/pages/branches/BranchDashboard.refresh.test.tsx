@@ -67,6 +67,7 @@ vi.mock("@/integrations/supabase/client", () => {
           },
           gte: () => chain,
           lte: () => chain,
+          neq: () => chain,
           is: () => chain,
           maybeSingle: () => answer(table, branchId),
           then: (onFulfilled: (value: unknown) => unknown, onRejected: (reason: unknown) => unknown) =>

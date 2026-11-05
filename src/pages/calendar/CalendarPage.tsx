@@ -494,6 +494,9 @@ export default function CalendarPage() {
       .select("scheduled_at")
       .gte("scheduled_at", start).lt("scheduled_at", end)
       .is("deleted_at", null)
+      // The dot is "how busy is this day"; a cancelled visit is not work, and
+      // cancellation is a status, so deleted_at alone kept counting it.
+      .neq("status", "cancelled")
       .eq("branch_id", currentBranchId);
     const { data } = await q;
     const dots: Record<string, number> = {};

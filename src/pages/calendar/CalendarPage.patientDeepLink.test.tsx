@@ -41,7 +41,7 @@ function builder(table: string) {
     return Promise.resolve({ data: [], error: null });
   };
   const chain: Record<string, unknown> = {};
-  for (const method of ["select", "eq", "is", "in", "not", "or", "filter", "order", "limit", "match", "range", "gte", "lte", "gt", "lt", "ilike", "like", "contains", "textSearch"]) {
+  for (const method of ["select", "eq", "neq", "is", "in", "not", "or", "filter", "order", "limit", "match", "range", "gte", "lte", "gt", "lt", "ilike", "like", "contains", "textSearch"]) {
     chain[method] = (field?: string, value?: unknown) => {
       if (field && (method === "eq" || method === "is" || method === "in")) filters.push(`${field},${String(value)}`);
       return chain;

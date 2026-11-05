@@ -989,6 +989,7 @@ function InvoicePreviewTab({ record, patient, procs, nav, userId }: any) {
         .select("id, invoice_number, invoice_date, status, total, paid_amount")
         .eq("patient_id", patient.id)
         .is("deleted_at", null)
+        .neq("status", "cancelled")
         .order("invoice_date", { ascending: false });
       setExisting(data ?? []);
     })();

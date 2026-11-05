@@ -154,9 +154,13 @@ export default function BranchDashboard() {
     const wEnd = endOfDay(addDays(now, -1)).toISOString();
     const sel = "id, status, scheduled_at, checked_in_at, started_at, patients(first_name_en, last_name_en, first_name_ar, last_name_ar)";
     const [{ data: tData }, { data: yData }, { data: wData }, { data: br }, qs] = await Promise.all([
-      supabase.from("appointments").select(sel).eq("branch_id", currentBranchId).gte("scheduled_at", tStart).lte("scheduled_at", tEnd),
-      supabase.from("appointments").select(sel).eq("branch_id", currentBranchId).gte("scheduled_at", yStart).lte("scheduled_at", yEnd),
-      supabase.from("appointments").select(sel).eq("branch_id", currentBranchId).gte("scheduled_at", wStart).lte("scheduled_at", wEnd),
+      // Every row below feeds a KPI only (computeMetrics + the time-of-day
+      // split), and a cancelled booking is not work: it inflated "total today",
+      // the 7-day baseline, and diluted the no-show rate by adding to the
+      // denominator without landing in any status bucket.
+      supabase.from("appointments").select(sel).neq("status", "cancelled").eq("branch_id", currentBranchId).gte("scheduled_at", tStart).lte("scheduled_at", tEnd),
+      supabase.from("appointments").select(sel).neq("status", "cancelled").eq("branch_id", currentBranchId).gte("scheduled_at", yStart).lte("scheduled_at", yEnd),
+      supabase.from("appointments").select(sel).neq("status", "cancelled").eq("branch_id", currentBranchId).gte("scheduled_at", wStart).lte("scheduled_at", wEnd),
       supabase.from("branches").select("name_en, name_ar").eq("id", currentBranchId).maybeSingle(),
       fetchQueueSettings(currentBranchId).catch(() => null),
     ]);

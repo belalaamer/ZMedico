@@ -24,6 +24,7 @@ import { formatMoney, formatDate, formatDateTime } from "@/lib/format";
 import { localDateOnly } from "@/lib/localDate";
 import { STATUS_KEY_BY_APPOINTMENT_STATUS, enumCopy } from "@/lib/enumKeys";
 import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
+import { dropReversedPairs } from "@/lib/treasuryVisibility";
 
 type ApptStatus = "scheduled" | "confirmed" | "in_progress" | "completed" | "cancelled" | "no_show" | "departed";
 
@@ -215,16 +216,19 @@ export default function Dashboard() {
           .order("created_at", { ascending: false }).limit(5)) : emptyResult(),
         canBookings ? branchEq(supabase.from("appointments").select("id,scheduled_at,status,doctor_id,patient:patients(first_name_en,first_name_ar,last_name_en,last_name_ar,name_language)")
           .is("deleted_at", null)
+          .neq("status", "cancelled")
           .order("created_at", { ascending: false }).limit(5)) : emptyResult(),
         canInvoices ? branchEq(supabase.from("payments").select("id,amount,payment_method,payment_date,patient:patients(first_name_en,first_name_ar,last_name_en,last_name_ar,name_language)")
           .is("deleted_at", null)
           .order("created_at", { ascending: false }).limit(5)) : emptyResult(),
         canBookings ? branchEq(supabase.from("appointments").select("doctor_id,status")
           .is("deleted_at", null)
+          .neq("status", "cancelled")
           .gte("scheduled_at", rs.toISOString()).lte("scheduled_at", re.toISOString())
           .not("doctor_id", "is", null)) : emptyResult(),
-        canInvoices ? supabase.from("invoice_items").select("description_en,description_ar,quantity,total,invoice:invoices!inner(branch_id,invoice_date,deleted_at)")
+        canInvoices ? supabase.from("invoice_items").select("description_en,description_ar,quantity,total,invoice:invoices!inner(branch_id,invoice_date,deleted_at,status)")
           .is("invoice.deleted_at", null)
+          .neq("invoice.status", "cancelled")
           .eq("invoice.branch_id", currentBranchId)
           .gte("invoice.invoice_date", rangeStart).lte("invoice.invoice_date", rangeEnd) : emptyResult(),
         canHR ? supabase.from("leave_requests").select("id", { count: "exact", head: true })
@@ -234,7 +238,7 @@ export default function Dashboard() {
       ]);
 
       // Treasury (mirrors Treasury page: filter by treasury_id for this branch,
-      // sum transaction_type income vs expense, exclude reversed expense pairs).
+      // sum transaction_type income vs expense, exclude reversed pairs).
       const lastCloseRes = await branchEq(
         (supabase as any).from("treasury_daily_closes")
           .select("business_date,counted_cash,variance,branch_id")
@@ -254,16 +258,7 @@ export default function Dashboard() {
           .in("treasury_id", trIds)
           .gte("created_at", start.toISOString())
           .lte("created_at", end.toISOString());
-        const reversed = new Set(
-          ((tt ?? []) as any[])
-            .filter((r) => r.reference_type === "expense_reversal" && r.reference_id)
-            .map((r) => r.reference_id as string)
-        );
-        const visible = ((tt ?? []) as any[]).filter((r) => {
-          if (r.reference_type === "expense_reversal") return false;
-          if (r.reference_type === "expense" && r.reference_id && reversed.has(r.reference_id)) return false;
-          return true;
-        });
+        const visible = dropReversedPairs((tt ?? []) as any[]);
         tIn  = visible.filter((r) => r.transaction_type === "income").reduce((s, r) => s + Number(r.amount || 0), 0);
         tOut = visible.filter((r) => r.transaction_type === "expense").reduce((s, r) => s + Number(r.amount || 0), 0);
       }
@@ -271,8 +266,11 @@ export default function Dashboard() {
       setTodayTreasuryOut(tOut);
 
       const apptRows = (apptsTodayRes.data ?? []) as { status: string; doctor_id: string | null }[];
-      setTodayAppts(apptRows.length);
-      setMyApptsToday(user?.id ? apptRows.filter((r) => r.doctor_id === user.id).length : 0);
+      // The headline counts the day's workload; cancelled visits stay out of it
+      // but keep their slice in the status breakdown below, which is supervision.
+      const liveApptRows = apptRows.filter((r) => r.status !== "cancelled");
+      setTodayAppts(liveApptRows.length);
+      setMyApptsToday(user?.id ? liveApptRows.filter((r) => r.doctor_id === user.id).length : 0);
       const sb: Record<string, number> = {};
       for (const r of apptRows) sb[r.status] = (sb[r.status] ?? 0) + 1;
       setApptStatusToday(sb);

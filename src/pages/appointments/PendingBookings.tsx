@@ -77,6 +77,11 @@ export default function PendingBookings() {
       .eq("branch_id", currentBranchId)
       .eq("booking_request_status", "pending")
       .is("deleted_at", null)
+      // Cancelling from the queue leaves the portal hold `pending`, and
+      // confirm_public_booking (20260827091000:169) checks the hold but not the
+      // status — approving one of these rows set status='confirmed' and rewrote
+      // a cancelled visit back into life, reminders included. It is not work.
+      .neq("status", "cancelled")
       .order("scheduled_at", { ascending: true });
     if (error) {
       toast.error(lang === "ar" ? "تعذر تحميل الحجوزات المعلقة" : "Could not load pending bookings");

@@ -15,6 +15,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { enumLabel } from "@/lib/enumLabels";
 import { documentTypeLabel, visitTypeLabel } from "@/lib/enumKeys";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatDate, formatMoney } from "@/lib/format";
@@ -33,6 +34,8 @@ export default function ConsultationDashboard() {
   const { recordId } = useParams();
   const { lang, t } = useI18n();
   const { user } = useAuth();
+  const { authz } = useAuthorization("ConsultationDashboard");
+  const canOpenInvoice = authz.can("invoices.view");
   const nav = useNavigate();
   const isAr = lang === "ar";
   const T = (en: string, ar: string) => (isAr ? ar : en);
@@ -253,13 +256,20 @@ export default function ConsultationDashboard() {
               <div className="mt-1 text-xs text-muted-foreground">{T("Document performed procedures below after the patient arrives.", "سجّل الإجراءات التي تم تنفيذها فعليًا بالأسفل بعد حضور المريض.")}</div>
             </div>
           )}
-          {draftInvoice && (
+          {draftInvoice && (canOpenInvoice ? (
             <Link to={`/invoices/${draftInvoice.id}`} className="text-sm">
               <Badge variant="outline" className="status-progress">
                 {T("Draft invoice", "فاتورة مسودة")} · {draftInvoice.invoice_number} · {formatMoney(draftInvoice.total ?? 0, lang)}
               </Badge>
             </Link>
-          )}
+          ) : (
+            // The draft is real money work, and this screen is the doctor's. The
+            // invoices screen is not, so the badge states the hand-off instead of
+            // linking to a door that answers with Access Denied.
+            <Badge variant="outline" className="status-progress">
+              {T("Draft invoice handed to reception", "فاتورة مسودة سُلّمت للاستقبال")} · {draftInvoice.invoice_number} · {formatMoney(draftInvoice.total ?? 0, lang)}
+            </Badge>
+          ))}
         </div>
       </Card>
 

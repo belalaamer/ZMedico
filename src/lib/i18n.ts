@@ -1164,6 +1164,21 @@ export const dict = {
     queueActionsHistory: "Queue actions history",
     openInAudit: "Open in audit",
     loadMore: "Load more",
+    // Treasury till shift desk (/treasury/shift). One duty, three states: the
+    // drawer is counted, the shift is watched, the drawer is counted again.
+    shiftDesk: "Till shift",
+    shiftOpen: "Open shift",
+    shiftIdle: "No open shift",
+    shiftClose: "Close shift",
+    shiftHandover: "Handed over to",
+    drawerNow: "The drawer should hold",
+    shiftSplit: "This shift only",
+    cumulativeNotYours: "Full treasury balance — not your custody",
+    openingGap: "Opening gap",
+    handoverPick: "Hand the drawer to",
+    variancePreview: "Variance preview",
+    cashBalanceCumulative: "Cash across all treasuries (cumulative)",
+    nonCashBalanceCumulative: "Non-cash across all treasuries (cumulative)",
   },
   ar: {
     appName: "ZMedico",
@@ -2329,6 +2344,20 @@ export const dict = {
     queueActionsHistory: "سجل عمليات الطابور",
     openInAudit: "افتح في السجل",
     loadMore: "تحميل المزيد",
+    // طاولة وردية الخزنة (/treasury/shift): تُعَدّ الدرج عند الفتح وعند التسليم.
+    shiftDesk: "وردية الخزنة",
+    shiftOpen: "فتح الوردية",
+    shiftIdle: "لا وردية مفتوحة",
+    shiftClose: "إقفال الوردية",
+    shiftHandover: "التسليم إلى",
+    drawerNow: "المفروض يكون في الدرج",
+    shiftSplit: "حركات الوردية دي فقط",
+    cumulativeNotYours: "الرصيد الكامل للخزنة — ليس عهدتك",
+    openingGap: "فارق الفتح",
+    handoverPick: "سلّم الدرج إلى",
+    variancePreview: "الفرق المتوقع قبل الحفظ",
+    cashBalanceCumulative: "الرصيد النقدي التراكمي لكل الخزائن",
+    nonCashBalanceCumulative: "الرصيد غير النقدي التراكمي لكل الخزائن",
   },
 } as const;
 

@@ -19,6 +19,7 @@ import { REPORT_NAVIGATION } from "./reportNavigation";
  */
 const SRC_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const sidebarSource = readFileSync(path.join(SRC_ROOT, "components/layout/Sidebar.tsx"), "utf8");
+const appSource = readFileSync(path.join(SRC_ROOT, "App.tsx"), "utf8");
 
 const DAY_START = "const dayItems";
 const DAY_END = "as NavItem[];";
@@ -130,6 +131,26 @@ const MAINTENANCE_PATHS = [
   "/system/self-audit",
 ];
 
+/**
+ * The permission the route mounted at `to` actually demands. PermissionRoute
+ * falls back to `<module>.view` (moduleForPath), but a route may declare a
+ * narrower duty with `permission=` — /treasury/shift does, because the desk
+ * holds treasury.shift.use and never treasury.view. Reading the truth from
+ * App.tsx is what keeps this scanner honest after that prop existed: the
+ * alternative was demanding `<module>.view` on every link, which is the exact
+ * mistake that made a nav item lead to an Access Denied card.
+ */
+function routePermission(to: string): string | null {
+  const line = appSource
+    .split("\n")
+    .find((l) => l.includes(`<Route path="${to}" element={<PermissionRoute`));
+  if (!line) return null;
+  const explicit = /<PermissionRoute permission="([^"]+)"/.exec(line);
+  if (explicit) return explicit[1];
+  const mod = moduleForPath(to);
+  return mod ? `${mod}.view` : null;
+}
+
 describe("role-tuned sidebar (P4)", () => {
   it("keeps the flat day list to the working screens it was scoped to", () => {
     expect(dayPaths).toEqual([
@@ -141,6 +162,7 @@ describe("role-tuned sidebar (P4)", () => {
       "/medical/quick-consult",
       "/invoices",
       "/payments",
+      "/treasury/shift",
     ]);
     for (const path of MAINTENANCE_PATHS) expect(dayPaths, `${path} is back in the day list`).not.toContain(path);
   });
@@ -190,14 +212,14 @@ describe("role-tuned sidebar (P4)", () => {
   });
 
   it("never offers a link its own route would refuse", () => {
-    // PermissionRoute admits a role on `<module>.view` for the path's module
-    // (moduleForPath is the function it calls), so a day link missing that key
-    // would open an Access Denied card — and because the day list is flat and
-    // always visible, that is the one place a wrong gate is unavoidable.
+    // A day link that is open to someone its route shuts out is unavoidable in
+    // the flat, always-visible list, so the gate must name the permission the
+    // mounted PermissionRoute demands — the module default or an explicit
+    // narrower duty.
     for (const entry of entries(region(sidebarSource, DAY_START, DAY_END))) {
-      const mod = moduleForPath(entry.to);
-      expect(mod, `${entry.to} maps to no module, so its route denies everyone`).not.toBeNull();
-      expect(entry.gate, `${entry.to} is not gated by ${mod}.view`).toContain(`authz.can("${mod}.view")`);
+      const required = routePermission(entry.to);
+      expect(required, `${entry.to} is not mounted behind a PermissionRoute in App.tsx`).not.toBeNull();
+      expect(entry.gate, `${entry.to} is not gated by ${required}`).toContain(`authz.can("${required}")`);
     }
   });
 

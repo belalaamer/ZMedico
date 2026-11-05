@@ -5,6 +5,7 @@ import { Plus, Search, FileText, CreditCard, AlertCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useI18n } from "@/contexts/I18nContext";
@@ -61,6 +62,10 @@ export default function Invoices() {
   const [q, setQ] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  // Voiding an invoice writes status='cancelled' and leaves deleted_at NULL, so
+  // the desk's own filter cannot see the void. The RPC hides them by default;
+  // this switch is the deliberate, page-aware way to bring them back.
+  const [includeCancelled, setIncludeCancelled] = useState(false);
   const [open, setOpen] = useState(false);
   const [payTarget, setPayTarget] = useState<Inv | null>(null);
   const [page, setPage] = useState(0);
@@ -87,6 +92,7 @@ export default function Invoices() {
       p_status: statusFilter === "all" ? null : statusFilter,
       p_limit: PAGE_SIZE,
       p_offset: page * PAGE_SIZE,
+      p_include_cancelled: includeCancelled,
     });
     if (requestId !== loadRequestRef.current) return;
     setLoading(false);
@@ -136,8 +142,11 @@ export default function Invoices() {
     setTotal(rows.length ? Number(rows[0].total_count ?? rows.length) : 0);
   };
 
-  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [branchSelectionReady, currentBranchId, statusFilter, searchTerm, page]);
-  useEffect(() => { setPage(0); }, [branchSelectionReady, currentBranchId, statusFilter]);
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [branchSelectionReady, currentBranchId, statusFilter, includeCancelled, searchTerm, page]);
+  // The page count belongs to the rows the desk was shown, so every filter that
+  // changes that set — cancelled included or not — has to send the desk back to
+  // the first page instead of leaving it on a page number that no longer exists.
+  useEffect(() => { setPage(0); }, [branchSelectionReady, currentBranchId, statusFilter, includeCancelled]);
   useDataSync(["invoices", "payments"], () => { void load(); });
 
   const filtered = items;
@@ -208,6 +217,20 @@ export default function Invoices() {
                 <SelectItem value="cancelled">{t("statusCancelled")}</SelectItem>
               </SelectContent>
             </Select>
+            <div className="hidden sm:block h-6 w-px bg-border" />
+            {/* The RPC hides voided invoices by default; this is the only way the
+                desk can bring them back without leaving the page. */}
+            <label
+              className="flex items-center gap-2 px-1 text-sm text-muted-foreground whitespace-nowrap cursor-pointer"
+              htmlFor="invoices-show-cancelled"
+            >
+              <Switch
+                id="invoices-show-cancelled"
+                checked={includeCancelled}
+                onCheckedChange={setIncludeCancelled}
+              />
+              {lang === "ar" ? "أظهر الملغاة" : "Show cancelled"}
+            </label>
           </div>
           <Can permission="invoices.create">
             <Button className="gradient-primary text-primary-foreground hidden sm:inline-flex" onClick={() => setOpen(true)}>

@@ -16,7 +16,11 @@ export function ReceptionGuide() {
     { permission: "patients.view", path: "/patients", title: ar ? "١. ابحث عن المريض أولًا" : "1. Find the patient first", text: ar ? "ابحث بالاسم أو الهاتف لتجنب إنشاء ملف مكرر. الإضافة تتطلب صلاحية إنشاء مريض." : "Search by name or phone to avoid duplicates. Creating a patient requires create permission." },
     { permission: "appointments.view", path: "/calendar", title: ar ? "٢. راجع الموعد" : "2. Check the appointment", text: ar ? "تأكد من الفرع والخدمة والطبيب والتاريخ قبل تأكيد الحجز." : "Check the branch, service, doctor and date before confirming." },
     { permission: "appointments.view", path: "/queue", title: ar ? "٣. تابع الطابور" : "3. Follow the queue", text: ar ? "راجع حالة الزيارة قبل الاستدعاء أو الإنهاء، ولا تكرر الإجراء أثناء التحميل." : "Check the visit status before calling or finishing. Do not repeat an action while it is loading." },
-    { permission: "treasury.view", path: "/treasury", title: ar ? "٤. راجع التحصيل" : "4. Review collections", text: ar ? "راجع المبلغ وطريقة الدفع والخزينة. لا تكرر الدفع قبل التحقق من نتيجة العملية السابقة." : "Check the amount, payment method and treasury. Verify the previous result before retrying a payment." },
+    // Fix: this step pointed at /treasury behind treasury.view, which the
+    // authorization matrix never grants a receptionist — an instruction leading
+    // to a dead screen. It now points at the till shift desk, which is the cash
+    // duty this person actually performs and which treasury.shift.use opens.
+    { permission: "treasury.shift.use", path: "/treasury/shift", title: ar ? "٤. افتح وردية الخزنة وسلّمها" : "4. Open and hand over the till", text: ar ? "عُدّ الدرج عند فتح الوردية وعند التسليم، وسلّمها لمن يخلفك من نفس الشاشة. لا تكرر الدفع قبل التحقق من نتيجة العملية السابقة." : "Count the drawer when you open the shift and when you hand it over, from this same screen. Verify the previous result before retrying a payment." },
   ].filter(step => authz.can(step.permission));
   if (loading || !steps.length) return null;
   return <Dialog open={open} onOpenChange={setOpen}>

@@ -48,6 +48,7 @@ const OutstandingDebts = lazy(() => import("@/pages/invoices/OutstandingDebts"))
 const Payments = lazy(() => import("@/pages/payments/Payments"));
 const Treasury = lazy(() => import("@/pages/treasury/Treasury"));
 const TreasuryDailyClose = lazy(() => import("@/pages/treasury/DailyClose"));
+const TreasuryShift = lazy(() => import("@/pages/treasury/Shift"));
 const Expenses = lazy(() => import("@/pages/expenses/Expenses"));
 const ExpenseSelfAudit = lazy(() => import("@/pages/expenses/ExpenseSelfAudit"));
 const PhysioCases = lazy(() => import("@/pages/physio/PhysioCases"));
@@ -202,6 +203,7 @@ function AppContent() {
               <Route path="/invoices/:id" element={<PermissionRoute><InvoiceDetail /></PermissionRoute>} />
               <Route path="/payments" element={<PermissionRoute><Payments /></PermissionRoute>} />
               <Route path="/treasury" element={<PermissionRoute><Treasury /></PermissionRoute>} />
+              <Route path="/treasury/shift" element={<PermissionRoute permission="treasury.shift.use"><TreasuryShift /></PermissionRoute>} />
               <Route path="/treasury/daily-close" element={<PermissionRoute><TreasuryDailyClose /></PermissionRoute>} />
               <Route path="/expenses" element={<PermissionRoute><Expenses /></PermissionRoute>} />
               <Route path="/expenses/self-audit" element={<PermissionRoute adminOnly><ExpenseSelfAudit /></PermissionRoute>} />

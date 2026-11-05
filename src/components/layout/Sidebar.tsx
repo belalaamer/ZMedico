@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap, FolderOpen, Briefcase, UserCog, Clock, CalendarDays, DollarSign, Star, Target, Ticket, ListChecks, ChevronDown, Wallet, ScrollText, Percent, Bot, Sun, type LucideIcon } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap, FolderOpen, Briefcase, UserCog, Clock, CalendarDays, DollarSign, Star, Target, Ticket, ListChecks, ChevronDown, Wallet, HandCoins, ScrollText, Percent, Bot, Sun, type LucideIcon } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { subscribeResilient } from "@/lib/realtime";
@@ -142,6 +142,12 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
     authz.can("medical_records.view") && isModuleEnabled("medical") && { to: "/medical/quick-consult", icon: Zap, label: t("quickConsult") },
     authz.can("invoices.view") && { to: "/invoices", icon: FileText, label: t("invoices") },
     authz.can("invoices.view") && { to: "/payments", icon: CreditCard, label: t("payments") },
+    // The till shift belongs in "My day", not in the Finance group: a group
+    // starts collapsed and only opens when one of its routes is already active,
+    // so a receptionist who has never visited /treasury/shift could not find it.
+    // Every role that holds the key (receptionist, manager, accountant, admin)
+    // sees the duty they actually perform.
+    authz.can("treasury.shift.use") && { to: "/treasury/shift", icon: HandCoins, label: t("shiftDesk") },
   ].filter(Boolean) as NavItem[];
 
   const groups: { key: string; label: string; icon: LucideIcon; items: NavItem[]; badge?: number }[] = useMemo(() => [

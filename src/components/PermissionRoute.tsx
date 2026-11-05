@@ -69,13 +69,18 @@ function InvoicesShadowProbeMount({ path }: { path: string }) {
  * Gates a route element based on the user's permission for the module
  * inferred from the current path. Admin always passes.
  */
-export function PermissionRoute({ children, module, adminOnly, systemOwnerOnly }: { children: ReactNode; module?: string; adminOnly?: boolean; systemOwnerOnly?: boolean }) {
+export function PermissionRoute({ children, module, permission, adminOnly, systemOwnerOnly }: { children: ReactNode; module?: string; permission?: string; adminOnly?: boolean; systemOwnerOnly?: boolean }) {
   const { pathname } = useLocation();
   const isPlatformPath = pathname.startsWith("/platform");
   const { authz, loading } = useAuthorization();
   const { t } = useI18n();
   const { currentBranchId, branchSelectionReady, modulesLoading, isModuleEnabled } = useBranch();
   const mod = module ?? moduleForPath(pathname);
+  // A route may need a narrower duty than `<module>.view`. /treasury/shift is
+  // the case: moduleForPath maps it to "treasury", but the receptionist holds
+  // only treasury.shift.use — the default gate would deny exactly the person
+  // the SQL grants the till to.
+  const requiredPermission = permission ?? (mod ? `${mod}.view` : null);
   const entitlement = moduleKeyForPath(pathname);
   const entitlementBlocked = shouldBlockRouteForEntitlement(entitlement, currentBranchId, isModuleEnabled);
   // Shadow-probe telemetry for the Settings vertical slice. Mounted
@@ -157,7 +162,7 @@ export function PermissionRoute({ children, module, adminOnly, systemOwnerOnly }
         {children}
       </>
     );
-  } else if (mod && authz.can(`${mod}.view`)) {
+  } else if (requiredPermission && authz.can(requiredPermission)) {
     // Deny by default: unmapped protected routes never fall through.
     return (
       <>

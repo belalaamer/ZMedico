@@ -110,7 +110,7 @@ export default function PatientMedicalTab({ patientId }: { patientId: string }) 
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold">{t("visitsTimeline")}</h3>
           <Can permission="medical_records.create">
-            <Button asChild size="sm"><Link to="/medical/quick-consult"><Plus className="me-2 size-3.5"/>{t("addRecord")}</Link></Button>
+            <Button asChild size="sm"><Link to={`/medical/quick-consult?patient=${patientId}`}><Plus className="me-2 size-3.5"/>{t("addRecord")}</Link></Button>
           </Can>
         </div>
         {records.length === 0 ? <div className="text-sm text-muted-foreground">{t("noVisits")}</div> : (

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Trash2, Plus, Printer, Upload, FileText, Save } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -19,6 +19,8 @@ import { enumLabel } from "@/lib/enumLabels";
 import { documentTypeLabel, enumCopy, GENDER_KEY, visitTypeLabel } from "@/lib/enumKeys";
 import type { DictKey } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
+import { notifyDataChange } from "@/lib/dataSync";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatDate, formatMoney } from "@/lib/format";
@@ -977,23 +979,32 @@ function DocumentsTab({ record, patient, docs, reload, userId }: any) {
 /* ============================================================ Invoice Preview Tab */
 function InvoicePreviewTab({ record, patient, procs, nav, userId }: any) {
   const { t, lang } = useI18n();
+  const { authz } = useAuthorization("MedicalRecordEditor");
   const items = procs.filter((rp: any) => rp.procedures?.default_price != null);
   const total = items.reduce((s: number, rp: any) => s + (Number(rp.procedures.default_price) * Number(rp.quantity)), 0);
   const [existing, setExisting] = useState<any[]>([]);
+  const [justCreatedId, setJustCreatedId] = useState<string | null>(null);
+  // The doctor's branch access lets the invoice insert through, but `/invoices/:id`
+  // is a money screen their role cannot open. Jumping there after a successful
+  // create is what threw the visit into an Access Denied card, so the door is only
+  // offered to the roles that can walk through it.
+  const canOpenInvoice = authz.can("invoices.view");
+
+  const loadInvoices = useCallback(async () => {
+    if (!patient?.id) return;
+    const { data } = await supabase
+      .from("invoices")
+      .select("id, invoice_number, invoice_date, status, total, paid_amount")
+      .eq("patient_id", patient.id)
+      .is("deleted_at", null)
+      .neq("status", "cancelled")
+      .order("invoice_date", { ascending: false });
+    setExisting(data ?? []);
+  }, [patient?.id]);
 
   useEffect(() => {
-    if (!patient?.id) return;
-    (async () => {
-      const { data } = await supabase
-        .from("invoices")
-        .select("id, invoice_number, invoice_date, status, total, paid_amount")
-        .eq("patient_id", patient.id)
-        .is("deleted_at", null)
-        .neq("status", "cancelled")
-        .order("invoice_date", { ascending: false });
-      setExisting(data ?? []);
-    })();
-  }, [patient?.id]);
+    void loadInvoices();
+  }, [loadInvoices]);
 
   const create = async () => {
     if (items.length === 0) return toast.error(t("noResults"));
@@ -1017,12 +1028,39 @@ function InvoicePreviewTab({ record, patient, procs, nav, userId }: any) {
     }));
     const { error: e2 } = await supabase.from("invoice_items").insert(rows as any);
     if (e2) return toast.error(e2.message);
+    await loadInvoices();
+    setJustCreatedId(inv.id);
+    // The desk's own invoice list refreshes on this event, which is what makes the
+    // "handed to reception" line below true rather than a hope.
+    notifyDataChange("invoices");
     toast.success(t("save"));
-    nav(`/invoices/${inv.id}`);
   };
+
+  const justCreated = justCreatedId ? existing.find((inv: any) => inv.id === justCreatedId) : null;
 
   return (
     <Card className="p-6 shadow-card space-y-4">
+      {justCreated && (
+        <div className="rounded-lg border border-primary/20 bg-primary/5 p-3" role="status">
+          <div className="text-sm font-semibold tabular-nums">
+            {lang === "ar" ? "أنشأت مسودة الفاتورة" : "Draft invoice created"}
+            {justCreated.invoice_number ? ` · ${justCreated.invoice_number}` : ""}
+            {` · ${formatMoney(justCreated.total ?? 0, lang)}`}
+          </div>
+          <div className="mt-1 text-xs text-muted-foreground">
+            {canOpenInvoice ? (
+              <Link to={`/invoices/${justCreated.id}`} className="underline">
+                {lang === "ar" ? "فتح الفاتورة" : "Open the invoice"}
+              </Link>
+            ) : (
+              lang === "ar"
+                ? "سلّمتها لمكتب الاستقبال لتحصيلها — لا تحتاج لفتح شاشة الفواتير."
+                : "Handed to the reception desk to collect — you do not need the invoices screen."
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Existing invoices for this patient */}
       <div className="space-y-2">
         <h3 className="font-semibold">{lang === "ar" ? "فواتير المريض" : "Patient Invoices"}</h3>
@@ -1042,7 +1080,11 @@ function InvoicePreviewTab({ record, patient, procs, nav, userId }: any) {
               </thead>
               <tbody>
                 {existing.map((inv) => (
-                  <tr key={inv.id} className="border-t border-border hover:bg-muted/30 cursor-pointer" onClick={() => nav(`/invoices/${inv.id}`)}>
+                  <tr
+                    key={inv.id}
+                    className={`border-t border-border${canOpenInvoice ? " hover:bg-muted/30 cursor-pointer" : ""}`}
+                    onClick={canOpenInvoice ? () => nav(`/invoices/${inv.id}`) : undefined}
+                  >
                     <td className="p-2 font-medium">{inv.invoice_number}</td>
                     <td className="p-2">{formatDate(inv.invoice_date, lang)}</td>
                     <td className="p-2"><Badge variant="outline">{enumLabel("invoice_status", inv.status, lang)}</Badge></td>

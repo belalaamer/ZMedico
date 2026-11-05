@@ -181,6 +181,29 @@ describe("fetchPatientOption", () => {
     const refused = fakeClient({ data: null, error: { message: "permission denied for table patients" } });
     expect(await fetchPatientOption(refused.client, { id: "p-1", lang: "en" })).toBeNull();
   });
+
+  it("resolves a handed-over id inside the clinic that is writing the record", async () => {
+    // QuickConsult saves with branch_id = currentBranchId, so an id arriving in a
+    // URL has to be read back through the same branch or it files a patient of one
+    // clinic inside another.
+    const { client, calls } = fakeClient({ data: ROW, error: null });
+    await fetchPatientOption(client, { id: "p-1", lang: "en", branchId: "branch-7" });
+    expect(calls).toContain("eq(branch_id|branch-7)");
+    expect(calls).toContain("eq(id|p-1)");
+  });
+
+  it("leaves a row the clinic already holds unfiltered", async () => {
+    const { client, calls } = fakeClient({ data: ROW, error: null });
+    await fetchPatientOption(client, { id: "p-1", lang: "en", branchId: null });
+    expect(calls.some((call) => call.startsWith("eq(branch_id"))).toBe(false);
+  });
+
+  it("names nobody when the id belongs to another branch", async () => {
+    // With the filter applied the row simply is not there, and the caller is left
+    // without a pre-filled patient rather than a cross-branch one.
+    const { client } = fakeClient({ data: null, error: null });
+    expect(await fetchPatientOption(client, { id: "p-1", lang: "en", branchId: "branch-7" })).toBeNull();
+  });
 });
 
 describe("pickedPatientLabel", () => {

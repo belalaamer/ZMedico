@@ -122,18 +122,25 @@ export function pickedPatientLabel(
  * A search page is a page, so the row a form is already holding -- picked from a
  * URL, or stored on an existing invoice -- is usually not on it. This is how that
  * row gets its label back without loading the clinic to find one person.
+ *
+ * `branchId` narrows the read to the clinic the form writes into. A caller that
+ * takes an id from a URL cannot trust it: naming a patient of another branch here
+ * is what hands the desk a form that saves the wrong patient's row under this
+ * branch. Without it, the id is taken as given, as it is for a row already stored
+ * on an invoice the clinic is holding.
  */
 export async function fetchPatientOption(
   client: SupabaseClient,
-  input: { id: string; lang: "ar" | "en" },
+  input: { id: string; lang: "ar" | "en"; branchId?: string | null },
 ): Promise<PatientSearchHit | null> {
   if (!input.id) return null;
-  const { data, error } = await client
+  let query = client
     .from("patients")
     .select(PATIENT_SEARCH_SELECT)
     .is("deleted_at", null)
-    .eq("id", input.id)
-    .maybeSingle();
+    .eq("id", input.id);
+  if (input.branchId) query = query.eq("branch_id", input.branchId);
+  const { data, error } = await query.maybeSingle();
   if (error || !data) return null;
   const row = data as PatientSearchRow;
   return { id: row.id, label: patientDisplayName(row, input.lang), phone: row.phone ?? null };

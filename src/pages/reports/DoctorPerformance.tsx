@@ -107,7 +107,10 @@ export default function DoctorPerformance() {
       // Commissions (revenue & earned)
       let cq = (supabase as any).from("doctor_commissions")
         .select("doctor_id, base_amount, commission_amount")
-        .gte("created_at", start).lte("created_at", end + "T23:59:59");
+        .gte("created_at", start).lte("created_at", end + "T23:59:59")
+        // Voiding an invoice flips its commission rows to cancelled but keeps
+        // them, so a cancelled visit stayed inside this doctor's revenue.
+        .neq("status", "cancelled");
       cq = cq.eq("branch_id", currentBranchId);
       const { data: comms } = await cq;
       const commMap = new Map<string, { revenue: number; commissions: number }>();

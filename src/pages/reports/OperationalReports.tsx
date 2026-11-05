@@ -44,6 +44,10 @@ function ApptsTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
     let q = supabase.from("appointments")
       .select("id, scheduled_at, status, doctor_id, patients(first_name_en, last_name_en, first_name_ar, last_name_ar, name_language), profiles!appointments_doctor_id_fkey(full_name,full_name_en,full_name_ar)")
       .is("deleted_at", null)
+      // Cancellation is a status, not a delete, so a dead visit kept its slot in
+      // this table, in the busiest-hour chart and in the export. The queue audit
+      // and the calendar keep the cancelled rows as the supervisory trace.
+      .neq("status", "cancelled")
       .gte("scheduled_at", start).lte("scheduled_at", end + "T23:59:59");
     if (branchId) q = q.eq("branch_id", branchId);
     q.then(({ data }) => setRows(data ?? []));
@@ -131,7 +135,7 @@ function DoctorTab({ start, end, setStart, setEnd, branchId, tenantId, lang, t }
         if (id) counts.set(id, { name, count: 0, revenue: 0 });
       });
 
-      let mq = supabase.from("medical_records").select("doctor_id").gte("visit_date", start).lte("visit_date", end);
+      let mq = supabase.from("medical_records").select("doctor_id").is("deleted_at", null).gte("visit_date", start).lte("visit_date", end);
       if (branchId) mq = mq.eq("branch_id", branchId);
       const { data: recs } = await mq;
       (recs ?? []).forEach((r: any) => {
@@ -141,7 +145,7 @@ function DoctorTab({ start, end, setStart, setEnd, branchId, tenantId, lang, t }
         cur.count += 1;
       });
       // revenue from invoices linked by created_by ≈ doctor (approx)
-      let iq = supabase.from("invoices").select("created_by, total").is("deleted_at", null).gte("invoice_date", start).lte("invoice_date", end);
+      let iq = supabase.from("invoices").select("created_by, total").is("deleted_at", null).neq("status", "cancelled").gte("invoice_date", start).lte("invoice_date", end);
       if (branchId) iq = iq.eq("branch_id", branchId);
       const { data: invs } = await iq;
       (invs ?? []).forEach((i: any) => {

@@ -28,7 +28,7 @@ type Row = {
   doctor_name?: string;
 };
 
-const STATUSES = ["all", "pending", "partial", "earned", "paid"] as const;
+const STATUSES = ["all", "pending", "partial", "earned", "paid", "cancelled"] as const;
 
 export default function PendingCommissions() {
   const { t, lang } = useI18n();
@@ -47,7 +47,10 @@ export default function PendingCommissions() {
       .order("updated_at", { ascending: false })
       .limit(1000);
     if (currentBranchId) query = query.eq("branch_id", currentBranchId);
-    if (status !== "all") query = query.eq("status", status);
+    // "All" is the payroll working view; a voided invoice cancels its commission
+    // row and used to leave it counted in the totals below the table.
+    if (status === "all") query = query.neq("status", "cancelled");
+    else query = query.eq("status", status);
     const { data } = await query;
     const list: Row[] = data ?? [];
 
@@ -59,7 +62,10 @@ export default function PendingCommissions() {
         .from("invoices")
         .select("id, invoice_number, invoice_date, total, status, medical_record_id")
         .in("medical_record_id", mrIds)
-        .is("deleted_at", null);
+        .is("deleted_at", null)
+        // A re-issued visit has a voided and a live invoice on the same record;
+        // without this the row label could point at the dead one.
+        .neq("status", "cancelled");
       (invs ?? []).forEach((inv: any) => { invMap[inv.medical_record_id] = inv; });
     }
     list.forEach((r) => { r.invoice = r.medical_record_id ? invMap[r.medical_record_id] ?? null : null; });

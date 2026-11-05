@@ -86,6 +86,9 @@ function RevenueTab({ start, end, setStart, setEnd, branchId, lang, t }: any) {
     let q = supabase.from("invoices")
       .select("id, invoice_number, invoice_date, total, paid_amount, status, patients(first_name_en, last_name_en, first_name_ar, last_name_ar, name_language)")
       .is("deleted_at", null)
+      // A void leaves status='cancelled' with deleted_at still null, so the
+      // deleted_at filter alone keeps cancelled money inside these totals.
+      .neq("status", "cancelled")
       .gte("invoice_date", start).lte("invoice_date", end).order("invoice_date", { ascending: false });
     if (branchId) q = q.eq("branch_id", branchId);
     q.then(({ data }) => setRows(data ?? []));

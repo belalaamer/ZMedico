@@ -80,6 +80,7 @@ export default function AppointmentDetailPage() {
           .from("appointments")
           .select("id,patient_id,doctor_id,branch_id,room,scheduled_at,status,procedure,service_id,priority,checked_in_at,started_at,is_walk_in,duration_minutes,booking_request_status,booking_request_expires_at,booking_rejection_reason,services(name_en,name_ar),patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code,phone),branches(name_en,name_ar)")
           .eq("id", appointmentId)
+          .is("deleted_at", null)
           .maybeSingle(),
         supabase
           .from("audit_logs")
@@ -127,6 +128,11 @@ export default function AppointmentDetailPage() {
     const b = appt?.branches; if (!b) return "—";
     return lang === "ar" ? (b.name_ar ?? b.name_en) : b.name_en;
   }, [appt, lang]);
+
+  // Cancelling from the queue flips `status` only and leaves the hold `pending`,
+  // and confirm_public_booking checks the hold but not the status — so a dead
+  // appointment could be confirmed back to life from this screen.
+  const bookingHoldPending = appt?.booking_request_status === "pending" && appt?.status !== "cancelled";
 
   const confirmBookingRequest = async () => {
     if (!appt || bookingActionBusy) return;
@@ -293,9 +299,9 @@ export default function AppointmentDetailPage() {
         <Card className="p-4 space-y-3 lg:col-span-1">
           <div className="text-xs text-muted-foreground">{t("status")}</div>
           <Badge variant="outline" className="capitalize">{STATUS_KEYS[String(appt.status)] ? t(STATUS_KEYS[String(appt.status)]) : String(appt.status).replace(/_/g, " ")}</Badge>
-          {appt.booking_request_status === "pending" && <Badge variant="secondary" className="ms-1">{lang === "ar" ? "طلب يحتاج تأكيدًا" : "Awaiting confirmation"}</Badge>}
+          {bookingHoldPending && <Badge variant="secondary" className="ms-1">{lang === "ar" ? "طلب يحتاج تأكيدًا" : "Awaiting confirmation"}</Badge>}
           {appt.booking_request_status === "rejected" && <Badge variant="destructive" className="ms-1">{lang === "ar" ? "مرفوض" : "Rejected"}</Badge>}
-          {appt.booking_request_status === "pending" ? (
+          {bookingHoldPending ? (
             <div className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
               <div className="text-xs text-muted-foreground">{appt.booking_request_expires_at ? (lang === "ar" ? `تنتهي المهلة: ${fmt(appt.booking_request_expires_at, lang)}` : `Hold expires: ${fmt(appt.booking_request_expires_at, lang)}`) : (lang === "ar" ? "في انتظار المراجعة" : "Awaiting review")}</div>
               <Can permission="appointments.edit">

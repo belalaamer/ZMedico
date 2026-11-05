@@ -93,6 +93,10 @@ export default function ConsultationDashboard() {
       supabase.from("invoices")
         .select("id, invoice_number, status, total, paid_amount")
         .eq("medical_record_id", r.id).is("deleted_at", null)
+        // Without this a cancelled visit invoice came back as the visit's live
+        // invoice: labelled "Draft", linked in the UI, and reused as the target
+        // for newly added procedures.
+        .neq("status", "cancelled")
         .order("created_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
     setPatient(p);

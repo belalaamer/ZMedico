@@ -56,7 +56,11 @@ export default function DoctorCommissions() {
         .limit(2000);
       q = q.eq("branch_id", currentBranchId);
       if (doctorId !== "all") q = q.eq("doctor_id", doctorId);
-      if (status !== "all") q = q.eq("status", status);
+      // "All" is the working view. A void flips its commission rows to cancelled
+      // and leaves them, so cancelled money kept adding into the three totals.
+      // The archive stays one explicit choice away.
+      if (status === "all") q = q.neq("status", "cancelled");
+      else q = q.eq("status", status);
       const { data } = await q;
       if (active) setRows(data ?? []);
     })();
@@ -103,6 +107,9 @@ export default function DoctorCommissions() {
                 <SelectItem value="partial">{lang === "ar" ? "جزئي" : "Partial"}</SelectItem>
                 <SelectItem value="earned">{lang === "ar" ? "مكتسب" : "Earned"}</SelectItem>
                 <SelectItem value="paid">{lang === "ar" ? "مدفوع" : "Paid"}</SelectItem>
+                {/* "All" is the working view and hides voided rows, so this option
+                    is the only way back to a cancelled visit's commission. */}
+                <SelectItem value="cancelled">{lang === "ar" ? "ملغاة" : "Cancelled"}</SelectItem>
               </SelectContent>
             </Select>
           </div>

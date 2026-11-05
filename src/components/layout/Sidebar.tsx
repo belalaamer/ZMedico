@@ -78,6 +78,10 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
         .eq("booking_request_status", "pending")
         .eq("branch_id", currentBranchId)
         .is("deleted_at", null)
+        // The badge counts approvals the desk still owes. A cancelled booking's
+        // hold is not one of them — and its row is out of PendingBookings too, so
+        // the number and the list have to agree.
+        .neq("status", "cancelled")
         .then(({ count }) => setPendingBookingsCount(count ?? 0));
     };
     refresh();

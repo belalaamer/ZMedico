@@ -91,6 +91,9 @@ export async function searchInvoices(
     .from("invoices")
     .select("id,invoice_number,status,total,paid_amount,patient_id,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code)")
     .is("deleted_at", null)
+    // A void keeps the row and only flips status, so cancelled invoices used to
+    // surface in the header search for every role.
+    .neq("status", "cancelled")
     .ilike("invoice_number", `%${eq}%`)
     .limit(LIMIT);
   if (branchId) qByNumber = qByNumber.eq("branch_id", branchId);
@@ -101,6 +104,7 @@ export async function searchInvoices(
       .from("invoices")
       .select("id,invoice_number,status,total,paid_amount,patient_id,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code)")
       .is("deleted_at", null)
+      .neq("status", "cancelled")
       .in("patient_id", patientIds)
       .order("invoice_date", { ascending: false })
       .limit(LIMIT);
@@ -143,6 +147,9 @@ export async function searchAppointments(
     .from("appointments")
     .select("id,scheduled_at,status,procedure,patient_id,patients(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code)")
     .is("deleted_at", null)
+    // A cancelled visit keeps its row and its future slot, so searching a
+    // patient offered the desk a jump into a dead appointment.
+    .neq("status", "cancelled")
     .in("patient_id", patientIds)
     .gte("scheduled_at", from.toISOString())
     .lte("scheduled_at", to.toISOString())

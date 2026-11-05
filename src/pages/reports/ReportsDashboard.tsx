@@ -32,7 +32,7 @@ export default function ReportsDashboard() {
       ptq = ptq.eq("branch_id", currentBranchId);
       const { count: patients } = await ptq;
 
-      let aq = supabase.from("appointments").select("id", { count: "exact", head: true }).is("deleted_at", null).gte("scheduled_at", monthStart);
+      let aq = supabase.from("appointments").select("id", { count: "exact", head: true }).is("deleted_at", null).neq("status", "cancelled").gte("scheduled_at", monthStart);
       aq = aq.eq("branch_id", currentBranchId);
       const { count: appts } = await aq;
 

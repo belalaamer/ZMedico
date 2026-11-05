@@ -444,7 +444,11 @@ export default function QueuePage() {
 
   // ---- Today's analytics (computed from already-loaded rows; same branch + day window)
   const analytics = useMemo(() => {
-    const total = rows.length;
+    // "Total today" sits next to the waiting/in-session/completed cards and the
+    // desk reads it as the day's workload. The rows query keeps cancelled rows on
+    // purpose — they are the undo surface at :668 and the explicit status filter
+    // option — but a cancelled booking is not work, so it is out of this count.
+    const total = rows.filter((r) => r.status !== "cancelled").length;
     const waiting = rows.filter((r) => r.status === "scheduled" || r.status === "confirmed").length;
     const inSession = rows.filter((r) => r.status === "in_progress").length;
     const completed = rows.filter((r) => r.status === "completed").length;

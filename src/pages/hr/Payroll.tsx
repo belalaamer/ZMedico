@@ -233,6 +233,10 @@ export default function Payroll() {
     setDetailRows([]);
     // If payroll is paid/has attached commissions, show those.
     // Otherwise show currently unattached earned/partial commissions for this doctor.
+    // Attached rows can never be 'cancelled': void_invoice_financials() flips only
+    // commissions whose payroll_id IS NULL, so the paid-off list needs no filter.
+    const hasAttached = await (supabase as any)
+      .from("doctor_commissions").select("id", { count: "exact", head: true }).eq("payroll_id", p.id);
     let q = (supabase as any)
       .from("doctor_commissions")
       .select("id, base_amount, collected_amount, commission_amount, commission_percent, status, created_at, updated_at, paid_at, payroll_id, procedures(name_en,name_ar), patients(first_name_en,last_name_en,first_name_ar,last_name_ar)")
@@ -242,8 +246,6 @@ export default function Payroll() {
     // This query joins patient names, so an unscoped read exposed patients
     // belonging to other branches/tenants in the commission breakdown.
     if (currentBranchId) q = q.eq("branch_id", currentBranchId);
-    const hasAttached = await (supabase as any)
-      .from("doctor_commissions").select("id", { count: "exact", head: true }).eq("payroll_id", p.id);
     if ((hasAttached?.count ?? 0) > 0) {
       q = q.eq("payroll_id", p.id);
     } else {

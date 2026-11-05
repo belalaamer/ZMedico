@@ -20,6 +20,7 @@ const CORE_ROUTES = [
   { path: "/queue", area: "queue" },
   { path: "/invoices", area: "invoices" },
   { path: "/treasury", area: "treasury" },
+  { path: "/treasury/shift", area: "treasury shift desk" },
   { path: "/physio", area: "physio" },
   { path: "/inventory/products", area: "inventory products" },
   { path: "/inventory/purchase-orders", area: "inventory purchase orders" },
@@ -122,4 +123,21 @@ test.describe("ZMedico authenticated core routes @admin", () => {
       await openCoreRoute(page, path);
     });
   }
+
+  // The harness above cannot tell a resolved label from a missing dictionary
+  // key: the raw key `shiftDesk` is nine characters, so it clears the blank
+  // check while the desk prints its own variable name to the cashier.
+  test("shift desk heading is a translated word, not the i18n key", async ({
+    page,
+  }) => {
+    await page.goto("/treasury/shift", {
+      waitUntil: "domcontentloaded",
+      timeout: 45_000,
+    });
+    const heading = page.locator("main h1").first();
+    await expect(heading, "No heading rendered on /treasury/shift").toBeVisible(
+      { timeout: 30_000 },
+    );
+    await expect(heading).toHaveText(/^(Till shift|وردية الخزنة)$/);
+  });
 });

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useDataSync } from "@/lib/dataSync";
-import { Banknote, ArrowDownToLine, ArrowUpFromLine, TrendingUp, ArrowLeftRight, Lock } from "lucide-react";
+import { Banknote, ArrowDownToLine, ArrowUpFromLine, TrendingUp, ArrowLeftRight, Lock, HandCoins } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -157,6 +157,13 @@ export default function Treasury() {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("treasury")}</h1>
         </div>
         <div className="flex gap-2">
+          <Can permission="treasury.shift.use">
+            <Button variant="outline" asChild>
+              <Link to="/treasury/shift">
+                <HandCoins className="me-2 size-4" />{t("shiftDesk")}
+              </Link>
+            </Button>
+          </Can>
           <Button variant="outline" asChild>
             <Link to="/treasury/daily-close">
               <Lock className="me-2 size-4" />{t("dailyClose")}
@@ -225,8 +232,11 @@ export default function Treasury() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-      { label: t("cashBalance"), money: cashByCurrency, icon: Banknote, tone: "from-primary to-primary-glow" },
-      { label: t("nonCashBalance"), money: nonCashByCurrency, icon: Banknote, tone: "from-info to-info" },
+      // These two cards add every till's whole history together, so they are
+      // titled as history: the number a cashier is accountable for right now is
+      // on the shift desk, not here.
+      { label: t("cashBalanceCumulative"), money: cashByCurrency, icon: Banknote, tone: "from-primary to-primary-glow" },
+      { label: t("nonCashBalanceCumulative"), money: nonCashByCurrency, icon: Banknote, tone: "from-info to-info" },
           { label: t("todayIncome"), money: today.income, icon: ArrowDownToLine, tone: "from-success to-success" },
           { label: t("todayExpenses"), money: today.expense, icon: ArrowUpFromLine, tone: "from-destructive to-destructive" },
         ].map((m) => (

@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Banknote, ArrowDownToLine, ArrowUpFromLine, Wallet, Lock, ArrowLeft } from "lucide-react";
+import { Banknote, ArrowDownToLine, ArrowUpFromLine, Wallet, Lock, ArrowLeft, Info } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -36,7 +36,18 @@ export default function DailyClose() {
   const canClose = authz.hasRoleAny("admin", "manager");
 
   const today = localDateOnly(new Date());
-  const [businessDate, setBusinessDate] = useState<string>(today);
+  // Closing a date locks every payment dated that date, so defaulting to today
+  // meant a manager closing at 18:00 blocked the evening patients — the reason
+  // this screen had produced zero close rows in Production. The day that is
+  // finished is the day that gets closed.
+  const [businessDate, setBusinessDate] = useState<string>(() => {
+    // setDate, not `Date.now() - 86400000`: a DST day is 23 or 25 hours long, and
+    // subtracting milliseconds from the instant can land back on the same
+    // calendar date. This walks the local calendar by exactly one day.
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    return localDateOnly(yesterday);
+  });
   const [treasuries, setTreasuries] = useState<any[]>([]);
   const [treasuryId, setTreasuryId] = useState<string>("");
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -205,6 +216,14 @@ export default function DailyClose() {
         <div className="space-y-2">
           <Label>{lang === "ar" ? "تاريخ العمل" : "Business date"}</Label>
           <Input type="date" value={businessDate} max={today} onChange={(e) => setBusinessDate(e.target.value)} />
+          <p className="text-[11px] leading-snug text-muted-foreground flex items-start gap-1.5">
+            <Info className="size-3 mt-0.5 shrink-0" />
+            <span>
+              {lang === "ar"
+                ? "اقفل اليوم اللي خلص — تقفيل النهاردة بيمنع مدفوعات النهاردة."
+                : "Close the day that has ended — closing today blocks today's payments."}
+            </span>
+          </p>
         </div>
         <div className="space-y-2 flex flex-col justify-end">
           {existing ? (
@@ -292,7 +311,7 @@ export default function DailyClose() {
         <div className="flex items-center justify-between">
           <div>
             <div className="text-sm font-semibold">
-              {lang === "ar" ? "إجمالي غير نقدي (لليوم)" : "Non-cash total (today)"}
+              {lang === "ar" ? "إجمالي غير نقدي (لليوم المختار)" : "Non-cash total (selected day)"}
             </div>
             <div className="text-[11px] text-muted-foreground">
               {lang === "ar"

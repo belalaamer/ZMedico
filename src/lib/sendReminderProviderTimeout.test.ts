@@ -54,10 +54,14 @@ const SETTINGS: Row = {
 const PATIENT: Row = { phone: "+201000000000", email: null, whatsapp_opt_in: false };
 
 // Same contract as `AbortSignal.timeout(ms)`: an already-aborted-able signal whose
-// reason is a `TimeoutError` DOMException once the deadline passes.
-function timeoutStandIn(): { timeout: (ms: number) => AbortSignal } {
+// reason is a `TimeoutError` DOMException once the deadline passes. Every value it
+// is armed with is recorded: the claim under test is "the tick hands the runtime the
+// deadline the environment configured", which is about that number, not about how
+// fast the scheduler reaches it.
+function timeoutStandIn(armed: number[]): { timeout: (ms: number) => AbortSignal } {
   return {
     timeout: (ms: number) => {
+      armed.push(ms);
       const controller = new AbortController();
       const timer = setTimeout(() => {
         controller.abort(new DOMException("The operation was aborted due to timeout", "TimeoutError"));
@@ -91,13 +95,14 @@ type TickResult = {
   status: number;
   outcome: Record<string, unknown>;
   writes: Write[];
-  providerCalls: { url: string; init: RequestInit; startedAt: number }[];
+  providerCalls: { url: string; init: RequestInit; deadlineMs: number | undefined }[];
 };
 
 async function runTick(input: TickInput): Promise<TickResult> {
   const reminders = input.reminders ?? [REMINDER];
   const writes: Write[] = [];
   const providerCalls: TickResult["providerCalls"] = [];
+  const armed: number[] = [];
 
   const client = {
     from(table: string) {
@@ -157,9 +162,9 @@ async function runTick(input: TickInput): Promise<TickResult> {
       throw new Error("no provider stub was configured for this tick");
     });
   vi.stubGlobal("fetch", async (url: string | URL, init?: RequestInit) => {
-    const call = { url: String(url), init: init ?? {}, startedAt: Date.now() };
-    providerCalls.push(call);
-    return provider(call.url, call.init);
+    // The deadline is armed by the request builder, one statement before fetch runs.
+    providerCalls.push({ url: String(url), init: init ?? {}, deadlineMs: armed[armed.length - 1] });
+    return provider(String(url), init ?? {});
   });
 
   new Function("Deno", "createClient", "corsPreflight", "jsonResponse", "AbortSignal", compiled)(
@@ -167,7 +172,7 @@ async function runTick(input: TickInput): Promise<TickResult> {
     () => client,
     () => new Response("preflight"),
     jsonResponse,
-    timeoutStandIn(),
+    timeoutStandIn(armed),
   );
 
   const response = await handler(
@@ -211,7 +216,10 @@ it("applies the configured provider deadline to the request it sends", async () 
 
   const call = tick.providerCalls[0];
   expect(call?.init.signal).toBeInstanceOf(AbortSignal);
-  expect(Date.now() - (call?.startedAt ?? 0)).toBeGreaterThanOrEqual(40);
+  // The number handed to the runtime, not the wall clock: a 40ms timer measured
+  // across two Date.now() calls came out 38ms on a CI runner, which is scheduler
+  // noise around a wiring fact this test can read directly.
+  expect(tick.providerCalls.map((entry) => entry.deadlineMs)).toEqual([40]);
   expect(tick.outcome).toMatchObject({ deferred: 1, failed: 0 });
 });
 

@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap, FolderOpen, Briefcase, UserCog, Clock, CalendarDays, DollarSign, Star, Target, Ticket, ListChecks, ChevronDown, Wallet, ScrollText, Percent, Bot, type LucideIcon } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Bell, Boxes, Settings, Stethoscope, Building2, FileText, CreditCard, Receipt, Banknote, Package, FolderTree, Truck, BarChart3, ClipboardList, AlertTriangle, HeartPulse, Pill, Activity, Zap, FolderOpen, Briefcase, UserCog, Clock, CalendarDays, DollarSign, Star, Target, Ticket, ListChecks, ChevronDown, Wallet, ScrollText, Percent, Bot, Sun, type LucideIcon } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { subscribeResilient } from "@/lib/realtime";
@@ -117,37 +117,43 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
     }));
   }, [authz, t]);
 
+  // Who maintains this clinic, as opposed to who works in it. Drawn with
+  // permission keys, not role names, the way every other role-differentiated
+  // surface in this app is (Dashboard.tsx derives its widgets the same way and
+  // PermissionRoute gates every route below) — so a matrix an owner edits in
+  // Settings → Roles moves the nav with it. canAny() short-circuits for an
+  // admin, so the owner loses nothing.
+  const isMaintainer = authz.canAny("settings.view", "settings.catalog.update");
+
+  // The shift's own work list: flat, always open, no group to expand. Each line
+  // keeps the permission its route is gated by, so a role that has no claim on
+  // the screen simply never sees it — a receptionist has no
+  // medical_records.view, a doctor no invoices.view. Nothing is filtered out
+  // here that the role could not already open.
+  const dayItems: NavItem[] = [
+    authz.can("appointments.view") && { to: "/calendar", icon: Calendar, label: t("calendar") },
+    // RBOOK-03: the actionable follow-up list for booking_request_status
+    // = 'pending' appointments -- see PendingBookings.tsx for why this
+    // was missing (only a calendar-day highlight existed before).
+    authz.can("appointments.view") && { to: "/appointments/pending", icon: ClipboardList, label: lang === "ar" ? "طلبات الحجز المعلقة" : "Pending Bookings", badge: pendingBookingsCount },
+    authz.can("appointments.view") && { to: "/queue", icon: ListChecks, label: t("queue") },
+    authz.can("patients.view") && { to: "/patients", icon: Users, label: t("patients") },
+    authz.can("leads.view") && isModuleEnabled("marketing") && { to: "/leads", icon: Target, label: lang === "ar" ? "العملاء المحتملون" : "Leads" },
+    authz.can("medical_records.view") && isModuleEnabled("medical") && { to: "/medical/quick-consult", icon: Zap, label: t("quickConsult") },
+    authz.can("invoices.view") && { to: "/invoices", icon: FileText, label: t("invoices") },
+    authz.can("invoices.view") && { to: "/payments", icon: CreditCard, label: t("payments") },
+  ].filter(Boolean) as NavItem[];
+
   const groups: { key: string; label: string; icon: LucideIcon; items: NavItem[]; badge?: number }[] = useMemo(() => [
     {
-      key: "clinic_operations",
-      label: lang === "ar" ? "تشغيل العيادة" : "Clinic Operations",
+      key: "care",
+      label: lang === "ar" ? "الرعاية والمتابعات" : "Care & Follow-ups",
       icon: Stethoscope,
       items: [
-        authz.can("appointments.view") && { to: "/calendar", icon: Calendar, label: t("calendar") },
-        // RBOOK-03: the actionable follow-up list for booking_request_status
-        // = 'pending' appointments -- see PendingBookings.tsx for why this
-        // was missing (only a calendar-day highlight existed before).
-        authz.can("appointments.view") && { to: "/appointments/pending", icon: ClipboardList, label: lang === "ar" ? "طلبات الحجز المعلقة" : "Pending Bookings", badge: pendingBookingsCount },
-        authz.can("leads.view") && isModuleEnabled("marketing") && { to: "/leads", icon: Target, label: lang === "ar" ? "العملاء المحتملون" : "Leads" },
-        authz.can("appointments.view") && { to: "/queue", icon: ListChecks, label: t("queue") },
-        authz.can("appointments.view") && { to: "/queue/audit", icon: ScrollText, label: lang === "ar" ? "تدقيق الطابور" : "Queue Audit" },
-        // Three /self-audit routes exist in App.tsx behind `adminOnly` and no
-        // control in the whole app linked any of them, while
-        // systemSelfAudit.ts tells the operator to open two of them by name.
-        // Same gate the routes use (PermissionRoute adminOnly =
-        // authz.isSuperAdmin()), plus the module the route also checks through
-        // moduleKeyForPath, so a nav item never opens an Access Denied card.
-        authz.isSuperAdmin() && isModuleEnabled("appointments") && { to: "/queue/self-audit", icon: ScrollText, label: lang === "ar" ? "التدقيق الذاتي للطابور" : "Queue Self-Audit" },
-        authz.can("patients.view") && { to: "/patients", icon: Users, label: t("patients") },
-        authz.can("appointments.view") && { to: "/reminders", icon: Bell, label: t("notifications") },
         authz.can("medical_records.view") && isModuleEnabled("medical") && { to: "/medical/records", icon: FileText, label: t("medicalRecords") },
-        authz.can("medical_records.view") && isModuleEnabled("medical") && { to: "/medical/quick-consult", icon: Zap, label: t("quickConsult") },
         authz.can("medical_records.view") && isModuleEnabled("medical") && { to: "/medical/prescriptions", icon: Pill, label: t("prescriptions") },
         authz.can("medical_records.view") && isModuleEnabled("medical") && { to: "/medical/documents", icon: FolderOpen, label: t("documentsCenter") },
-        authz.can("medical_records.view") && isModuleEnabled("medical") && { to: "/medical/specialties", icon: Stethoscope, label: t("specialties") },
-        authz.can("medical_records.view") && isModuleEnabled("medical") && { to: "/medical/diagnoses", icon: HeartPulse, label: t("diagnoses") },
-        authz.can("medical_records.view") && isModuleEnabled("medical") && { to: "/medical/medications", icon: Pill, label: t("medications") },
-        authz.can("medical_records.view") && isModuleEnabled("medical") && { to: "/medical/procedures", icon: Activity, label: t("proceduresCatalog") },
+        authz.can("appointments.view") && { to: "/reminders", icon: Bell, label: t("notifications") },
       ].filter(Boolean) as NavItem[],
     },
     {
@@ -162,16 +168,13 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       ].filter(Boolean) as NavItem[],
     },
     {
-      key: "finance",
+      key: "money",
       label: lang === "ar" ? "المالية" : "Finance",
       icon: Wallet,
       items: [
-        authz.can("invoices.view") && { to: "/invoices", icon: FileText, label: t("invoices") },
-        authz.can("invoices.view") && { to: "/payments", icon: CreditCard, label: t("payments") },
-        authz.can("coupons.view") && { to: "/coupons", icon: Ticket, label: lang === "ar" ? "الكوبونات" : "Coupons" },
         authz.can("treasury.view") && { to: "/treasury", icon: Banknote, label: t("treasury") },
         authz.can("treasury.view") && { to: "/expenses", icon: Receipt, label: t("expenses") },
-        authz.isSuperAdmin() && isModuleEnabled("invoices") && { to: "/expenses/self-audit", icon: ScrollText, label: lang === "ar" ? "التدقيق الذاتي للمصروفات والخزينة" : "Expense & Treasury Self-Audit" },
+        authz.can("coupons.view") && { to: "/coupons", icon: Ticket, label: lang === "ar" ? "الكوبونات" : "Coupons" },
       ].filter(Boolean) as NavItem[],
     },
     {
@@ -214,6 +217,43 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       ],
     },
     {
+      key: "catalogs",
+      label: lang === "ar" ? "الكتالوجات الأساسية" : "Master Catalogs",
+      icon: FolderTree,
+      // Specialties, diagnoses, medications and procedures are reference data:
+      // a doctor picks from them during a visit and nobody edits them between
+      // patients. They were sitting in the middle of the day-work list, which is
+      // why the desk's nav read like an admin sitemap.
+      items: !isMaintainer ? [] : [
+        authz.can("medical_records.view") && isModuleEnabled("medical") && { to: "/medical/specialties", icon: Stethoscope, label: t("specialties") },
+        authz.can("medical_records.view") && isModuleEnabled("medical") && { to: "/medical/diagnoses", icon: HeartPulse, label: t("diagnoses") },
+        authz.can("medical_records.view") && isModuleEnabled("medical") && { to: "/medical/medications", icon: Pill, label: t("medications") },
+        authz.can("medical_records.view") && isModuleEnabled("medical") && { to: "/medical/procedures", icon: Activity, label: t("proceduresCatalog") },
+      ].filter(Boolean) as NavItem[],
+    },
+    {
+      key: "oversight",
+      label: lang === "ar" ? "الرقابة والتدقيق" : "Oversight & Audits",
+      icon: ScrollText,
+      // The queue check-in ledger and the three /self-audit screens answer
+      // "what went wrong in the system", not "who is next". Kept one click away
+      // for whoever maintains the clinic, off the working lists for everyone
+      // else. Queue Audit is still linked from the queue screen itself, so this
+      // is not the only way to reach it.
+      items: !isMaintainer ? [] : [
+        authz.can("appointments.view") && { to: "/queue/audit", icon: ScrollText, label: lang === "ar" ? "تدقيق الطابور" : "Queue Audit" },
+        // Three /self-audit routes exist in App.tsx behind `adminOnly` and no
+        // control in the whole app linked any of them, while
+        // systemSelfAudit.ts tells the operator to open two of them by name.
+        // Same gate the routes use (PermissionRoute adminOnly =
+        // authz.isSuperAdmin()), plus the module the route also checks through
+        // moduleKeyForPath, so a nav item never opens an Access Denied card.
+        authz.isSuperAdmin() && isModuleEnabled("appointments") && { to: "/queue/self-audit", icon: ScrollText, label: lang === "ar" ? "التدقيق الذاتي للطابور" : "Queue Self-Audit" },
+        authz.isSuperAdmin() && isModuleEnabled("invoices") && { to: "/expenses/self-audit", icon: ScrollText, label: lang === "ar" ? "التدقيق الذاتي للمصروفات والخزينة" : "Expense & Treasury Self-Audit" },
+        authz.isSuperAdmin() && { to: "/system/self-audit", icon: Activity, label: lang === "ar" ? "التدقيق الذاتي الكامل للنظام" : "Full System Self-Audit" },
+      ].filter(Boolean) as NavItem[],
+    },
+    {
       key: "setup",
       label: lang === "ar" ? "الإعداد والإدارة" : "Setup & Admin",
       icon: Settings,
@@ -228,13 +268,9 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
         // /settings/ai is gated systemOwnerOnly (stricter than the adminOnly
         // /settings above) because it holds the tenant's AI provider API key.
         isSystemOwner && { to: "/settings/ai", icon: Bot, label: lang === "ar" ? "إعدادات الذكاء الاصطناعي" : "AI Settings" },
-        // The third self-audit route from the note above /queue/self-audit.
-        // No module gate: moduleKeyForPath("/system/self-audit") is null, so
-        // PermissionRoute blocks it for admins on no condition at all.
-        authz.isSuperAdmin() && { to: "/system/self-audit", icon: Activity, label: lang === "ar" ? "التدقيق الذاتي الكامل للنظام" : "Full System Self-Audit" },
       ].filter(Boolean) as NavItem[],
     },
-  ].filter(g => g.items.length > 0), [t, lang, authz, alertCount, pendingBookingsCount, reportItems, isModuleEnabled, isPlatformSurface, isSystemOwner]);
+  ].filter(g => g.items.length > 0), [t, lang, authz, alertCount, pendingBookingsCount, reportItems, isModuleEnabled, isPlatformSurface, isSystemOwner, isMaintainer]);
 
   // Platform administration is a separate surface. A System Owner may still
   // see the full clinic navigation after an explicit workspace handoff.
@@ -256,6 +292,24 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
     });
   }, [pathname, activeGroupKey]);
   const toggle = (k: string) => setOpenMap(m => ({ ...m, [k]: !m[k] }));
+
+  // One link renderer for the day list and the collapsible groups, so the two
+  // can never drift apart in size or in how an active route is marked.
+  const itemLink = (it: NavItem, tabIndex = 0) => (
+    <NavLink key={it.to} to={branchAwarePath(it.to)} onClick={onNavigate} tabIndex={tabIndex}
+      className={({ isActive }) => cn(
+        "flex min-h-11 items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors duration-150 touch-manipulation",
+        isActive
+          ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold border-s-2 border-sidebar-primary rounded-s-none"
+          : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground font-medium"
+      )}>
+      <it.icon className="size-4 shrink-0" />
+      <span className="flex-1 truncate">{it.label}</span>
+      {it.badge && it.badge > 0 ? (
+        <span className="bg-destructive text-destructive-foreground text-[10px] rounded-full px-1.5 py-0.5 font-bold">{it.badge}</span>
+      ) : null}
+    </NavLink>
+  );
 
   if (authzLoading) {
     return (
@@ -298,6 +352,16 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
           <span className="flex-1 truncate">{dashboardItem.label}</span>
         </NavLink>
 
+        {!isPlatformSurface && dayItems.length > 0 && (
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 px-3 py-2 text-xs font-bold uppercase tracking-wide text-sidebar-foreground/60">
+              <Sun className="size-3.5 shrink-0 opacity-70" aria-hidden />
+              <span className="flex-1 truncate text-start">{lang === "ar" ? "عملي اليوم" : "My day"}</span>
+            </div>
+            {dayItems.map((it) => itemLink(it))}
+          </div>
+        )}
+
             {visibleGroups.map((g) => {
           const isOpen = !!openMap[g.key];
           return (
@@ -335,21 +399,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
               >
                 <div className="overflow-hidden min-h-0">
                   <div className="space-y-1 pt-1">
-                    {g.items.map((it) => (
-                      <NavLink key={it.to} to={branchAwarePath(it.to)} onClick={onNavigate} tabIndex={isOpen ? 0 : -1}
-                        className={({ isActive }) => cn(
-                          "flex min-h-11 items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors duration-150 touch-manipulation",
-                          isActive
-                            ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold border-s-2 border-sidebar-primary rounded-s-none"
-                            : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground font-medium"
-                        )}>
-                        <it.icon className="size-4 shrink-0" />
-                        <span className="flex-1 truncate">{it.label}</span>
-                        {it.badge && it.badge > 0 ? (
-                          <span className="bg-destructive text-destructive-foreground text-[10px] rounded-full px-1.5 py-0.5 font-bold">{it.badge}</span>
-                        ) : null}
-                      </NavLink>
-                    ))}
+                    {g.items.map((it) => itemLink(it, isOpen ? 0 : -1))}
                   </div>
                 </div>
               </div>

@@ -8017,6 +8017,10 @@ export type Database = {
       }
       tenants: {
         Row: {
+          archive_reason: string | null
+          archive_snapshot: Json | null
+          archived_at: string | null
+          archived_by: string | null
           billing_address: string | null
           billing_city: string | null
           billing_country: string | null
@@ -8025,6 +8029,8 @@ export type Database = {
           created_at: string
           id: string
           is_active: boolean
+          // Generated always: readable, never writable.
+          is_archived: boolean
           name: string
           name_ar: string | null
           name_en: string | null
@@ -8038,6 +8044,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archive_reason?: string | null
+          archive_snapshot?: Json | null
+          archived_at?: string | null
+          archived_by?: string | null
           billing_address?: string | null
           billing_city?: string | null
           billing_country?: string | null
@@ -8059,6 +8069,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archive_reason?: string | null
+          archive_snapshot?: Json | null
+          archived_at?: string | null
+          archived_by?: string | null
           billing_address?: string | null
           billing_city?: string | null
           billing_country?: string | null
@@ -9803,8 +9817,21 @@ export type Database = {
         }[]
       }
       platform_log_change: { Args: { payload: Json }; Returns: string }
+      platform_permanent_delete_tenant: {
+        Args: { p_confirm_slug: string; p_reason?: string; p_tenant_id: string }
+        Returns: Json
+      }
       platform_provision_approved_subscription_request: {
         Args: { p_notes?: string; p_payload?: Json; p_request_id: string }
+        Returns: Json
+      }
+      platform_restore_tenant: {
+        Args: {
+          p_branch_ids?: string[]
+          p_reason?: string
+          p_subscription_status?: Database["public"]["Enums"]["subscription_status"]
+          p_tenant_id: string
+        }
         Returns: Json
       }
       platform_save_tenant_branding: {
@@ -9859,6 +9886,10 @@ export type Database = {
       }
       platform_update_tenant_subscription: {
         Args: { payload: Json }
+        Returns: Json
+      }
+      platform_workspace_delete_assess: {
+        Args: { p_tenant_id: string }
         Returns: Json
       }
       prune_client_errors: { Args: { _keep_days?: number }; Returns: number }

@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ListSkeleton } from "@/components/ListSkeleton";
 import { Activity, ArrowLeft, ExternalLink, Stethoscope, User as UserIcon, MapPin, Clock, ScrollText, Receipt, CheckCircle2, MessageCircle, Check, X } from "lucide-react";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,18 +19,6 @@ import { formatDateTime } from "@/lib/format";
 import type { DictKey } from "@/lib/i18n";
 import { appointmentWhatsAppMessage, openWhatsApp } from "@/lib/whatsapp";
 import { getOrCreateAppointmentMedicalRecord } from "@/lib/medicalRecordEncounter";
-import {
-  ActionButton,
-  FieldLabel,
-  Notice,
-  PageHeader,
-  Panel,
-  PlatformDialog,
-  PlatformTextarea,
-  SectionLabel,
-  StatusChip,
-  type SignalTone,
-} from "@/components/zds/surface";
 
 import { QUEUE_AUDIT_ACTIONS as QUEUE_ACTIONS, QUEUE_AUDIT_SAFE_KEYS as SAFE_KEYS, queueActionLabel } from "@/lib/queueAuditActions";
 
@@ -41,16 +35,6 @@ const STATUS_KEYS: Record<string, DictKey> = {
   cancelled: "statusCancelled",
   no_show: "statusNoShow",
   departed: "statusDeparted",
-};
-
-const STATUS_TONE: Record<string, SignalTone> = {
-  scheduled: "neutral",
-  confirmed: "positive",
-  in_progress: "caution",
-  completed: "positive",
-  cancelled: "critical",
-  no_show: "critical",
-  departed: "neutral",
 };
 
 function fmt(iso: string | null | undefined, lang: "en" | "ar") {
@@ -85,7 +69,6 @@ export default function AppointmentDetailPage() {
   const [bookingActionBusy, setBookingActionBusy] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
-  const isArabic = lang === "ar";
 
   useEffect(() => {
     if (!appointmentId) return;
@@ -159,288 +142,243 @@ export default function AppointmentDetailPage() {
     if (error) {
       const message = String(error.message || "");
       toast.error(message.includes("booking_request_expired")
-        ? (isArabic ? "انتهت مهلة الطلب وتحررت السعة." : "The request expired and capacity was released.")
+        ? (lang === "ar" ? "انتهت مهلة الطلب وتحررت السعة." : "The request expired and capacity was released.")
         : message.includes("slot_unavailable")
-          ? (isArabic ? "لم تعد السعة متاحة لهذا الموعد." : "Capacity is no longer available for this appointment.")
-          : (isArabic ? "تعذر تأكيد طلب الحجز." : "Could not confirm the booking request."));
+          ? (lang === "ar" ? "لم تعد السعة متاحة لهذا الموعد." : "Capacity is no longer available for this appointment.")
+          : (lang === "ar" ? "تعذر تأكيد طلب الحجز." : "Could not confirm the booking request."));
       return;
     }
     setAppt((current: any) => current ? { ...current, status: "confirmed", booking_request_status: "confirmed", booking_request_expires_at: null } : current);
-    toast.success(isArabic ? "تم تأكيد طلب الحجز" : "Booking request confirmed");
+    toast.success(lang === "ar" ? "تم تأكيد طلب الحجز" : "Booking request confirmed");
   };
 
   const rejectBookingRequest = async () => {
     if (!appt || bookingActionBusy) return;
     const reason = rejectReason.trim();
     if (!reason) {
-      toast.error(isArabic ? "اكتب سبب الرفض" : "Enter a rejection reason");
+      toast.error(lang === "ar" ? "اكتب سبب الرفض" : "Enter a rejection reason");
       return;
     }
     setBookingActionBusy(true);
     const { error } = await supabase.rpc("reject_public_booking", { p_appointment_id: appt.id, p_reason: reason });
     setBookingActionBusy(false);
     if (error) {
-      toast.error(isArabic ? "تعذر رفض طلب الحجز" : "Could not reject the booking request");
+      toast.error(lang === "ar" ? "تعذر رفض طلب الحجز" : "Could not reject the booking request");
       return;
     }
     setAppt((current: any) => current ? { ...current, status: "cancelled", booking_request_status: "rejected", booking_request_expires_at: null, booking_rejection_reason: reason } : current);
     setRejectOpen(false);
     setRejectReason("");
-    toast.success(isArabic ? "تم رفض الطلب وتحرير السعة" : "Request rejected and capacity released");
+    toast.success(lang === "ar" ? "تم رفض الطلب وتحرير السعة" : "Request rejected and capacity released");
   };
 
   if (loading) {
-    return (
-      <div className="z-desk min-h-screen p-z4 sm:p-z6">
-        <Panel className="overflow-hidden">
-          <ListSkeleton rows={6} />
-        </Panel>
-      </div>
-    );
+    return <div className="p-4 sm:p-6 space-y-4"><Card className="p-0 overflow-hidden"><ListSkeleton rows={6} /></Card></div>;
   }
   if (!appt) {
     return (
-      <div className="z-desk min-h-screen p-z4 sm:p-z6">
-        <Panel className="p-z10 text-center text-z-small rtl:text-z-small-ar text-z-ink-500">{t("noData")}</Panel>
+      <div className="p-4 sm:p-6">
+        <Card className="p-10 text-center text-muted-foreground">{t("noData")}</Card>
       </div>
     );
   }
 
-  const statusText = STATUS_KEYS[String(appt.status)] ? t(STATUS_KEYS[String(appt.status)]) : String(appt.status).replace(/_/g, " ");
-  const statusTone: SignalTone = STATUS_TONE[String(appt.status)] ?? "neutral";
-
   return (
-    <div className="z-desk min-h-screen space-y-z4 p-z4 sm:p-z6" dir={isArabic ? "rtl" : "ltr"}>
-      <PageHeader
-        title={t("appointmentDetailTitle")}
-        actions={
-          <>
-            <ActionButton tone="quiet" asChild>
-              <Link to={`/patients/${appt.patient_id}`}><UserIcon className="size-4" aria-hidden="true" />{t("openChart")}</Link>
-            </ActionButton>
-            {appt.patients?.phone ? (
-              <ActionButton
-                tone="quiet"
-                onClick={() => {
-                  const ok = openWhatsApp(
-                    appt.patients.phone,
-                    appointmentWhatsAppMessage({ patientName, appointmentDate: fmt(appt.scheduled_at, lang), branchName, lang }),
-                  );
-                  if (!ok) toast.error(isArabic ? "رقم الهاتف غير صالح" : "Invalid phone number");
+    <div className="p-4 sm:p-6 space-y-4">
+      <header className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <Link to="/queue" className="text-muted-foreground hover:text-foreground"><ArrowLeft className="size-5" /></Link>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold leading-tight">{t("appointmentDetailTitle")}</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">{patientName} · {fmt(appt.scheduled_at, lang)}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button asChild variant="outline" size="sm" className="h-9">
+            <Link to={`/patients/${appt.patient_id}`}><UserIcon className="size-4 me-1" />{t("openChart")}</Link>
+          </Button>
+          {appt.patients?.phone && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 border-emerald-500/30 text-emerald-700 dark:text-emerald-300"
+              onClick={() => {
+                const ok = openWhatsApp(
+                  appt.patients.phone,
+                  appointmentWhatsAppMessage({ patientName, appointmentDate: fmt(appt.scheduled_at, lang), branchName, lang }),
+                );
+                if (!ok) toast.error(lang === "ar" ? "رقم الهاتف غير صالح" : "Invalid phone number");
+              }}
+            >
+              <MessageCircle className="size-4 me-1" />
+              {lang === "ar" ? "رسالة WhatsApp" : "WhatsApp message"}
+            </Button>
+          )}
+          {record && (
+            <Button asChild size="sm" className="h-9">
+              <Link to={`/medical/consultation/${record.id}`}><Stethoscope className="size-4 me-1" />{t("openConsultation")}</Link>
+            </Button>
+          )}
+          {appt.status === "completed" && !record && (
+            <Can permission="medical_records.create">
+              <Button
+                size="sm"
+                className="h-9 gradient-primary text-primary-foreground"
+                disabled={starting}
+                onClick={async () => {
+                  setStarting(true);
+                  try {
+                    const encounter = await getOrCreateAppointmentMedicalRecord({
+                      appointmentId: appt.id,
+                      patientId: appt.patient_id,
+                      branchId: appt.branch_id,
+                      doctorId: appt.doctor_id ?? user?.id ?? null,
+                      createdBy: user?.id ?? null,
+                    });
+                    nav(`/medical/records/${encounter.id}`);
+                  } catch (e: any) {
+                    toast.error(e?.message ?? (lang === "ar" ? "تعذر بدء الاستشارة" : "Could not start consultation"));
+                  } finally {
+                    setStarting(false);
+                  }
                 }}
               >
-                <MessageCircle className="size-4" aria-hidden="true" />
-                {isArabic ? "رسالة WhatsApp" : "WhatsApp message"}
-              </ActionButton>
-            ) : null}
-            {record ? (
-              <ActionButton asChild>
-                <Link to={`/medical/consultation/${record.id}`}><Stethoscope className="size-4" aria-hidden="true" />{t("openConsultation")}</Link>
-              </ActionButton>
-            ) : null}
-            {appt.status === "completed" && !record ? (
-              <Can permission="medical_records.create">
-                <ActionButton
-                  disabled={starting}
-                  onClick={async () => {
-                    setStarting(true);
-                    try {
-                      const encounter = await getOrCreateAppointmentMedicalRecord({
-                        appointmentId: appt.id,
-                        patientId: appt.patient_id,
-                        branchId: appt.branch_id,
-                        doctorId: appt.doctor_id ?? user?.id ?? null,
-                        createdBy: user?.id ?? null,
-                      });
-                      nav(`/medical/records/${encounter.id}`);
-                    } catch (e: any) {
-                      toast.error(e?.message ?? (isArabic ? "تعذر بدء الاستشارة" : "Could not start consultation"));
-                    } finally {
-                      setStarting(false);
-                    }
-                  }}
-                >
-                  <Stethoscope className="size-4" aria-hidden="true" />
-                  {isArabic ? "بدء الاستشارة" : "Start Consultation"}
-                </ActionButton>
-              </Can>
-            ) : null}
-            {appt.status === "completed" ? (
-              <Can permission="medical_records.create">
-                <ActionButton tone="quiet" asChild>
-                  <Link to={`/physio?patient=${appt.patient_id}&appointment=${appt.id}&new=1`}>
-                    <Activity className="size-4" aria-hidden="true" />
-                    {isArabic ? "بدء حالة علاج طبيعي" : "Start Physio Case"}
-                  </Link>
-                </ActionButton>
-              </Can>
-            ) : null}
-            {appt.status === "completed" ? (
-              <Can permission="invoices.create">
-                <ActionButton tone="quiet" onClick={() => setInvoiceOpen(true)}>
-                  <Receipt className="size-4" aria-hidden="true" />
-                  {isArabic ? "إنشاء فاتورة" : "Generate Invoice"}
-                </ActionButton>
-              </Can>
-            ) : null}
-          </>
-        }
-      />
+                <Stethoscope className="size-4 me-1" />
+                {lang === "ar" ? "بدء الاستشارة" : "Start Consultation"}
+              </Button>
+            </Can>
+          )}
+          {appt.status === "completed" && (
+            <Can permission="medical_records.create">
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="h-9 border-primary/30 text-primary hover:bg-primary/10"
+              >
+                <Link to={`/physio?patient=${appt.patient_id}&appointment=${appt.id}&new=1`}>
+                  <Activity className="size-4 me-1" />
+                  {lang === "ar" ? "بدء حالة علاج طبيعي" : "Start Physio Case"}
+                </Link>
+              </Button>
+            </Can>
+          )}
+          {appt.status === "completed" && (
+            <Can permission="invoices.create">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-9 border-primary/30 text-primary hover:bg-primary/10"
+                onClick={() => setInvoiceOpen(true)}
+              >
+                <Receipt className="size-4 me-1" />
+                {lang === "ar" ? "إنشاء فاتورة" : "Generate Invoice"}
+              </Button>
+            </Can>
+          )}
+        </div>
+      </header>
 
-      <div className="flex flex-wrap items-center gap-z3">
-        <Link to="/queue" className="inline-flex items-center gap-z2 text-z-small rtl:text-z-small-ar text-z-ink-500 hover:text-z-ink-900">
-          <ArrowLeft className="size-4" aria-hidden="true" />
-          {isArabic ? "الرجوع إلى الطابور" : "Back to queue"}
-        </Link>
-        <span className="text-z-small rtl:text-z-small-ar text-z-ink-700">{patientName}</span>
-        <span className="z-num text-z-small rtl:text-z-small-ar text-z-ink-500">{fmt(appt.scheduled_at, lang)}</span>
-      </div>
-
-      {appt.status === "completed" ? (
-        <Notice tone="positive" title={isArabic ? "الموعد مكتمل — الخطوات التالية" : "Appointment completed — next steps"}>
-          {isArabic
-            ? "تابع مباشرة إلى السجل الطبي أو ابدأ حالة علاج طبيعي أو أصدر الفاتورة."
-            : "Continue to the medical record, start a physio case, or issue the invoice."}
-        </Notice>
-      ) : null}
-
-      <div className="grid grid-cols-1 gap-z4 lg:grid-cols-3">
-        <Panel className="space-y-z3 p-z4 lg:col-span-1">
-          <SectionLabel>{t("status")}</SectionLabel>
-          <div className="flex flex-wrap items-center gap-z2">
-            <StatusChip tone={statusTone}>{statusText}</StatusChip>
-            {bookingHoldPending ? <StatusChip tone="caution">{isArabic ? "طلب يحتاج تأكيدًا" : "Awaiting confirmation"}</StatusChip> : null}
-            {appt.booking_request_status === "rejected" ? <StatusChip tone="critical">{isArabic ? "مرفوض" : "Rejected"}</StatusChip> : null}
-            {appt.booking_request_status === "expired" ? <StatusChip tone="neutral">{isArabic ? "منتهي" : "Expired"}</StatusChip> : null}
-            {appt.is_walk_in ? <StatusChip tone="neutral">{t("walkIn")}</StatusChip> : null}
-            {(appt.priority ?? 0) > 0 ? <StatusChip tone="critical">{t("urgent")}</StatusChip> : null}
+      {appt.status === "completed" && (
+        <Card className="p-4 flex items-start gap-3 border-emerald-500/30 bg-emerald-500/5">
+          <CheckCircle2 className="size-5 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0" />
+          <div className="text-sm">
+            <div className="font-semibold text-emerald-700 dark:text-emerald-300">
+              {lang === "ar" ? "الموعد مكتمل — الخطوات التالية" : "Appointment completed — next steps"}
+            </div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              {lang === "ar"
+                ? "تابع مباشرة إلى السجل الطبي أو ابدأ حالة علاج طبيعي أو أصدر الفاتورة."
+                : "Continue to the medical record, start a physio case, or issue the invoice."}
+            </div>
           </div>
+        </Card>
+      )}
 
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <Card className="p-4 space-y-3 lg:col-span-1">
+          <div className="text-xs text-muted-foreground">{t("status")}</div>
+          <Badge variant="outline" className="capitalize">{STATUS_KEYS[String(appt.status)] ? t(STATUS_KEYS[String(appt.status)]) : String(appt.status).replace(/_/g, " ")}</Badge>
+          {bookingHoldPending && <Badge variant="secondary" className="ms-1">{lang === "ar" ? "طلب يحتاج تأكيدًا" : "Awaiting confirmation"}</Badge>}
+          {appt.booking_request_status === "rejected" && <Badge variant="destructive" className="ms-1">{lang === "ar" ? "مرفوض" : "Rejected"}</Badge>}
           {bookingHoldPending ? (
-            <div className="space-y-z2 rounded-z2 border border-s-2 border-z-caution-stroke bg-z-caution-fill p-z3">
-              <div className="text-z-micro rtl:text-z-micro-ar text-z-caution-ink">
-                {appt.booking_request_expires_at
-                  ? (isArabic ? `تنتهي المهلة: ${fmt(appt.booking_request_expires_at, lang)}` : `Hold expires: ${fmt(appt.booking_request_expires_at, lang)}`)
-                  : (isArabic ? "في انتظار المراجعة" : "Awaiting review")}
-              </div>
+            <div className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
+              <div className="text-xs text-muted-foreground">{appt.booking_request_expires_at ? (lang === "ar" ? `تنتهي المهلة: ${fmt(appt.booking_request_expires_at, lang)}` : `Hold expires: ${fmt(appt.booking_request_expires_at, lang)}`) : (lang === "ar" ? "في انتظار المراجعة" : "Awaiting review")}</div>
               <Can permission="appointments.edit">
-                <div className="flex flex-wrap gap-z2">
-                  <ActionButton disabled={bookingActionBusy} onClick={confirmBookingRequest}>
-                    <Check className="size-4" aria-hidden="true" />
-                    {isArabic ? "تأكيد الحجز" : "Confirm booking"}
-                  </ActionButton>
-                  <ActionButton tone="danger" disabled={bookingActionBusy} onClick={() => setRejectOpen(true)}>
-                    <X className="size-4" aria-hidden="true" />
-                    {isArabic ? "رفض الطلب" : "Reject request"}
-                  </ActionButton>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" disabled={bookingActionBusy} onClick={confirmBookingRequest}><Check className="size-4 me-1" />{lang === "ar" ? "تأكيد الحجز" : "Confirm booking"}</Button>
+                  <Button size="sm" variant="destructive" disabled={bookingActionBusy} onClick={() => setRejectOpen(true)}><X className="size-4 me-1" />{lang === "ar" ? "رفض الطلب" : "Reject request"}</Button>
                 </div>
               </Can>
             </div>
           ) : null}
-
+          {appt.booking_request_status === "expired" && <Badge variant="secondary" className="ms-1">{lang === "ar" ? "منتهي" : "Expired"}</Badge>}
+          {appt.is_walk_in && <Badge variant="secondary" className="ms-1">{t("walkIn")}</Badge>}
           {appt.booking_request_status === "rejected" && appt.booking_rejection_reason ? (
-            <div className="space-y-z1 rounded-z2 border border-s-2 border-z-critical-stroke bg-z-critical-fill p-z3">
-              <div className="text-z-micro rtl:text-z-micro-ar font-semibold text-z-critical-ink">{isArabic ? "سبب الرفض" : "Rejection reason"}</div>
-              <div className="text-z-small rtl:text-z-small-ar text-z-ink-700">{appt.booking_rejection_reason}</div>
+            <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs leading-5">
+              <div className="font-semibold text-destructive">{lang === "ar" ? "سبب الرفض" : "Rejection reason"}</div>
+              <div className="mt-1 text-muted-foreground">{appt.booking_rejection_reason}</div>
             </div>
           ) : null}
-
-          <dl className="space-y-z2 border-t border-z-line-hairline pt-z3 text-z-small rtl:text-z-small-ar">
-            <div className="flex items-center gap-z2">
-              <UserIcon className="size-4 shrink-0 text-z-ink-500" aria-hidden="true" />
-              <dt className="text-z-ink-500">{t("doctor")}</dt>
-              <dd className="min-w-0 text-z-ink-900">{appt.doctor_id ? (profiles[appt.doctor_id] ? doctorDisplayName(profiles[appt.doctor_id], lang) : appt.doctor_id.slice(0, 8)) : "—"}</dd>
-            </div>
-            <div className="flex items-center gap-z2">
-              <MapPin className="size-4 shrink-0 text-z-ink-500" aria-hidden="true" />
-              <dd className="min-w-0 text-z-ink-900">{branchName}{appt.room ? ` · ${t("room")}: ${appt.room}` : ""}</dd>
-            </div>
-            <div className="flex items-center gap-z2">
-              <Clock className="size-4 shrink-0 text-z-ink-500" aria-hidden="true" />
-              <dt className="text-z-ink-500">{t("appointmentTime")}</dt>
-              <dd className="z-num min-w-0 text-z-ink-900">{fmt(appt.scheduled_at, lang)}</dd>
-            </div>
-            <div className="flex items-center gap-z2">
-              <Clock className="size-4 shrink-0 text-z-ink-500" aria-hidden="true" />
-              <dt className="text-z-ink-500">{t("checkedInAt")}</dt>
-              <dd className="z-num min-w-0 text-z-ink-900">{fmt(appt.checked_in_at, lang)}</dd>
-            </div>
-            <div className="flex items-center gap-z2">
-              <Clock className="size-4 shrink-0 text-z-ink-500" aria-hidden="true" />
-              <dt className="text-z-ink-500">{t("inSessionTime")}</dt>
-              <dd className="z-num min-w-0 text-z-ink-900">{fmt(appt.started_at, lang)}</dd>
-            </div>
-          </dl>
-
-          {(appt.services || appt.procedure) ? (
-            <div className="border-t border-z-line-hairline pt-z3 text-z-small rtl:text-z-small-ar text-z-ink-700">
+          {(appt.priority ?? 0) > 0 && <Badge variant="destructive" className="ms-1">{t("urgent")}</Badge>}
+          <div className="pt-2 space-y-1.5 text-sm">
+            <div className="flex items-center gap-2"><UserIcon className="size-4 text-muted-foreground" /><span>{t("doctor")}: {appt.doctor_id ? (profiles[appt.doctor_id] ? doctorDisplayName(profiles[appt.doctor_id], lang) : appt.doctor_id.slice(0, 8)) : "—"}</span></div>
+            <div className="flex items-center gap-2"><MapPin className="size-4 text-muted-foreground" /><span>{branchName}{appt.room ? ` · ${t("room")}: ${appt.room}` : ""}</span></div>
+            <div className="flex items-center gap-2"><Clock className="size-4 text-muted-foreground" /><span>{t("appointmentTime")}: {fmt(appt.scheduled_at, lang)}</span></div>
+            <div className="flex items-center gap-2"><Clock className="size-4 text-muted-foreground" /><span>{t("checkedInAt")}: {fmt(appt.checked_in_at, lang)}</span></div>
+            <div className="flex items-center gap-2"><Clock className="size-4 text-muted-foreground" /><span>{t("inSessionTime")}: {fmt(appt.started_at, lang)}</span></div>
+          </div>
+          {(appt.services || appt.procedure) && (
+            <div className="pt-2 text-sm text-muted-foreground">
               {appt.services
-                ? (isArabic ? (appt.services.name_ar || appt.services.name_en) : (appt.services.name_en || appt.services.name_ar))
+                ? (lang === "ar" ? (appt.services.name_ar || appt.services.name_en) : (appt.services.name_en || appt.services.name_ar))
                 : appt.procedure}
             </div>
-          ) : null}
-        </Panel>
+          )}
+        </Card>
 
-        <Panel className="p-z4 lg:col-span-2">
-          <div className="mb-z3 flex items-center gap-z2">
-            <ScrollText className="size-4 text-z-ink-500" aria-hidden="true" />
-            <h2 className="text-z-small rtl:text-z-small-ar font-semibold text-z-ink-900">{t("queueActionsHistory")}</h2>
-            <Link to={`/queue/audit?appointment=${appt.id}`} className="ms-auto inline-flex items-center gap-z1 text-z-micro rtl:text-z-micro-ar text-z-brand-700 hover:underline">
-              {t("openInAudit")}
-              <ExternalLink className="size-3" aria-hidden="true" />
+        <Card className="p-4 lg:col-span-2">
+          <div className="flex items-center gap-2 mb-3">
+            <ScrollText className="size-4 text-muted-foreground" />
+            <h2 className="font-semibold">{t("queueActionsHistory")}</h2>
+            <Link to={`/queue/audit?appointment=${appt.id}`} className="ms-auto text-xs text-primary inline-flex items-center gap-1 hover:underline">
+              {t("openInAudit")}<ExternalLink className="size-3" />
             </Link>
           </div>
           {logs.length === 0 ? (
-            <div className="py-z10 text-center text-z-small rtl:text-z-small-ar text-z-ink-500">{t("noData")}</div>
+            <div className="py-10 text-center text-muted-foreground text-sm">{t("noData")}</div>
           ) : (
-            <ol className="relative ms-z3 space-y-z3 border-s border-z-line-edge">
+            <ol className="relative ms-3 border-s border-border space-y-3">
               {logs.map((r) => (
-                <li key={r.id} className="ps-z4">
-                  <span className="absolute -start-1.5 mt-1.5 size-3 rounded-full border border-z-brand-500 bg-z-brand-100" aria-hidden="true" />
-                  <div className="flex flex-wrap items-center gap-z2 text-z-small rtl:text-z-small-ar">
-                    <StatusChip tone="neutral">{queueActionLabel(r.action, lang)}</StatusChip>
-                    <span className="z-num text-z-micro rtl:text-z-micro-ar text-z-ink-500">{fmt(r.created_at, lang)}</span>
-                    <span className="text-z-micro rtl:text-z-micro-ar text-z-ink-500">{profiles[r.user_id]?.full_name ?? (r.user_id ? r.user_id.slice(0, 8) : "—")}</span>
+                <li key={r.id} className="ps-4">
+                  <div className="absolute -start-1.5 mt-1.5 size-3 rounded-full bg-primary/40 border border-primary/60" />
+                  <div className="flex items-center gap-2 flex-wrap text-sm">
+                    <Badge variant="outline" className="text-[10px] capitalize">{queueActionLabel(r.action, lang)}</Badge>
+                    <span className="text-xs text-muted-foreground">{fmt(r.created_at, lang)}</span>
+                    <span className="text-xs text-muted-foreground">· {profiles[r.user_id]?.full_name ?? (r.user_id ? r.user_id.slice(0, 8) : "—")}</span>
                   </div>
-                  <div className="mt-z1 text-z-micro rtl:text-z-micro-ar text-z-ink-500">{diff(r.old_values, r.new_values) || "—"}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{diff(r.old_values, r.new_values) || "—"}</div>
                 </li>
               ))}
             </ol>
           )}
-        </Panel>
+        </Card>
       </div>
 
-      <PlatformDialog
-        open={rejectOpen}
-        onOpenChange={setRejectOpen}
-        title={isArabic ? "رفض طلب الحجز" : "Reject booking request"}
-        icon={<X />}
-        dir={isArabic ? "rtl" : "ltr"}
-        busy={bookingActionBusy}
-        footer={
-          <>
-            <ActionButton tone="quiet" onClick={() => setRejectOpen(false)}>{t("cancel")}</ActionButton>
-            <ActionButton tone="danger" disabled={bookingActionBusy || !rejectReason.trim()} onClick={rejectBookingRequest}>
-              {isArabic ? "تأكيد الرفض" : "Confirm rejection"}
-            </ActionButton>
-          </>
-        }
-      >
-        <div className="space-y-z2">
-          <FieldLabel htmlFor="appointment-rejection-reason">{isArabic ? "سبب الرفض" : "Reason for rejection"}</FieldLabel>
-          <PlatformTextarea
-            id="appointment-rejection-reason"
-            value={rejectReason}
-            onChange={(event) => setRejectReason(event.target.value)}
-            maxLength={1000}
-            rows={5}
-            placeholder={isArabic ? "اكتب سببًا واضحًا…" : "Write a clear reason…"}
-          />
-          <p className="text-z-micro rtl:text-z-micro-ar text-z-ink-500">
-            {isArabic ? "سيتم حفظ السبب ضمن سجل الموعد." : "The reason will be saved with the appointment."}
-          </p>
-        </div>
-      </PlatformDialog>
+      <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
+        <DialogContent className="max-w-md w-[calc(100vw-2rem)] sm:w-full">
+          <DialogHeader><DialogTitle>{lang === "ar" ? "رفض طلب الحجز" : "Reject booking request"}</DialogTitle></DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="appointment-rejection-reason">{lang === "ar" ? "سبب الرفض" : "Reason for rejection"}</Label>
+            <Textarea id="appointment-rejection-reason" value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} maxLength={1000} rows={5} placeholder={lang === "ar" ? "اكتب سببًا واضحًا..." : "Write a clear reason..."} />
+            <p className="text-xs text-muted-foreground">{lang === "ar" ? "سيتم حفظ السبب ضمن سجل الموعد." : "The reason will be saved with the appointment."}</p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setRejectOpen(false)}>{t("cancel")}</Button>
+            <Button type="button" variant="destructive" disabled={bookingActionBusy || !rejectReason.trim()} onClick={rejectBookingRequest}>{lang === "ar" ? "تأكيد الرفض" : "Confirm rejection"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <CreateInvoiceDialog
         open={invoiceOpen}
         onOpenChange={setInvoiceOpen}

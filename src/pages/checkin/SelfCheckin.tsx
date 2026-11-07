@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, CheckCircle2, Clock3, Globe2, Link2Off, Loader2, MapPin, ShieldCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
-import { ActionButton, Panel } from "@/components/zds/surface";
-import { cn } from "@/lib/utils";
 import {
   getSelfCheckinToken,
   localizedBranchName,
@@ -106,62 +107,36 @@ export default function SelfCheckin() {
     privacy: isArabic ? "لا نطلب اسمك أو رقم هاتفك أو أي تفاصيل طبية عبر هذا الرابط." : "We do not ask for your name, phone number, or medical details through this link.",
   };
 
-  /** One shape for every non-ready state: a mark, a title, one sentence, and an optional action. */
-  function StateCard({
-    tone,
-    icon,
-    title,
-    body,
-    action,
-  }: {
-    tone: "positive" | "critical" | "neutral";
-    icon: React.ReactNode;
-    title: string;
-    body: string;
-    action?: React.ReactNode;
-  }) {
-    const mark = {
-      positive: "bg-z-positive-fill text-z-positive-ink",
-      critical: "bg-z-critical-fill text-z-critical-ink",
-      neutral: "bg-z-sunk text-z-ink-500",
-    }[tone];
-    return (
-      <div className="py-z5 text-center" role={tone === "critical" ? "alert" : "status"}>
-        <div className={cn("mx-auto flex size-14 items-center justify-center rounded-z2 [&_svg]:size-7", mark)}>{icon}</div>
-        <h2 className="mt-z4 text-z-subtitle rtl:text-z-subtitle-ar font-semibold text-z-ink-900">{title}</h2>
-        <p className="mt-z2 text-z-small rtl:text-z-small-ar text-z-ink-500">{body}</p>
-        {action}
-      </div>
-    );
-  }
-
   const body = (() => {
     if (loading) {
+      return <div className="flex min-h-48 items-center justify-center" role="status" aria-live="polite"><Loader2 className="size-6 animate-spin text-primary" /></div>;
+    }
+    if (resultState === "success") {
       return (
-        <div className="flex min-h-48 items-center justify-center" role="status" aria-live="polite">
-          <Loader2 className="size-6 animate-spin text-z-ink-400" />
+        <div className="py-5 text-center">
+          <CheckCircle2 className="mx-auto size-14 text-emerald-600" aria-hidden="true" />
+          <h2 className="mt-4 text-xl font-semibold">{copy.successTitle}</h2>
+          <p className="mt-2 text-sm text-muted-foreground">{copy.successBody}</p>
         </div>
       );
     }
-    if (resultState === "success") {
-      return <StateCard tone="positive" icon={<CheckCircle2 aria-hidden="true" />} title={copy.successTitle} body={copy.successBody} />;
-    }
     if (resultState === "closed") {
-      return <StateCard tone="neutral" icon={<Link2Off aria-hidden="true" />} title={copy.closedTitle} body={copy.closedBody} />;
+      return (
+        <div className="py-5 text-center">
+          <Link2Off className="mx-auto size-12 text-muted-foreground" aria-hidden="true" />
+          <h2 className="mt-4 text-xl font-semibold">{copy.closedTitle}</h2>
+          <p className="mt-2 text-sm text-muted-foreground">{copy.closedBody}</p>
+        </div>
+      );
     }
     if (resultState === "error") {
       return (
-        <StateCard
-          tone="critical"
-          icon={<Link2Off aria-hidden="true" />}
-          title={copy.errorTitle}
-          body={copy.errorBody}
-          action={
-            <ActionButton tone="quiet" className="mt-z5" onClick={() => window.location.reload()}>
-              {copy.retry}
-            </ActionButton>
-          }
-        />
+        <div className="py-5 text-center">
+          <Link2Off className="mx-auto size-12 text-destructive" aria-hidden="true" />
+          <h2 className="mt-4 text-xl font-semibold">{copy.errorTitle}</h2>
+          <p className="mt-2 text-sm text-muted-foreground">{copy.errorBody}</p>
+          <Button className="mt-5" variant="outline" onClick={() => window.location.reload()}>{copy.retry}</Button>
+        </div>
       );
     }
     if (resultState === "invalid" || detailsState !== "ready" || !details) {
@@ -175,74 +150,45 @@ export default function SelfCheckin() {
         : reason === "closed" ? [copy.closedTitle, copy.closedBody]
         : reason === "clinic_unavailable" ? [copy.unavailableTitle, copy.unavailableBody]
         : [copy.rejectedTitle, copy.rejectedBody];
-      return <StateCard tone="critical" icon={<Link2Off aria-hidden="true" />} title={title} body={message} />;
+      return (
+        <div className="py-5 text-center" role="alert">
+          <Link2Off className="mx-auto size-12 text-muted-foreground" aria-hidden="true" />
+          <h2 className="mt-4 text-xl font-semibold">{title}</h2>
+          <p className="mt-2 text-sm text-muted-foreground">{message}</p>
+        </div>
+      );
     }
     return (
-      <div className="space-y-z5">
+      <div className="space-y-5">
         <div>
-          <p className="text-z-small rtl:text-z-small-ar font-medium text-z-ink-900">{copy.readyTitle}</p>
-          <p className="mt-z1 text-z-small rtl:text-z-small-ar text-z-ink-500">{copy.readyBody}</p>
+          <p className="text-sm font-medium">{copy.readyTitle}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{copy.readyBody}</p>
         </div>
-        <div className="space-y-z3 rounded-z3 border border-z-line-edge bg-z-sunk px-z4 py-z4">
-          <div className="flex items-start gap-z3">
-            <CalendarDays className="mt-0.5 size-5 shrink-0 text-z-brand-500" aria-hidden="true" />
-            <div className="min-w-0">
-              <p className="text-z-micro rtl:text-z-micro-ar text-z-ink-500">{copy.appointment}</p>
-              <p className="text-z-small rtl:text-z-small-ar font-medium text-z-ink-900">{formatAppointmentTime(details.scheduled_at, language)}</p>
-            </div>
-          </div>
-          <div className="border-t border-z-line-hairline" />
-          <div className="flex items-start gap-z3">
-            <MapPin className="mt-0.5 size-5 shrink-0 text-z-brand-500" aria-hidden="true" />
-            <div className="min-w-0">
-              <p className="text-z-micro rtl:text-z-micro-ar text-z-ink-500">{copy.branch}</p>
-              <p className="text-z-small rtl:text-z-small-ar font-medium text-z-ink-900">{branchName || clinicName}</p>
-            </div>
-          </div>
+        <div className="space-y-3 rounded-xl border bg-muted/20 p-4">
+          <div className="flex items-start gap-3"><CalendarDays className="mt-0.5 size-5 shrink-0 text-primary" /><div><p className="text-xs text-muted-foreground">{copy.appointment}</p><p className="font-medium">{formatAppointmentTime(details.scheduled_at, language)}</p></div></div>
+          <Separator />
+          <div className="flex items-start gap-3"><MapPin className="mt-0.5 size-5 shrink-0 text-primary" /><div><p className="text-xs text-muted-foreground">{copy.branch}</p><p className="font-medium">{clinicName}{branchName ? ` · ${branchName}` : ""}</p></div></div>
         </div>
-        <ActionButton className={cn("h-z12 w-full")} onClick={() => void submitCheckin()} disabled={checkingIn}>
-          {checkingIn ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <CheckCircle2 className="size-4" aria-hidden="true" />}
+        <Button className="w-full" size="lg" onClick={() => void submitCheckin()} disabled={checkingIn}>
+          {checkingIn ? <Loader2 className="me-2 size-4 animate-spin" /> : <CheckCircle2 className="me-2 size-4" />}
           {copy.confirm}
-        </ActionButton>
+        </Button>
       </div>
     );
   })();
 
   return (
-    <main className="z-desk min-h-screen px-z4 py-z6 sm:py-z10" dir={isArabic ? "rtl" : "ltr"}>
+    <main className="min-h-screen bg-gradient-to-b from-primary/5 via-background to-background px-4 py-6 sm:py-10" dir={isArabic ? "rtl" : "ltr"}>
       <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-lg flex-col justify-center">
-        <header className="mb-z5 flex items-center justify-between gap-z3 px-z1">
-          <div className="flex items-center gap-z3">
-            <div className="flex size-10 items-center justify-center rounded-z2 bg-z-brand-050 text-z-brand-700 [&_svg]:size-5">
-              <ShieldCheck aria-hidden="true" />
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-z-small rtl:text-z-small-ar font-semibold text-z-ink-900">{clinicName}</p>
-              <p className="text-z-micro rtl:text-z-micro-ar text-z-ink-500">{copy.subtitle}</p>
-            </div>
-          </div>
-          <ActionButton
-            tone="ghost"
-            onClick={() => setLang(isArabic ? "en" : "ar")}
-            aria-label={isArabic ? "Switch to English" : "التبديل إلى العربية"}
-          >
-            <Globe2 className="size-4" aria-hidden="true" />
-            {isArabic ? "EN" : "عربي"}
-          </ActionButton>
+        <header className="mb-5 flex items-center justify-between gap-3 px-1">
+          <div className="flex items-center gap-2"><div className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground"><ShieldCheck className="size-5" /></div><div><p className="font-semibold">{clinicName}</p><p className="text-xs text-muted-foreground">{copy.subtitle}</p></div></div>
+          <Button variant="ghost" size="sm" onClick={() => setLang(isArabic ? "en" : "ar")} aria-label={isArabic ? "Switch to English" : "التبديل إلى العربية"}><Globe2 className="me-1 size-4" />{isArabic ? "EN" : "عربي"}</Button>
         </header>
-        <Panel className="overflow-hidden">
-          <div className="border-b border-z-line-hairline px-z6 py-z4">
-            <h1 className="text-z-subtitle rtl:text-z-subtitle-ar font-semibold text-z-ink-900">{copy.title}</h1>
-            <p className="mt-z1 flex items-center gap-z2 text-z-micro rtl:text-z-micro-ar text-z-ink-500">
-              <Clock3 className="size-4 shrink-0" aria-hidden="true" />
-              {copy.privacy}
-            </p>
-          </div>
-          <div className="px-z6 py-z5">{body}</div>
-        </Panel>
-        <p className="mt-z5 text-center text-z-micro rtl:text-z-micro-ar text-z-ink-500">
-          {isArabic ? "للمساعدة، تواصل مع فريق الاستقبال في العيادة." : "For help, contact your clinic's front desk."}
-        </p>
+        <Card className="shadow-sm">
+          <CardHeader><CardTitle>{copy.title}</CardTitle><CardDescription className="flex items-center gap-2"><Clock3 className="size-4" />{copy.privacy}</CardDescription></CardHeader>
+          <CardContent>{body}</CardContent>
+        </Card>
+        <p className="mt-5 text-center text-xs text-muted-foreground">{isArabic ? "للمساعدة، تواصل مع فريق الاستقبال في العيادة." : "For help, contact your clinic's front desk."}</p>
       </div>
     </main>
   );

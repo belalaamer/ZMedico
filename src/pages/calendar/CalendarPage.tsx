@@ -1,12 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useDataSync } from "@/lib/dataSync";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Fab } from "@/components/ui/fab";
-import { ChevronLeft, ChevronRight, Plus, Send, CalendarDays, LayoutGrid, Clock, Filter, X, CalendarRange, Check, ArrowRight, Wallet as WalletIcon, AlertCircle, AlertTriangle, History } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ChevronLeft, ChevronRight, Plus, Send, CalendarDays, LayoutGrid, Clock, Filter, X, CalendarRange, Check, ArrowRight, Wallet as WalletIcon, AlertCircle, History } from "lucide-react";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Can } from "@/components/Can";
 import { doctorDisplayName } from "@/lib/doctorName";
 import { patientDisplayName } from "@/lib/patientName";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Combobox } from "@/components/ui/combobox";
 import { usePatientSearch } from "@/hooks/usePatientSearch";
 import { cn } from "@/lib/utils";
@@ -29,19 +38,6 @@ import { PATIENT_PICKER_LIMIT, patientPickerCopy, pickedPatientLabel } from "@/l
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { deskFailure } from "@/lib/deskFailure";
 import { localDateTimeInput } from "@/lib/localDate";
-import {
-  ActionButton,
-  FieldLabel,
-  Panel,
-  PlatformDialog,
-  PlatformInput,
-  PlatformTextarea,
-  SectionLabel,
-  SelectField,
-  StatusChip,
-  TableShell,
-  type SignalTone,
-} from "@/components/zds/surface";
 
 function statusLabel(s: Appt["status"], t: (k: any) => string) {
   const map: Record<Appt["status"], string> = {
@@ -81,37 +77,36 @@ function startOfWeek(d: Date) { const x = startOfDay(d); const dow = x.getDay();
 function startOfMonth(d: Date) { const x = new Date(d.getFullYear(), d.getMonth(), 1); x.setHours(0,0,0,0); return x; }
 function sameDay(a: Date, b: Date) { return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
 
-// Signal colour is meaning, never decoration: a status is a chip with a word, and a grid
-// block takes its fill and its start-edge accent from the same signal family.
-const STATUS_TONE: Record<Appt["status"], SignalTone> = {
-  scheduled:   "neutral",
-  confirmed:   "positive",
-  in_progress: "caution",
-  completed:   "positive",
-  cancelled:   "critical",
-  no_show:     "critical",
-  departed:    "neutral",
+const statusClass: Record<Appt["status"], string> = {
+  scheduled: "status-progress",
+  confirmed: "status-completed",
+  in_progress: "status-progress",
+  completed: "status-completed",
+  cancelled: "status-cancelled",
+  no_show: "status-cancelled",
+  departed: "status-departed",
 };
 
+// HSL tokens for time-grid blocks (uses semantic tokens)
 const statusBlock: Record<Appt["status"], string> = {
-  scheduled:   "bg-z-brand-050 border-z-brand-100 text-z-ink-900",
-  confirmed:   "bg-z-positive-fill border-z-positive-stroke text-z-ink-900",
-  in_progress: "bg-z-caution-fill border-z-caution-stroke text-z-ink-900",
-  completed:   "bg-z-positive-fill border-z-positive-stroke text-z-ink-900",
-  cancelled:   "bg-z-critical-fill border-z-critical-stroke text-z-ink-900 line-through opacity-70",
-  no_show:     "bg-z-critical-fill border-z-critical-stroke text-z-ink-900 opacity-70",
-  departed:    "bg-z-sunk border-z-line-edge text-z-ink-500",
+  scheduled:   "bg-primary/15 border-primary/40 text-foreground",
+  confirmed:   "bg-emerald-500/15 border-emerald-500/40 text-foreground",
+  in_progress: "bg-amber-500/15 border-amber-500/40 text-foreground",
+  completed:   "bg-emerald-500/20 border-emerald-500/50 text-foreground",
+  cancelled:   "bg-destructive/15 border-destructive/40 text-foreground line-through opacity-70",
+  no_show:     "bg-destructive/10 border-destructive/30 text-foreground opacity-70",
+  departed:    "bg-muted border-border text-muted-foreground",
 };
 
-// Start-edge accent per status — makes a block pop on the grid without a second fill.
+// Left-accent border color per status — used to make blocks pop on the grid.
 const statusAccent: Record<Appt["status"], string> = {
-  scheduled:   "border-s-z-brand-500",
-  confirmed:   "border-s-z-positive",
-  in_progress: "border-s-z-caution",
-  completed:   "border-s-z-positive",
-  cancelled:   "border-s-z-critical",
-  no_show:     "border-s-z-critical",
-  departed:    "border-s-z-line-strong",
+  scheduled:   "border-l-primary",
+  confirmed:   "border-l-emerald-500",
+  in_progress: "border-l-amber-500",
+  completed:   "border-l-emerald-600",
+  cancelled:   "border-l-destructive",
+  no_show:     "border-l-destructive",
+  departed:    "border-l-muted-foreground",
 };
 
 // Default fallback when a branch has no working hours configured.
@@ -151,7 +146,6 @@ export default function CalendarPage() {
   const isMobile = useIsMobile();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const isArabic = lang === "ar";
   const [date, setDate] = useState<Date>(startOfDay(new Date()));
   const [view, setView] = useState<"day" | "week" | "month">("day");
   const [miniOpen, setMiniOpen] = useState(false);
@@ -331,7 +325,7 @@ export default function CalendarPage() {
     const { data, error } = await q;
     if (requestId !== loadRequestRef.current) return;
     if (error) {
-      const failure = deskFailure(error, lang, isArabic ? "تعذر تحميل التقويم." : "Could not load the calendar.");
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تحميل التقويم." : "Could not load the calendar.");
       toast.error(failure.title, { description: failure.description });
       return;
     }
@@ -391,7 +385,7 @@ export default function CalendarPage() {
       });
       if (cancelled) return;
       if (error) {
-        const failure = deskFailure(error, lang, isArabic ? "تعذر تحميل أطباء هذه الخدمة." : "Could not load the doctors for this service.");
+        const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تحميل أطباء هذه الخدمة." : "Could not load the doctors for this service.");
         toast.error(failure.title, { description: failure.description });
         setServiceDoctors([]);
         return;
@@ -433,7 +427,6 @@ export default function CalendarPage() {
     }
     // eslint-disable-next-line
   }, [searchParams]);
-
 
   // C3: resolve the deep-linked patient once per id. A failed lookup and a patient that
   // genuinely is not there are kept apart, because the desk needs to know which happened.
@@ -614,19 +607,19 @@ export default function CalendarPage() {
   // available for queue history, reports, and audit. Hard delete is no longer
   // exposed in the UI; admins can purge rows via the database directly.
   const cancelAppointment = async (a: Appt): Promise<void> => {
-    if (a.status === "cancelled") { toast.message(isArabic ? "الموعد ملغي بالفعل" : "Appointment already cancelled"); return; }
+    if (a.status === "cancelled") { toast.message(lang === "ar" ? "الموعد ملغي بالفعل" : "Appointment already cancelled"); return; }
     const patch = buildStatusPatch("cancelled", {
       checked_in_at: (a as any).checked_in_at ?? null,
       started_at: (a as any).started_at ?? null,
     });
     const { data, error } = await supabase.from("appointments").update(patch as any).eq("id", a.id).select("id");
     if (error) {
-      const failure = deskFailure(error, lang, isArabic ? "تعذر إلغاء الموعد." : "The appointment could not be cancelled.");
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر إلغاء الموعد." : "The appointment could not be cancelled.");
       toast.error(failure.title, { description: failure.description });
       return;
     }
     if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); load(); return; }
-    toast.success(isArabic ? "تم إلغاء الموعد" : "Appointment cancelled");
+    toast.success(lang === "ar" ? "تم إلغاء الموعد" : "Appointment cancelled");
     load();
   };
 
@@ -638,7 +631,7 @@ export default function CalendarPage() {
     });
     const { data, error } = await supabase.from("appointments").update(patch as any).eq("id", a.id).select("id");
     if (error) {
-      const failure = deskFailure(error, lang, isArabic ? "تعذر تحديث حالة الموعد." : "The appointment status could not be changed.");
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تحديث حالة الموعد." : "The appointment status could not be changed.");
       toast.error(failure.title, { description: failure.description });
       return;
     }
@@ -657,14 +650,14 @@ export default function CalendarPage() {
     if (error) {
       const message = String(error.message || "");
       toast.error(message.includes("booking_request_expired")
-        ? (isArabic ? "انتهت مهلة طلب الحجز وتحررت السعة." : "The booking request expired and its capacity was released.")
+        ? (lang === "ar" ? "انتهت مهلة طلب الحجز وتحررت السعة." : "The booking request expired and its capacity was released.")
         : message.includes("slot_unavailable")
-          ? (isArabic ? "لم تعد السعة متاحة لهذا الموعد." : "The capacity is no longer available for this appointment.")
-          : (isArabic ? "تعذر تأكيد طلب الحجز." : "Could not confirm the booking request."));
+          ? (lang === "ar" ? "لم تعد السعة متاحة لهذا الموعد." : "The capacity is no longer available for this appointment.")
+          : (lang === "ar" ? "تعذر تأكيد طلب الحجز." : "Could not confirm the booking request."));
       await load();
       return;
     }
-    toast.success(isArabic ? "تم تأكيد طلب الحجز" : "Booking request confirmed");
+    toast.success(lang === "ar" ? "تم تأكيد طلب الحجز" : "Booking request confirmed");
     setOpen(false);
     await load();
   };
@@ -679,7 +672,7 @@ export default function CalendarPage() {
     if (!rejectingAppointment || actionBusy) return;
     const reason = rejectReason.trim();
     if (!reason) {
-      toast.error(isArabic ? "اكتب سبب رفض طلب الحجز" : "Enter a reason for rejecting the booking request");
+      toast.error(lang === "ar" ? "اكتب سبب رفض طلب الحجز" : "Enter a reason for rejecting the booking request");
       return;
     }
     setActionBusy(true);
@@ -689,10 +682,10 @@ export default function CalendarPage() {
     });
     setActionBusy(false);
     if (error) {
-      toast.error(isArabic ? "تعذر رفض طلب الحجز" : "Could not reject the booking request");
+      toast.error(lang === "ar" ? "تعذر رفض طلب الحجز" : "Could not reject the booking request");
       return;
     }
-    toast.success(isArabic ? "تم رفض طلب الحجز وتحرير السعة" : "Booking request rejected and capacity released");
+    toast.success(lang === "ar" ? "تم رفض طلب الحجز وتحرير السعة" : "Booking request rejected and capacity released");
     setRejectOpen(false);
     setRejectingAppointment(null);
     setOpen(false);
@@ -711,7 +704,7 @@ export default function CalendarPage() {
   const nextStatusLabel = (s: Appt["status"]): string | null => {
     const n = nextStatus(s);
     if (!n) return null;
-    if (isArabic) {
+    if (lang === "ar") {
       return n === "confirmed" ? "وصل" : n === "in_progress" ? "ابدأ" : "تم";
     }
     return n === "confirmed" ? "Arrived" : n === "in_progress" ? "Start" : "Done";
@@ -740,7 +733,7 @@ export default function CalendarPage() {
         status: "pending",
       } as any).select("id").single();
       if (insErr) {
-        const failure = deskFailure(insErr, lang, isArabic ? "تعذر جدولة التذكير." : "The reminder could not be scheduled.");
+        const failure = deskFailure(insErr, lang, lang === "ar" ? "تعذر جدولة التذكير." : "The reminder could not be scheduled.");
         toast.error(failure.title, { description: failure.description });
         return;
       }
@@ -761,11 +754,11 @@ export default function CalendarPage() {
     // instead of guessing.
     if (!form.patient_id || !form.scheduled_at) {
       const missing = !form.patient_id && !form.scheduled_at
-        ? (isArabic ? "المريض والتاريخ/الوقت" : "a patient and a date/time")
+        ? (lang === "ar" ? "المريض والتاريخ/الوقت" : "a patient and a date/time")
         : !form.patient_id
-          ? (isArabic ? "المريض" : "a patient")
-          : (isArabic ? "التاريخ والوقت" : "a date/time");
-      toast.error(isArabic ? `من فضلك اختر ${missing}` : `Please select ${missing}`);
+          ? (lang === "ar" ? "المريض" : "a patient")
+          : (lang === "ar" ? "التاريخ والوقت" : "a date/time");
+      toast.error(lang === "ar" ? `من فضلك اختر ${missing}` : `Please select ${missing}`);
       return;
     }
     if (savingRef.current) return;
@@ -802,12 +795,12 @@ export default function CalendarPage() {
       ? await supabase.from("appointments").update(payload).eq("id", editId).select("id")
       : await supabase.from("appointments").insert({ ...payload, branch_id: currentBranchId, status: "scheduled" });
     if (error) {
-      const failure = deskFailure(error, lang, isArabic ? "تعذر حفظ الموعد." : "The appointment could not be saved.");
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر حفظ الموعد." : "The appointment could not be saved.");
       toast.error(failure.title, { description: failure.description });
       return;
     }
     if (editId && rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "save")); load(); return; }
-    toast.success(isArabic ? "تم حفظ الموعد" : "Appointment saved");
+    toast.success(lang === "ar" ? "تم حفظ الموعد" : "Appointment saved");
     setOpen(false); setEditId(null);
     // C3: the link asked for one booking; keeping it would prefill the next form with the
     // patient who was just saved.
@@ -966,43 +959,43 @@ export default function CalendarPage() {
       id={`appt-${a.id}`}
       onClick={(e) => { e.stopPropagation(); navigate(`/appointments/${a.id}`); }}
       className={cn(
-        "absolute overflow-hidden rounded-z2 border border-s-4 px-z2 py-z1 text-start shadow-z1",
-        "transition-[transform,box-shadow] duration-zquick ease-z-out hover:z-20 hover:shadow-z2",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-z-brand-500",
+        "absolute rounded-md border border-l-4 text-start px-2 py-1 overflow-hidden shadow-sm",
+        "hover:shadow-md hover:z-20 hover:scale-[1.01] transition-all",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
         statusBlock[a.status],
         statusAccent[a.status],
-        highlightId === a.id && "z-20 ring-2 ring-z-brand-500 shadow-z2",
-        lanes > 1 && "ring-1 ring-z-raised",
+        highlightId === a.id && "ring-2 ring-primary shadow-lg z-20",
+        lanes > 1 && "ring-1 ring-background/60",
         // Pinned to the top/bottom edge of the visible grid because its real
         // time falls outside the branch's configured working hours -- the
-        // ring calls that out so the pinned position isn't mistaken for the
-        // actual appointment time (shown correctly below regardless).
-        isOutOfHours && "ring-2 ring-z-line-strong",
+        // dashed ring calls that out so the pinned position isn't mistaken
+        // for the actual appointment time (shown correctly below regardless).
+        isOutOfHours && "ring-2 ring-dashed ring-muted-foreground/50",
         // A public booking awaiting staff confirmation must be easy to spot
         // without opening it -- without this ring it renders identically to
         // any other scheduled appointment on the grid.
-        a.booking_request_status === "pending" && "ring-2 ring-z-caution ring-offset-1",
+        a.booking_request_status === "pending" && "ring-2 ring-amber-500 ring-offset-1",
       )}
       style={style}
-      title={`${fullName(a.patients!)} · ${timeStr(new Date(a.scheduled_at))}${isOutOfHours ? ` (${isArabic ? "خارج ساعات العمل" : "outside working hours"})` : ""}`}
+      title={`${fullName(a.patients!)} · ${timeStr(new Date(a.scheduled_at))}${isOutOfHours ? ` (${lang === "ar" ? "خارج ساعات العمل" : "outside working hours"})` : ""}`}
     >
-      <div className="truncate text-z-micro rtl:text-z-micro-ar font-semibold leading-tight text-z-ink-900">
+      <div className="text-xs font-bold leading-tight truncate">
         {fullName(a.patients!)}
       </div>
-      <div className="flex flex-wrap items-center gap-x-z1 truncate text-z-micro rtl:text-z-micro-ar leading-tight text-z-ink-500">
-        <span className="z-num">{timeStr(new Date(a.scheduled_at))}</span>
-        {isOutOfHours ? <AlertTriangle className="size-3 shrink-0 text-z-caution-ink" aria-hidden="true" /> : null}
-        {a.booking_request_status === "pending" ? (
-          <span className="font-semibold text-z-caution-ink" title={isArabic ? "طلب حجز في انتظار التأكيد" : "Booking request awaiting confirmation"}>
-            {isArabic ? "بانتظار التأكيد" : "Needs confirmation"}
+      <div className="text-[11px] leading-tight truncate text-muted-foreground">
+        {timeStr(new Date(a.scheduled_at))}
+        {isOutOfHours && <span className="ms-1" aria-hidden>⚠</span>}
+        {a.booking_request_status === "pending" && (
+          <span className="ms-1 font-semibold text-amber-600 dark:text-amber-400" title={lang === "ar" ? "طلب حجز في انتظار التأكيد" : "Booking request awaiting confirmation"}>
+            {lang === "ar" ? "بانتظار التأكيد" : "Needs confirmation"}
           </span>
-        ) : null}
+        )}
       </div>
-      {(appointmentServiceLabel(a) || a.room) ? (
-        <div className="truncate text-z-micro rtl:text-z-micro-ar leading-tight text-z-ink-500">
+      {(appointmentServiceLabel(a) || a.room) && (
+        <div className="text-[10px] leading-tight truncate text-muted-foreground/90">
           {appointmentServiceLabel(a) || "—"}{a.room ? ` · ${a.room}` : ""}
         </div>
-      ) : null}
+      )}
     </button>
     );
   };
@@ -1027,33 +1020,33 @@ export default function CalendarPage() {
   const showNowLine = now.getHours() >= dayStartHour && now.getHours() < dayEndHour;
 
   const sidebarContent = (
-    <div className="space-y-z4">
-      <Panel className={cn("p-z4", (workStartMin == null || workEndMin == null) && "border-dashed bg-z-sunk")}>
+    <div className="space-y-4">
+      <Card className={`p-4 shadow-card ${workStartMin == null || workEndMin == null ? "border-dashed bg-muted/40" : ""}`}>
         {(workStartMin == null || workEndMin == null) && (
-          <div className="mb-z3 text-center text-z-micro rtl:text-z-micro-ar leading-snug text-z-ink-500">
-            {isArabic ? "لا توجد ساعات عمل محددة لهذا الفرع" : "No working hours for this branch"}
+          <div className="mb-3 text-[11px] text-muted-foreground text-center leading-snug">
+            {lang === "ar" ? "لا توجد ساعات عمل محددة لهذا الفرع" : "No working hours for this branch"}
           </div>
         )}
-        <div className="mb-z3 flex items-center justify-between">
+        <div className="flex items-center justify-between mb-3">
           <button onClick={() => setMonthCursor(new Date(monthCursor.getFullYear(), monthCursor.getMonth() - 1, 1))}
-            className="inline-flex size-7 items-center justify-center rounded-z2 hover:bg-z-sunk">
+            className="size-7 inline-flex items-center justify-center rounded hover:bg-muted">
             <ChevronLeft className="size-4 rtl:rotate-180" />
           </button>
-          <div className="text-z-small rtl:text-z-small-ar font-semibold text-z-ink-900">
+          <div className="text-sm font-semibold">
             {monthCursor.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", { month: "long", year: "numeric" })}
           </div>
           <button onClick={() => setMonthCursor(new Date(monthCursor.getFullYear(), monthCursor.getMonth() + 1, 1))}
-            className="inline-flex size-7 items-center justify-center rounded-z2 hover:bg-z-sunk">
+            className="size-7 inline-flex items-center justify-center rounded hover:bg-muted">
             <ChevronRight className="size-4 rtl:rotate-180" />
           </button>
         </div>
-        <div className="mb-z1 grid grid-cols-7 gap-z1 text-center text-z-micro rtl:text-z-micro-ar text-z-ink-500">
-          {(isArabic
+        <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-muted-foreground mb-1">
+          {(lang === "ar"
             ? ["أحد","اثن","ثلا","أرب","خمي","جمع","سبت"]
             : ["S","M","T","W","T","F","S"]
           ).map((d, i) => <div key={i}>{d}</div>)}
         </div>
-        <div className="grid grid-cols-7 gap-z1 text-center text-z-micro rtl:text-z-micro-ar">
+        <div className="grid grid-cols-7 gap-1 text-center text-xs">
           {monthGrid.map((d, i) => {
             if (!d) return <div key={i} />;
             const active = sameDay(d, date);
@@ -1061,126 +1054,330 @@ export default function CalendarPage() {
             const count = monthDots[d.toDateString()] ?? 0;
             return (
               <button key={i} onClick={() => { setDate(d); setMiniOpen(false); }}
-                className={cn(
-                  "relative flex aspect-square flex-col items-center justify-center rounded-z2",
-                  active ? "bg-z-brand-700 text-z-raised" : today ? "ring-1 ring-z-brand-500 text-z-brand-700" : "hover:bg-z-sunk",
-                )}>
-                <span className="z-num font-medium">{d.getDate()}</span>
+                className={`aspect-square rounded-lg relative flex flex-col items-center justify-center
+                  ${active ? "gradient-primary text-primary-foreground" : today ? "ring-1 ring-primary text-primary" : "hover:bg-muted"}`}>
+                <span className="font-medium">{d.getDate()}</span>
                 {count > 0 && (
-                  <span className={cn("absolute bottom-1 size-1 rounded-full", active ? "bg-z-raised" : "bg-z-brand-500")} />
+                  <span className={`absolute bottom-1 size-1 rounded-full ${active ? "bg-primary-foreground" : "bg-primary"}`} />
                 )}
               </button>
             );
           })}
         </div>
-      </Panel>
+      </Card>
     </div>
   );
 
-  const viewOptions: { key: "day" | "week" | "month"; label: string; icon: React.ReactNode; hideOnMobile?: boolean }[] = [
-    { key: "day", label: isArabic ? "يوم" : "Day", icon: <CalendarDays className="size-4" aria-hidden="true" /> },
-    { key: "week", label: isArabic ? "أسبوع" : "Week", icon: <LayoutGrid className="size-4" aria-hidden="true" />, hideOnMobile: true },
-    { key: "month", label: isArabic ? "شهر" : "Month", icon: <CalendarRange className="size-4" aria-hidden="true" /> },
-  ];
-
   return (
-    <div className="z-desk min-h-screen space-y-z6 p-z4 sm:p-z6" dir={isArabic ? "rtl" : "ltr"}>
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-z3">
-        <div className="min-w-0">
-          <h1 className="text-z-title rtl:text-z-title-ar font-semibold text-z-ink-900">{t("calendar")}</h1>
-          <p className="z-num mt-z1 text-z-small rtl:text-z-small-ar text-z-ink-500">{dayLabel}</p>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t("calendar")}</h1>
+          <p className="text-sm text-muted-foreground mt-1 capitalize">{dayLabel}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-z2">
-          <div className="inline-flex overflow-hidden rounded-z2 border border-z-line-edge bg-z-raised">
-            {viewOptions.filter((o) => !(o.hideOnMobile && isMobile)).map((o) => (
+        <div className="flex gap-2 items-center">
+          <div className="inline-flex rounded-md border border-border overflow-hidden">
+            <button
+              onClick={() => setView("day")}
+              className={`px-3 h-9 text-sm inline-flex items-center gap-1 ${view === "day" ? "bg-muted" : "hover:bg-muted/50"}`}
+            >
+              <CalendarDays className="size-4" /> {lang === "ar" ? "يوم" : "Day"}
+            </button>
+            {!isMobile && (
               <button
-                key={o.key}
-                onClick={() => setView(o.key)}
-                aria-pressed={view === o.key}
-                className={cn(
-                  "inline-flex h-z9 items-center gap-z1 border-s border-z-line-edge px-z3 text-z-small rtl:text-z-small-ar first:border-s-0",
-                  view === o.key ? "bg-z-sunk text-z-ink-900" : "text-z-ink-500 hover:bg-z-sunk",
-                )}
+                onClick={() => setView("week")}
+                className={`px-3 h-9 text-sm inline-flex items-center gap-1 border-s border-border ${view === "week" ? "bg-muted" : "hover:bg-muted/50"}`}
               >
-                {o.icon} {o.label}
+                <LayoutGrid className="size-4" /> {lang === "ar" ? "أسبوع" : "Week"}
               </button>
-            ))}
+            )}
+            <button
+              onClick={() => setView("month")}
+              className={`px-3 h-9 text-sm inline-flex items-center gap-1 border-s border-border ${view === "month" ? "bg-muted" : "hover:bg-muted/50"}`}
+            >
+              <CalendarRange className="size-4" /> {lang === "ar" ? "شهر" : "Month"}
+            </button>
           </div>
           {view === "day" && resources.length ? (
-            <ActionButton tone={roomBoard ? "primary" : "quiet"} onClick={() => setRoomBoard((value) => !value)} aria-pressed={roomBoard}>
-              <LayoutGrid className="size-4" aria-hidden="true" />{isArabic ? "جدول الغرف" : "Room board"}
-            </ActionButton>
+            <Button variant={roomBoard ? "default" : "outline"} size="sm" onClick={() => setRoomBoard((value) => !value)} className="gap-1">
+              <LayoutGrid className="size-4" />{lang === "ar" ? "جدول الغرف" : "Room board"}
+            </Button>
           ) : null}
-          <ActionButton
-            tone="quiet"
-            aria-label={isArabic ? "الفترة السابقة" : "Previous period"}
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label={lang === "ar" ? "الفترة السابقة" : "Previous period"}
             onClick={() => {
               if (view === "month") setDate(new Date(date.getFullYear(), date.getMonth() - 1, 1));
               else setDate(addDays(date, view === "week" ? -7 : -1));
             }}
-          ><ChevronLeft className="size-4 rtl:rotate-180" /></ActionButton>
-          <ActionButton tone="quiet" onClick={() => setDate(startOfDay(new Date()))}>{t("today")}</ActionButton>
-          <ActionButton
-            tone="quiet"
-            aria-label={isArabic ? "الفترة التالية" : "Next period"}
+          ><ChevronLeft className="size-4 rtl:rotate-180" /></Button>
+          <Button variant="outline" size="sm" onClick={() => setDate(startOfDay(new Date()))}>{t("today")}</Button>
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label={lang === "ar" ? "الفترة التالية" : "Next period"}
             onClick={() => {
               if (view === "month") setDate(new Date(date.getFullYear(), date.getMonth() + 1, 1));
               else setDate(addDays(date, view === "week" ? 7 : 1));
             }}
-          ><ChevronRight className="size-4 rtl:rotate-180" /></ActionButton>
+          ><ChevronRight className="size-4 rtl:rotate-180" /></Button>
           <Popover open={miniOpen} onOpenChange={setMiniOpen}>
             <PopoverTrigger asChild>
-              <ActionButton tone="quiet" aria-label={isArabic ? "التقويم" : "Calendar"}>
+              <Button variant="outline" size="icon" aria-label={lang === "ar" ? "التقويم" : "Calendar"}>
                 <CalendarDays className="size-4" />
-              </ActionButton>
+              </Button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="z-desk w-[320px] border-z-line-edge bg-z-raised p-z2">
+            <PopoverContent align="end" className="w-[320px] p-0">
               {sidebarContent}
             </PopoverContent>
           </Popover>
           {/* Escape or a backdrop tap during the save hid the form while the write
               was still landing, so the operator never knew which way it went. */}
-          <ActionButton className="hidden md:inline-flex" onClick={openNew}>
-            <Plus className="size-4" aria-hidden="true" />
-            {t("newAppointment")}
-          </ActionButton>
+          <Dialog open={open} onOpenChange={(o) => { if (!savingRef.current) setOpen(o); }}>
+            <DialogTrigger asChild>
+              <Button className="gradient-primary text-primary-foreground hidden md:inline-flex" onClick={openNew}><Plus className="me-2 size-4" />{t("newAppointment")}</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg w-[calc(100vw-2rem)] sm:w-full p-5 sm:p-6 max-h-[90vh] overflow-y-auto">
+              <DialogHeader><DialogTitle>{editId ? t("edit") : t("newAppointment")}</DialogTitle></DialogHeader>
+              <form onSubmit={handleSave} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>{t("patientName")}</Label>
+                  <Combobox
+                    options={patients.map((p) => ({
+                      value: p.id,
+                      label: p.label,
+                      // Two patients can share a name; the number they were found by is
+                      // the one piece of evidence that says which one this is.
+                      detail: p.phone ?? undefined,
+                    }))}
+                    value={form.patient_id}
+                    onChange={(next) => {
+                      const picked = patients.find((p) => p.id === next);
+                      setPatientEcho(picked ? { id: picked.id, label: picked.label } : null);
+                      setForm((current) => ({ ...current, patient_id: next }));
+                    }}
+                    placeholder={lang === "ar" ? "ابحث عن مريض..." : "Search patient..."}
+                    searchPlaceholder={pickerCopy.searchPlaceholder}
+                    emptyText={patientSearch.failed ? pickerCopy.failed : pickerCopy.empty}
+                    searchingText={pickerCopy.searching}
+                    hintText={patients.length >= PATIENT_PICKER_LIMIT ? pickerCopy.truncated : undefined}
+                    selectedLabel={bookingPatientLabel(form.patient_id)}
+                    searching={patientSearch.searching}
+                    onSearch={loadPatientOptions}
+                  />
+                  {form.patient_id && (
+                    <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs flex flex-wrap items-center gap-x-4 gap-y-1">
+                      {patientCtxLoading || !patientCtx ? (
+                        <span className="text-muted-foreground">{lang === "ar" ? "جارٍ تحميل بيانات المريض..." : "Loading patient context..."}</span>
+                      ) : (
+                        <>
+                          <span className="inline-flex items-center gap-1">
+                            <WalletIcon className="size-3.5 text-muted-foreground" />
+                            <span className="text-muted-foreground">{lang === "ar" ? "المحفظة:" : "Wallet:"}</span>
+                            <span className={`font-medium tabular-nums ${patientCtx.wallet > 0 ? "text-emerald-600" : ""}`}>{formatMoney(patientCtx.wallet, lang)}</span>
+                          </span>
+                          <span className="inline-flex items-center gap-1">
+                            <AlertCircle className={`size-3.5 ${patientCtx.outstanding > 0 ? "text-destructive" : "text-muted-foreground"}`} />
+                            <span className="text-muted-foreground">{lang === "ar" ? "متبقي:" : "Outstanding:"}</span>
+                            <span className={`font-medium tabular-nums ${patientCtx.outstanding > 0 ? "text-destructive" : ""}`}>{formatMoney(patientCtx.outstanding, lang)}</span>
+                          </span>
+                          <span className="inline-flex items-center gap-1">
+                            <History className="size-3.5 text-muted-foreground" />
+                            <span className="text-muted-foreground">{lang === "ar" ? "آخر زيارة:" : "Last visit:"}</span>
+                            <span className="font-medium">{patientCtx.lastVisit ? formatDate(patientCtx.lastVisit, lang) : (lang === "ar" ? "—" : "—")}</span>
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>{lang === "ar" ? "الطبيب" : "Doctor"}</Label>
+                  <Combobox
+                    value={form.doctor_id}
+                    onChange={(v) => setForm({ ...form, doctor_id: v })}
+                    options={bookingDoctors.map((d) => ({ value: d.id, label: doctorDisplayName(d, lang) }))}
+                    placeholder={lang === "ar" ? "— بدون —" : "— None —"}
+                    searchPlaceholder={lang === "ar" ? "ابحث عن طبيب..." : "Search doctor..."}
+                    emptyText={form.service_id && serviceDoctors?.length === 0 ? (lang === "ar" ? "لا يوجد طبيب مؤهل لهذه الخدمة" : "No doctor is assigned to this service") : (lang === "ar" ? "لا يوجد أطباء" : "No doctors found")}
+                    allowClear
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>{t("scheduledAt")}</Label>
+                    <Input type="datetime-local" value={form.scheduled_at} onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{t("durationMin")}</Label>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      dir="ltr"
+                      value={String(form.duration_minutes ?? "")}
+                      onChange={(e) => {
+                        // Accept Arabic-Indic & Persian digits
+                        const ascii = e.target.value
+                          .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+                          .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 0x06F0))
+                          .replace(/[^\d]/g, "");
+                        setForm({ ...form, duration_minutes: ascii === "" ? 0 : Number(ascii) });
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>{lang === "ar" ? "الخدمة / نوع الزيارة" : "Service / appointment type"}</Label>
+                    <Select
+                      value={form.service_id || "__none__"}
+                      onValueChange={(v) => {
+                        if (v === "__none__") {
+                          setForm({ ...form, service_id: "", procedure: "" });
+                          return;
+                        }
+                        const selected = services.find((s) => s.id === v);
+                        setForm({
+                          ...form,
+                          service_id: v,
+                          // Keep a snapshot for legacy reports and old rows while
+                          // service_id remains the canonical booking relationship.
+                          procedure: selected?.name_en || selected?.name_ar || "",
+                          duration_minutes: selected?.duration || form.duration_minutes,
+                        });
+                      }}
+                    >
+                      <SelectTrigger><SelectValue placeholder={lang === "ar" ? "اختر الخدمة" : "Choose service"} /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">— {lang === "ar" ? "بدون خدمة" : "No service"} —</SelectItem>
+                        {services.map((service) => (
+                          <SelectItem key={service.id} value={service.id}>
+                            {lang === "ar" ? service.name_ar : service.name_en} · {service.duration}m
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[11px] leading-4 text-muted-foreground">
+                      {lang === "ar" ? "الإجراءات الطبية التي تم تنفيذها تُسجل داخل السجل الطبي بعد حضور المريض." : "Clinical procedures performed are documented in the medical record after the patient visit."}
+                    </p>
+                    {form.procedure && !form.service_id ? (
+                      <p className="text-[11px] leading-4 text-amber-600">
+                        {lang === "ar" ? "هذا موعد قديم يحتوي على إجراء محفوظ؛ اختر خدمة جديدة لتحديثه." : "This legacy appointment has a saved procedure; choose a service to update it."}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{t("room")}</Label>
+                    {resources.length ? (
+                      <Select value={form.resource_id || "__none__"} onValueChange={(value) => {
+                        const selected = resources.find((resource) => resource.id === value);
+                        setForm({ ...form, resource_id: value === "__none__" ? "" : value, room: selected?.name_en || "" });
+                      }}>
+                        <SelectTrigger><SelectValue placeholder={lang === "ar" ? "اختر الغرفة" : "Choose room"} /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">— {lang === "ar" ? "بدون غرفة محددة" : "No specific room"} —</SelectItem>
+                          {resources.map((resource) => <SelectItem key={resource.id} value={resource.id}>{lang === "ar" ? resource.name_ar : resource.name_en} · {resource.capacity} {lang === "ar" ? "سعة" : "capacity"}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <>
+                        <Input list="calendar-rooms-list" value={form.room} onChange={(e) => setForm({ ...form, room: e.target.value, resource_id: "" })} maxLength={40} placeholder={t("selectRoom")} />
+                        <datalist id="calendar-rooms-list">{rooms.map((r) => <option key={r} value={r} />)}</datalist>
+                      </>
+                    )}
+                    <p className="text-[11px] leading-4 text-muted-foreground">{resources.length ? (lang === "ar" ? "اختيار الغرفة يثبت المورد الذي سيستهلكه الموعد." : "Selecting a room assigns the resource consumed by this appointment.") : (lang === "ar" ? "أضف الغرف من إعدادات المواعيد لتفعيل حساب السعة." : "Add rooms in Appointment Settings to enable capacity-aware booking.")}</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("notes")}</Label>
+                  <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} maxLength={1000} />
+                </div>
+                {editId && (
+                  <div className="space-y-2">
+                    <Label>{t("status")}</Label>
+                                            <Select disabled={editingAppointment?.booking_request_status === "pending"} value={form.status} onValueChange={(v) => setForm({ ...form, status: v as Appt["status"] })}>
+
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="scheduled">{t("statusScheduled")}</SelectItem>
+                        <SelectItem value="confirmed">{t("statusConfirmed")}</SelectItem>
+                        <SelectItem value="in_progress">{t("statusInProgress")}</SelectItem>
+                        <SelectItem value="completed">{t("statusCompleted")}</SelectItem>
+                        <SelectItem value="cancelled">{t("statusCancelled")}</SelectItem>
+                        <SelectItem value="no_show">{t("statusNoShow")}</SelectItem>
+                        <SelectItem value="departed">{t("statusDeparted")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {editingAppointment?.booking_request_status === "pending" ? (
+                      <p className="text-xs text-amber-600">
+                        {lang === "ar" ? "استخدم زر التأكيد أو الرفض لمعالجة طلب الحجز. لا يمكن تغيير الحالة يدويًا قبل المعالجة." : "Use Confirm or Reject to process this booking request. Manual status changes are disabled until it is processed."}
+                      </p>
+                    ) : null}
+                  </div>
+                )}
+                {editingAppointment?.booking_request_status === "pending" ? (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-3">
+                    <div>
+                      <div className="font-semibold text-sm">{lang === "ar" ? "طلب حجز في انتظار المراجعة" : "Booking request awaiting review"}</div>
+                      {editingAppointment.booking_request_expires_at ? <div className="text-xs text-muted-foreground mt-1">{lang === "ar" ? "تنتهي المهلة: " : "Hold expires: "}{new Date(editingAppointment.booking_request_expires_at).toLocaleString(lang === "ar" ? "ar-EG" : "en-EG")}</div> : null}
+                    </div>
+                    <Can permission="appointments.edit">
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" className="bg-emerald-600 text-white hover:bg-emerald-700" disabled={actionBusy} onClick={() => confirmBookingRequest(editingAppointment)}>
+                          <Check className="size-4 me-1" />{lang === "ar" ? "تأكيد الحجز" : "Confirm booking"}
+                        </Button>
+                        <Button type="button" variant="destructive" disabled={actionBusy} onClick={() => openRejectDialog(editingAppointment)}>
+                          <X className="size-4 me-1" />{lang === "ar" ? "رفض الطلب" : "Reject request"}
+                        </Button>
+                      </div>
+                    </Can>
+                  </div>
+                ) : null}
+                <DialogFooter>
+                  <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={saving}>{t("cancel")}</Button>
+                  <Button type="submit" className="gradient-primary text-primary-foreground" disabled={saving}>{t("save")}</Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
       {/* C3: the patient the link arrived with, stated out loud instead of silently dropped. */}
       {deepLinkPending || deepLinkCopy ? (
-        <Panel className="flex flex-wrap items-center justify-between gap-z3 border-z-brand-100 bg-z-brand-050 px-z3 py-z2">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
           {deepLinkPending || !deepLinkCopy ? (
-            <span role="status" className="text-z-small rtl:text-z-small-ar text-z-ink-500">
-              {isArabic ? "جارٍ التحقق من المريض…" : "Checking the patient…"}
+            <span role="status" className="text-sm text-muted-foreground">
+              {lang === "ar" ? "جارٍ التحقق من المريض…" : "Checking the patient…"}
             </span>
           ) : (
             <>
               <div className="min-w-0">
-                <div className="truncate text-z-small rtl:text-z-small-ar font-semibold text-z-ink-900">{deepLinkCopy.title}</div>
-                <div className="text-z-micro rtl:text-z-micro-ar text-z-ink-500">{deepLinkCopy.detail}</div>
+                <div className="text-sm font-semibold truncate">{deepLinkCopy.title}</div>
+                <div className="text-xs text-muted-foreground">{deepLinkCopy.detail}</div>
               </div>
-              <div className="flex shrink-0 items-center gap-z1">
-                <ActionButton tone={deepLink?.name ? "primary" : "quiet"} onClick={openNew}>
-                  <Plus className="size-4" aria-hidden="true" />{deepLinkCopy.action}
-                </ActionButton>
-                <ActionButton tone="ghost" aria-label={deepLinkCopy.dismiss} onClick={clearPatientDeepLink}>
+              <div className="flex shrink-0 items-center gap-1">
+                <Button size="sm" variant={deepLink?.name ? "default" : "outline"} onClick={openNew}>
+                  <Plus className="me-2 size-4" />{deepLinkCopy.action}
+                </Button>
+                <Button size="icon" variant="ghost" aria-label={deepLinkCopy.dismiss} onClick={clearPatientDeepLink}>
                   <X className="size-4" />
-                </ActionButton>
+                </Button>
               </div>
             </>
           )}
-        </Panel>
+        </div>
       ) : null}
 
       {/* Stats strip — each card filters the list to exactly what it counted */}
-      <div className="grid grid-cols-2 gap-z3 md:grid-cols-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {([
-          { key: "all",      label: isArabic ? "إجمالي"  : "Total",     value: stats.total,     cls: "text-z-ink-900" },
-          { key: "upcoming", label: isArabic ? "قادمة"   : "Upcoming",  value: stats.upcoming,  cls: "text-z-brand-700" },
-          { key: "completed",label: isArabic ? "مكتمل"   : "Completed", value: stats.completed, cls: "text-z-positive-ink" },
-          { key: "missed",   label: isArabic ? "ملغية"   : "Cancelled", value: stats.missed,    cls: "text-z-critical-ink" },
+          { key: "all",      label: lang === "ar" ? "إجمالي"  : "Total",     value: stats.total,     cls: "text-foreground" },
+          { key: "upcoming", label: lang === "ar" ? "قادمة"   : "Upcoming",  value: stats.upcoming, cls: "text-primary" },
+          { key: "completed",label: lang === "ar" ? "مكتمل"   : "Completed", value: stats.completed, cls: "text-emerald-500" },
+          { key: "missed",   label: lang === "ar" ? "ملغية"   : "Cancelled", value: stats.missed,   cls: "text-destructive" },
         ] as const).map((s) => {
           const active = statusFilter === s.key;
           return (
@@ -1191,73 +1388,82 @@ export default function CalendarPage() {
               onClick={() => setStatusFilter(nextStatusFilter(statusFilter, s.key))}
               className="text-start"
             >
-              <Panel className={cn("p-z4 transition-colors duration-zquick hover:bg-z-sunk", active && "ring-2 ring-z-brand-500")}>
-                <div className="text-z-micro rtl:text-z-micro-ar text-z-ink-500">{s.label}</div>
-                <div className={cn("z-num mt-z1 text-z-title rtl:text-z-title-ar font-semibold", s.cls)}>{s.value}</div>
-              </Panel>
+              <Card className={`p-4 shadow-card transition-all hover:shadow-elegant ${active ? "ring-2 ring-primary" : ""}`}>
+                <div className="text-xs text-muted-foreground">{s.label}</div>
+                <div className={`text-2xl font-bold mt-1 ${s.cls}`}>{s.value}</div>
+              </Card>
             </button>
           );
         })}
       </div>
 
       {/* Filters */}
-      <Panel className="flex items-end gap-z2 overflow-x-auto p-z3">
-        <div className="me-z1 inline-flex shrink-0 items-center gap-z1 text-z-micro rtl:text-z-micro-ar text-z-ink-500">
-          <Filter className="size-3.5" aria-hidden="true" /> {isArabic ? "تصفية:" : "Filter:"}
+      <Card className="p-3 shadow-card flex md:flex-wrap items-stretch md:items-center gap-2 overflow-x-auto md:overflow-visible">
+        <div className="inline-flex items-center gap-1 text-xs text-muted-foreground me-1 shrink-0">
+          <Filter className="size-3.5" /> {lang === "ar" ? "تصفية:" : "Filter:"}
         </div>
-        <SelectField aria-label={isArabic ? "كل الأطباء" : "All doctors"} className="h-z9 w-auto min-w-[140px] shrink-0" value={doctorFilter} onChange={(e) => setDoctorFilter(e.target.value)}>
-          <option value="all">{isArabic ? "كل الأطباء" : "All doctors"}</option>
-          {isDoctorUser && user?.id ? <option value={user.id}>{isArabic ? "جدولي" : "My schedule"}</option> : null}
-          <option value="__none__">{isArabic ? "بدون طبيب" : "Unassigned"}</option>
-          {doctors.map((d) => <option key={d.id} value={d.id}>{doctorDisplayName(d, lang)}</option>)}
-        </SelectField>
-        <SelectField aria-label={isArabic ? "كل الغرف" : "All rooms"} className="h-z9 w-auto min-w-[120px] shrink-0" value={roomFilter} onChange={(e) => setRoomFilter(e.target.value)}>
-          <option value="all">{isArabic ? "كل الغرف" : "All rooms"}</option>
-          <option value="__none__">{isArabic ? "بدون غرفة" : "No room"}</option>
-          {rooms.map((r) => <option key={r} value={r}>{r}</option>)}
-        </SelectField>
-        <SelectField aria-label={isArabic ? "كل الحالات" : "All statuses"} className="h-z9 w-auto min-w-[130px] shrink-0" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-          <option value="all">{isArabic ? "كل الحالات" : "All statuses"}</option>
-          {/* The cards filter by these group tokens; without an option here the
-              trigger would render blank after a card click. */}
-          <option value="upcoming">{isArabic ? "قادمة (مجدولة + مؤكدة)" : "Upcoming (scheduled + confirmed)"}</option>
-          <option value="missed">{isArabic ? "ملغية (ملغاة + لم تحضر)" : "Cancelled (cancelled + no-show)"}</option>
-          <option value="scheduled">{t("statusScheduled")}</option>
-          <option value="confirmed">{t("statusConfirmed")}</option>
-          <option value="in_progress">{t("statusInProgress")}</option>
-          <option value="completed">{t("statusCompleted")}</option>
-          <option value="cancelled">{t("statusCancelled")}</option>
-          <option value="no_show">{t("statusNoShow")}</option>
-          <option value="departed">{t("statusDeparted")}</option>
-        </SelectField>
-        {(doctorFilter !== "all" || roomFilter !== "all" || statusFilter !== "all") ? (
-          <ActionButton tone="ghost" onClick={() => { setDoctorFilter("all"); setRoomFilter("all"); setStatusFilter("all"); }}>
-            <X className="size-3" aria-hidden="true" />{isArabic ? "مسح" : "Clear"}
-          </ActionButton>
-        ) : null}
-      </Panel>
+        <Select value={doctorFilter} onValueChange={setDoctorFilter}>
+          <SelectTrigger className="h-10 md:h-9 w-auto min-w-[140px] text-sm md:text-xs shrink-0"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{lang === "ar" ? "كل الأطباء" : "All doctors"}</SelectItem>
+            {isDoctorUser && user?.id && (
+              <SelectItem value={user.id}>{lang === "ar" ? "جدولي" : "My schedule"}</SelectItem>
+            )}
+            <SelectItem value="__none__">{lang === "ar" ? "بدون طبيب" : "Unassigned"}</SelectItem>
+            {doctors.map((d) => <SelectItem key={d.id} value={d.id}>{doctorDisplayName(d, lang)}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={roomFilter} onValueChange={setRoomFilter}>
+          <SelectTrigger className="h-10 md:h-9 w-auto min-w-[120px] text-sm md:text-xs shrink-0"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{lang === "ar" ? "كل الغرف" : "All rooms"}</SelectItem>
+            <SelectItem value="__none__">{lang === "ar" ? "بدون غرفة" : "No room"}</SelectItem>
+            {rooms.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="h-10 md:h-9 w-auto min-w-[130px] text-sm md:text-xs shrink-0"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{lang === "ar" ? "كل الحالات" : "All statuses"}</SelectItem>
+            {/* The cards filter by these group tokens; without an option here the
+                trigger would render blank after a card click. */}
+            <SelectItem value="upcoming">{lang === "ar" ? "قادمة (مجدولة + مؤكدة)" : "Upcoming (scheduled + confirmed)"}</SelectItem>
+            <SelectItem value="missed">{lang === "ar" ? "ملغية (ملغاة + لم تحضر)" : "Cancelled (cancelled + no-show)"}</SelectItem>
+            <SelectItem value="scheduled">{t("statusScheduled")}</SelectItem>
+            <SelectItem value="confirmed">{t("statusConfirmed")}</SelectItem>
+            <SelectItem value="in_progress">{t("statusInProgress")}</SelectItem>
+            <SelectItem value="completed">{t("statusCompleted")}</SelectItem>
+            <SelectItem value="cancelled">{t("statusCancelled")}</SelectItem>
+            <SelectItem value="no_show">{t("statusNoShow")}</SelectItem>
+            <SelectItem value="departed">{t("statusDeparted")}</SelectItem>
+          </SelectContent>
+        </Select>
+        {(doctorFilter !== "all" || roomFilter !== "all" || statusFilter !== "all") && (
+          <Button size="sm" variant="ghost" className="h-8 text-xs"
+            onClick={() => { setDoctorFilter("all"); setRoomFilter("all"); setStatusFilter("all"); }}>
+            <X className="size-3 me-1" />{lang === "ar" ? "مسح" : "Clear"}
+          </Button>
+        )}
+      </Card>
 
-      <div className="grid grid-cols-1 gap-z4">
+      <div className="grid grid-cols-1 gap-4">
         {view === "day" && roomBoard && roomBoardColumns.length ? (
-          <Panel className="overflow-hidden">
-            <div className="flex items-center justify-between gap-z3 border-b border-z-line-hairline p-z4">
-              <div>
-                <h2 className="text-z-small rtl:text-z-small-ar font-semibold text-z-ink-900">{isArabic ? "جدول الغرف اليومي" : "Daily room board"}</h2>
-                <p className="text-z-micro rtl:text-z-micro-ar text-z-ink-500">{isArabic ? "كل عمود يمثل غرفة، والإلغاء يحرر السعة تلقائيًا." : "Each column is a room; cancelled appointments release capacity automatically."}</p>
-              </div>
-              <StatusChip tone="neutral">{roomBoardColumns.length} {isArabic ? "موارد" : "resources"}</StatusChip>
+          <Card className="shadow-card overflow-hidden">
+            <div className="flex items-center justify-between gap-3 border-b p-4">
+              <div><h2 className="font-bold">{lang === "ar" ? "جدول الغرف اليومي" : "Daily room board"}</h2><p className="text-xs text-muted-foreground">{lang === "ar" ? "كل عمود يمثل غرفة، والإلغاء يحرر السعة تلقائيًا." : "Each column is a room; cancelled appointments release capacity automatically."}</p></div>
+              <Badge variant="outline">{roomBoardColumns.length} {lang === "ar" ? "موارد" : "resources"}</Badge>
             </div>
-            <TableShell className="rounded-none border-0">
+            <div className="overflow-x-auto">
               <div className="min-w-[760px]">
-                <div className="grid border-b border-z-line-hairline bg-z-sunk" style={{ gridTemplateColumns: `76px repeat(${roomBoardColumns.length}, minmax(180px, 1fr))` }}>
-                  <div className="border-e border-z-line-hairline p-z3 text-z-micro rtl:text-z-micro-ar font-semibold text-z-ink-500">{isArabic ? "الوقت" : "Time"}</div>
-                  {roomBoardColumns.map((resource) => <div key={resource.id} className="border-e border-z-line-hairline p-z3 text-z-small rtl:text-z-small-ar font-semibold text-z-ink-900 last:border-e-0">{isArabic ? resource.name_ar : resource.name_en}<span className="ms-z2 text-z-micro rtl:text-z-micro-ar font-normal text-z-ink-500">{resource.capacity ? `${resource.capacity} ${isArabic ? "سعة" : "capacity"}` : ""}</span></div>)}
+                <div className="grid border-b bg-muted/30" style={{ gridTemplateColumns: `76px repeat(${roomBoardColumns.length}, minmax(180px, 1fr))` }}>
+                  <div className="border-e p-3 text-xs font-semibold text-muted-foreground">{lang === "ar" ? "الوقت" : "Time"}</div>
+                  {roomBoardColumns.map((resource) => <div key={resource.id} className="border-e p-3 text-sm font-semibold last:border-e-0">{lang === "ar" ? resource.name_ar : resource.name_en}<span className="ms-2 text-xs font-normal text-muted-foreground">{resource.capacity ? `${resource.capacity} ${lang === "ar" ? "سعة" : "capacity"}` : ""}</span></div>)}
                 </div>
                 {hours.map((hour) => {
                   const hourStart = hour * 60;
                   const hourEnd = hourStart + 60;
-                  return <div key={hour} className="grid min-h-[84px] border-b border-z-line-hairline last:border-b-0" style={{ gridTemplateColumns: `76px repeat(${roomBoardColumns.length}, minmax(180px, 1fr))` }}>
-                    <div className="z-num border-e border-z-line-hairline p-z2 text-end text-z-micro rtl:text-z-micro-ar text-z-ink-500">{new Date(2000, 0, 1, hour).toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US", { hour: "numeric", minute: "2-digit", hour12: true })}</div>
+                  return <div key={hour} className="grid min-h-[84px] border-b last:border-b-0" style={{ gridTemplateColumns: `76px repeat(${roomBoardColumns.length}, minmax(180px, 1fr))` }}>
+                    <div className="border-e p-2 text-end text-xs text-muted-foreground">{new Date(2000, 0, 1, hour).toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US", { hour: "numeric", minute: "2-digit", hour12: true })}</div>
                     {roomBoardColumns.map((resource) => {
                       const roomItems = (itemsByDay[date.toDateString()] ?? []).filter((item) => {
                         const start = new Date(item.scheduled_at);
@@ -1265,23 +1471,23 @@ export default function CalendarPage() {
                         const isRoom = resource.id === "__unassigned__" ? !resources.some((candidate) => roomBoardMatches(item, candidate)) : roomBoardMatches(item, resource);
                         return isRoom && minute >= hourStart && minute < hourEnd;
                       });
-                      return <div key={resource.id} className="border-e border-z-line-hairline p-z2 last:border-e-0"><div className="space-y-z1">{roomItems.map((item) => <button key={item.id} type="button" onClick={() => openEdit(item)} className={cn("w-full rounded-z2 border p-z2 text-start text-z-micro rtl:text-z-micro-ar", statusBlock[item.status])}><div className="font-semibold">{timeStr(new Date(item.scheduled_at))} · {fullName(item.patients!)}</div><div className="mt-z1 truncate text-z-ink-500">{item.services?.[lang === "ar" ? "name_ar" : "name_en"] || item.procedure || (isArabic ? "موعد" : "Appointment")}</div></button>)}</div></div>;
+                      return <div key={resource.id} className="border-e p-2 last:border-e-0"><div className="space-y-1">{roomItems.map((item) => <button key={item.id} type="button" onClick={() => openEdit(item)} className={cn("w-full rounded-md border p-2 text-start text-xs", statusBlock[item.status])}><div className="font-semibold">{timeStr(new Date(item.scheduled_at))} · {fullName(item.patients!)}</div><div className="mt-1 truncate text-muted-foreground">{item.services?.[lang === "ar" ? "name_ar" : "name_en"] || item.procedure || (lang === "ar" ? "موعد" : "Appointment")}</div></button>)}</div></div>;
                     })}
                   </div>;
                 })}
               </div>
-            </TableShell>
-          </Panel>
+            </div>
+          </Card>
         ) : null}
         {view === "month" ? (
-          <Panel className="p-z3">
-            <div className="mb-z2 grid grid-cols-7 gap-z1 text-center text-z-micro rtl:text-z-micro-ar text-z-ink-500">
-              {(isArabic
+          <Card className="shadow-card p-3">
+            <div className="grid grid-cols-7 gap-1 text-center text-[11px] text-muted-foreground mb-2">
+              {(lang === "ar"
                 ? ["أحد","إثن","ثلا","أرب","خمي","جمع","سبت"]
                 : ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"]
               ).map((d) => <div key={d} className="font-medium">{d}</div>)}
             </div>
-            <div className="grid grid-cols-7 gap-z1">
+            <div className="grid grid-cols-7 gap-1">
               {(() => {
                 const first = startOfMonth(date);
                 const leading = first.getDay();
@@ -1298,34 +1504,31 @@ export default function CalendarPage() {
                     <button
                       key={i}
                       onClick={() => { setDate(d); setView("day"); }}
-                      className={cn(
-                        "flex min-h-[64px] flex-col gap-z1 rounded-z2 border border-z-line-edge p-z1 text-start transition-colors duration-zquick hover:bg-z-sunk sm:min-h-[88px] sm:p-z2",
-                        today && "ring-1 ring-z-brand-500",
-                      )}
+                      className={`text-start rounded-lg border border-border p-1.5 sm:p-2 hover:bg-muted/40 transition-colors min-h-[64px] sm:min-h-[88px] flex flex-col gap-1 ${today ? "ring-1 ring-primary" : ""}`}
                     >
-                      <div className={cn("z-num text-z-micro rtl:text-z-micro-ar font-semibold", today ? "text-z-brand-700" : "text-z-ink-700")}>{d.getDate()}</div>
-                      <div className="flex flex-1 flex-col gap-z1 overflow-hidden">
+                      <div className={`text-xs font-semibold ${today ? "text-primary" : ""}`}>{d.getDate()}</div>
+                      <div className="flex-1 flex flex-col gap-0.5 overflow-hidden">
                         {dayItems.slice(0, isMobile ? 2 : 3).map((a) => (
-                          <div key={a.id} className={cn("truncate rounded-z1 border px-z1 py-z1 text-z-micro rtl:text-z-micro-ar leading-tight", statusBlock[a.status])}>
-                            <span className="z-num">{timeStr(new Date(a.scheduled_at))}</span> {fullName(a.patients!)}
+                          <div key={a.id} className={`text-[10px] leading-tight truncate rounded px-1 py-0.5 border ${statusBlock[a.status]}`}>
+                            {timeStr(new Date(a.scheduled_at))} {fullName(a.patients!)}
                           </div>
                         ))}
-                        {dayItems.length > (isMobile ? 2 : 3) ? (
-                          <div className="z-num text-z-micro rtl:text-z-micro-ar text-z-ink-500">+{dayItems.length - (isMobile ? 2 : 3)}</div>
-                        ) : null}
+                        {dayItems.length > (isMobile ? 2 : 3) && (
+                          <div className="text-[10px] text-muted-foreground">+{dayItems.length - (isMobile ? 2 : 3)}</div>
+                        )}
                       </div>
                     </button>
                   );
                 });
               })()}
             </div>
-          </Panel>
+          </Card>
         ) : (
         /* Time grid */
-        <Panel className="overflow-hidden">
+        <Card className="shadow-card overflow-hidden">
           {view === "week" && (
             <div
-              className="grid overflow-x-auto border-b border-z-line-hairline"
+              className="grid border-b border-border overflow-x-auto"
               style={{
                 gridTemplateColumns: `56px repeat(7, minmax(${isMobile ? "72px" : "0"}, 1fr))`,
                 minWidth: isMobile ? "640px" : undefined,
@@ -1336,9 +1539,9 @@ export default function CalendarPage() {
                 const today = sameDay(d, new Date());
                 return (
                   <button key={d.toISOString()} onClick={() => { setDate(d); setView("day"); }}
-                    className={cn("p-z2 text-center transition-colors duration-zquick hover:bg-z-sunk", today && "bg-z-brand-050")}>
-                    <div className="text-z-micro rtl:text-z-micro-ar text-z-ink-500">{weekHeader(d)}</div>
-                    <div className={cn("z-num text-z-subtitle rtl:text-z-subtitle-ar font-semibold", today ? "text-z-brand-700" : "text-z-ink-700")}>{d.getDate()}</div>
+                    className={`p-2 text-center hover:bg-muted/40 transition-colors ${today ? "bg-primary/5" : ""}`}>
+                    <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{weekHeader(d)}</div>
+                    <div className={`text-lg font-semibold ${today ? "text-primary" : ""}`}>{d.getDate()}</div>
                   </button>
                 );
               })}
@@ -1347,20 +1550,20 @@ export default function CalendarPage() {
 
           <div className="overflow-auto" style={{ maxHeight: "70vh" }}>
             {workStartMin == null || workEndMin == null ? (
-              <div className="p-z12 text-center">
-                <Clock className="mx-auto mb-z3 size-10 text-z-ink-400" />
-                <div className="text-z-body rtl:text-z-body-ar font-medium text-z-ink-900">
-                  {isArabic ? "لا توجد ساعات عمل محددة لهذا الفرع" : "No working hours configured for this branch"}
+              <div className="p-12 text-center">
+                <Clock className="size-10 mx-auto text-muted-foreground mb-3" />
+                <div className="text-base font-medium">
+                  {lang === "ar" ? "لا توجد ساعات عمل محددة لهذا الفرع" : "No working hours configured for this branch"}
                 </div>
-                <div className="mt-z1 text-z-micro rtl:text-z-micro-ar text-z-ink-500">
-                  {isArabic
+                <div className="text-xs text-muted-foreground mt-1">
+                  {lang === "ar"
                     ? "قم بتحديد ساعات عمل الفرع من الإعدادات لعرض التقويم هنا."
                     : "Set branch working hours in Settings to show the calendar here."}
                 </div>
               </div>
             ) : (
             <div
-              className="relative grid"
+              className="grid relative"
               style={{
                 gridTemplateColumns: view === "week"
                   ? `56px repeat(7, minmax(${isMobile ? "72px" : "0"}, 1fr))`
@@ -1369,15 +1572,15 @@ export default function CalendarPage() {
               }}
             >
               {/* Hour labels column */}
-              <div className="border-e border-z-line-hairline bg-z-sunk">
+              <div className="border-e border-border bg-muted/20">
                 {hours.map((h) => (
-                  <div key={h} className="z-num pe-z2 pt-z1 text-end text-z-micro rtl:text-z-micro-ar text-z-ink-500" style={{ height: HOUR_HEIGHT }}>
+                  <div key={h} className="text-[10px] text-muted-foreground text-end pe-2 pt-1" style={{ height: HOUR_HEIGHT }}>
                     {new Date(2000, 0, 1, h).toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US", { hour: "numeric", hour12: true })}
                   </div>
                 ))}
                 {/* Closing-hour marker — sits flush with the bottom edge of
                     the last row so the branch's end time is visible. */}
-                <div className="z-num -mt-z2 pe-z2 text-end text-z-micro rtl:text-z-micro-ar text-z-ink-500">
+                <div className="text-[10px] text-muted-foreground text-end pe-2 -mt-2">
                   {new Date(2000, 0, 1, Math.min(23, endHourLabel), endHourLabel >= 24 ? 59 : 0)
                     .toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US", { hour: "numeric", hour12: true })}
                 </div>
@@ -1393,12 +1596,12 @@ export default function CalendarPage() {
                 const bandHeight = hasHours ? ((workEndMin! - workStartMin!) / 60) * HOUR_HEIGHT : 0;
                 const isClosed = !workingDays.includes(d.getDay());
                 return (
-                  <div key={dayKey} className="relative border-e border-z-line-hairline last:border-e-0">
+                  <div key={dayKey} className="relative border-e border-border last:border-e-0">
                     {/* Working-hours highlight band (behind everything, non-interactive) */}
                     {hasHours && !isClosed && (
                       <div
                         aria-hidden
-                        className="pointer-events-none absolute inset-x-0 bg-z-brand-050"
+                        className="absolute inset-x-0 bg-primary/5 pointer-events-none"
                         style={{ top: bandTop, height: bandHeight }}
                       />
                     )}
@@ -1410,16 +1613,16 @@ export default function CalendarPage() {
                           const slot = new Date(d); slot.setHours(h, 0, 0, 0);
                           openNewAt(slot);
                         }}
-                        className="block w-full border-b border-z-line-hairline transition-colors duration-zquick hover:bg-z-brand-050"
+                        className="block w-full border-b border-border/60 hover:bg-primary/5 transition-colors"
                         style={{ height: HOUR_HEIGHT }}
                         aria-label={`${t("createAt")} ${h}:00`}
                       />
                     ))}
                     {/* Now line */}
                     {isToday && showNowLine && (
-                      <div className="pointer-events-none absolute inset-x-0 z-10" style={{ top: nowTop }}>
-                        <div className="h-px bg-z-critical" />
-                        <div className="ms-0 -mt-1 size-2 rounded-full bg-z-critical" />
+                      <div className="absolute inset-x-0 z-10 pointer-events-none" style={{ top: nowTop }}>
+                        <div className="h-px bg-destructive" />
+                        <div className="size-2 -mt-1 ms-0 rounded-full bg-destructive" />
                       </div>
                     )}
                     {/* Appointment blocks (side-by-side when overlapping) */}
@@ -1435,14 +1638,14 @@ export default function CalendarPage() {
                     {isClosed && (
                       <div
                         aria-hidden
-                        className="pointer-events-none absolute inset-0 flex items-start justify-center bg-z-sunk/40 pt-z3"
+                        className="absolute inset-0 pointer-events-none bg-muted/40 backdrop-blur-[0.5px] flex items-start justify-center pt-3"
                         style={{
                           backgroundImage:
-                            "repeating-linear-gradient(135deg, hsl(var(--z-ink-500) / 0.06) 0 6px, transparent 6px 12px)",
+                            "repeating-linear-gradient(135deg, hsl(var(--muted-foreground) / 0.06) 0 6px, transparent 6px 12px)",
                         }}
                       >
-                        <span className="rounded-z1 border border-z-line-edge bg-z-raised/70 px-z2 py-z1 text-z-micro rtl:text-z-micro-ar text-z-ink-500">
-                          {isArabic ? "مغلق" : "Closed"}
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground bg-background/70 border border-border rounded-full px-2 py-0.5">
+                          {lang === "ar" ? "مغلق" : "Closed"}
                         </span>
                       </div>
                     )}
@@ -1454,247 +1657,27 @@ export default function CalendarPage() {
           </div>
 
           {filteredItems.length === 0 && (
-            <div className="border-t border-z-line-hairline p-z6 text-center text-z-small rtl:text-z-small-ar text-z-ink-500">
-              {t("noAppointments")} — {isArabic ? "اضغط على أي خانة لإنشاء موعد" : "click any slot to create one"}
+            <div className="p-6 text-center text-sm text-muted-foreground border-t border-border">
+              {t("noAppointments")} — {lang === "ar" ? "اضغط على أي خانة لإنشاء موعد" : "click any slot to create one"}
             </div>
           )}
-        </Panel>
+        </Card>
         )}
       </div>
-
-      <PlatformDialog
-        open={rejectOpen}
-        onOpenChange={setRejectOpen}
-        title={isArabic ? "رفض طلب الحجز" : "Reject booking request"}
-        icon={<X />}
-        dir={isArabic ? "rtl" : "ltr"}
-        busy={actionBusy}
-        footer={
-          <>
-            <ActionButton tone="quiet" onClick={() => setRejectOpen(false)}>{t("cancel")}</ActionButton>
-            <ActionButton tone="danger" disabled={actionBusy || !rejectReason.trim()} onClick={rejectBookingRequest}>{isArabic ? "تأكيد الرفض" : "Confirm rejection"}</ActionButton>
-          </>
-        }
-      >
-        <div className="space-y-z2">
-          <FieldLabel htmlFor="booking-rejection-reason">{isArabic ? "سبب الرفض" : "Reason for rejection"}</FieldLabel>
-          <PlatformTextarea id="booking-rejection-reason" value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} maxLength={1000} rows={5} placeholder={isArabic ? "اكتب سببًا واضحًا يمكن الرجوع إليه..." : "Write a clear reason for the record..."} />
-          <p className="text-z-micro rtl:text-z-micro-ar text-z-ink-500">{isArabic ? "سيتم حفظ السبب في سجل الموعد، ولن يتم إرسال رسالة خارجية تلقائيًا." : "The reason is saved with the appointment; no external message is sent automatically."}</p>
-        </div>
-      </PlatformDialog>
-
-      <PlatformDialog
-        open={open}
-        onOpenChange={(o) => { if (!savingRef.current) setOpen(o); }}
-        title={editId ? t("edit") : t("newAppointment")}
-        icon={<CalendarDays />}
-        dir={isArabic ? "rtl" : "ltr"}
-        busy={saving}
-        wide
-        footer={
-          <>
-            <ActionButton tone="quiet" onClick={() => setOpen(false)} disabled={saving}>{t("cancel")}</ActionButton>
-            <ActionButton form="calendar-booking-form" type="submit" disabled={saving}>{t("save")}</ActionButton>
-          </>
-        }
-      >
-              <form id="calendar-booking-form" onSubmit={handleSave} className="space-y-z4">
-                <div className="space-y-z2">
-                  <FieldLabel>{t("patientName")}</FieldLabel>
-                  <Combobox
-                    options={patients.map((p) => ({
-                      value: p.id,
-                      label: p.label,
-                      // Two patients can share a name; the number they were found by is
-                      // the one piece of evidence that says which one this is.
-                      detail: p.phone ?? undefined,
-                    }))}
-                    value={form.patient_id}
-                    onChange={(next) => {
-                      const picked = patients.find((p) => p.id === next);
-                      setPatientEcho(picked ? { id: picked.id, label: picked.label } : null);
-                      setForm((current) => ({ ...current, patient_id: next }));
-                    }}
-                    placeholder={isArabic ? "ابحث عن مريض..." : "Search patient..."}
-                    searchPlaceholder={pickerCopy.searchPlaceholder}
-                    emptyText={patientSearch.failed ? pickerCopy.failed : pickerCopy.empty}
-                    searchingText={pickerCopy.searching}
-                    hintText={patients.length >= PATIENT_PICKER_LIMIT ? pickerCopy.truncated : undefined}
-                    selectedLabel={bookingPatientLabel(form.patient_id)}
-                    searching={patientSearch.searching}
-                    onSearch={loadPatientOptions}
-                  />
-                  {form.patient_id && (
-                    <div className="flex flex-wrap items-center gap-x-z4 gap-y-z1 rounded-z2 border border-z-line-edge bg-z-sunk px-z3 py-z2 text-z-micro rtl:text-z-micro-ar">
-                      {patientCtxLoading || !patientCtx ? (
-                        <span className="text-z-ink-500">{isArabic ? "جارٍ تحميل بيانات المريض..." : "Loading patient context..."}</span>
-                      ) : (
-                        <>
-                          <span className="inline-flex items-center gap-z1">
-                            <WalletIcon className="size-3.5 text-z-ink-500" aria-hidden="true" />
-                            <span className="text-z-ink-500">{isArabic ? "المحفظة:" : "Wallet:"}</span>
-                            <span className={cn("z-num font-medium", patientCtx.wallet > 0 && "text-z-positive-ink")}>{formatMoney(patientCtx.wallet, lang)}</span>
-                          </span>
-                          <span className="inline-flex items-center gap-z1">
-                            <AlertCircle className={cn("size-3.5", patientCtx.outstanding > 0 ? "text-z-critical-ink" : "text-z-ink-500")} aria-hidden="true" />
-                            <span className="text-z-ink-500">{isArabic ? "متبقي:" : "Outstanding:"}</span>
-                            <span className={cn("z-num font-medium", patientCtx.outstanding > 0 && "text-z-critical-ink")}>{formatMoney(patientCtx.outstanding, lang)}</span>
-                          </span>
-                          <span className="inline-flex items-center gap-z1">
-                            <History className="size-3.5 text-z-ink-500" aria-hidden="true" />
-                            <span className="text-z-ink-500">{isArabic ? "آخر زيارة:" : "Last visit:"}</span>
-                            <span className="z-num font-medium text-z-ink-900">{patientCtx.lastVisit ? formatDate(patientCtx.lastVisit, lang) : "—"}</span>
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-z2">
-                  <FieldLabel>{isArabic ? "الطبيب" : "Doctor"}</FieldLabel>
-                  <Combobox
-                    value={form.doctor_id}
-                    onChange={(v) => setForm({ ...form, doctor_id: v })}
-                    options={bookingDoctors.map((d) => ({ value: d.id, label: doctorDisplayName(d, lang) }))}
-                    placeholder={isArabic ? "— بدون —" : "— None —"}
-                    searchPlaceholder={isArabic ? "ابحث عن طبيب..." : "Search doctor..."}
-                    emptyText={form.service_id && serviceDoctors?.length === 0 ? (isArabic ? "لا يوجد طبيب مؤهل لهذه الخدمة" : "No doctor is assigned to this service") : (isArabic ? "لا يوجد أطباء" : "No doctors found")}
-                    allowClear
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-z3">
-                  <div className="space-y-z2">
-                    <FieldLabel htmlFor="calendar-scheduled-at">{t("scheduledAt")}</FieldLabel>
-                    <PlatformInput id="calendar-scheduled-at" type="datetime-local" value={form.scheduled_at} onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })} required />
-                  </div>
-                  <div className="space-y-z2">
-                    <FieldLabel htmlFor="calendar-duration">{t("durationMin")}</FieldLabel>
-                    <PlatformInput
-                      id="calendar-duration"
-                      type="text"
-                      inputMode="numeric"
-                      dir="ltr"
-                      className="z-num"
-                      value={String(form.duration_minutes ?? "")}
-                      onChange={(e) => {
-                        // Accept Arabic-Indic & Persian digits
-                        const ascii = e.target.value
-                          .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660))
-                          .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 0x06F0))
-                          .replace(/[^\d]/g, "");
-                        setForm({ ...form, duration_minutes: ascii === "" ? 0 : Number(ascii) });
-                      }}
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-z3">
-                  <div className="space-y-z2">
-                    <FieldLabel htmlFor="calendar-service">{isArabic ? "الخدمة / نوع الزيارة" : "Service / appointment type"}</FieldLabel>
-                    <SelectField
-                      id="calendar-service"
-                      value={form.service_id || "__none__"}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        if (v === "__none__") {
-                          setForm({ ...form, service_id: "", procedure: "" });
-                          return;
-                        }
-                        const selected = services.find((s) => s.id === v);
-                        setForm({
-                          ...form,
-                          service_id: v,
-                          // Keep a snapshot for legacy reports and old rows while
-                          // service_id remains the canonical booking relationship.
-                          procedure: selected?.name_en || selected?.name_ar || "",
-                          duration_minutes: selected?.duration || form.duration_minutes,
-                        });
-                      }}
-                    >
-                      <option value="__none__">— {isArabic ? "بدون خدمة" : "No service"} —</option>
-                      {services.map((service) => (
-                        <option key={service.id} value={service.id}>
-                          {isArabic ? service.name_ar : service.name_en} · {service.duration}m
-                        </option>
-                      ))}
-                    </SelectField>
-                    <p className="text-z-micro rtl:text-z-micro-ar leading-4 text-z-ink-500">
-                      {isArabic ? "الإجراءات الطبية التي تم تنفيذها تُسجل داخل السجل الطبي بعد حضور المريض." : "Clinical procedures performed are documented in the medical record after the patient visit."}
-                    </p>
-                    {form.procedure && !form.service_id ? (
-                      <p className="text-z-micro rtl:text-z-micro-ar leading-4 text-z-caution-ink">
-                        {isArabic ? "هذا موعد قديم يحتوي على إجراء محفوظ؛ اختر خدمة جديدة لتحديثه." : "This legacy appointment has a saved procedure; choose a service to update it."}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="space-y-z2">
-                    <FieldLabel htmlFor="calendar-room">{t("room")}</FieldLabel>
-                    {resources.length ? (
-                      <SelectField id="calendar-room" value={form.resource_id || "__none__"} onChange={(e) => {
-                        const value = e.target.value;
-                        const selected = resources.find((resource) => resource.id === value);
-                        setForm({ ...form, resource_id: value === "__none__" ? "" : value, room: selected?.name_en || "" });
-                      }}>
-                        <option value="__none__">— {isArabic ? "بدون غرفة محددة" : "No specific room"} —</option>
-                        {resources.map((resource) => <option key={resource.id} value={resource.id}>{isArabic ? resource.name_ar : resource.name_en} · {resource.capacity} {isArabic ? "سعة" : "capacity"}</option>)}
-                      </SelectField>
-                    ) : (
-                      <>
-                        <PlatformInput id="calendar-room" list="calendar-rooms-list" value={form.room} onChange={(e) => setForm({ ...form, room: e.target.value, resource_id: "" })} maxLength={40} placeholder={t("selectRoom")} />
-                        <datalist id="calendar-rooms-list">{rooms.map((r) => <option key={r} value={r} />)}</datalist>
-                      </>
-                    )}
-                    <p className="text-z-micro rtl:text-z-micro-ar leading-4 text-z-ink-500">{resources.length ? (isArabic ? "اختيار الغرفة يثبت المورد الذي سيستهلكه الموعد." : "Selecting a room assigns the resource consumed by this appointment.") : (isArabic ? "أضف الغرف من إعدادات المواعيد لتفعيل حساب السعة." : "Add rooms in Appointment Settings to enable capacity-aware booking.")}</p>
-                  </div>
-                </div>
-                <div className="space-y-z2">
-                  <FieldLabel htmlFor="calendar-notes">{t("notes")}</FieldLabel>
-                  <PlatformTextarea id="calendar-notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} maxLength={1000} />
-                </div>
-                {editId ? (
-                  <div className="space-y-z2">
-                    <FieldLabel htmlFor="calendar-status">{t("status")}</FieldLabel>
-                    <SelectField
-                      id="calendar-status"
-                      disabled={editingAppointment?.booking_request_status === "pending"}
-                      value={form.status}
-                      onChange={(e) => setForm({ ...form, status: e.target.value as Appt["status"] })}
-                    >
-                      <option value="scheduled">{t("statusScheduled")}</option>
-                      <option value="confirmed">{t("statusConfirmed")}</option>
-                      <option value="in_progress">{t("statusInProgress")}</option>
-                      <option value="completed">{t("statusCompleted")}</option>
-                      <option value="cancelled">{t("statusCancelled")}</option>
-                      <option value="no_show">{t("statusNoShow")}</option>
-                      <option value="departed">{t("statusDeparted")}</option>
-                    </SelectField>
-                    {editingAppointment?.booking_request_status === "pending" ? (
-                      <p className="text-z-micro rtl:text-z-micro-ar text-z-caution-ink">
-                        {isArabic ? "استخدم زر التأكيد أو الرفض لمعالجة طلب الحجز. لا يمكن تغيير الحالة يدويًا قبل المعالجة." : "Use Confirm or Reject to process this booking request. Manual status changes are disabled until it is processed."}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : null}
-                {editingAppointment?.booking_request_status === "pending" ? (
-                  <div className="space-y-z3 rounded-z2 border border-s-2 border-z-caution-stroke bg-z-caution-fill p-z3">
-                    <div>
-                      <div className="text-z-small rtl:text-z-small-ar font-semibold text-z-caution-ink">{isArabic ? "طلب حجز في انتظار المراجعة" : "Booking request awaiting review"}</div>
-                      {editingAppointment.booking_request_expires_at ? <div className="z-num mt-z1 text-z-micro rtl:text-z-micro-ar text-z-ink-500">{isArabic ? "تنتهي المهلة: " : "Hold expires: "}{new Date(editingAppointment.booking_request_expires_at).toLocaleString(lang === "ar" ? "ar-EG" : "en-EG")}</div> : null}
-                    </div>
-                    <Can permission="appointments.edit">
-                      <div className="flex flex-wrap gap-z2">
-                        <ActionButton disabled={actionBusy} onClick={() => confirmBookingRequest(editingAppointment)}>
-                          <Check className="size-4" aria-hidden="true" />{isArabic ? "تأكيد الحجز" : "Confirm booking"}
-                        </ActionButton>
-                        <ActionButton tone="danger" disabled={actionBusy} onClick={() => openRejectDialog(editingAppointment)}>
-                          <X className="size-4" aria-hidden="true" />{isArabic ? "رفض الطلب" : "Reject request"}
-                        </ActionButton>
-                      </div>
-                    </Can>
-                  </div>
-                ) : null}
-              </form>
-      </PlatformDialog>
-
+      <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
+        <DialogContent className="max-w-md w-[calc(100vw-2rem)] sm:w-full">
+          <DialogHeader><DialogTitle>{lang === "ar" ? "رفض طلب الحجز" : "Reject booking request"}</DialogTitle></DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="booking-rejection-reason">{lang === "ar" ? "سبب الرفض" : "Reason for rejection"}</Label>
+            <Textarea id="booking-rejection-reason" value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} maxLength={1000} rows={5} placeholder={lang === "ar" ? "اكتب سببًا واضحًا يمكن الرجوع إليه..." : "Write a clear reason for the record..."} />
+            <p className="text-xs text-muted-foreground">{lang === "ar" ? "سيتم حفظ السبب في سجل الموعد، ولن يتم إرسال رسالة خارجية تلقائيًا." : "The reason is saved with the appointment; no external message is sent automatically."}</p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setRejectOpen(false)}>{t("cancel")}</Button>
+            <Button type="button" variant="destructive" disabled={actionBusy || !rejectReason.trim()} onClick={rejectBookingRequest}>{lang === "ar" ? "تأكيد الرفض" : "Confirm rejection"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Fab ariaLabel={t("newAppointment")} onClick={openNew}>
         <Plus className="size-6" />
       </Fab>

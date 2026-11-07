@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Activity, AlertCircle, AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { AlertCircle, CheckCircle2, AlertTriangle, RefreshCw, Activity } from "lucide-react";
 import { useBranch } from "@/contexts/BranchContext";
 import { useI18n } from "@/contexts/I18nContext";
 import { runQueueSelfAudit, type AuditReport, type AuditCheck, type AuditCategory } from "@/lib/queueSelfAudit";
-import { ActionButton, Panel, SectionLabel, Skeleton, StatusChip, type SignalTone } from "@/components/zds/surface";
 import { cn } from "@/lib/utils";
 
 const CATEGORY_LABEL: Record<AuditCategory, string> = {
@@ -21,27 +24,16 @@ const CATEGORY_ORDER: AuditCategory[] = [
   "access", "lifecycle", "integrity", "detector", "heartbeat", "realtime", "hours", "consumer",
 ];
 
-const STATUS_TONE: Record<AuditCheck["status"], SignalTone> = {
-  pass: "positive",
-  warning: "caution",
-  fail: "critical",
-};
-
-const STATUS_ICON: Record<AuditCheck["status"], React.ReactNode> = {
-  pass: <CheckCircle2 aria-hidden="true" />,
-  warning: <AlertTriangle aria-hidden="true" />,
-  fail: <AlertCircle aria-hidden="true" />,
-};
-
-const STATUS_ICON_CLASS: Record<AuditCheck["status"], string> = {
-  pass: "text-z-positive-ink",
-  warning: "text-z-caution-ink",
-  fail: "text-z-critical-ink",
-};
+function StatusIcon({ status }: { status: AuditCheck["status"] }) {
+  if (status === "fail") return <AlertCircle className="size-4 text-destructive" />;
+  if (status === "warning") return <AlertTriangle className="size-4 text-yellow-600" />;
+  return <CheckCircle2 className="size-4 text-emerald-600" />;
+}
 
 function StatusBadge({ status }: { status: AuditCheck["status"] }) {
-  const label = status === "fail" ? "Fail" : status === "warning" ? "Warn" : "Pass";
-  return <StatusChip tone={STATUS_TONE[status]}>{label}</StatusChip>;
+  if (status === "fail") return <Badge variant="destructive" className="uppercase text-[10px]">Fail</Badge>;
+  if (status === "warning") return <Badge className="uppercase text-[10px] bg-yellow-500 hover:bg-yellow-500/90 text-white">Warn</Badge>;
+  return <Badge className="uppercase text-[10px] bg-emerald-600 hover:bg-emerald-600/90 text-white">Pass</Badge>;
 }
 
 export default function QueueSelfAudit() {
@@ -97,108 +89,96 @@ export default function QueueSelfAudit() {
   const failures = report?.checks.filter((c) => c.status === "fail") ?? [];
 
   return (
-    <div className="z-desk min-h-screen">
-      <div className="mx-auto max-w-5xl space-y-z6 px-z4 py-z6 md:px-z6">
-        {/* The selfAuditReachability contract reads the first h1 element in this file as the
-            screen's own title, so it is written here rather than inside a shared header. */}
-        <div className="flex flex-wrap items-end justify-between gap-z4">
-          <div className="min-w-0">
-            <div className="inline-flex items-center gap-z2 text-z-small rtl:text-z-small-ar font-medium text-z-ink-500 [&_svg]:size-4">
-              <Activity aria-hidden="true" />
-            </div>
-            <h1 className="text-z-title rtl:text-z-title-ar font-semibold text-z-ink-900">Queue Self-Audit</h1>
-            <p className="mt-z2 max-w-[76ch] text-z-small rtl:text-z-small-ar text-z-ink-500">Health, security and correctness of the alert subsystem for the current branch.</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-z2">
-            <ActionButton
-              tone="quiet"
-              onClick={() => setAuto((v) => !v)}
-              className={cn(auto && "border-z-brand-500 text-z-brand-700")}
-            >
-              Auto refresh: {auto ? "on" : "off"}
-            </ActionButton>
-            <ActionButton onClick={() => void run()} disabled={loading || !branchSelectionReady || !currentBranchId}>
-              <RefreshCw className={cn("size-4", loading && "animate-spin")} aria-hidden="true" />
-              Run audit
-            </ActionButton>
-          </div>
+    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Activity className="size-6 text-primary" />
+            Queue Self-Audit
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Health, security and correctness of the alert subsystem for the current branch.
+          </p>
         </div>
-
-        {!branchSelectionReady || !currentBranchId ? (
-          <Panel className="py-z8 text-center text-z-small rtl:text-z-small-ar text-z-ink-500">Select a branch to run the audit.</Panel>
-        ) : !report ? (
-          <Panel className="space-y-z3 p-z4">
-            <Skeleton className="h-z5 w-1/3" />
-            <Skeleton className="h-z4 w-2/3" />
-            <Skeleton className="h-z4 w-1/2" />
-          </Panel>
-        ) : (
-          <>
-            <Panel className="flex flex-wrap items-center gap-z4 px-z4 py-z3">
-              <div className="flex items-center gap-z2 text-z-small rtl:text-z-small-ar text-z-positive-ink">
-                <CheckCircle2 className="size-4" aria-hidden="true" />
-                <span className="z-num font-medium">{report.totals.pass} pass</span>
-              </div>
-              <div className="flex items-center gap-z2 text-z-small rtl:text-z-small-ar text-z-caution-ink">
-                <AlertTriangle className="size-4" aria-hidden="true" />
-                <span className="z-num font-medium">{report.totals.warning} warning</span>
-              </div>
-              <div className="flex items-center gap-z2 text-z-small rtl:text-z-small-ar text-z-critical-ink">
-                <AlertCircle className="size-4" aria-hidden="true" />
-                <span className="z-num font-medium">{report.totals.fail} fail</span>
-              </div>
-              <span className="ms-auto z-num text-z-micro rtl:text-z-micro-ar text-z-ink-500">Ran {new Date(report.ranAt).toLocaleString()}</span>
-            </Panel>
-
-            {failures.length > 0 && (
-              <Panel className="border-z-critical-stroke">
-                <div className="border-b border-z-line-hairline px-z4 py-z3">
-                  <div className="flex items-center gap-z2 text-z-small rtl:text-z-small-ar font-semibold text-z-critical-ink">
-                    <AlertCircle className="size-4" aria-hidden="true" />
-                    Failures ({failures.length})
-                  </div>
-                </div>
-                <div className="space-y-z2 p-z4">
-                  {failures.map((c) => <CheckRow key={c.id} check={c} />)}
-                </div>
-              </Panel>
-            )}
-
-            {grouped.map(({ category, items }) => (
-              <Panel key={category}>
-                <div className="border-b border-z-line-hairline px-z4 py-z3">
-                  <SectionLabel>{CATEGORY_LABEL[category]}</SectionLabel>
-                </div>
-                <div className="space-y-z2 p-z4">
-                  {items.map((c) => <CheckRow key={c.id} check={c} />)}
-                </div>
-              </Panel>
-            ))}
-          </>
-        )}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setAuto((v) => !v)}
+            className={cn(auto && "border-primary text-primary")}
+          >
+            Auto refresh: {auto ? "on" : "off"}
+          </Button>
+          <Button size="sm" onClick={() => void run()} disabled={loading || !branchSelectionReady || !currentBranchId}>
+            <RefreshCw className={cn("size-4 mr-2", loading && "animate-spin")} />
+            Run audit
+          </Button>
+        </div>
       </div>
+
+      {!branchSelectionReady || !currentBranchId ? (
+        <Card><CardContent className="py-8 text-center text-muted-foreground">Select a branch to run the audit.</CardContent></Card>
+      ) : !report ? (
+        <Card><CardContent className="py-8 text-center text-muted-foreground">Running first audit…</CardContent></Card>
+      ) : (
+        <>
+          <Card>
+            <CardContent className="py-4 flex flex-wrap items-center gap-4 text-sm">
+              <div className="flex items-center gap-2"><CheckCircle2 className="size-4 text-emerald-600" /><span className="font-medium">{report.totals.pass} pass</span></div>
+              <div className="flex items-center gap-2"><AlertTriangle className="size-4 text-yellow-600" /><span className="font-medium">{report.totals.warning} warning</span></div>
+              <div className="flex items-center gap-2"><AlertCircle className="size-4 text-destructive" /><span className="font-medium">{report.totals.fail} fail</span></div>
+              <Separator orientation="vertical" className="h-5" />
+              <span className="text-muted-foreground">Ran {new Date(report.ranAt).toLocaleString()}</span>
+            </CardContent>
+          </Card>
+
+          {failures.length > 0 && (
+            <Card className="border-destructive/40">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2 text-destructive">
+                  <AlertCircle className="size-4" /> Failures ({failures.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {failures.map((c) => (
+                  <CheckRow key={c.id} check={c} />
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {grouped.map(({ category, items }) => (
+            <Card key={category}>
+              <CardHeader>
+                <CardTitle className="text-base">{CATEGORY_LABEL[category]}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {items.map((c) => <CheckRow key={c.id} check={c} />)}
+              </CardContent>
+            </Card>
+          ))}
+        </>
+      )}
     </div>
   );
 }
 
 function CheckRow({ check }: { check: AuditCheck }) {
   return (
-    <div className="flex items-start gap-z3 rounded-z2 border border-z-line-edge bg-z-sunk p-z3">
-      <span className={cn("mt-0.5 shrink-0 [&_svg]:size-4", STATUS_ICON_CLASS[check.status])}>{STATUS_ICON[check.status]}</span>
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-z2">
-          <span className="text-z-small rtl:text-z-small-ar font-medium text-z-ink-900">{check.title}</span>
+    <div className="flex items-start gap-3 p-3 rounded-md border bg-card/50">
+      <StatusIcon status={check.status} />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-medium text-sm">{check.title}</span>
           <StatusBadge status={check.status} />
-          {check.severity !== "info" && check.status !== "pass" ? (
-            <StatusChip tone="neutral">{check.severity}</StatusChip>
-          ) : null}
+          {check.severity !== "info" && check.status !== "pass" && (
+            <Badge variant="outline" className="text-[10px] uppercase">{check.severity}</Badge>
+          )}
         </div>
-        <div className="mt-z1 text-z-micro rtl:text-z-micro-ar text-z-ink-500">{check.reason}</div>
-        {check.action && check.status !== "pass" ? (
-          <div className="mt-z1 text-z-micro rtl:text-z-micro-ar text-z-ink-700">
-            <span className="font-medium">Next:</span> {check.action}
-          </div>
-        ) : null}
+        <div className="text-xs text-muted-foreground mt-0.5">{check.reason}</div>
+        {check.action && check.status !== "pass" && (
+          <div className="text-xs mt-1"><span className="font-medium">Next:</span> {check.action}</div>
+        )}
       </div>
     </div>
   );

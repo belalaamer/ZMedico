@@ -10,9 +10,13 @@ import { describe, expect, it } from "vitest";
 const ARCHIVE = readFileSync("supabase/migrations/20261106120000_platform_workspace_archive_restore.sql", "utf8");
 const DELETE = readFileSync("supabase/migrations/20261106121000_platform_workspace_permanent_delete.sql", "utf8");
 const MODULE = readFileSync("src/lib/platformWorkspaces.ts", "utf8");
-const ARCHIVE_DIALOG = readFileSync("src/components/platform/ArchiveWorkspaceDialog.tsx", "utf8");
-const RESTORE_DIALOG = readFileSync("src/components/platform/RestoreWorkspaceDialog.tsx", "utf8");
-const DELETE_DIALOG = readFileSync("src/components/platform/PermanentDeleteDialog.tsx", "utf8");
+// The archive / restore / permanent-delete dialogs moved out of their Clinical Ink
+// components and back into the console's own shadcn surface. This file now reads the one
+// place all three live, so the wire contract keeps guarding them.
+const CONSOLE = readFileSync("src/pages/platform/PlatformConsole.tsx", "utf8");
+const ARCHIVE_DIALOG = CONSOLE;
+const RESTORE_DIALOG = CONSOLE;
+const DELETE_DIALOG = CONSOLE;
 
 describe("the archive ledger (file أ)", () => {
   it("adds the ledger without dropping or re-valuing anything that exists", () => {
@@ -230,7 +234,7 @@ describe("the wire contract between the console and the RPCs", () => {
 
   it("re-checks the typed slug in the console with the server's own rule", () => {
     expect(MODULE).toContain("input.trim().toLowerCase() === slug.trim().toLowerCase()");
-    expect(ARCHIVE_DIALOG).toContain("slugConfirmed(confirmSlug, slug)");
-    expect(DELETE_DIALOG).toContain("slugConfirmed(confirm, confirmValue)");
+    expect(CONSOLE).toContain("slugConfirmed(archiveConfirmation, archiveTenant.slug)");
+    expect(CONSOLE).toContain("slugConfirmed(deleteSlug, deleteTenant.slug)");
   });
 });

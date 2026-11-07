@@ -64,6 +64,7 @@ const LEDGER: string[] = [
   "src/pages/payments/RecordPaymentDialog.tsx=1",
   "src/pages/physio/PhysioCases.tsx=1",
   "src/pages/platform/PlanCatalogPanel.tsx=1",
+  "src/pages/platform/PlatformConsole.tsx=4",
   "src/pages/platform/SubscriptionRequestsPanel.tsx=3",
   "src/pages/platform/TenantBrandingDialog.tsx=5",
   "src/pages/platform/TenantDomains.tsx=3",
@@ -163,10 +164,6 @@ const ledgerEntry = (file: string, count: number) => `${file}=${count}`;
 // message, named in the header above. Batch 33's three HR leftovers stay in the
 // ledger above (DoctorServicesTab, Payroll, Staff), so "the HR module is clean" is
 // not a sentence this file lets anyone write.
-//
-// The platform console left the ledger on purpose in the craft batch: its four raw
-// sinks became two inline `deskFailure` notices plus bilingual sentinel mapping in
-// the lifecycle dialogs, so the screen no longer quotes Postgres at the operator.
 const CONVERTED = [
   { file: "src/pages/queue/Queue.tsx", ruleCalls: 6, remainingRaw: 0 },
   { file: "src/pages/calendar/CalendarPage.tsx", ruleCalls: 6, remainingRaw: 0 },
@@ -179,7 +176,6 @@ const CONVERTED = [
   { file: "src/pages/hr/Schedules.tsx", ruleCalls: 3, remainingRaw: 0 },
   { file: "src/pages/hr/StaffBranchesTab.tsx", ruleCalls: 2, remainingRaw: 0 },
   { file: "src/pages/hr/TargetBonuses.tsx", ruleCalls: 3, remainingRaw: 0 },
-  { file: "src/pages/platform/PlatformConsole.tsx", ruleCalls: 2, remainingRaw: 0 },
 ];
 
 describe("screens stop quoting the database (S1)", () => {

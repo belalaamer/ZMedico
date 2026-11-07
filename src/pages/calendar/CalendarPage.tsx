@@ -621,6 +621,20 @@ export default function CalendarPage() {
     setOpen(true);
   };
 
+  // A queue handoff asks the calendar to open the booking dialog directly
+  // (`?patient_id=…&book=1`), so "Book next session" is one click, not a banner then a button.
+  const autoBookRef = useRef(false);
+  useEffect(() => {
+    if (autoBookRef.current) return;
+    if (searchParams.get("book") !== "1") return;
+    if (!deepLink?.name) return;
+    autoBookRef.current = true;
+    openNew();
+    const next = new URLSearchParams(searchParams);
+    next.delete("book");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, deepLink, openNew, setSearchParams]);
+
   // Keyboard-first desk: N books, T jumps to today, arrows move the period, D/W/M switch
   // the view. Guards skip every field and every open dialog.
   useEffect(() => {

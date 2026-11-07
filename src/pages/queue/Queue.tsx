@@ -9,8 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 import { RowActions } from "@/components/RowActions";
+import { CreateInvoiceDialog } from "@/pages/invoices/CreateInvoiceDialog";
 import { ListSkeleton } from "@/components/ListSkeleton";
-import { AlertTriangle, CheckCircle2, Clock, Flag, ListChecks, Play, UserPlus, X, ExternalLink, RotateCcw, Plus, Stethoscope, Users, Activity, CheckCheck, UserX, Timer, UserCog, DoorOpen, Settings as SettingsIcon, ScrollText, Link2 as Link2Icon } from "lucide-react";
+import { AlertTriangle, CalendarDays, CheckCircle2, Clock, Flag, ListChecks, Play, Receipt, UserPlus, X, ExternalLink, RotateCcw, Plus, Stethoscope, Users, Activity, CheckCheck, UserX, Timer, UserCog, DoorOpen, Settings as SettingsIcon, ScrollText, Link2 as Link2Icon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
@@ -159,6 +160,10 @@ export default function QueuePage() {
   const [selfCheckinUrl, setSelfCheckinUrl] = useState<string | null>(null);
   const [selfCheckinExpiresAt, setSelfCheckinExpiresAt] = useState<string | null>(null);
   const [selfCheckinSaving, setSelfCheckinSaving] = useState(false);
+  // Finishing a visit used to drop the desk back on the board with nothing to do next.
+  // The handoff keeps the two real next steps together: collect, or book the next session.
+  const [handoffRow, setHandoffRow] = useState<QueueRow | null>(null);
+  const [invoiceForRow, setInvoiceForRow] = useState<QueueRow | null>(null);
   // C4: the walk-in picker is one bounded page of server-side matches, not the
   // newest 500 patients of the clinic. `walkInEcho` remembers the row the desk
   // chose so the button keeps naming that patient after the list moves on.
@@ -381,17 +386,28 @@ export default function QueuePage() {
     return true;
   };
 
-  const transition = async (r: QueueRow, next: ApptStatus) => {
+  const transition = async (r: QueueRow, next: ApptStatus): Promise<boolean> => {
     const patch = buildStatusPatch(next, { checked_in_at: r.checked_in_at, started_at: r.started_at });
-    if (!await updateRow(r.id, patch, r.status)) return;
+    return updateRow(r.id, patch, r.status);
   };
 
   const doCheckIn  = (r: QueueRow) => transition(r, "confirmed");
   const doStart    = (r: QueueRow) => transition(r, "in_progress");
-  const doComplete = (r: QueueRow) => transition(r, "completed");
+  const doComplete = async (r: QueueRow) => {
+    if (await transition(r, "completed")) setHandoffRow(r);
+  };
   const doNoShow   = (r: QueueRow) => transition(r, "no_show");
   const doCancel   = (r: QueueRow) => transition(r, "cancelled");
   const doReopen   = (r: QueueRow) => transition(r, "scheduled");
+
+  // The one action this row needs right now, outside the menu: check in, start, or finish.
+  const primaryAction = (r: QueueRow) => {
+    if (!canMutate) return null;
+    if (r.status === "scheduled") return { label: t("checkIn"), icon: <UserPlus className="size-4" />, run: () => void doCheckIn(r) };
+    if (r.status === "confirmed") return { label: t("startVisit"), icon: <Play className="size-4" />, run: () => void doStart(r) };
+    if (r.status === "in_progress") return { label: t("completeVisit"), icon: <CheckCircle2 className="size-4" />, run: () => void doComplete(r) };
+    return null;
+  };
 
   const generateSelfCheckinLink = async (r: QueueRow) => {
     if (!canMutate) { toast.error(lang === "ar" ? "غير مسموح" : "Not allowed"); return; }
@@ -705,6 +721,18 @@ export default function QueuePage() {
         onClick: () => openRoom(r),
       });
     }
+    if (authz.can("invoices.create")) {
+      items.push({
+        label: lang === "ar" ? "تحصيل دفعة" : "Collect payment",
+        icon: <Receipt className="size-4" />,
+        onClick: () => setInvoiceForRow(r),
+      });
+    }
+    items.push({
+      label: lang === "ar" ? "حجز الجلسة القادمة" : "Book next session",
+      icon: <CalendarDays className="size-4" />,
+      onClick: () => navigate(`/calendar?patient_id=${r.patient_id}&book=1`),
+    });
     items.push({
       label: t("openChart"),
       icon: <ExternalLink className="size-4" />,
@@ -941,7 +969,19 @@ export default function QueuePage() {
                           <span className="inline-flex items-center gap-1"><Clock className="size-3.5" />{formatDur(sessMs)}</span>
                         ) : "—"}
                       </td>
-                      <td className="px-3 py-2 text-end">{renderActions(r)}</td>
+                      <td className="px-3 py-2 text-end">
+                        <div className="flex items-center justify-end gap-1">
+                          {(() => {
+                            const action = primaryAction(r);
+                            return action ? (
+                              <Button type="button" size="sm" className="h-8" onClick={action.run}>
+                                {action.icon}<span className="ms-1 hidden lg:inline">{action.label}</span>
+                              </Button>
+                            ) : null;
+                          })()}
+                          {renderActions(r)}
+                        </div>
+                      </td>
                     </tr>
                   );
                 })
@@ -1003,7 +1043,17 @@ export default function QueuePage() {
                       )}
                     </div>
                   </div>
-                  {renderActions(r)}
+                  <div className="flex items-center gap-1">
+                    {(() => {
+                      const action = primaryAction(r);
+                      return action ? (
+                        <Button type="button" size="sm" className="h-8" onClick={action.run}>
+                          {action.icon}<span className="ms-1">{action.label}</span>
+                        </Button>
+                      ) : null;
+                    })()}
+                    {renderActions(r)}
+                  </div>
                 </div>
               </Card>
             );
@@ -1208,6 +1258,37 @@ export default function QueuePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Visit complete: the two things the desk actually does next, one click away. */}
+      <Dialog open={!!handoffRow} onOpenChange={(open) => { if (!open) setHandoffRow(null); }}>
+        <DialogContent className="max-w-md w-[calc(100vw-2rem)] sm:w-full">
+          <DialogHeader>
+            <DialogTitle>{lang === "ar" ? "انتهى الكشف — الخطوة التالية" : "Visit complete — next step"}</DialogTitle>
+            <DialogDescription>{handoffRow ? patientName(handoffRow) : ""}</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2">
+            <Button type="button" onClick={() => { const row = handoffRow; setHandoffRow(null); if (row) setInvoiceForRow(row); }}>
+              <Receipt className="me-2 size-4" />{lang === "ar" ? "تحصيل الفاتورة" : "Collect payment"}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => { const row = handoffRow; setHandoffRow(null); if (row) navigate(`/calendar?patient_id=${row.patient_id}&book=1`); }}>
+              <CalendarDays className="me-2 size-4" />{lang === "ar" ? "حجز الجلسة القادمة" : "Book next session"}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => { const row = handoffRow; setHandoffRow(null); if (row) navigate(`/patients/${row.patient_id}`); }}>
+              <ExternalLink className="me-2 size-4" />{t("openChart")}
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setHandoffRow(null)}>{lang === "ar" ? "إغلاق" : "Close"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <CreateInvoiceDialog
+        open={!!invoiceForRow}
+        onOpenChange={(open) => { if (!open) setInvoiceForRow(null); }}
+        presetPatientId={invoiceForRow?.patient_id}
+        onSaved={() => setInvoiceForRow(null)}
+      />
     </div>
   );
 }

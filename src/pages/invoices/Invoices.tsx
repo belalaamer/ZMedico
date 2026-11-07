@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useDataSync, notifyDataChange } from "@/lib/dataSync";
 import { Link } from "react-router-dom";
-import { Plus, Search, FileText, CreditCard, AlertCircle } from "lucide-react";
+import { Plus, Search, FileText, CreditCard, Printer, AlertCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -307,15 +307,12 @@ export default function Invoices() {
                     onDelete={() => softDelete(i)}
                     canEdit={authz.can("invoices.edit")}
                     canDelete={authz.can("invoices.delete") && (canOverride || i.status === "draft")}
-                    extraItems={
-                      i.status !== "paid" && i.status !== "cancelled" && authz.can("invoices.create")
-                        ? [{
-                            label: t("recordPayment"),
-                            icon: <CreditCard className="size-4" />,
-                            onClick: () => setPayTarget(i),
-                          }]
-                        : undefined
-                    }
+                    extraItems={[
+                      ...(i.status !== "paid" && i.status !== "cancelled" && authz.can("invoices.create")
+                        ? [{ label: t("recordPayment"), icon: <CreditCard className="size-4" />, onClick: () => setPayTarget(i) }]
+                        : []),
+                      { label: lang === "ar" ? "طباعة الإيصال" : "Print receipt", icon: <Printer className="size-4" />, onClick: () => navigate(`/invoices/${i.id}?print=1`) },
+                    ]}
                   />
                 </div>
               );

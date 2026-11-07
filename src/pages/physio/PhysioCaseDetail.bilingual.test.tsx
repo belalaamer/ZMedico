@@ -14,6 +14,7 @@ const state = vi.hoisted(() => ({
 
 vi.mock("react-router-dom", () => ({
   useParams: () => ({ id: "case-1" }),
+  useNavigate: () => vi.fn(),
   Link: ({ children }: any) => <a>{children}</a>,
 }));
 vi.mock("@/contexts/I18nContext", () => ({

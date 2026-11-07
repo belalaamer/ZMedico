@@ -55,6 +55,15 @@ export default function PatientProfile() {
   const [delOpen, setDelOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
+  // A list-level "Record payment" deep link opens the payment dialog directly.
+  useEffect(() => {
+    if (searchParams.get("pay") !== "1") return;
+    if (!authz.can("invoices.create")) return;
+    setPayOpen(true);
+    const p = new URLSearchParams(searchParams);
+    p.delete("pay");
+    setSearchParams(p, { replace: true });
+  }, [searchParams, authz, setSearchParams]);
   const [showVoided, setShowVoided] = useState(false);
   const [clinicalView, setClinicalView] = useState<"medical" | "plans">("medical");
   const [reloadKey, setReloadKey] = useState(0);
@@ -243,6 +252,8 @@ export default function PatientProfile() {
 
       <PatientQuickActions
         onBook={() => navigate(`/calendar?patient_id=${patient.id}`)}
+        onQuickConsult={() => navigate(`/medical/quick-consult?patient=${patient.id}`)}
+        onCall={patient.phone ? () => { window.location.href = `tel:${patient.phone}`; } : undefined}
         onCreateInvoice={() => setCreateOpen(true)}
         onRecordPayment={() => setPayOpen(true)}
         onTopupWallet={() => setTab("financial")}

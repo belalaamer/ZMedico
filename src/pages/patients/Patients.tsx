@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Phone, Mail, MapPin, MoreHorizontal, Calendar as CalendarIcon, FileText, Eye, Trash2, UserRound, Copy, ChevronDown } from "lucide-react";
+import { Plus, Search, Phone, Mail, MapPin, MoreHorizontal, Calendar as CalendarIcon, CreditCard, FileText, Eye, Stethoscope, Trash2, UserRound, Copy, ChevronDown } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -627,6 +627,21 @@ export default function PatientsPage() {
                             <DropdownMenuItem onClick={() => navigate(`/calendar?patient_id=${p.id}`)}>
                               <CalendarIcon className="size-4 me-2" /> {lang === "ar" ? "حجز موعد" : "Book Appointment"}
                             </DropdownMenuItem>
+                            {authz.can("medical_records.create") && (
+                              <DropdownMenuItem onClick={() => navigate(`/medical/quick-consult?patient=${p.id}`)}>
+                                <Stethoscope className="size-4 me-2" /> {lang === "ar" ? "كشف جديد" : "New encounter"}
+                              </DropdownMenuItem>
+                            )}
+                            {authz.can("invoices.create") && (
+                              <DropdownMenuItem onClick={() => navigate(`/patients/${p.id}?tab=financial&pay=1`)}>
+                                <CreditCard className="size-4 me-2" /> {lang === "ar" ? "تحصيل دفعة" : "Record payment"}
+                              </DropdownMenuItem>
+                            )}
+                            {p.phone && (
+                              <DropdownMenuItem onClick={() => { window.location.href = `tel:${p.phone}`; }}>
+                                <Phone className="size-4 me-2" /> {lang === "ar" ? "اتصال" : "Call"}
+                              </DropdownMenuItem>
+                            )}
                             {authz.can("invoices.create") && (
                               <DropdownMenuItem onClick={() => setInvoiceForPatient(p.id)}>
                                 <FileText className="size-4 me-2" /> {lang === "ar" ? "إنشاء فاتورة" : "Create Invoice"}

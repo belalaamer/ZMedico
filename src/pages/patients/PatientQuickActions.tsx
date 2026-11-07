@@ -1,18 +1,20 @@
-import { Calendar, CreditCard, Wallet, FileText, Upload } from "lucide-react";
+import { Calendar, CreditCard, Phone, Stethoscope, Wallet, FileText, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 
 type Props = {
   onBook?: () => void;
+  onQuickConsult?: () => void;
   onRecordPayment?: () => void;
   onTopupWallet?: () => void;
   onCreateInvoice?: () => void;
   onUploadDocument?: () => void;
+  onCall?: () => void;
 };
 
 export default function PatientQuickActions({
-  onBook, onRecordPayment, onTopupWallet, onCreateInvoice, onUploadDocument,
+  onBook, onQuickConsult, onRecordPayment, onTopupWallet, onCreateInvoice, onUploadDocument, onCall,
 }: Props) {
   const { lang } = useI18n();
   // R2: canonical authorization entry point.
@@ -25,6 +27,13 @@ export default function PatientQuickActions({
       label: lang === "ar" ? "حجز موعد" : "Book appointment",
       onClick: onBook,
       show: authz.can("appointments.create"),
+    },
+    {
+      key: "consult",
+      icon: Stethoscope,
+      label: lang === "ar" ? "كشف جديد" : "New encounter",
+      onClick: onQuickConsult,
+      show: authz.can("medical_records.create"),
     },
     {
       key: "invoice",
@@ -46,6 +55,13 @@ export default function PatientQuickActions({
       label: lang === "ar" ? "شحن المحفظة" : "Top-up wallet",
       onClick: onTopupWallet,
       show: authz.can("invoices.create"),
+    },
+    {
+      key: "call",
+      icon: Phone,
+      label: lang === "ar" ? "اتصال" : "Call",
+      onClick: onCall,
+      show: Boolean(onCall),
     },
     {
       key: "upload",

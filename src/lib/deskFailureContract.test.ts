@@ -166,7 +166,9 @@ const ledgerEntry = (file: string, count: number) => `${file}=${count}`;
 // not a sentence this file lets anyone write.
 const CONVERTED = [
   { file: "src/pages/queue/Queue.tsx", ruleCalls: 6, remainingRaw: 0 },
-  { file: "src/pages/calendar/CalendarPage.tsx", ruleCalls: 6, remainingRaw: 0 },
+  // 7 since the calendar-workflow batch: the inline "new patient" dialog can now fail on
+  // its own insert, and that path routes through deskFailure like every other write here.
+  { file: "src/pages/calendar/CalendarPage.tsx", ruleCalls: 7, remainingRaw: 0 },
   { file: "src/pages/patients/Patients.tsx", ruleCalls: 3, remainingRaw: 1 },
   { file: "src/pages/hr/Attendance.tsx", ruleCalls: 5, remainingRaw: 0 },
   { file: "src/pages/hr/Departments.tsx", ruleCalls: 2, remainingRaw: 0 },

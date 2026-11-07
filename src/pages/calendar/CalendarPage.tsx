@@ -7,11 +7,12 @@ import { Fab } from "@/components/ui/fab";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft, ChevronRight, Plus, Send, CalendarDays, LayoutGrid, Clock, Filter, X, CalendarRange, Check, ArrowRight, Wallet as WalletIcon, AlertCircle, History } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Plus, Send, CalendarDays, LayoutGrid, Clock, Filter, X, CalendarRange, Check, ArrowRight, Wallet as WalletIcon, AlertCircle, History, Loader2, MoreHorizontal, Phone, Search } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Can } from "@/components/Can";
 import { doctorDisplayName } from "@/lib/doctorName";
-import { patientDisplayName } from "@/lib/patientName";
+import { containsArabicScript, patientDisplayName } from "@/lib/patientName";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -68,7 +69,7 @@ type Appt = {
   resource_id: string | null;
   notes: string | null;
   services?: { name_en: string | null; name_ar: string | null } | null;
-  patients?: { first_name_en: string; last_name_en: string | null; first_name_ar: string | null; last_name_ar: string | null; patient_code: number };
+  patients?: { first_name_en: string; last_name_en: string | null; first_name_ar: string | null; last_name_ar: string | null; patient_code: number; phone?: string | null };
 };
 
 function startOfDay(d: Date) { const x = new Date(d); x.setHours(0,0,0,0); return x; }
@@ -141,11 +142,14 @@ function parseHour(s: string | null | undefined, mode: "floor" | "ceil"): number
 
 export default function CalendarPage() {
   const { t, lang } = useI18n();
+  const isAr = lang === "ar";
   const { currentBranchId, branchSelectionReady, subscription } = useBranch();
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const gridScrollRef = useRef<HTMLDivElement | null>(null);
+  const didScrollRef = useRef(false);
   const [date, setDate] = useState<Date>(startOfDay(new Date()));
   const [view, setView] = useState<"day" | "week" | "month">("day");
   const [miniOpen, setMiniOpen] = useState(false);
@@ -170,6 +174,9 @@ export default function CalendarPage() {
   const [roomFilter, setRoomFilter] = useState<string>("all");
   const [roomBoard, setRoomBoard] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  // A patient search that filters the board by name, clinic number or phone, so the desk
+  // can find one appointment in a busy day without scrolling every column.
+  const [query, setQuery] = useState("");
   const [monthDots, setMonthDots] = useState<Record<string, number>>({});
   // C4: the booking picker holds one page of server matches, not the clinic. It used to
   // load the newest 200 patients and filter them in the browser, so a patient past #200
@@ -181,6 +188,9 @@ export default function CalendarPage() {
   const [services, setServices] = useState<{ id: string; name_en: string; name_ar: string; duration: number }[]>([]);
   const [resources, setResources] = useState<{ id: string; name_en: string; name_ar: string; capacity: number; is_active: boolean }[]>([]);
   const [open, setOpen] = useState(false);
+  // The booking dialog shows the four fields a booking actually needs; service, room,
+  // notes and status live behind "More details" so Save stays on screen.
+  const [showDetails, setShowDetails] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({
     patient_id: "", doctor_id: "", scheduled_at: "", duration_minutes: 30, service_id: "", procedure: "", room: "", resource_id: "", notes: "",
@@ -188,6 +198,11 @@ export default function CalendarPage() {
   });
   const [patientCtx, setPatientCtx] = useState<{ wallet: number; outstanding: number; lastVisit: string | null } | null>(null);
   const [patientCtxLoading, setPatientCtxLoading] = useState(false);
+  // Register the caller without leaving the calendar, then book them in the same dialog.
+  const [newPatientOpen, setNewPatientOpen] = useState(false);
+  const [newPatientForm, setNewPatientForm] = useState({ name_en: "", name_ar: "", phone: "" });
+  const [creatingPatient, setCreatingPatient] = useState(false);
+  const creatingPatientRef = useRef(false);
   const [actionBusy, setActionBusy] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectingAppointment, setRejectingAppointment] = useState<Appt | null>(null);
@@ -316,7 +331,7 @@ export default function CalendarPage() {
     const start = rangeStart.toISOString();
     const end = rangeEnd.toISOString();
     let q = supabase.from("appointments")
-      .select("*, patients!inner(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code,deleted_at), services(name_en,name_ar)")
+      .select("*, patients!inner(first_name_en,last_name_en,first_name_ar,last_name_ar,name_language,patient_code,phone,deleted_at), services(name_en,name_ar)")
       .gte("scheduled_at", start).lt("scheduled_at", end)
       .is("deleted_at", null)
       .is("patients.deleted_at", null)
@@ -555,6 +570,7 @@ export default function CalendarPage() {
 
   const openNew = () => {
     setEditId(null);
+    setShowDetails(false);
     // UX fix: this entry point (the toolbar "New Appointment" button and the
     // mobile FAB) previously left scheduled_at completely empty -- unlike
     // openNewAt() below (triggered by clicking a grid slot), which always
@@ -577,6 +593,7 @@ export default function CalendarPage() {
   };
   const openNewAt = (slot: Date) => {
     setEditId(null);
+    setShowDetails(false);
     const local = localDateTimeInput(slot);
     const linked = deepLinkPatientId(deepLink);
     setPatientEcho(linked && deepLink?.name ? { id: linked, label: deepLink.name } : null);
@@ -585,6 +602,7 @@ export default function CalendarPage() {
   };
   const openEdit = (a: Appt) => {
     setEditId(a.id);
+    setShowDetails(true);
     const dt = new Date(a.scheduled_at);
     const local = localDateTimeInput(dt);
     setPatientEcho(a.patient_id && a.patients ? { id: a.patient_id, label: patientDisplayName(a.patients, lang) } : null);
@@ -602,6 +620,27 @@ export default function CalendarPage() {
     });
     setOpen(true);
   };
+
+  // Keyboard-first desk: N books, T jumps to today, arrows move the period, D/W/M switch
+  // the view. Guards skip every field and every open dialog.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target?.isContentEditable) return;
+      if (open || newPatientOpen || rejectOpen) return;
+      if (event.key === "n" || event.key === "N") { event.preventDefault(); openNew(); }
+      else if (event.key === "t" || event.key === "T") { event.preventDefault(); setDate(startOfDay(new Date())); }
+      else if (event.key === "ArrowRight") { event.preventDefault(); setDate(addDays(date, view === "week" ? 7 : 1)); }
+      else if (event.key === "ArrowLeft") { event.preventDefault(); setDate(addDays(date, view === "week" ? -7 : -1)); }
+      else if (event.key === "d" || event.key === "D") setView("day");
+      else if (event.key === "w" || event.key === "W") { if (!isMobile) setView("week"); }
+      else if (event.key === "m" || event.key === "M") setView("month");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [date, view, isMobile, open, newPatientOpen, rejectOpen, openNew]);
 
   // Soft-cancel an appointment instead of hard-deleting it so the row stays
   // available for queue history, reports, and audit. Hard delete is no longer
@@ -814,15 +853,117 @@ export default function CalendarPage() {
     }
   };
 
+  // ---- Workflow helpers: the desk should not have to hunt for a free slot, discover a
+  // double booking only after saving, or leave the calendar to register a caller.
+  const bookingConflict = useMemo(() => {
+    if (!form.scheduled_at) return null;
+    const start = new Date(form.scheduled_at).getTime();
+    const end = start + (Number(form.duration_minutes) || 30) * 60_000;
+    return items.find((a) => {
+      if (a.id === editId) return false;
+      if (a.status === "cancelled" || a.status === "no_show") return false;
+      const s = new Date(a.scheduled_at).getTime();
+      const e = s + a.duration_minutes * 60_000;
+      if (!(start < e && end > s)) return false;
+      const sameDoctor = Boolean(form.doctor_id) && a.doctor_id === form.doctor_id;
+      const sameRoom = (Boolean(form.resource_id) && a.resource_id === form.resource_id) || (Boolean(form.room) && a.room === form.room);
+      return sameDoctor || sameRoom;
+    }) ?? null;
+  }, [form.scheduled_at, form.duration_minutes, form.doctor_id, form.resource_id, form.room, items, editId]);
+
+  const findNextFreeSlot = () => {
+    const base = form.scheduled_at ? new Date(form.scheduled_at) : new Date(date);
+    if (!sameDay(base, date)) {
+      toast.error(isAr ? "انتقل إلى ذلك اليوم أولًا ثم اضغط أقرب وقت." : "Switch to that day first, then pick the next free slot.");
+      return;
+    }
+    const duration = Number(form.duration_minutes) || 30;
+    const busy = items
+      .filter((a) => a.id !== editId && a.status !== "cancelled" && a.status !== "no_show")
+      .filter((a) => !form.doctor_id || a.doctor_id === form.doctor_id)
+      .map((a) => {
+        const s = new Date(a.scheduled_at);
+        const start = s.getHours() * 60 + s.getMinutes();
+        return [start, start + a.duration_minutes] as const;
+      });
+    const from = Math.max(dayStartHour * 60, Math.ceil((base.getHours() * 60 + base.getMinutes()) / 30) * 30);
+    for (let m = from; m + duration <= dayEndHour * 60; m += 30) {
+      if (!busy.some(([s, e]) => m < e && m + duration > s)) {
+        const slot = new Date(base);
+        slot.setHours(Math.floor(m / 60), m % 60, 0, 0);
+        setForm((current) => ({ ...current, scheduled_at: localDateTimeInput(slot) }));
+        return;
+      }
+    }
+    toast.error(isAr ? "لا يوجد وقت فارغ متبقٍ في هذا اليوم." : "No free slot left in this day.");
+  };
+
+  const shiftScheduled = (minutes: number) => {
+    const base = form.scheduled_at ? new Date(form.scheduled_at) : new Date(date);
+    setForm((current) => ({ ...current, scheduled_at: localDateTimeInput(new Date(base.getTime() + minutes * 60_000)) }));
+  };
+
+  const createPatientInline = async () => {
+    if (creatingPatientRef.current) return;
+    const nameEn = newPatientForm.name_en.trim();
+    const nameAr = newPatientForm.name_ar.trim();
+    const phone = newPatientForm.phone.trim();
+    if (!nameEn && !nameAr) {
+      toast.error(isAr ? "اكتب اسم المريض." : "Enter the patient's name.");
+      return;
+    }
+    if (!currentBranchId) {
+      toast.error(t("selectBranch"));
+      return;
+    }
+    creatingPatientRef.current = true;
+    setCreatingPatient(true);
+    try {
+      const payload = {
+        // The enabled BEFORE INSERT trigger allocates zero under an advisory lock.
+        patient_code: 0,
+        first_name_en: nameEn || nameAr,
+        last_name_en: null,
+        first_name_ar: nameAr || nameEn,
+        last_name_ar: null,
+        name_language: containsArabicScript(nameAr || nameEn) ? "ar" : "en",
+        phone: phone || null,
+        branch_id: currentBranchId,
+        whatsapp_opt_in: false,
+      };
+      const { data, error } = await supabase.from("patients").insert(payload).select("id").single();
+      if (error || !data) {
+        const failure = deskFailure(error, lang, isAr ? "تعذر إضافة المريض." : "The patient could not be added.");
+        toast.error(failure.title, { description: failure.description });
+        return;
+      }
+      setPatientEcho({ id: data.id, label: nameAr || nameEn });
+      setForm((current) => ({ ...current, patient_id: data.id }));
+      setNewPatientForm({ name_en: "", name_ar: "", phone: "" });
+      setNewPatientOpen(false);
+      void patientSearch.reload();
+      toast.success(isAr ? "تمت إضافة المريض واختياره للحجز." : "Patient added and selected for this booking.");
+    } finally {
+      creatingPatientRef.current = false;
+      setCreatingPatient(false);
+    }
+  };
+
   // Doctor/room scope only: the status cards below report this set, so their
   // numbers survive whichever card the operator selects.
   const scopedItems = useMemo(() => {
+    const needle = query.trim().toLowerCase();
     return items.filter((a) => {
       if (doctorFilter !== "all" && (a.doctor_id ?? "__none__") !== doctorFilter) return false;
       if (roomFilter !== "all" && (a.room ?? "__none__") !== roomFilter) return false;
+      if (needle) {
+        const p = a.patients;
+        const haystack = `${patientDisplayName(p, "en")} ${patientDisplayName(p, "ar")} ${p?.patient_code ?? ""} ${p?.phone ?? ""}`.toLowerCase();
+        if (!haystack.includes(needle)) return false;
+      }
       return true;
     });
-  }, [items, doctorFilter, roomFilter]);
+  }, [items, doctorFilter, roomFilter, query]);
 
   // Group items by day for week view
   const itemsByDay = useMemo(() => {
@@ -954,14 +1095,12 @@ export default function CalendarPage() {
   const renderApptBlock = (a: Appt, lane = 0, lanes = 1) => {
     const { style, isOutOfHours } = blockStyle(a, lane, lanes);
     return (
-    <button
+    <div
       key={a.id}
       id={`appt-${a.id}`}
-      onClick={(e) => { e.stopPropagation(); navigate(`/appointments/${a.id}`); }}
       className={cn(
-        "absolute rounded-md border border-l-4 text-start px-2 py-1 overflow-hidden shadow-sm",
+        "group absolute rounded-md border border-l-4 text-start overflow-hidden shadow-sm",
         "hover:shadow-md hover:z-20 hover:scale-[1.01] transition-all",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
         statusBlock[a.status],
         statusAccent[a.status],
         highlightId === a.id && "ring-2 ring-primary shadow-lg z-20",
@@ -979,24 +1118,86 @@ export default function CalendarPage() {
       style={style}
       title={`${fullName(a.patients!)} · ${timeStr(new Date(a.scheduled_at))}${isOutOfHours ? ` (${lang === "ar" ? "خارج ساعات العمل" : "outside working hours"})` : ""}`}
     >
-      <div className="text-xs font-bold leading-tight truncate">
-        {fullName(a.patients!)}
-      </div>
-      <div className="text-[11px] leading-tight truncate text-muted-foreground">
-        {timeStr(new Date(a.scheduled_at))}
-        {isOutOfHours && <span className="ms-1" aria-hidden>⚠</span>}
-        {a.booking_request_status === "pending" && (
-          <span className="ms-1 font-semibold text-amber-600 dark:text-amber-400" title={lang === "ar" ? "طلب حجز في انتظار التأكيد" : "Booking request awaiting confirmation"}>
-            {lang === "ar" ? "بانتظار التأكيد" : "Needs confirmation"}
-          </span>
-        )}
-      </div>
-      {(appointmentServiceLabel(a) || a.room) && (
-        <div className="text-[10px] leading-tight truncate text-muted-foreground/90">
-          {appointmentServiceLabel(a) || "—"}{a.room ? ` · ${a.room}` : ""}
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); navigate(`/appointments/${a.id}`); }}
+        className="block h-full w-full px-2 py-1 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        <div className="text-xs font-bold leading-tight truncate">
+          {fullName(a.patients!)}
         </div>
-      )}
-    </button>
+        <div className="text-[11px] leading-tight truncate text-muted-foreground">
+          {timeStr(new Date(a.scheduled_at))}
+          {isOutOfHours && <span className="ms-1" aria-hidden>⚠</span>}
+          {a.booking_request_status === "pending" && (
+            <span className="ms-1 font-semibold text-amber-600 dark:text-amber-400" title={lang === "ar" ? "طلب حجز في انتظار التأكيد" : "Booking request awaiting confirmation"}>
+              {lang === "ar" ? "بانتظار التأكيد" : "Needs confirmation"}
+            </span>
+          )}
+        </div>
+        {(appointmentServiceLabel(a) || a.room) && (
+          <div className="text-[10px] leading-tight truncate text-muted-foreground/90">
+            {appointmentServiceLabel(a) || "—"}{a.room ? ` · ${a.room}` : ""}
+          </div>
+        )}
+      </button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            onClick={(e) => e.stopPropagation()}
+            aria-label={lang === "ar" ? "إجراءات الموعد" : "Appointment actions"}
+            className="absolute end-1 top-1 rounded bg-background/85 p-0.5 text-muted-foreground shadow-sm opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100"
+          >
+            <MoreHorizontal className="size-3.5" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48">
+          <Can permission="appointments.edit">
+            {a.status === "scheduled" ? (
+              <DropdownMenuItem onSelect={() => { void changeStatus(a, "confirmed"); }}>
+                <Check className="me-2 size-4" />{lang === "ar" ? "وصل" : "Arrived"}
+              </DropdownMenuItem>
+            ) : null}
+            {a.status === "scheduled" || a.status === "confirmed" ? (
+              <DropdownMenuItem onSelect={() => { void changeStatus(a, "in_progress"); }}>
+                <ArrowRight className="me-2 size-4" />{lang === "ar" ? "ابدأ" : "Start"}
+              </DropdownMenuItem>
+            ) : null}
+            {a.status === "in_progress" ? (
+              <DropdownMenuItem onSelect={() => { void changeStatus(a, "completed"); }}>
+                <Check className="me-2 size-4" />{lang === "ar" ? "تم" : "Done"}
+              </DropdownMenuItem>
+            ) : null}
+            {a.status === "scheduled" || a.status === "confirmed" ? (
+              <DropdownMenuItem onSelect={() => { void changeStatus(a, "confirmed").then(() => navigate("/queue")); }}>
+                <Send className="me-2 size-4" />{lang === "ar" ? "أرسل إلى الطابور" : "Send to queue"}
+              </DropdownMenuItem>
+            ) : null}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => openEdit(a)}>
+              <CalendarDays className="me-2 size-4" />{t("edit")}
+            </DropdownMenuItem>
+          </Can>
+          <DropdownMenuItem onSelect={() => navigate(`/patients/${a.patient_id}`)}>
+            <History className="me-2 size-4" />{t("openChart")}
+          </DropdownMenuItem>
+          {a.patients?.phone && (
+            <DropdownMenuItem onSelect={() => { window.location.href = `tel:${a.patients?.phone}`; }}>
+              <Phone className="me-2 size-4" />{lang === "ar" ? "اتصال" : "Call"}
+            </DropdownMenuItem>
+          )}
+          {a.status !== "cancelled" && a.status !== "completed" && a.status !== "no_show" ? (
+            <Can permission="appointments.edit">
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive" onSelect={() => { void cancelAppointment(a); }}>
+                <X className="me-2 size-4" />{t("cancelVisit")}
+              </DropdownMenuItem>
+            </Can>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
     );
   };
 
@@ -1018,6 +1219,17 @@ export default function CalendarPage() {
   const now = new Date();
   const nowTop = ((now.getHours() - dayStartHour) * 60 + now.getMinutes()) / 60 * HOUR_HEIGHT;
   const showNowLine = now.getHours() >= dayStartHour && now.getHours() < dayEndHour;
+
+  // Open today's grid at the current time instead of at the branch's opening hour, so the
+  // desk sees the next appointment without scrolling first. Once only; arrows still work.
+  useEffect(() => {
+    if (didScrollRef.current) return;
+    if (view === "month") return;
+    if (!sameDay(date, new Date())) return;
+    didScrollRef.current = true;
+    const el = gridScrollRef.current;
+    if (el) el.scrollTop = Math.max(0, nowTop - 96);
+  }, [view, date, nowTop]);
 
   const sidebarContent = (
     <div className="space-y-4">
@@ -1114,6 +1326,17 @@ export default function CalendarPage() {
             }}
           ><ChevronLeft className="size-4 rtl:rotate-180" /></Button>
           <Button variant="outline" size="sm" onClick={() => setDate(startOfDay(new Date()))}>{t("today")}</Button>
+          {view !== "month" ? (
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label={lang === "ar" ? "الذهاب إلى الوقت الحالي" : "Jump to now"}
+              onClick={() => {
+                const el = gridScrollRef.current;
+                if (el) el.scrollTo({ top: Math.max(0, nowTop - 96), behavior: "smooth" });
+              }}
+            ><Clock className="size-4" /></Button>
+          ) : null}
           <Button
             variant="outline"
             size="icon"
@@ -1143,7 +1366,14 @@ export default function CalendarPage() {
               <DialogHeader><DialogTitle>{editId ? t("edit") : t("newAppointment")}</DialogTitle></DialogHeader>
               <form onSubmit={handleSave} className="space-y-4">
                 <div className="space-y-2">
-                  <Label>{t("patientName")}</Label>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label>{t("patientName")}</Label>
+                    <Can permission="patients.create">
+                      <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setNewPatientOpen(true)}>
+                        <Plus className="me-1 size-3.5" />{t("newPatient")}
+                      </Button>
+                    </Can>
+                  </div>
                   <Combobox
                     options={patients.map((p) => ({
                       value: p.id,
@@ -1193,23 +1423,36 @@ export default function CalendarPage() {
                     </div>
                   )}
                 </div>
-                <div className="space-y-2">
-                  <Label>{lang === "ar" ? "الطبيب" : "Doctor"}</Label>
-                  <Combobox
-                    value={form.doctor_id}
-                    onChange={(v) => setForm({ ...form, doctor_id: v })}
-                    options={bookingDoctors.map((d) => ({ value: d.id, label: doctorDisplayName(d, lang) }))}
-                    placeholder={lang === "ar" ? "— بدون —" : "— None —"}
-                    searchPlaceholder={lang === "ar" ? "ابحث عن طبيب..." : "Search doctor..."}
-                    emptyText={form.service_id && serviceDoctors?.length === 0 ? (lang === "ar" ? "لا يوجد طبيب مؤهل لهذه الخدمة" : "No doctor is assigned to this service") : (lang === "ar" ? "لا يوجد أطباء" : "No doctors found")}
-                    allowClear
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>{lang === "ar" ? "الطبيب" : "Doctor"}</Label>
+                    <Combobox
+                      value={form.doctor_id}
+                      onChange={(v) => setForm({ ...form, doctor_id: v })}
+                      options={bookingDoctors.map((d) => ({ value: d.id, label: doctorDisplayName(d, lang) }))}
+                      placeholder={lang === "ar" ? "— بدون —" : "— None —"}
+                      searchPlaceholder={lang === "ar" ? "ابحث عن طبيب..." : "Search doctor..."}
+                      emptyText={form.service_id && serviceDoctors?.length === 0 ? (lang === "ar" ? "لا يوجد طبيب مؤهل لهذه الخدمة" : "No doctor is assigned to this service") : (lang === "ar" ? "لا يوجد أطباء" : "No doctors found")}
+                      allowClear
+                    />
+                  </div>
                   <div className="space-y-2">
                     <Label>{t("scheduledAt")}</Label>
                     <Input type="datetime-local" value={form.scheduled_at} onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })} required />
+                    <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={findNextFreeSlot}>
+                      <Clock className="me-1 size-3.5" />{lang === "ar" ? "أقرب وقت فارغ" : "Next free slot"}
+                    </Button>
+                    {editId ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => shiftScheduled(15)}>+15m</Button>
+                        <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => shiftScheduled(30)}>+30m</Button>
+                        <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => shiftScheduled(60)}>+1h</Button>
+                        <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => shiftScheduled(24 * 60)}>{lang === "ar" ? "غدًا" : "Tomorrow"}</Button>
+                      </div>
+                    ) : null}
                   </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label>{t("durationMin")}</Label>
                     <Input
@@ -1226,97 +1469,127 @@ export default function CalendarPage() {
                         setForm({ ...form, duration_minutes: ascii === "" ? 0 : Number(ascii) });
                       }}
                     />
+                    <div className="flex flex-wrap gap-1.5">
+                      {[15, 30, 45, 60].map((minutes) => (
+                        <Button
+                          key={minutes}
+                          type="button"
+                          variant={Number(form.duration_minutes) === minutes ? "default" : "outline"}
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => setForm({ ...form, duration_minutes: minutes })}
+                        >
+                          {minutes}m
+                        </Button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label>{lang === "ar" ? "الخدمة / نوع الزيارة" : "Service / appointment type"}</Label>
-                    <Select
-                      value={form.service_id || "__none__"}
-                      onValueChange={(v) => {
-                        if (v === "__none__") {
-                          setForm({ ...form, service_id: "", procedure: "" });
-                          return;
-                        }
-                        const selected = services.find((s) => s.id === v);
-                        setForm({
-                          ...form,
-                          service_id: v,
-                          // Keep a snapshot for legacy reports and old rows while
-                          // service_id remains the canonical booking relationship.
-                          procedure: selected?.name_en || selected?.name_ar || "",
-                          duration_minutes: selected?.duration || form.duration_minutes,
-                        });
-                      }}
-                    >
-                      <SelectTrigger><SelectValue placeholder={lang === "ar" ? "اختر الخدمة" : "Choose service"} /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">— {lang === "ar" ? "بدون خدمة" : "No service"} —</SelectItem>
-                        {services.map((service) => (
-                          <SelectItem key={service.id} value={service.id}>
-                            {lang === "ar" ? service.name_ar : service.name_en} · {service.duration}m
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-[11px] leading-4 text-muted-foreground">
-                      {lang === "ar" ? "الإجراءات الطبية التي تم تنفيذها تُسجل داخل السجل الطبي بعد حضور المريض." : "Clinical procedures performed are documented in the medical record after the patient visit."}
-                    </p>
-                    {form.procedure && !form.service_id ? (
+                    {bookingConflict ? (
                       <p className="text-[11px] leading-4 text-amber-600">
-                        {lang === "ar" ? "هذا موعد قديم يحتوي على إجراء محفوظ؛ اختر خدمة جديدة لتحديثه." : "This legacy appointment has a saved procedure; choose a service to update it."}
+                        {lang === "ar"
+                          ? `يتعارض مع ${fullName(bookingConflict.patients!)} في ${timeStr(new Date(bookingConflict.scheduled_at))}.`
+                          : `Overlaps ${fullName(bookingConflict.patients!)} at ${timeStr(new Date(bookingConflict.scheduled_at))}.`}
                       </p>
                     ) : null}
                   </div>
-                  <div className="space-y-2">
-                    <Label>{t("room")}</Label>
-                    {resources.length ? (
-                      <Select value={form.resource_id || "__none__"} onValueChange={(value) => {
-                        const selected = resources.find((resource) => resource.id === value);
-                        setForm({ ...form, resource_id: value === "__none__" ? "" : value, room: selected?.name_en || "" });
-                      }}>
-                        <SelectTrigger><SelectValue placeholder={lang === "ar" ? "اختر الغرفة" : "Choose room"} /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">— {lang === "ar" ? "بدون غرفة محددة" : "No specific room"} —</SelectItem>
-                          {resources.map((resource) => <SelectItem key={resource.id} value={resource.id}>{lang === "ar" ? resource.name_ar : resource.name_en} · {resource.capacity} {lang === "ar" ? "سعة" : "capacity"}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <>
-                        <Input list="calendar-rooms-list" value={form.room} onChange={(e) => setForm({ ...form, room: e.target.value, resource_id: "" })} maxLength={40} placeholder={t("selectRoom")} />
-                        <datalist id="calendar-rooms-list">{rooms.map((r) => <option key={r} value={r} />)}</datalist>
-                      </>
+                </div>
+                <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs text-muted-foreground" onClick={() => setShowDetails((value) => !value)}>
+                  {showDetails ? <ChevronUp className="me-1 size-3.5" /> : <ChevronDown className="me-1 size-3.5" />}
+                  {showDetails ? (lang === "ar" ? "تفاصيل أقل" : "Fewer details") : (lang === "ar" ? "المزيد من التفاصيل" : "More details")}
+                </Button>
+                {showDetails ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label>{lang === "ar" ? "الخدمة / نوع الزيارة" : "Service / appointment type"}</Label>
+                        <Select
+                          value={form.service_id || "__none__"}
+                          onValueChange={(v) => {
+                            if (v === "__none__") {
+                              setForm({ ...form, service_id: "", procedure: "" });
+                              return;
+                            }
+                            const selected = services.find((s) => s.id === v);
+                            setForm({
+                              ...form,
+                              service_id: v,
+                              // Keep a snapshot for legacy reports and old rows while
+                              // service_id remains the canonical booking relationship.
+                              procedure: selected?.name_en || selected?.name_ar || "",
+                              duration_minutes: selected?.duration || form.duration_minutes,
+                            });
+                          }}
+                        >
+                          <SelectTrigger><SelectValue placeholder={lang === "ar" ? "اختر الخدمة" : "Choose service"} /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">— {lang === "ar" ? "بدون خدمة" : "No service"} —</SelectItem>
+                            {services.map((service) => (
+                              <SelectItem key={service.id} value={service.id}>
+                                {lang === "ar" ? service.name_ar : service.name_en} · {service.duration}m
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-[11px] leading-4 text-muted-foreground">
+                          {lang === "ar" ? "الإجراءات الطبية التي تم تنفيذها تُسجل داخل السجل الطبي بعد حضور المريض." : "Clinical procedures performed are documented in the medical record after the patient visit."}
+                        </p>
+                        {form.procedure && !form.service_id ? (
+                          <p className="text-[11px] leading-4 text-amber-600">
+                            {lang === "ar" ? "هذا موعد قديم يحتوي على إجراء محفوظ؛ اختر خدمة جديدة لتحديثه." : "This legacy appointment has a saved procedure; choose a service to update it."}
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t("room")}</Label>
+                        {resources.length ? (
+                          <Select value={form.resource_id || "__none__"} onValueChange={(value) => {
+                            const selected = resources.find((resource) => resource.id === value);
+                            setForm({ ...form, resource_id: value === "__none__" ? "" : value, room: selected?.name_en || "" });
+                          }}>
+                            <SelectTrigger><SelectValue placeholder={lang === "ar" ? "اختر الغرفة" : "Choose room"} /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">— {lang === "ar" ? "بدون غرفة محددة" : "No specific room"} —</SelectItem>
+                              {resources.map((resource) => <SelectItem key={resource.id} value={resource.id}>{lang === "ar" ? resource.name_ar : resource.name_en} · {resource.capacity} {lang === "ar" ? "سعة" : "capacity"}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <>
+                            <Input list="calendar-rooms-list" value={form.room} onChange={(e) => setForm({ ...form, room: e.target.value, resource_id: "" })} maxLength={40} placeholder={t("selectRoom")} />
+                            <datalist id="calendar-rooms-list">{rooms.map((r) => <option key={r} value={r} />)}</datalist>
+                          </>
+                        )}
+                        <p className="text-[11px] leading-4 text-muted-foreground">{resources.length ? (lang === "ar" ? "اختيار الغرفة يثبت المورد الذي سيستهلكه الموعد." : "Selecting a room assigns the resource consumed by this appointment.") : (lang === "ar" ? "أضف الغرف من إعدادات المواعيد لتفعيل حساب السعة." : "Add rooms in Appointment Settings to enable capacity-aware booking.")}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("notes")}</Label>
+                      <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} maxLength={1000} />
+                    </div>
+                    {editId && (
+                      <div className="space-y-2">
+                        <Label>{t("status")}</Label>
+                        <Select disabled={editingAppointment?.booking_request_status === "pending"} value={form.status} onValueChange={(v) => setForm({ ...form, status: v as Appt["status"] })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="scheduled">{t("statusScheduled")}</SelectItem>
+                            <SelectItem value="confirmed">{t("statusConfirmed")}</SelectItem>
+                            <SelectItem value="in_progress">{t("statusInProgress")}</SelectItem>
+                            <SelectItem value="completed">{t("statusCompleted")}</SelectItem>
+                            <SelectItem value="cancelled">{t("statusCancelled")}</SelectItem>
+                            <SelectItem value="no_show">{t("statusNoShow")}</SelectItem>
+                            <SelectItem value="departed">{t("statusDeparted")}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {editingAppointment?.booking_request_status === "pending" ? (
+                          <p className="text-xs text-amber-600">
+                            {lang === "ar" ? "استخدم زر التأكيد أو الرفض لمعالجة طلب الحجز. لا يمكن تغيير الحالة يدويًا قبل المعالجة." : "Use Confirm or Reject to process this booking request. Manual status changes are disabled until it is processed."}
+                          </p>
+                        ) : null}
+                      </div>
                     )}
-                    <p className="text-[11px] leading-4 text-muted-foreground">{resources.length ? (lang === "ar" ? "اختيار الغرفة يثبت المورد الذي سيستهلكه الموعد." : "Selecting a room assigns the resource consumed by this appointment.") : (lang === "ar" ? "أضف الغرف من إعدادات المواعيد لتفعيل حساب السعة." : "Add rooms in Appointment Settings to enable capacity-aware booking.")}</p>
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>{t("notes")}</Label>
-                  <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} maxLength={1000} />
-                </div>
-                {editId && (
-                  <div className="space-y-2">
-                    <Label>{t("status")}</Label>
-                                            <Select disabled={editingAppointment?.booking_request_status === "pending"} value={form.status} onValueChange={(v) => setForm({ ...form, status: v as Appt["status"] })}>
-
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="scheduled">{t("statusScheduled")}</SelectItem>
-                        <SelectItem value="confirmed">{t("statusConfirmed")}</SelectItem>
-                        <SelectItem value="in_progress">{t("statusInProgress")}</SelectItem>
-                        <SelectItem value="completed">{t("statusCompleted")}</SelectItem>
-                        <SelectItem value="cancelled">{t("statusCancelled")}</SelectItem>
-                        <SelectItem value="no_show">{t("statusNoShow")}</SelectItem>
-                        <SelectItem value="departed">{t("statusDeparted")}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {editingAppointment?.booking_request_status === "pending" ? (
-                      <p className="text-xs text-amber-600">
-                        {lang === "ar" ? "استخدم زر التأكيد أو الرفض لمعالجة طلب الحجز. لا يمكن تغيير الحالة يدويًا قبل المعالجة." : "Use Confirm or Reject to process this booking request. Manual status changes are disabled until it is processed."}
-                      </p>
-                    ) : null}
-                  </div>
-                )}
+                ) : null}
                 {editingAppointment?.booking_request_status === "pending" ? (
                   <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-3">
                     <div>
@@ -1401,6 +1674,20 @@ export default function CalendarPage() {
       <Card className="p-3 shadow-card flex md:flex-wrap items-stretch md:items-center gap-2 overflow-x-auto md:overflow-visible">
         <div className="inline-flex items-center gap-1 text-xs text-muted-foreground me-1 shrink-0">
           <Filter className="size-3.5" /> {lang === "ar" ? "تصفية:" : "Filter:"}
+        </div>
+        <div className="relative min-w-[180px] flex-1 sm:max-w-xs shrink-0">
+          <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={lang === "ar" ? "ابحث عن مريض بالاسم أو الرقم" : "Find a patient by name or number"}
+            className="h-10 ps-9 text-sm md:h-9 md:text-xs"
+          />
+          {query ? (
+            <button type="button" onClick={() => setQuery("")} className="absolute end-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label={lang === "ar" ? "مسح البحث" : "Clear search"}>
+              <X className="size-3.5" />
+            </button>
+          ) : null}
         </div>
         <Select value={doctorFilter} onValueChange={setDoctorFilter}>
           <SelectTrigger className="h-10 md:h-9 w-auto min-w-[140px] text-sm md:text-xs shrink-0"><SelectValue /></SelectTrigger>
@@ -1542,13 +1829,14 @@ export default function CalendarPage() {
                     className={`p-2 text-center hover:bg-muted/40 transition-colors ${today ? "bg-primary/5" : ""}`}>
                     <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{weekHeader(d)}</div>
                     <div className={`text-lg font-semibold ${today ? "text-primary" : ""}`}>{d.getDate()}</div>
+                    <div className="text-[10px] text-muted-foreground">{(itemsByDay[d.toDateString()] ?? []).length || ""}</div>
                   </button>
                 );
               })}
             </div>
           )}
 
-          <div className="overflow-auto" style={{ maxHeight: "70vh" }}>
+          <div className="overflow-auto" style={{ maxHeight: "70vh" }} ref={gridScrollRef}>
             {workStartMin == null || workEndMin == null ? (
               <div className="p-12 text-center">
                 <Clock className="size-10 mx-auto text-muted-foreground mb-3" />
@@ -1664,6 +1952,32 @@ export default function CalendarPage() {
         </Card>
         )}
       </div>
+      {/* Register the caller here, then the same booking dialog continues with them selected. */}
+      <Dialog open={newPatientOpen} onOpenChange={(value) => { if (!creatingPatientRef.current) setNewPatientOpen(value); }}>
+        <DialogContent className="max-w-md w-[calc(100vw-2rem)] sm:w-full">
+          <DialogHeader><DialogTitle>{t("newPatient")}</DialogTitle></DialogHeader>
+          <form onSubmit={(event) => { event.preventDefault(); void createPatientInline(); }} className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>{lang === "ar" ? "الاسم بالإنجليزية" : "Name in English"}</Label>
+              <Input dir="ltr" value={newPatientForm.name_en} onChange={(event) => setNewPatientForm((current) => ({ ...current, name_en: event.target.value }))} maxLength={160} placeholder="Mohamed Ibrahim" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>{lang === "ar" ? "الاسم بالعربية" : "Name in Arabic"}</Label>
+              <Input value={newPatientForm.name_ar} onChange={(event) => setNewPatientForm((current) => ({ ...current, name_ar: event.target.value }))} maxLength={160} placeholder="محمد إبراهيم" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>{lang === "ar" ? "الهاتف" : "Phone"}</Label>
+              <Input dir="ltr" type="tel" value={newPatientForm.phone} onChange={(event) => setNewPatientForm((current) => ({ ...current, phone: event.target.value }))} maxLength={30} />
+            </div>
+            <p className="text-xs text-muted-foreground">{lang === "ar" ? "سيُضاف المريض إلى الفرع الحالي ويُختار في هذا الحجز." : "The patient is added to the current branch and selected for this booking."}</p>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setNewPatientOpen(false)} disabled={creatingPatient}>{t("cancel")}</Button>
+              <Button type="submit" disabled={creatingPatient}>{creatingPatient ? <Loader2 className="me-2 size-4 animate-spin" /> : <Plus className="me-2 size-4" />}{t("save")}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
         <DialogContent className="max-w-md w-[calc(100vw-2rem)] sm:w-full">
           <DialogHeader><DialogTitle>{lang === "ar" ? "رفض طلب الحجز" : "Reject booking request"}</DialogTitle></DialogHeader>

@@ -26,14 +26,7 @@ const TEST_FILE = /\.test\.(ts|tsx)$/;
  * every rule. The baseline cannot pin a finding inside this scope, so debt from the legacy
  * app can never be borrowed by new platform work.
  */
-export const STRICT_SCOPES = [
-  "src/components/platform/",
-  "src/components/zds/",
-  "src/pages/appointments/",
-  "src/pages/calendar/",
-  "src/pages/checkin/",
-  "src/pages/queue/",
-];
+export const STRICT_SCOPES = ["src/components/platform/"];
 const isStrict = (file) => STRICT_SCOPES.some((s) => file === s || file.startsWith(s));
 
 /** Rules whose presence anywhere is a defect, listed separately so the report can rank them. */

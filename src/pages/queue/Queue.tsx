@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 import { RowActions } from "@/components/RowActions";
 import { ListSkeleton } from "@/components/ListSkeleton";
@@ -23,21 +30,9 @@ import type { DictKey } from "@/lib/i18n";
 import { getQueueSettings, fetchQueueSettings, type QueueSettings } from "@/lib/queueSettings";
 import { showLoadingPlaceholder } from "@/lib/quietRefresh";
 import { listOpenAlerts, effectiveState, type QueueAlert } from "@/lib/queueAlerts";
+import { Switch } from "@/components/ui/switch";
 import { useOperationScope } from "@/hooks/useOperationScope";
 import { usePatientSearch } from "@/hooks/usePatientSearch";
-import {
-  ActionButton,
-  FieldLabel,
-  PageHeader,
-  Panel,
-  PlatformDialog,
-  PlatformInput,
-  SectionLabel,
-  SelectField,
-  StatusChip,
-  TableShell,
-  type SignalTone,
-} from "@/components/zds/surface";
 import {
   PATIENT_PICKER_LIMIT,
   patientPickerCopy,
@@ -93,15 +88,14 @@ function formatTime(iso: string | null | undefined) {
   try { return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); } catch { return "—"; }
 }
 
-// Signal colour is meaning: a status is a chip with its word, not a palette wash.
-const STATUS_TONE: Record<ApptStatus, SignalTone> = {
-  scheduled:   "neutral",
-  confirmed:   "positive",
-  in_progress: "caution",
-  completed:   "positive",
-  cancelled:   "critical",
-  no_show:     "critical",
-  departed:    "neutral",
+const STATUS_BADGE: Record<ApptStatus, string> = {
+  scheduled:   "bg-primary/10 text-primary border border-primary/30",
+  confirmed:   "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30",
+  in_progress: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30",
+  completed:   "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/40",
+  cancelled:   "bg-destructive/10 text-destructive border border-destructive/30",
+  no_show:     "bg-destructive/10 text-destructive border border-destructive/30",
+  departed:    "bg-muted text-muted-foreground border border-border",
 };
 
 function uiStatusLabel(s: ApptStatus, t: (k: DictKey) => string) {
@@ -121,7 +115,6 @@ export default function QueuePage() {
   const { currentBranchId, branchSelectionReady } = useBranch();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const isArabic = lang === "ar";
   // R2: canonical authorization entry point.
   const { authz } = useAuthorization("Queue");
   // Queue mutations are gated behind appointments.edit — the real permission
@@ -254,7 +247,7 @@ export default function QueuePage() {
     const { data, error } = await q;
     if (requestId !== loadRequestRef.current) return;
     if (error) {
-      const failure = deskFailure(error, lang, isArabic ? "تعذر تحميل الطابور." : "Could not load the queue.");
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تحميل الطابور." : "Could not load the queue.");
       toast.error(failure.title, { description: failure.description });
       setRows([]);
     } else {
@@ -367,19 +360,19 @@ export default function QueuePage() {
   }, [filtered, tick]);
 
   const updateRow = async (id: string, patch: Record<string, unknown>, expectedStatus: ApptStatus, expectedPriority?: number | null): Promise<boolean> => {
-    if (!canMutate) { toast.error(isArabic ? "غير مسموح" : "Not allowed"); return false; }
+    if (!canMutate) { toast.error(lang === "ar" ? "غير مسموح" : "Not allowed"); return false; }
     if (!currentBranchId) { toast.error(t("selectBranch")); return false; }
     let updated = false;
     try {
       updated = await updateQueueAppointment({ appointmentId: id, branchId: currentBranchId, patch, expectedStatus, expectedPriority });
     } catch (error) {
-      const failure = deskFailure(error, lang, isArabic ? "تعذر حفظ هذا التغيير في الطابور." : "This queue change could not be saved.");
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر حفظ هذا التغيير في الطابور." : "This queue change could not be saved.");
       toast.error(failure.title, { description: failure.description });
       void load();
       return false;
     }
     if (!updated) {
-      toast.error(isArabic ? "تم تحديث الموعد بواسطة مستخدم آخر؛ أعد تحميل الطابور." : "This appointment was updated by another user. Refresh the queue and try again.");
+      toast.error(lang === "ar" ? "تم تحديث الموعد بواسطة مستخدم آخر؛ أعد تحميل الطابور." : "This appointment was updated by another user. Refresh the queue and try again.");
       await load();
       return false;
     }
@@ -401,7 +394,7 @@ export default function QueuePage() {
   const doReopen   = (r: QueueRow) => transition(r, "scheduled");
 
   const generateSelfCheckinLink = async (r: QueueRow) => {
-    if (!canMutate) { toast.error(isArabic ? "غير مسموح" : "Not allowed"); return; }
+    if (!canMutate) { toast.error(lang === "ar" ? "غير مسموح" : "Not allowed"); return; }
     setSelfCheckinRow(r);
     setSelfCheckinUrl(null);
     setSelfCheckinExpiresAt(null);
@@ -485,7 +478,7 @@ export default function QueuePage() {
   const submitWalkIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (walkInSubmittingRef.current) return;
-    if (!canMutate) { toast.error(isArabic ? "غير مسموح" : "Not allowed"); return; }
+    if (!canMutate) { toast.error(lang === "ar" ? "غير مسموح" : "Not allowed"); return; }
     if (!walkInPatient) { toast.error(t("selectPatient")); return; }
     if (!branchSelectionReady || !currentBranchId) { toast.error(t("selectBranch")); return; }
     walkInSubmittingRef.current = true;
@@ -509,7 +502,7 @@ export default function QueuePage() {
     };
     const { error } = await supabase.from("appointments").insert(payload).select("id").single();
     if (error) {
-      const failure = deskFailure(error, lang, isArabic ? "تعذر تسجيل الزيارة." : "The walk-in could not be booked.");
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تسجيل الزيارة." : "The walk-in could not be booked.");
       toast.error(failure.title, { description: failure.description });
       return;
     }
@@ -520,7 +513,7 @@ export default function QueuePage() {
     load();
     } catch (error) {
       console.error("[Queue] walk-in outcome needs review", error);
-      toast.error(isArabic
+      toast.error(lang === "ar"
         ? "تعذر تأكيد تسجيل الزيارة. راجع الطابور قبل إعادة المحاولة."
         : "Walk-in outcome could not be confirmed. Check the queue before retrying.");
     } finally {
@@ -588,7 +581,7 @@ export default function QueuePage() {
   };
   const submitReassign = async () => {
     if (!reassignRow) return;
-    if (!canMutate) { toast.error(isArabic ? "غير مسموح" : "Not allowed"); return; }
+    if (!canMutate) { toast.error(lang === "ar" ? "غير مسموح" : "Not allowed"); return; }
     const r = reassignRow;
     if (!currentBranchId || r.branch_id !== currentBranchId) { toast.error(t("selectBranch")); return; }
     const next = reassignDoctor || null;
@@ -607,12 +600,12 @@ export default function QueuePage() {
     const { data: reassigned, error } = await reassignQuery.select("id").maybeSingle();
     setReassignSaving(false);
     if (error) {
-      const failure = deskFailure(error, lang, isArabic ? "تعذر تغيير الطبيب المعالج." : "The doctor could not be changed.");
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تغيير الطبيب المعالج." : "The doctor could not be changed.");
       toast.error(failure.title, { description: failure.description });
       return;
     }
     if (!reassigned) {
-      toast.error(isArabic ? "تم تعديل الموعد بواسطة مستخدم آخر؛ أعد تحميل الطابور." : "This appointment was changed by another user. Refresh the queue and try again.");
+      toast.error(lang === "ar" ? "تم تعديل الموعد بواسطة مستخدم آخر؛ أعد تحميل الطابور." : "This appointment was changed by another user. Refresh the queue and try again.");
       setReassignRow(null);
       await load();
       return;
@@ -629,7 +622,7 @@ export default function QueuePage() {
   };
   const submitRoom = async () => {
     if (!roomRow) return;
-    if (!canMutate) { toast.error(isArabic ? "غير مسموح" : "Not allowed"); return; }
+    if (!canMutate) { toast.error(lang === "ar" ? "غير مسموح" : "Not allowed"); return; }
     const r = roomRow;
     if (!currentBranchId || r.branch_id !== currentBranchId) { toast.error(t("selectBranch")); return; }
     const next = roomValue.trim() ? roomValue.trim() : null;
@@ -645,11 +638,11 @@ export default function QueuePage() {
     const { data: updated, error } = await roomQuery.select("id").maybeSingle();
     setRoomSaving(false);
     if (error) {
-      const failure = deskFailure(error, lang, isArabic ? "تعذر تغيير غرفة الموعد." : "The room could not be changed.");
+      const failure = deskFailure(error, lang, lang === "ar" ? "تعذر تغيير غرفة الموعد." : "The room could not be changed.");
       toast.error(failure.title, { description: failure.description });
       return;
     }
-    if (!updated) { toast.error(isArabic ? "تم تغيير الغرفة بواسطة مستخدم آخر؛ أعد تحميل الطابور." : "The room was changed by another user. Refresh the queue."); await load(); return; }
+    if (!updated) { toast.error(lang === "ar" ? "تم تغيير الغرفة بواسطة مستخدم آخر؛ أعد تحميل الطابور." : "The room was changed by another user. Refresh the queue."); await load(); return; }
     toast.success(t("saved"));
     setRoomRow(null);
     load();
@@ -720,108 +713,125 @@ export default function QueuePage() {
     return <RowActions extraItems={items} canEdit={false} canDelete={false} />;
   };
 
-  const urgentWaitingCount = filtered.filter((r) => r.status === "scheduled" || r.status === "confirmed").length;
-
   return (
-    <div className="z-desk min-h-screen space-y-z4 p-z4 sm:p-z6" dir={isArabic ? "rtl" : "ltr"}>
-      <PageHeader
-        title={t("queue")}
-        lead={t("queueSubtitle")}
-        icon={<ListChecks />}
-        actions={
-          <>
-            <ActionButton tone="quiet" asChild>
-              <Link to="/queue/audit"><ScrollText className="size-4" aria-hidden="true" />{t("queueAuditLink")}</Link>
-            </ActionButton>
-            <ActionButton tone="quiet" onClick={() => setSettingsOpen(true)} aria-label={t("queueSettings")}>
-              <SettingsIcon className="size-4" aria-hidden="true" />
-            </ActionButton>
-            {canMutate ? (
-              <ActionButton onClick={() => setWalkInOpen(true)}>
-                <Plus className="size-4" aria-hidden="true" />
-                {t("addWalkIn")}
-              </ActionButton>
-            ) : null}
-          </>
-        }
-      />
+    <div className="p-4 sm:p-6 space-y-4">
+      <header className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <div className="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+            <ListChecks className="size-5" />
+          </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold leading-tight">{t("queue")}</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">{t("queueSubtitle")}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button asChild type="button" variant="outline" size="sm" className="h-9">
+            <Link to="/queue/audit"><ScrollText className="size-4 me-1" />{t("queueAuditLink")}</Link>
+          </Button>
+          <Button type="button" variant="outline" size="sm" className="h-9" onClick={() => setSettingsOpen(true)}>
+            <SettingsIcon className="size-4" />
+          </Button>
+          {canMutate && (
+            <Button type="button" onClick={() => setWalkInOpen(true)} size="sm" className="h-9">
+              <Plus className="size-4 me-1" /> {t("addWalkIn")}
+            </Button>
+          )}
+        </div>
+      </header>
 
       {/* Mini analytics strip — today, current branch */}
-      <div className="grid grid-cols-2 gap-z2 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
         <StatCard icon={<Users className="size-4" />}      label={t("queueTotalToday")}     value={analytics.total} />
-        <StatCard icon={<Clock className="size-4" />}      label={t("queueWaitingNow")}     value={analytics.waiting} tone="brand" />
-        <StatCard icon={<Activity className="size-4" />}   label={t("queueInSessionNow")}   value={analytics.inSession} tone="caution" />
-        <StatCard icon={<CheckCheck className="size-4" />} label={t("queueCompletedToday")} value={analytics.completed} tone="positive" />
-        <StatCard icon={<UserX className="size-4" />}      label={t("queueNoShowToday")}    value={analytics.noShow} tone="critical" />
+        <StatCard icon={<Clock className="size-4" />}      label={t("queueWaitingNow")}     value={analytics.waiting} tone="primary" />
+        <StatCard icon={<Activity className="size-4" />}   label={t("queueInSessionNow")}   value={analytics.inSession} tone="amber" />
+        <StatCard icon={<CheckCheck className="size-4" />} label={t("queueCompletedToday")} value={analytics.completed} tone="emerald" />
+        <StatCard icon={<UserX className="size-4" />}      label={t("queueNoShowToday")}    value={analytics.noShow} tone="destructive" />
         <StatCard icon={<Timer className="size-4" />}      label={t("queueAvgWait")}        value={analytics.avgWaitMs == null ? "—" : formatDur(analytics.avgWaitMs)} />
       </div>
 
-      {analytics.longestRow ? (
-        <div className="flex flex-wrap items-center gap-z2 text-z-micro rtl:text-z-micro-ar text-z-ink-500">
-          <Clock className="size-3.5" aria-hidden="true" />
-          <span>{t("queueLongestWait")}</span>
-          <span className="font-medium text-z-ink-900">{patientName(analytics.longestRow)}</span>
-          <span className="z-num">{formatDur(analytics.longestMs)}</span>
+      {analytics.longestRow && (
+        <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+          <Clock className="size-3.5" />
+          <span>{t("queueLongestWait")}:</span>
+          <span className="font-medium text-foreground">{patientName(analytics.longestRow)}</span>
+          <span className="tabular-nums">· {formatDur(analytics.longestMs)}</span>
         </div>
-      ) : null}
+      )}
 
       {/* Sticky filter bar */}
-      <Panel className="sticky top-z2 z-10 space-y-z2 p-z3">
-        <div className="flex flex-wrap items-end gap-z3">
-          <div className="space-y-z1">
-            <FieldLabel htmlFor="queue-status-filter">{t("statusFilter")}</FieldLabel>
-            <SelectField
-              id="queue-status-filter"
-              className="h-z9 w-[170px]"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as "active" | "all" | ApptStatus)}
-            >
-              <option value="active">{t("queue")}</option>
-              <option value="all">{t("allStatuses")}</option>
-              <option value="scheduled">{t("queueWaiting")}</option>
-              <option value="confirmed">{t("queueCheckedIn")}</option>
-              <option value="in_progress">{t("queueWithDoctor")}</option>
-              <option value="completed">{t("statusCompleted")}</option>
-              <option value="cancelled">{t("statusCancelled")}</option>
-              <option value="no_show">{t("statusNoShow")}</option>
-              <option value="departed">{t("statusDeparted")}</option>
-            </SelectField>
+      <Card className="p-3 sticky top-0 z-10 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">{t("statusFilter")}</span>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "active" | "all" | ApptStatus)}>
+              <SelectTrigger className="h-9 w-[170px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">{t("queue")}</SelectItem>
+                <SelectItem value="all">{t("allStatuses")}</SelectItem>
+                <SelectItem value="scheduled">{t("queueWaiting")}</SelectItem>
+                <SelectItem value="confirmed">{t("queueCheckedIn")}</SelectItem>
+                <SelectItem value="in_progress">{t("queueWithDoctor")}</SelectItem>
+                <SelectItem value="completed">{t("statusCompleted")}</SelectItem>
+                <SelectItem value="cancelled">{t("statusCancelled")}</SelectItem>
+                <SelectItem value="no_show">{t("statusNoShow")}</SelectItem>
+                <SelectItem value="departed">{t("statusDeparted")}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <div className="space-y-z1">
-            <FieldLabel htmlFor="queue-doctor-filter">{t("doctorFilter")}</FieldLabel>
-            <SelectField id="queue-doctor-filter" className="h-z9 w-[180px]" value={doctorFilter} onChange={(e) => setDoctorFilter(e.target.value)}>
-              <option value="all">{t("allDoctors")}</option>
-              {isDoctorUser && user?.id ? <option value={user.id}>{t("queueViewMine")}</option> : null}
-              {doctors.map((d) => (<option key={d.id} value={d.id}>{doctorDisplayName(d, lang)}</option>))}
-            </SelectField>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">{t("doctorFilter")}</span>
+            <Select value={doctorFilter} onValueChange={setDoctorFilter}>
+              <SelectTrigger className="h-9 w-[180px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("allDoctors")}</SelectItem>
+                {isDoctorUser && user?.id && (
+                  <SelectItem value={user.id}>{t("queueViewMine")}</SelectItem>
+                )}
+                {doctors.map((d) => (
+                  <SelectItem key={d.id} value={d.id}>{doctorDisplayName(d, lang)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          {roomOptions.length > 0 ? (
-            <div className="space-y-z1">
-              <FieldLabel htmlFor="queue-room-filter">{t("roomFilter")}</FieldLabel>
-              <SelectField id="queue-room-filter" className="h-z9 w-[140px]" value={roomFilter} onChange={(e) => setRoomFilter(e.target.value)}>
-                <option value="all">{t("allRooms")}</option>
-                {roomOptions.map((rm) => (<option key={rm} value={rm}>{rm}</option>))}
-              </SelectField>
+          {roomOptions.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">{t("roomFilter")}</span>
+              <Select value={roomFilter} onValueChange={setRoomFilter}>
+                <SelectTrigger className="h-9 w-[140px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("allRooms")}</SelectItem>
+                  {roomOptions.map((rm) => (
+                    <SelectItem key={rm} value={rm}>{rm}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          ) : null}
-          <ActionButton
-            tone={urgentOnly ? "primary" : "quiet"}
+          )}
+          <Button
+            type="button"
+            variant={urgentOnly ? "default" : "outline"}
+            size="sm"
             onClick={() => setUrgentOnly((x) => !x)}
-            aria-pressed={urgentOnly}
+            className="h-9"
           >
-            <Flag className="size-4" aria-hidden="true" />
-            {t("onlyUrgent")}
-          </ActionButton>
-          <ActionButton
-            tone={statusFilter === "no_show" ? "primary" : "quiet"}
+            <Flag className="size-4 me-1" /> {t("onlyUrgent")}
+          </Button>
+          <Button
+            type="button"
+            variant={statusFilter === "no_show" ? "default" : "outline"}
+            size="sm"
             onClick={() => setStatusFilter((s) => (s === "no_show" ? "active" : "no_show"))}
-            aria-pressed={statusFilter === "no_show"}
+            className="h-9"
           >
-            <UserX className="size-4" aria-hidden="true" />
-            {t("noShowsTodayChip")}
-            {analytics.noShow > 0 ? <StatusChip tone="critical">{analytics.noShow}</StatusChip> : null}
-          </ActionButton>
-          <span className="ms-auto z-num text-z-small rtl:text-z-small-ar text-z-ink-500">{filtered.length}</span>
+            <UserX className="size-4 me-1" /> {t("noShowsTodayChip")}
+            {analytics.noShow > 0 && (
+              <Badge variant="destructive" className="ms-1.5 h-4 text-[10px] px-1.5">{analytics.noShow}</Badge>
+            )}
+          </Button>
+          <div className="ms-auto text-xs text-muted-foreground">
+            {filtered.length}
+          </div>
         </div>
         {(() => {
           const nowMs = Date.now();
@@ -830,11 +840,11 @@ export default function QueuePage() {
           const ackCount = openAlerts.filter((a) => effectiveState(a, nowMs) === "acknowledged").length;
           if (activeCount + snoozedCount + ackCount === 0) return null;
           return (
-            <div className="flex flex-wrap items-center gap-z2 text-z-micro rtl:text-z-micro-ar">
-              {activeCount > 0 ? <StatusChip tone="caution"><AlertTriangle className="size-3" aria-hidden="true" />{activeCount} {isArabic ? "نشط" : "active"}</StatusChip> : null}
-              {snoozedCount > 0 ? <StatusChip tone="neutral">{snoozedCount} {isArabic ? "مؤجل" : "snoozed"}</StatusChip> : null}
-              {ackCount > 0 ? <StatusChip tone="neutral">{ackCount} {isArabic ? "مؤكد" : "ack"}</StatusChip> : null}
-              <Link to="/branches/dashboard" className="text-z-ink-500 hover:text-z-ink-900 hover:underline">{isArabic ? "إدارة" : "Manage"}</Link>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+              {activeCount > 0 && <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30 gap-1"><AlertTriangle className="size-3" />{activeCount} {lang === "ar" ? "نشط" : "active"}</Badge>}
+              {snoozedCount > 0 && <Badge variant="outline" className="gap-1">{snoozedCount} {lang === "ar" ? "مؤجل" : "snoozed"}</Badge>}
+              {ackCount > 0 && <Badge variant="outline" className="gap-1">{ackCount} {lang === "ar" ? "مؤكد" : "ack"}</Badge>}
+              <Link to="/branches/dashboard" className="text-muted-foreground hover:underline">{lang === "ar" ? "إدارة" : "Manage"}</Link>
             </div>
           );
         })()}
@@ -842,374 +852,362 @@ export default function QueuePage() {
           const nowMs = Date.now();
           const muted = openAlerts.some((a) => a.alert_type === "long_wait" && effectiveState(a, nowMs) !== "active");
           return settings.alertsOnQueue && longWaitCount > 0 && !muted;
-        })() ? (
-          <div className="flex items-center gap-z2 rounded-z2 border border-s-2 border-z-caution-stroke bg-z-caution-fill px-z3 py-z2 text-z-micro rtl:text-z-micro-ar text-z-caution-ink">
-            <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />
+        })() && (
+          <div className="mt-2 flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-md px-2 py-1.5">
+            <AlertTriangle className="size-4" />
             <span>{t("longWaitBanner").replace("{n}", String(longWaitCount))}</span>
           </div>
-        ) : null}
+        )}
         {(() => {
           const nowMs = Date.now();
           const muted = openAlerts.some((a) => a.alert_type === "busy_queue" && effectiveState(a, nowMs) !== "active");
-          return settings.alertsOnQueue && urgentWaitingCount >= settings.busyQueueThreshold && !muted;
-        })() ? (
-          <div className="flex items-center gap-z2 rounded-z2 border border-s-2 border-z-caution-stroke bg-z-caution-fill px-z3 py-z2 text-z-micro rtl:text-z-micro-ar text-z-caution-ink">
-            <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />
-            <span>{isArabic ? `الطابور مزدحم (${urgentWaitingCount} / ${settings.busyQueueThreshold})` : `Queue is busy (${urgentWaitingCount} / ${settings.busyQueueThreshold})`}</span>
+          return settings.alertsOnQueue && filtered.filter((r) => r.status === "scheduled" || r.status === "confirmed").length >= settings.busyQueueThreshold && !muted;
+        })() && (
+          <div className="mt-2 flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-md px-2 py-1.5">
+            <AlertTriangle className="size-4" />
+            <span>{lang === "ar" ? `الطابور مزدحم (${filtered.filter((r) => r.status === "scheduled" || r.status === "confirmed").length} / ${settings.busyQueueThreshold})` : `Queue is busy (${filtered.filter((r) => r.status === "scheduled" || r.status === "confirmed").length} / ${settings.busyQueueThreshold})`}</span>
           </div>
-        ) : null}
-      </Panel>
+        )}
+      </Card>
 
       {/* Desktop table */}
-      <TableShell className="hidden md:block">
-        <table className="w-full text-z-small rtl:text-z-small-ar">
-          <thead className="bg-z-sunk text-z-ink-500">
-            <tr>
-              <th className="px-z3 py-z2 text-start font-medium">{t("patientName")}</th>
-              <th className="px-z3 py-z2 text-start font-medium">{t("appointmentTime")}</th>
-              <th className="px-z3 py-z2 text-start font-medium">{t("checkedInAt")}</th>
-              <th className="px-z3 py-z2 text-start font-medium">{t("doctor")}</th>
-              <th className="px-z3 py-z2 text-start font-medium">{t("status")}</th>
-              <th className="px-z3 py-z2 text-start font-medium">{t("waitingTime")}</th>
-              <th className="px-z3 py-z2 text-start font-medium">{t("inSessionTime")}</th>
-              <th className="px-z3 py-z2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {showLoadingPlaceholder(loading, rows.length) ? (
-              <tr><td colSpan={8} className="p-0"><ListSkeleton rows={6} /></td></tr>
-            ) : filtered.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="py-z10 text-center">
-                  <div className="flex flex-col items-center gap-z3 text-z-ink-500">
-                    <span>{t("noPatientsInQueue")}</span>
-                    <ActionButton tone="quiet" onClick={() => setWalkInOpen(true)}>
-                      <Plus className="size-4" aria-hidden="true" />
-                      {t("addWalkIn")}
-                    </ActionButton>
-                  </div>
-                </td>
+      <Card className="hidden md:block overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 text-muted-foreground">
+              <tr className="text-start">
+                <th className="text-start px-3 py-2 font-medium">{t("patientName")}</th>
+                <th className="text-start px-3 py-2 font-medium">{t("appointmentTime")}</th>
+                <th className="text-start px-3 py-2 font-medium">{t("checkedInAt")}</th>
+                <th className="text-start px-3 py-2 font-medium">{t("doctor")}</th>
+                <th className="text-start px-3 py-2 font-medium">{t("status")}</th>
+                <th className="text-start px-3 py-2 font-medium">{t("waitingTime")}</th>
+                <th className="text-start px-3 py-2 font-medium">{t("inSessionTime")}</th>
+                <th className="px-3 py-2"></th>
               </tr>
-            ) : (
-              filtered.map((r) => {
-                const waitMs = rowWaitingMs(r);
-                const sessMs = rowSessionMs(r);
-                const longWait = waitMs > LONG_WAIT_MS;
-                return (
-                  <tr key={r.id} className={cn(
-                    "border-t border-z-line-hairline hover:bg-z-sunk",
-                    longWait && "bg-z-caution-fill",
-                    r.status === "no_show" && "bg-z-critical-fill",
-                  )}>
-                    <td className="px-z3 py-z2">
-                      <div className="flex flex-wrap items-center gap-z2">
-                        <Link to={`/patients/${r.patient_id}`} className="font-medium text-z-ink-900 hover:underline">{patientName(r)}</Link>
-                        {(r.priority ?? 0) > 0 ? <StatusChip tone="critical">{t("urgent")}</StatusChip> : null}
-                        {r.is_walk_in ? <StatusChip tone="neutral">{t("walkIn")}</StatusChip> : null}
-                      </div>
-                      {r.room ? <div className="text-z-micro rtl:text-z-micro-ar text-z-ink-500">{t("room")}: {r.room}</div> : null}
-                    </td>
-                    <td className="z-num px-z3 py-z2 text-z-ink-700">{formatTime(r.scheduled_at)}</td>
-                    <td className="z-num px-z3 py-z2 text-z-ink-700">{formatTime(r.checked_in_at)}</td>
-                    <td className="px-z3 py-z2 text-z-ink-700">{doctorName(r.doctor_id)}</td>
-                    <td className="px-z3 py-z2"><StatusChip tone={STATUS_TONE[r.status]}>{uiStatusLabel(r.status, t)}</StatusChip></td>
-                    <td className={cn("z-num px-z3 py-z2", longWait ? "font-medium text-z-caution-ink" : "text-z-ink-700")}>
-                      {r.status === "confirmed" ? (
-                        <span className="inline-flex items-center gap-z1"><Clock className="size-3.5" aria-hidden="true" />{formatDur(waitMs)}</span>
-                      ) : "—"}
-                    </td>
-                    <td className="z-num px-z3 py-z2 text-z-ink-700">
-                      {r.status === "in_progress" ? (
-                        <span className="inline-flex items-center gap-z1"><Clock className="size-3.5" aria-hidden="true" />{formatDur(sessMs)}</span>
-                      ) : "—"}
-                    </td>
-                    <td className="px-z3 py-z2 text-end">{renderActions(r)}</td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </TableShell>
+            </thead>
+            <tbody>
+              {showLoadingPlaceholder(loading, rows.length) ? (
+                <tr><td colSpan={8} className="p-0"><ListSkeleton rows={6} /></td></tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="text-center py-10">
+                    <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                      <span>{t("noPatientsInQueue")}</span>
+                      <Button type="button" onClick={() => setWalkInOpen(true)} size="sm" variant="outline">
+                        <Plus className="size-4 me-1" /> {t("addWalkIn")}
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((r) => {
+                  const waitMs = rowWaitingMs(r);
+                  const sessMs = rowSessionMs(r);
+                  const longWait = waitMs > LONG_WAIT_MS;
+                  return (
+                    <tr key={r.id} className={cn(
+                      "border-t border-border hover:bg-muted/30",
+                      longWait && "bg-amber-500/5",
+                      r.status === "no_show" && "bg-destructive/5",
+                    )}>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <Link to={`/patients/${r.patient_id}`} className="font-medium hover:underline">{patientName(r)}</Link>
+                          {(r.priority ?? 0) > 0 && (
+                            <Badge variant="destructive" className="text-[10px] h-5">{t("urgent")}</Badge>
+                          )}
+                          {r.is_walk_in && (
+                            <Badge variant="secondary" className="text-[10px] h-5">{t("walkIn")}</Badge>
+                          )}
+                        </div>
+                        {r.room && <div className="text-[11px] text-muted-foreground">{t("room")}: {r.room}</div>}
+                      </td>
+                      <td className="px-3 py-2">{formatTime(r.scheduled_at)}</td>
+                      <td className="px-3 py-2">{formatTime(r.checked_in_at)}</td>
+                      <td className="px-3 py-2">{doctorName(r.doctor_id)}</td>
+                      <td className="px-3 py-2">
+                        <span className={cn("inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium", STATUS_BADGE[r.status])}>
+                          {uiStatusLabel(r.status, t)}
+                        </span>
+                      </td>
+                      <td className={cn("px-3 py-2 tabular-nums", longWait && "text-amber-700 dark:text-amber-300 font-medium")}>
+                        {r.status === "confirmed" ? (
+                          <span className="inline-flex items-center gap-1"><Clock className="size-3.5" />{formatDur(waitMs)}</span>
+                        ) : "—"}
+                      </td>
+                      <td className="px-3 py-2 tabular-nums">
+                        {r.status === "in_progress" ? (
+                          <span className="inline-flex items-center gap-1"><Clock className="size-3.5" />{formatDur(sessMs)}</span>
+                        ) : "—"}
+                      </td>
+                      <td className="px-3 py-2 text-end">{renderActions(r)}</td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
 
       {/* Mobile cards */}
-      <div className="space-y-z2 md:hidden">
+      <div className="md:hidden space-y-2">
         {showLoadingPlaceholder(loading, rows.length) ? (
-          <Panel className="overflow-hidden"><ListSkeleton rows={5} /></Panel>
+          <Card className="p-0 overflow-hidden"><ListSkeleton rows={5} /></Card>
         ) : filtered.length === 0 ? (
-          <Panel className="flex flex-col items-center gap-z3 py-z10 text-center text-z-ink-500">
+          <Card className="py-10 flex flex-col items-center gap-3 text-center text-muted-foreground">
             <span>{t("noPatientsInQueue")}</span>
-            <ActionButton tone="quiet" onClick={() => setWalkInOpen(true)}>
-              <Plus className="size-4" aria-hidden="true" />
-              {t("addWalkIn")}
-            </ActionButton>
-          </Panel>
+            <Button type="button" onClick={() => setWalkInOpen(true)} size="sm" variant="outline">
+              <Plus className="size-4 me-1" /> {t("addWalkIn")}
+            </Button>
+          </Card>
         ) : (
           filtered.map((r) => {
             const waitMs = rowWaitingMs(r);
             const sessMs = rowSessionMs(r);
             const longWait = waitMs > LONG_WAIT_MS;
             return (
-              <Panel key={r.id} className={cn(
-                "p-z3",
-                longWait && "bg-z-caution-fill",
-                r.status === "no_show" && "border-z-critical-stroke bg-z-critical-fill",
+              <Card key={r.id} className={cn(
+                "p-3",
+                longWait && "bg-amber-500/5",
+                r.status === "no_show" && "bg-destructive/5 border-destructive/30",
               )}>
-                <div className="flex items-start justify-between gap-z2">
+                <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <Link to={`/patients/${r.patient_id}`} className="font-semibold text-z-ink-900 hover:underline">{patientName(r)}</Link>
-                    <div className="flex flex-wrap items-center gap-x-z3 text-z-micro rtl:text-z-micro-ar text-z-ink-500">
-                      <span>{t("appointmentTime")}: <span className="z-num">{formatTime(r.scheduled_at)}</span></span>
-                      {r.checked_in_at ? <span>{t("checkedInAt")}: <span className="z-num">{formatTime(r.checked_in_at)}</span></span> : null}
+                    <Link to={`/patients/${r.patient_id}`} className="font-semibold hover:underline">{patientName(r)}</Link>
+                    <div className="text-[11px] text-muted-foreground">
+                      {t("appointmentTime")}: {formatTime(r.scheduled_at)}
+                      {r.checked_in_at && <> · {t("checkedInAt")}: {formatTime(r.checked_in_at)}</>}
                     </div>
-                    <div className="text-z-micro rtl:text-z-micro-ar text-z-ink-500">{doctorName(r.doctor_id)}{r.room ? <span className="z-num"> — {r.room}</span> : null}</div>
-                    <div className="mt-z1 flex flex-wrap items-center gap-z2">
-                      <StatusChip tone={STATUS_TONE[r.status]}>{uiStatusLabel(r.status, t)}</StatusChip>
-                      {(r.priority ?? 0) > 0 ? <StatusChip tone="critical">{t("urgent")}</StatusChip> : null}
-                      {r.is_walk_in ? <StatusChip tone="neutral">{t("walkIn")}</StatusChip> : null}
-                      {r.status === "confirmed" ? (
-                        <span className={cn("z-num inline-flex items-center gap-z1 text-z-micro rtl:text-z-micro-ar", longWait && "font-medium text-z-caution-ink")}>
-                          <Clock className="size-3" aria-hidden="true" />{formatDur(waitMs)}
+                    <div className="text-[11px] text-muted-foreground">{doctorName(r.doctor_id)}{r.room ? ` · ${r.room}` : ""}</div>
+                    <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                      <span className={cn("inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium", STATUS_BADGE[r.status])}>
+                        {uiStatusLabel(r.status, t)}
+                      </span>
+                      {(r.priority ?? 0) > 0 && (
+                        <Badge variant="destructive" className="text-[10px] h-5">{t("urgent")}</Badge>
+                      )}
+                      {r.is_walk_in && (
+                        <Badge variant="secondary" className="text-[10px] h-5">{t("walkIn")}</Badge>
+                      )}
+                      {r.status === "confirmed" && (
+                        <span className={cn("text-[11px] inline-flex items-center gap-1", longWait && "text-amber-700 dark:text-amber-300 font-medium")}>
+                          <Clock className="size-3" />{formatDur(waitMs)}
                         </span>
-                      ) : null}
-                      {r.status === "in_progress" ? (
-                        <span className="z-num inline-flex items-center gap-z1 text-z-micro rtl:text-z-micro-ar text-z-ink-700">
-                          <Clock className="size-3" aria-hidden="true" />{formatDur(sessMs)}
+                      )}
+                      {r.status === "in_progress" && (
+                        <span className="text-[11px] inline-flex items-center gap-1">
+                          <Clock className="size-3" />{formatDur(sessMs)}
                         </span>
-                      ) : null}
+                      )}
                     </div>
                   </div>
                   {renderActions(r)}
                 </div>
-              </Panel>
+              </Card>
             );
           })
         )}
       </div>
 
       {/* Patient self check-in link dialog */}
-      <PlatformDialog
-        open={!!selfCheckinRow}
-        onOpenChange={(open) => { if (!open && !selfCheckinSaving) setSelfCheckinRow(null); }}
-        title={t("selfCheckinLinkTitle")}
-        icon={<Link2Icon />}
-        dir={isArabic ? "rtl" : "ltr"}
-        busy={selfCheckinSaving}
-        footer={
-          <>
-            <ActionButton tone="quiet" onClick={() => setSelfCheckinRow(null)} disabled={selfCheckinSaving}>{t("cancel")}</ActionButton>
-            {selfCheckinUrl ? (
-              <ActionButton onClick={() => void copySelfCheckinLink()}>
-                <Link2Icon className="size-4" aria-hidden="true" />
-                {t("copyLink")}
-              </ActionButton>
-            ) : null}
-          </>
-        }
-      >
-        <p className="text-z-small rtl:text-z-small-ar text-z-ink-500">{t("selfCheckinLinkDesc")}</p>
-        {selfCheckinSaving ? (
-          <div className="py-z6 text-center text-z-small rtl:text-z-small-ar text-z-ink-500" role="status" aria-live="polite">
-            {isArabic ? "جارٍ إنشاء الرابط…" : "Creating link…"}
-          </div>
-        ) : selfCheckinUrl ? (
-          <div className="space-y-z3">
-            <div className="rounded-z2 border border-z-line-edge bg-z-sunk p-z3">
-              <div className="text-z-small rtl:text-z-small-ar font-medium text-z-ink-900">{patientName(selfCheckinRow!)}</div>
-              <div className="flex flex-wrap items-center gap-x-z3 text-z-micro rtl:text-z-micro-ar text-z-ink-500">
-                <span className="z-num">{formatTime(selfCheckinRow?.scheduled_at)}</span>
-                <span>{doctorName(selfCheckinRow?.doctor_id ?? null)}</span>
+      <Dialog open={!!selfCheckinRow} onOpenChange={(open) => { if (!open && !selfCheckinSaving) setSelfCheckinRow(null); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t("selfCheckinLinkTitle")}</DialogTitle>
+            <DialogDescription>{t("selfCheckinLinkDesc")}</DialogDescription>
+          </DialogHeader>
+          {selfCheckinSaving ? (
+            <div className="py-6 text-center text-sm text-muted-foreground" role="status" aria-live="polite">
+              {lang === "ar" ? "جارٍ إنشاء الرابط…" : "Creating link…"}
+            </div>
+          ) : selfCheckinUrl ? (
+            <div className="space-y-3">
+              <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+                <div className="font-medium">{patientName(selfCheckinRow!)}</div>
+                <div className="text-muted-foreground">{formatTime(selfCheckinRow?.scheduled_at)} · {doctorName(selfCheckinRow?.doctor_id ?? null)}</div>
               </div>
-            </div>
-            <div className="space-y-z1">
-              <FieldLabel htmlFor="self-checkin-link">{t("selfCheckinLinkReady")}</FieldLabel>
-              <PlatformInput
-                id="self-checkin-link"
-                value={selfCheckinUrl}
-                readOnly
-                onFocus={(e) => e.currentTarget.select()}
-                dir="ltr"
-                className="z-ident text-z-micro"
-              />
-            </div>
-            {selfCheckinExpiresAt ? (
-              <p className="z-num text-z-micro rtl:text-z-micro-ar text-z-ink-500">{t("linkExpires")}: {formatDateTime(selfCheckinExpiresAt, lang)}</p>
-            ) : null}
-          </div>
-        ) : null}
-      </PlatformDialog>
-
-      {/* Walk-in dialog */}
-      <PlatformDialog
-        open={walkInOpen}
-        onOpenChange={(nextOpen) => { if (!walkInSubmittingRef.current) setWalkInOpen(nextOpen); }}
-        title={t("newWalkInTitle")}
-        icon={<UserPlus />}
-        dir={isArabic ? "rtl" : "ltr"}
-        busy={walkInSaving}
-        footer={
-          <>
-            <ActionButton tone="quiet" onClick={() => setWalkInOpen(false)} disabled={walkInSaving}>{t("cancel")}</ActionButton>
-            <ActionButton form="walk-in-form" type="submit" disabled={walkInSaving || !walkInPatient}>{t("save")}</ActionButton>
-          </>
-        }
-      >
-        <p className="text-z-small rtl:text-z-small-ar text-z-ink-500">{t("newWalkInDesc")}</p>
-        <form id="walk-in-form" onSubmit={submitWalkIn} className="space-y-z3">
-          <div className="space-y-z1">
-            <FieldLabel>{t("selectPatient")}</FieldLabel>
-            <Combobox
-              options={walkInPatientSearch.options.map((p) => ({
-                value: p.id,
-                // Only the patient's name; the "#N" clinic number stays exclusive
-                // to the main Patients list. Typing the number still finds them --
-                // the server matches it -- it is just not printed here.
-                label: p.label,
-                // Two patients can share a name; the number they were found by is
-                // the one piece of evidence that says which one this is.
-                detail: p.phone ?? undefined,
-              }))}
-              value={walkInPatient}
-              onChange={(next) => {
-                const picked = walkInPatientSearch.options.find((p) => p.id === next);
-                setWalkInEcho(picked ? { id: picked.id, label: picked.label } : null);
-                setWalkInPatient(next);
-              }}
-              placeholder={t("selectPatient")}
-              searchPlaceholder={walkInPickerCopy.searchPlaceholder}
-              emptyText={walkInPatientSearch.failed ? walkInPickerCopy.failed : walkInPickerCopy.empty}
-              searchingText={walkInPickerCopy.searching}
-              hintText={
-                walkInPatientSearch.options.length >= PATIENT_PICKER_LIMIT
-                  ? walkInPickerCopy.truncated
-                  : undefined
-              }
-              selectedLabel={pickedPatientLabel(walkInEcho, walkInPatientSearch.options, walkInPatient)}
-              searching={walkInPatientSearch.searching}
-              onSearch={(term) => walkInPatientSearch.search(term)}
-            />
-          </div>
-          <div className="space-y-z1">
-            <FieldLabel>{t("selectDoctorOptional")}</FieldLabel>
-            <Combobox
-              options={[{ value: "", label: "—" }, ...doctors.map((d) => ({ value: d.id, label: doctorDisplayName(d, lang) }))]}
-              value={walkInDoctor}
-              onChange={setWalkInDoctor}
-              placeholder={t("selectDoctorOptional")}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-z2">
-            <div className="space-y-z1">
-              <FieldLabel>{t("roomOptional")}</FieldLabel>
-              <PlatformInput value={walkInRoom} onChange={(e) => setWalkInRoom(e.target.value)} />
-            </div>
-            <div className="space-y-z1">
-              <FieldLabel>{t("procedureOptional")}</FieldLabel>
-              <PlatformInput value={walkInProcedure} onChange={(e) => setWalkInProcedure(e.target.value)} />
-            </div>
-          </div>
-        </form>
-      </PlatformDialog>
-
-      {/* Reassign doctor dialog */}
-      <PlatformDialog
-        open={!!reassignRow}
-        onOpenChange={(o) => { if (!o) setReassignRow(null); }}
-        title={t("reassignDoctorTitle")}
-        icon={<UserCog />}
-        dir={isArabic ? "rtl" : "ltr"}
-        busy={reassignSaving}
-        footer={
-          <>
-            <ActionButton tone="quiet" onClick={() => setReassignRow(null)}>{t("cancel")}</ActionButton>
-            <ActionButton onClick={submitReassign} disabled={reassignSaving}>{t("save")}</ActionButton>
-          </>
-        }
-      >
-        <p className="text-z-small rtl:text-z-small-ar text-z-ink-500">{t("reassignDoctorDesc")}</p>
-        <div className="space-y-z1">
-          <FieldLabel>{t("doctor")}</FieldLabel>
-          <Combobox
-            options={[{ value: "", label: `— ${t("unassigned")} —` }, ...doctors.map((d) => ({ value: d.id, label: doctorDisplayName(d, lang) }))]}
-            value={reassignDoctor}
-            onChange={setReassignDoctor}
-            placeholder={t("selectDoctorOptional")}
-          />
-        </div>
-      </PlatformDialog>
-
-      {/* Assign room dialog */}
-      <PlatformDialog
-        open={!!roomRow}
-        onOpenChange={(o) => { if (!o) setRoomRow(null); }}
-        title={t("assignRoomTitle")}
-        icon={<DoorOpen />}
-        dir={isArabic ? "rtl" : "ltr"}
-        busy={roomSaving}
-        footer={
-          <>
-            <ActionButton tone="ghost" onClick={() => setRoomValue("")}>{t("clearRoom")}</ActionButton>
-            <ActionButton tone="quiet" onClick={() => setRoomRow(null)}>{t("cancel")}</ActionButton>
-            <ActionButton onClick={submitRoom} disabled={roomSaving}>{t("save")}</ActionButton>
-          </>
-        }
-      >
-        <p className="text-z-small rtl:text-z-small-ar text-z-ink-500">{t("assignRoomDesc")}</p>
-        <div className="space-y-z3">
-          {roomOptions.length > 0 ? (
-            <div className="flex flex-wrap gap-z2">
-              {roomOptions.map((rm) => (
-                <ActionButton
-                  key={rm}
-                  tone={roomValue === rm ? "primary" : "quiet"}
-                  onClick={() => setRoomValue(rm)}
-                  aria-pressed={roomValue === rm}
-                >
-                  {rm}
-                </ActionButton>
-              ))}
+              <div className="space-y-1.5">
+                <Label htmlFor="self-checkin-link">{t("selfCheckinLinkReady")}</Label>
+                <Input id="self-checkin-link" value={selfCheckinUrl} readOnly onFocus={(e) => e.currentTarget.select()} dir="ltr" className="text-xs" />
+              </div>
+              {selfCheckinExpiresAt && (
+                <p className="text-xs text-muted-foreground">{t("linkExpires")}: {formatDateTime(selfCheckinExpiresAt, lang)}</p>
+              )}
             </div>
           ) : null}
-          <div className="space-y-z1">
-            <FieldLabel htmlFor="queue-room-value">{t("room")}</FieldLabel>
-            <PlatformInput id="queue-room-value" value={roomValue} onChange={(e) => setRoomValue(e.target.value)} placeholder={t("roomOptional")} />
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setSelfCheckinRow(null)} disabled={selfCheckinSaving}>{t("cancel")}</Button>
+            {selfCheckinUrl && <Button type="button" onClick={() => void copySelfCheckinLink()}><Link2Icon className="size-4 me-1" />{t("copyLink")}</Button>}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Walk-in dialog */}
+      <Dialog open={walkInOpen} onOpenChange={(nextOpen) => { if (!walkInSubmittingRef.current) setWalkInOpen(nextOpen); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("newWalkInTitle")}</DialogTitle>
+            <DialogDescription>{t("newWalkInDesc")}</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={submitWalkIn} className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>{t("selectPatient")}</Label>
+              <Combobox
+                options={walkInPatientSearch.options.map((p) => ({
+                  value: p.id,
+                  // Only the patient's name; the "#N" clinic number stays exclusive
+                  // to the main Patients list. Typing the number still finds them --
+                  // the server matches it -- it is just not printed here.
+                  label: p.label,
+                  // Two patients can share a name; the number they were found by is
+                  // the one piece of evidence that says which one this is.
+                  detail: p.phone ?? undefined,
+                }))}
+                value={walkInPatient}
+                onChange={(next) => {
+                  const picked = walkInPatientSearch.options.find((p) => p.id === next);
+                  setWalkInEcho(picked ? { id: picked.id, label: picked.label } : null);
+                  setWalkInPatient(next);
+                }}
+                placeholder={t("selectPatient")}
+                searchPlaceholder={walkInPickerCopy.searchPlaceholder}
+                emptyText={walkInPatientSearch.failed ? walkInPickerCopy.failed : walkInPickerCopy.empty}
+                searchingText={walkInPickerCopy.searching}
+                hintText={
+                  walkInPatientSearch.options.length >= PATIENT_PICKER_LIMIT
+                    ? walkInPickerCopy.truncated
+                    : undefined
+                }
+                selectedLabel={pickedPatientLabel(walkInEcho, walkInPatientSearch.options, walkInPatient)}
+                searching={walkInPatientSearch.searching}
+                onSearch={(term) => walkInPatientSearch.search(term)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>{t("selectDoctorOptional")}</Label>
+              <Combobox
+                options={[{ value: "", label: "—" }, ...doctors.map((d) => ({ value: d.id, label: doctorDisplayName(d, lang) }))]}
+                value={walkInDoctor}
+                onChange={setWalkInDoctor}
+                placeholder={t("selectDoctorOptional")}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1.5">
+                <Label>{t("roomOptional")}</Label>
+                <Input value={walkInRoom} onChange={(e) => setWalkInRoom(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t("procedureOptional")}</Label>
+                <Input value={walkInProcedure} onChange={(e) => setWalkInProcedure(e.target.value)} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setWalkInOpen(false)} disabled={walkInSaving}>{t("cancel")}</Button>
+              <Button type="submit" disabled={walkInSaving || !walkInPatient}>{t("save")}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reassign doctor dialog */}
+      <Dialog open={!!reassignRow} onOpenChange={(o) => !o && setReassignRow(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("reassignDoctorTitle")}</DialogTitle>
+            <DialogDescription>{t("reassignDoctorDesc")}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>{t("doctor")}</Label>
+              <Combobox
+                options={[{ value: "", label: `— ${t("unassigned")} —` }, ...doctors.map((d) => ({ value: d.id, label: doctorDisplayName(d, lang) }))]}
+                value={reassignDoctor}
+                onChange={setReassignDoctor}
+                placeholder={t("selectDoctorOptional")}
+              />
+            </div>
           </div>
-        </div>
-      </PlatformDialog>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setReassignRow(null)}>{t("cancel")}</Button>
+            <Button type="button" onClick={submitReassign} disabled={reassignSaving}>{t("save")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign room dialog */}
+      <Dialog open={!!roomRow} onOpenChange={(o) => !o && setRoomRow(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("assignRoomTitle")}</DialogTitle>
+            <DialogDescription>{t("assignRoomDesc")}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {roomOptions.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {roomOptions.map((rm) => (
+                  <Button
+                    key={rm}
+                    type="button"
+                    size="sm"
+                    variant={roomValue === rm ? "default" : "outline"}
+                    onClick={() => setRoomValue(rm)}
+                    className="h-8"
+                  >
+                    {rm}
+                  </Button>
+                ))}
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label>{t("room")}</Label>
+              <Input value={roomValue} onChange={(e) => setRoomValue(e.target.value)} placeholder={t("roomOptional")} />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="ghost" onClick={() => setRoomValue("")}>{t("clearRoom")}</Button>
+            <Button type="button" variant="outline" onClick={() => setRoomRow(null)}>{t("cancel")}</Button>
+            <Button type="button" onClick={submitRoom} disabled={roomSaving}>{t("save")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Queue settings dialog (localStorage, per-branch) */}
-      <PlatformDialog
-        open={settingsOpen}
-        onOpenChange={setSettingsOpen}
-        title={t("queueSettings")}
-        icon={<SettingsIcon />}
-        dir={isArabic ? "rtl" : "ltr"}
-        footer={
-          <>
-            <ActionButton tone="quiet" onClick={() => setSettingsOpen(false)}>{t("cancel")}</ActionButton>
-            <ActionButton asChild>
-              <a href="/branches">{isArabic ? "افتح إدارة الفروع" : "Open Branches"}</a>
-            </ActionButton>
-          </>
-        }
-      >
-        <p className="text-z-small rtl:text-z-small-ar text-z-ink-500">{t("queueSettingsDesc")}</p>
-        <div className="space-y-z2">
-          {[
-            [t("longWaitThresholdMin"), `${settings.longWaitMinutes} ${t("minutesShort")}`],
-            [t("defaultMyQueueLabel"), settings.defaultMyQueue ? t("enabled") : t("disabled")],
-            [t("showNoShowsInDefaultLabel"), settings.showNoShowsInDefault ? t("enabled") : t("disabled")],
-          ].map(([label, value]) => (
-            <div key={label} className="flex items-center justify-between gap-z3 rounded-z2 border border-z-line-edge px-z3 py-z2">
-              <SectionLabel className="font-normal text-z-ink-500">{label}</SectionLabel>
-              <span className="z-num text-z-small rtl:text-z-small-ar font-medium text-z-ink-900">{value}</span>
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("queueSettings")}</DialogTitle>
+            <DialogDescription>{t("queueSettingsDesc")}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <div className="flex items-center justify-between gap-3 rounded-md border p-2.5">
+              <span className="text-muted-foreground">{t("longWaitThresholdMin")}</span>
+              <span className="font-medium tabular-nums">{settings.longWaitMinutes} {t("minutesShort")}</span>
             </div>
-          ))}
-        </div>
-        <p className="text-z-micro rtl:text-z-micro-ar text-z-ink-500">
-          {isArabic ? "يتم تعديل هذه الإعدادات من إدارة الفروع." : "These settings are now edited in Branch administration."}
-        </p>
-      </PlatformDialog>
+            <div className="flex items-center justify-between gap-3 rounded-md border p-2.5">
+              <span className="text-muted-foreground">{t("defaultMyQueueLabel")}</span>
+              <span className="font-medium">{settings.defaultMyQueue ? t("enabled") : t("disabled")}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-md border p-2.5">
+              <span className="text-muted-foreground">{t("showNoShowsInDefaultLabel")}</span>
+              <span className="font-medium">{settings.showNoShowsInDefault ? t("enabled") : t("disabled")}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {lang === "ar"
+                ? "يتم تعديل هذه الإعدادات من إدارة الفروع."
+                : "These settings are now edited in Branch administration."}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setSettingsOpen(false)}>{t("cancel")}</Button>
+            <Button type="button" asChild>
+              <a href="/branches">{lang === "ar" ? "افتح إدارة الفروع" : "Open Branches"}</a>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1220,20 +1218,20 @@ function StatCard({
   icon: React.ReactNode;
   label: string;
   value: number | string;
-  tone?: "brand" | "positive" | "caution" | "critical";
+  tone?: "primary" | "emerald" | "amber" | "destructive";
 }) {
   const toneCls =
-    tone === "brand"    ? "text-z-brand-700"
-  : tone === "positive" ? "text-z-positive-ink"
-  : tone === "caution"  ? "text-z-caution-ink"
-  : tone === "critical" ? "text-z-critical-ink"
-  : "text-z-ink-900";
+    tone === "primary"     ? "text-primary"
+  : tone === "emerald"     ? "text-emerald-600 dark:text-emerald-400"
+  : tone === "amber"       ? "text-amber-600 dark:text-amber-400"
+  : tone === "destructive" ? "text-destructive"
+  : "text-foreground";
   return (
-    <Panel className="p-z3">
-      <div className="flex items-center gap-z2 text-z-micro rtl:text-z-micro-ar text-z-ink-500">
+    <Card className="p-3">
+      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
         {icon}<span className="truncate">{label}</span>
       </div>
-      <div className={cn("z-num mt-z1 text-z-title rtl:text-z-title-ar font-semibold", toneCls)}>{value}</div>
-    </Panel>
+      <div className={cn("mt-1 text-xl font-semibold tabular-nums", toneCls)}>{value}</div>
+    </Card>
   );
 }

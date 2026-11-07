@@ -14,7 +14,12 @@ import { describe, expect, it } from "vitest";
 // Second job: the debt ledger is a contract. If the baseline regrows, or a strict-scope
 // file sneaks into it, the ratchet has been disarmed and this fails.
 
-const STRICT_SCOPES = ["src/components/platform/"];
+const STRICT_SCOPES = [
+  "src/components/platform/",
+  "src/components/zds/",
+  "src/pages/appointments/",
+  "src/pages/checkin/",
+];
 
 const ZERO_TOLERANCE = [
   { id: "purple-gradient", re: /(?<![\w-])(?:gradient-primary|gradient-card)(?![\w-])/g },

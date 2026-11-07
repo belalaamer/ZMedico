@@ -86,8 +86,12 @@ describe("no screen asks the browser for a typed value (C16)", () => {
     for (const file of ["src/pages/hr/Leaves.tsx", "src/pages/queue/QueueAudit.tsx", "src/pages/reminders/ScheduledReminders.tsx"]) {
       expect(sites.filter((s) => s.file === file)).toEqual([]);
       const src = readFileSync(file, "utf8");
-      expect(src, `${file} must give the typed value somewhere to live`).toMatch(/<DialogContent/);
-      expect(src, `${file} must be able to back out`).toMatch(/<DialogFooter>[\s\S]{0,400}t\("cancel"\)/);
+      // Phase 2a moved the dialog primitive into src/components/zds/surface.tsx, where
+      // `<PlatformDialog>` renders the same `<DialogContent>`. The contract's intent — the
+      // typed value lives in the app's own dialog and has a cancel path — is unchanged, so it
+      // accepts the wrapper as well as the raw element.
+      expect(src, `${file} must give the typed value somewhere to live`).toMatch(/<DialogContent|<PlatformDialog/);
+      expect(src, `${file} must be able to back out`).toMatch(/<DialogFooter>[\s\S]{0,400}t\("cancel"\)|footer=\{[\s\S]{0,600}t\("cancel"\)/);
     }
   });
 });

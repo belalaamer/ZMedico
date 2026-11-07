@@ -18,7 +18,9 @@ const STRICT_SCOPES = [
   "src/components/platform/",
   "src/components/zds/",
   "src/pages/appointments/",
+  "src/pages/calendar/",
   "src/pages/checkin/",
+  "src/pages/queue/",
 ];
 
 const ZERO_TOLERANCE = [

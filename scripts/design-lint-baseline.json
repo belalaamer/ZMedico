@@ -5,7 +5,9 @@
     "src/components/platform/",
     "src/components/zds/",
     "src/pages/appointments/",
-    "src/pages/checkin/"
+    "src/pages/calendar/",
+    "src/pages/checkin/",
+    "src/pages/queue/"
   ],
   "nonWaivableRules": [
     "purple-gradient",
@@ -13,7 +15,7 @@
     "animate-layout",
     "emoji-icon"
   ],
-  "nonWaivableLegacyCount": 170,
+  "nonWaivableLegacyCount": 164,
   "allowance": {
     "src/components/attendance/GpsCheckDialog.tsx::tailwind-palette": 4,
     "src/components/ErrorBoundary.tsx::kit-radius-uniform": 1,
@@ -92,12 +94,6 @@
     "src/pages/branches/BranchDashboard.tsx::literal-color-code": 1,
     "src/pages/branches/BranchDashboard.tsx::tailwind-palette": 9,
     "src/pages/branches/Branches.tsx::tailwind-palette": 3,
-    "src/pages/calendar/CalendarPage.tsx::emoji-icon": 1,
-    "src/pages/calendar/CalendarPage.tsx::physical-inset": 1,
-    "src/pages/calendar/CalendarPage.tsx::purple-gradient": 3,
-    "src/pages/calendar/CalendarPage.tsx::tailwind-palette": 10,
-    "src/pages/calendar/CalendarPage.tsx::tracked-caps": 4,
-    "src/pages/calendar/CalendarPage.tsx::transition-all": 2,
     "src/pages/coupons/Coupons.tsx::purple-gradient": 3,
     "src/pages/dashboard/Dashboard.tsx::kit-radius-uniform": 21,
     "src/pages/dashboard/Dashboard.tsx::transition-all": 3,
@@ -208,12 +204,6 @@
     "src/pages/platform/TenantDomains.tsx::kit-radius-uniform": 3,
     "src/pages/platform/TenantDomains.tsx::tailwind-palette": 15,
     "src/pages/platform/TenantHealthDialog.tsx::tailwind-palette": 15,
-    "src/pages/queue/Queue.tsx::kit-radius-uniform": 1,
-    "src/pages/queue/Queue.tsx::tailwind-palette": 18,
-    "src/pages/queue/QueueAudit.tsx::kit-radius-uniform": 1,
-    "src/pages/queue/QueueSelfAudit.tsx::physical-inset": 1,
-    "src/pages/queue/QueueSelfAudit.tsx::tailwind-palette": 10,
-    "src/pages/queue/QueueSelfAudit.tsx::tracked-caps": 4,
     "src/pages/reports/DoctorCommissions.tsx::tailwind-palette": 2,
     "src/pages/reports/DoctorCommissions.tsx::tracked-caps": 8,
     "src/pages/reports/DoctorCommissions.tsx::transition-all": 2,

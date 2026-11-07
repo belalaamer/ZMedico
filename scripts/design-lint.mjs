@@ -30,7 +30,9 @@ export const STRICT_SCOPES = [
   "src/components/platform/",
   "src/components/zds/",
   "src/pages/appointments/",
+  "src/pages/calendar/",
   "src/pages/checkin/",
+  "src/pages/queue/",
 ];
 const isStrict = (file) => STRICT_SCOPES.some((s) => file === s || file.startsWith(s));
 

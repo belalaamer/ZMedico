@@ -1,14 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ListSkeleton } from "@/components/ListSkeleton";
-import { ArrowLeft, Download, ScrollText, ExternalLink, BookmarkPlus, Bookmark, X } from "lucide-react";
+import { ArrowLeft, Bookmark, BookmarkPlus, Download, ExternalLink, ScrollText, X } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useBranch } from "@/contexts/BranchContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,6 +10,19 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { patientDisplayName } from "@/lib/patientName";
 import { localDateOnly } from "@/lib/localDate";
+import {
+  ActionButton,
+  FieldLabel,
+  PageHeader,
+  Panel,
+  PlatformDialog,
+  PlatformInput,
+  SectionLabel,
+  SelectField,
+  StatusChip,
+  TableShell,
+} from "@/components/zds/surface";
+import { cn } from "@/lib/utils";
 
 import { QUEUE_AUDIT_ACTIONS as QUEUE_ACTIONS, QUEUE_AUDIT_SAFE_KEYS as SAFE_KEYS, queueActionLabel } from "@/lib/queueAuditActions";
 type QAction = typeof QUEUE_ACTIONS[number];
@@ -108,6 +114,7 @@ export default function QueueAuditPage() {
   const [presets, setPresets] = useState<AuditPreset[]>(() => loadCachedPresets(currentBranchId));
   const [presetSaveOpen, setPresetSaveOpen] = useState(false);
   const [presetName, setPresetName] = useState("");
+  const isArabic = lang === "ar";
 
   // Hydrate presets from the server when branch changes. Falls back to the
   // local cache so the UI is never empty while the request is in flight.
@@ -388,171 +395,174 @@ export default function QueueAuditPage() {
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-4">
-      <header className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <Link to="/queue" className="text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="size-5" />
-          </Link>
-          <div className="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-            <ScrollText className="size-5" />
-          </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold leading-tight">{t("queueAuditTitle")}</h1>
-            <p className="text-xs sm:text-sm text-muted-foreground">{t("queueAuditSubtitle")}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button type="button" size="sm" variant="outline" onClick={exportCsv} disabled={filtered.length === 0 || exportingAll}>
-            <Download className="size-4 me-1" /> {t("exportCsv")}
-          </Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => void exportAll()} disabled={exportingAll}>
-            <Download className="size-4 me-1" /> {exportingAll ? "…" : (lang === "ar" ? "تصدير الكل" : "Export all")}
-          </Button>
-        </div>
-      </header>
+    <div className="z-desk min-h-screen space-y-z4 p-z4 sm:p-z6" dir={isArabic ? "rtl" : "ltr"}>
+      <Link to="/queue" className="inline-flex items-center gap-z2 text-z-small rtl:text-z-small-ar text-z-ink-500 hover:text-z-ink-900">
+        <ArrowLeft className="size-4" aria-hidden="true" />
+        {isArabic ? "الرجوع إلى الطابور" : "Back to queue"}
+      </Link>
+      <PageHeader
+        title={t("queueAuditTitle")}
+        lead={t("queueAuditSubtitle")}
+        icon={<ScrollText />}
+        actions={
+          <>
+            <ActionButton tone="quiet" onClick={exportCsv} disabled={filtered.length === 0 || exportingAll}>
+              <Download className="size-4" aria-hidden="true" />
+              {t("exportCsv")}
+            </ActionButton>
+            <ActionButton tone="quiet" onClick={() => void exportAll()} disabled={exportingAll}>
+              <Download className="size-4" aria-hidden="true" />
+              {exportingAll ? "…" : (isArabic ? "تصدير الكل" : "Export all")}
+            </ActionButton>
+          </>
+        }
+      />
 
-      <Card className="p-3">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 items-end">
-          <div>
-            <Label htmlFor="audit-from" className="text-xs text-muted-foreground">{t("from")}</Label>
-            <Input id="audit-from" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="h-9" />
+      <Panel className="space-y-z3 p-z4">
+        <div className="grid grid-cols-2 items-end gap-z3 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="space-y-z1">
+            <FieldLabel htmlFor="audit-from">{t("from")}</FieldLabel>
+            <PlatformInput id="audit-from" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="z-num h-z9" />
           </div>
-          <div>
-            <Label htmlFor="audit-to" className="text-xs text-muted-foreground">{t("to")}</Label>
-            <Input id="audit-to" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="h-9" />
+          <div className="space-y-z1">
+            <FieldLabel htmlFor="audit-to">{t("to")}</FieldLabel>
+            <PlatformInput id="audit-to" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="z-num h-z9" />
           </div>
-          <div>
-            <Label className="text-xs text-muted-foreground">{t("action")}</Label>
-            <Select value={actionFilter} onValueChange={(v) => setActionFilter(v as any)}>
-              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("allActions")}</SelectItem>
-                {QUEUE_ACTIONS.map((a) => (<SelectItem key={a} value={a}>{queueActionLabel(a, lang)}</SelectItem>))}
-              </SelectContent>
-            </Select>
+          <div className="space-y-z1">
+            <FieldLabel htmlFor="audit-action">{t("action")}</FieldLabel>
+            <SelectField id="audit-action" value={actionFilter} onChange={(e) => setActionFilter(e.target.value as any)} className="h-z9">
+              <option value="all">{t("allActions")}</option>
+              {QUEUE_ACTIONS.map((a) => (<option key={a} value={a}>{queueActionLabel(a, lang)}</option>))}
+            </SelectField>
           </div>
-          <div>
-            <Label className="text-xs text-muted-foreground">{t("user")}</Label>
-            <Select value={userFilter} onValueChange={setUserFilter}>
-              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("allUsers")}</SelectItem>
-                {userOptions.map((u) => (<SelectItem key={u.id} value={u.id}>{u.label}</SelectItem>))}
-              </SelectContent>
-            </Select>
+          <div className="space-y-z1">
+            <FieldLabel htmlFor="audit-user">{t("user")}</FieldLabel>
+            <SelectField id="audit-user" value={userFilter} onChange={(e) => setUserFilter(e.target.value)} className="h-z9">
+              <option value="all">{t("allUsers")}</option>
+              {userOptions.map((u) => (<option key={u.id} value={u.id}>{u.label}</option>))}
+            </SelectField>
           </div>
-          <div className="lg:col-span-2">
-            <Label htmlFor="audit-ref" className="text-xs text-muted-foreground">{t("referenceFilter")}</Label>
-            <Input id="audit-ref" value={refFilter} onChange={(e) => setRefFilter(e.target.value)} placeholder={t("referenceFilterPh")} className="h-9" />
+          <div className="space-y-z1 lg:col-span-2">
+            <FieldLabel htmlFor="audit-ref">{t("referenceFilter")}</FieldLabel>
+            <PlatformInput id="audit-ref" value={refFilter} onChange={(e) => setRefFilter(e.target.value)} placeholder={t("referenceFilterPh")} className="h-z9" />
           </div>
         </div>
-        <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
-          <label className="inline-flex items-center gap-1.5">
-            <input type="checkbox" checked={scopeBranch} onChange={(e) => setScopeBranch(e.target.checked)} />
+        <div className="flex flex-wrap items-center gap-z3 text-z-micro rtl:text-z-micro-ar text-z-ink-500">
+          <label className="inline-flex items-center gap-z2">
+            <input
+              type="checkbox"
+              checked={scopeBranch}
+              onChange={(e) => setScopeBranch(e.target.checked)}
+              className="size-4 rounded-z1 border-z-line-edge accent-z-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-z-brand-500"
+            />
             {t("scopeToCurrentBranch")}
           </label>
-          <div className="ms-3 flex items-center gap-1.5 flex-wrap">
-            <Bookmark className="size-3.5" />
-            <span>{lang === "ar" ? "إعدادات مسبقة:" : "Presets:"}</span>
-            {presets.length === 0 && <span className="opacity-60">—</span>}
+          <div className="ms-z3 flex flex-wrap items-center gap-z2">
+            <Bookmark className="size-3.5" aria-hidden="true" />
+            <span>{isArabic ? "إعدادات مسبقة:" : "Presets:"}</span>
+            {presets.length === 0 ? <span className="text-z-ink-400">—</span> : null}
             {presets.map((p) => (
-              <span key={p.id} className="inline-flex items-center gap-0.5 rounded-full border bg-background ps-2 pe-0.5 py-0.5">
-                <button type="button" onClick={() => applyPreset(p.id)} className="hover:underline">{p.name}</button>
-                <button type="button" onClick={() => deletePreset(p.id)} className="text-muted-foreground hover:text-destructive p-0.5" aria-label="Delete preset">
+              <span key={p.id} className="inline-flex items-center gap-z1 rounded-z2 border border-z-line-edge bg-z-raised ps-z2 pe-z1 py-z1">
+                <button type="button" onClick={() => applyPreset(p.id)} className="text-z-micro rtl:text-z-micro-ar hover:underline">{p.name}</button>
+                <button type="button" onClick={() => deletePreset(p.id)} className="p-z1 text-z-ink-400 hover:text-z-critical-ink" aria-label="Delete preset">
                   <X className="size-3" />
                 </button>
               </span>
             ))}
-            <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={openPresetSave}>
-              <BookmarkPlus className="size-3.5 me-1" />{lang === "ar" ? "حفظ" : "Save current"}
-            </Button>
+            <ActionButton tone="ghost" className="h-z7 px-z2 text-z-micro rtl:text-z-micro-ar" onClick={openPresetSave}>
+              <BookmarkPlus className="size-3.5" aria-hidden="true" />
+              {isArabic ? "حفظ" : "Save current"}
+            </ActionButton>
           </div>
-          <span className="ms-auto">{filtered.length}</span>
+          <span className="ms-auto z-num">{filtered.length}</span>
         </div>
-      </Card>
+      </Panel>
 
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-muted-foreground">
-              <tr>
-                <th className="text-start px-3 py-2 font-medium">{t("timestamp")}</th>
-                <th className="text-start px-3 py-2 font-medium">{t("action")}</th>
-                <th className="text-start px-3 py-2 font-medium">{t("user")}</th>
-                <th className="text-start px-3 py-2 font-medium">{t("patient")}</th>
-                <th className="text-start px-3 py-2 font-medium">{t("change")}</th>
-                <th className="px-3 py-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={6} className="p-0"><ListSkeleton rows={6} /></td></tr>
-              ) : filtered.length === 0 ? (
-                <tr><td colSpan={6} className="text-center text-muted-foreground py-10">{t("noData")}</td></tr>
-              ) : filtered.map((r) => {
-                const p = r.entity_id ? patients[r.entity_id] : null;
-                return (
-                  <tr key={r.id} className="border-t border-border hover:bg-muted/30">
-                    <td className="px-3 py-2 whitespace-nowrap text-xs">{new Date(r.created_at).toLocaleString()}</td>
-                    <td className="px-3 py-2"><Badge variant="outline" className="text-[10px] capitalize">{queueActionLabel(r.action, lang)}</Badge></td>
-                    <td className="px-3 py-2 truncate max-w-[180px]">{profiles[r.user_id ?? ""] ?? (r.user_id ? r.user_id.slice(0, 8) : "—")}</td>
-                    <td className="px-3 py-2">
-                      {p ? (
-                        <span className="truncate">{p.name} <span className="text-[11px] text-muted-foreground">#{p.code}</span></span>
-                      ) : <span className="text-muted-foreground">—</span>}
-                    </td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground truncate max-w-[360px]">{summarizeDiff(r.old_values, r.new_values) || "—"}</td>
-                    <td className="px-3 py-2 text-end">
-                      {r.entity_id && (
-                        <Link to={`/appointments/${r.entity_id}`} className="text-primary inline-flex items-center gap-1 text-xs hover:underline">
-                          <ExternalLink className="size-3.5" />
-                        </Link>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-      {hasMore && (
+      <TableShell>
+        <table className="w-full text-z-small rtl:text-z-small-ar">
+          <thead className="bg-z-sunk text-z-ink-500">
+            <tr>
+              <th className="px-z3 py-z2 text-start font-medium">{t("timestamp")}</th>
+              <th className="px-z3 py-z2 text-start font-medium">{t("action")}</th>
+              <th className="px-z3 py-z2 text-start font-medium">{t("user")}</th>
+              <th className="px-z3 py-z2 text-start font-medium">{t("patient")}</th>
+              <th className="px-z3 py-z2 text-start font-medium">{t("change")}</th>
+              <th className="px-z3 py-z2"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={6} className="p-0"><ListSkeleton rows={6} /></td></tr>
+            ) : filtered.length === 0 ? (
+              <tr><td colSpan={6} className="py-z10 text-center text-z-ink-500">{t("noData")}</td></tr>
+            ) : filtered.map((r) => {
+              const p = r.entity_id ? patients[r.entity_id] : null;
+              return (
+                <tr key={r.id} className="border-t border-z-line-hairline hover:bg-z-sunk">
+                  <td className="whitespace-nowrap px-z3 py-z2 z-num text-z-micro rtl:text-z-micro-ar text-z-ink-500">{new Date(r.created_at).toLocaleString()}</td>
+                  <td className="px-z3 py-z2"><StatusChip tone="neutral">{queueActionLabel(r.action, lang)}</StatusChip></td>
+                  <td className="max-w-[180px] truncate px-z3 py-z2 text-z-ink-700">{profiles[r.user_id ?? ""] ?? (r.user_id ? r.user_id.slice(0, 8) : "—")}</td>
+                  <td className="px-z3 py-z2">
+                    {p ? (
+                      <span className="inline-flex items-baseline gap-z1">
+                        <span className="truncate text-z-ink-900">{p.name}</span>
+                        <span className="z-num text-z-micro rtl:text-z-micro-ar text-z-ink-500">#{p.code}</span>
+                      </span>
+                    ) : <span className="text-z-ink-400">—</span>}
+                  </td>
+                  <td className="max-w-[360px] truncate px-z3 py-z2 text-z-micro rtl:text-z-micro-ar text-z-ink-500">{summarizeDiff(r.old_values, r.new_values) || "—"}</td>
+                  <td className="px-z3 py-z2 text-end">
+                    {r.entity_id ? (
+                      <Link to={`/appointments/${r.entity_id}`} className="inline-flex items-center text-z-brand-700 hover:underline" aria-label={isArabic ? "فتح الموعد" : "Open appointment"}>
+                        <ExternalLink className="size-3.5" aria-hidden="true" />
+                      </Link>
+                    ) : null}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </TableShell>
+      {hasMore ? (
         <div className="flex justify-center">
-          <Button type="button" variant="outline" size="sm" onClick={() => void loadMore()} disabled={loadingMore}>
+          <ActionButton tone="quiet" onClick={() => void loadMore()} disabled={loadingMore}>
             {loadingMore ? "…" : t("loadMore")}
-          </Button>
+          </ActionButton>
         </div>
-      )}
+      ) : null}
 
-      <Dialog open={presetSaveOpen} onOpenChange={setPresetSaveOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{lang === "ar" ? "حفظ الإعدادات المسبقة" : "Save preset"}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="audit-preset-name">{lang === "ar" ? "اسم الإعداد المسبق" : "Preset name"}</Label>
-            <Input
-              id="audit-preset-name"
-              value={presetName}
-              autoFocus
-              maxLength={80}
-              onChange={(e) => setPresetName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && presetName.trim()) void savePreset(); }}
-              placeholder={lang === "ar" ? "مثال: حذف المواعيد اليوم" : "e.g. Today's cancelled appointments"}
-            />
-            <p className="text-xs text-muted-foreground">
-              {lang === "ar"
-                ? "يحفظ هذا الفلاتر الحالية: الإجراء والمستخدم والمرجع و«الاقتصار على الفرع الحالي»."
-                : "Saves the filters as they are now: action, user, reference and “scope to current branch”."}
-            </p>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setPresetSaveOpen(false)}>{t("cancel")}</Button>
-            <Button type="button" onClick={() => void savePreset()} disabled={!presetName.trim()}>{t("save")}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <PlatformDialog
+        open={presetSaveOpen}
+        onOpenChange={setPresetSaveOpen}
+        title={isArabic ? "حفظ الإعدادات المسبقة" : "Save preset"}
+        icon={<BookmarkPlus />}
+        dir={isArabic ? "rtl" : "ltr"}
+        footer={
+          <>
+            <ActionButton tone="quiet" onClick={() => setPresetSaveOpen(false)}>{t("cancel")}</ActionButton>
+            <ActionButton onClick={() => void savePreset()} disabled={!presetName.trim()}>{t("save")}</ActionButton>
+          </>
+        }
+      >
+        <div className="space-y-z2">
+          <FieldLabel htmlFor="audit-preset-name">{isArabic ? "اسم الإعداد المسبق" : "Preset name"}</FieldLabel>
+          <PlatformInput
+            id="audit-preset-name"
+            value={presetName}
+            autoFocus
+            maxLength={80}
+            onChange={(e) => setPresetName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && presetName.trim()) void savePreset(); }}
+            placeholder={isArabic ? "مثال: حذف المواعيد اليوم" : "e.g. Today's cancelled appointments"}
+          />
+          <p className="text-z-micro rtl:text-z-micro-ar text-z-ink-500">
+            {isArabic
+              ? "يحفظ هذا الفلاتر الحالية: الإجراء والمستخدم والمرجع و«الاقتصار على الفرع الحالي»."
+              : "Saves the filters as they are now: action, user, reference and “scope to current branch”."}
+          </p>
+        </div>
+      </PlatformDialog>
     </div>
   );
 }

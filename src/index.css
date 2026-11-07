@@ -469,9 +469,11 @@ iframe[src*="lovable.dev"][title*="badge" i] {
 }
 
 @layer components {
-  /* The only surface that opts into Clinical Ink in batch 1. Everything below is
-     scoped to it, so no existing screen changes appearance. */
-  .z-platform {
+  /* The surfaces that opt into Clinical Ink. Everything below is scoped to them, so no
+     existing screen changes appearance. `.z-platform` is the console; `.z-desk` is the
+     operational desks (phase 2a onwards). */
+  .z-platform,
+  .z-desk {
     background-color: hsl(var(--z-surface-canvas));
     color: hsl(var(--z-ink-700));
     font-family: var(--z-font-sans);
@@ -479,11 +481,14 @@ iframe[src*="lovable.dev"][title*="badge" i] {
   }
 
   .z-platform[dir="rtl"],
-  .z-platform[dir="rtl"] body {
+  .z-platform[dir="rtl"] body,
+  .z-desk[dir="rtl"],
+  .z-desk[dir="rtl"] body {
     font-family: var(--z-font-arabic);
   }
 
-  .z-platform :is(h1, h2, h3, h4) {
+  .z-platform :is(h1, h2, h3, h4),
+  .z-desk :is(h1, h2, h3, h4) {
     color: hsl(var(--z-ink-900));
     font-weight: 600;
   }
@@ -509,7 +514,10 @@ iframe[src*="lovable.dev"][title*="badge" i] {
   @media (prefers-reduced-motion: reduce) {
     .z-platform *,
     .z-platform *::before,
-    .z-platform *::after {
+    .z-platform *::after,
+    .z-desk *,
+    .z-desk *::before,
+    .z-desk *::after {
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;

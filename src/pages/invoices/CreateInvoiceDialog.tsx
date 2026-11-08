@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Trash2, Plus } from "lucide-react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NumberInput } from "@/components/ui/number-input";
@@ -65,6 +65,9 @@ export function CreateInvoiceDialog({
   const [manualOverride, setManualOverride] = useState(false);
   const [manualClaim, setManualClaim] = useState<number>(0);
   const [items, setItems] = useState<Item[]>([{ item_type: "service", description_en: "", description_ar: "", quantity: 1, unit_price: 0 }]);
+  // A registered service already names itself, so its free-text description is only shown
+  // when the desk asks to edit it (or when the line is custom); the row stays one control high.
+  const [descriptionEdit, setDescriptionEdit] = useState<Record<number, boolean>>({});
   const [saving, setSaving] = useState(false);
   const submittingRef = useRef(false);
   const [patientProcedures, setPatientProcedures] = useState<any[]>([]);
@@ -325,6 +328,8 @@ export function CreateInvoiceDialog({
       description_ar: s.name_ar || s.name_en,
       unit_price: Number(s.default_price) || 0,
     });
+    // A registered service supplies the description; collapse the free-text input again.
+    setDescriptionEdit((current) => ({ ...current, [idx]: false }));
   };
 
   const applyCoupon = async () => {
@@ -547,9 +552,10 @@ export function CreateInvoiceDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>{t("newInvoice")}</DialogTitle></DialogHeader>
+      <DialogContent className="flex max-h-[90vh] max-w-3xl flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="border-b border-border px-6 py-4"><DialogTitle>{t("newInvoice")}</DialogTitle></DialogHeader>
 
+        <div data-testid="invoice-dialog-body" className="min-h-0 flex-1 overflow-y-auto px-6 py-4 pe-1">
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div className="space-y-2">
             <Label>{t("patientName")}</Label>
@@ -740,21 +746,47 @@ export function CreateInvoiceDialog({
                     </SelectContent>
                   </Select>
                 ) : (
-                  <div className="grid gap-1">
-                    <Select value={it.product_id ?? ""} onValueChange={(v) => pickService(idx, v)}>
-                      <SelectTrigger><SelectValue placeholder={lang === "ar" ? "اختر خدمة" : "Select service"} /></SelectTrigger>
-                      <SelectContent>
-                        {services.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            <span className="flex items-center gap-2">
-                              <span>{lang === "ar" ? (s.name_ar || s.name_en) : s.name_en}</span>
-                              <span className="text-[10px] tabular-nums text-muted-foreground">· {formatMoney(Number(s.default_price) || 0, lang)}</span>
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Input value={it.description_en} placeholder="Description" onChange={(e) => updateItem(idx, { description_en: e.target.value, description_ar: e.target.value })} />
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1">
+                      <Select
+                        value={it.product_id ?? "__none__"}
+                        onValueChange={(v) => {
+                          if (v === "__none__") {
+                            updateItem(idx, { product_id: null });
+                            setDescriptionEdit((current) => ({ ...current, [idx]: true }));
+                            return;
+                          }
+                          pickService(idx, v);
+                        }}
+                      >
+                        <SelectTrigger className="w-auto min-w-0 flex-1"><SelectValue placeholder={lang === "ar" ? "اختر خدمة" : "Select service"} /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">{lang === "ar" ? "بند مخصص" : "Custom line"}</SelectItem>
+                          {services.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              <span className="flex items-center gap-2">
+                                <span>{lang === "ar" ? (s.name_ar || s.name_en) : s.name_en}</span>
+                                <span className="text-[10px] tabular-nums text-muted-foreground">· {formatMoney(Number(s.default_price) || 0, lang)}</span>
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="size-8 shrink-0"
+                        aria-label={lang === "ar" ? "تعديل الوصف" : "Edit description"}
+                        aria-pressed={Boolean(descriptionEdit[idx])}
+                        onClick={() => setDescriptionEdit((current) => ({ ...current, [idx]: !current[idx] }))}
+                      >
+                        <Pencil className="size-3.5" />
+                      </Button>
+                    </div>
+                    {(!it.product_id || descriptionEdit[idx]) && (
+                      <Input value={it.description_en} placeholder="Description" onChange={(e) => updateItem(idx, { description_en: e.target.value, description_ar: e.target.value })} />
+                    )}
                   </div>
                 )}
               </div>
@@ -951,8 +983,9 @@ export function CreateInvoiceDialog({
             </div>
           )}
         </div>
+        </div>
 
-        <DialogFooter>
+        <DialogFooter className="border-t border-border px-6 py-4">
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>{t("cancel")}</Button>
           <Button type="button" variant="outline" onClick={() => save("draft")} disabled={saving}>{t("saveDraft")}</Button>
           <Button

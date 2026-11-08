@@ -103,7 +103,36 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
+describe("dialog layout", () => {
+  it("keeps the header and footer fixed and scrolls only the body", () => {
+    render(<CreateInvoiceDialog open onOpenChange={vi.fn()} onSaved={vi.fn()} presetPatientId="pat-1" />);
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.className).toContain("max-h-[90vh]");
+
+    const body = screen.getByTestId("invoice-dialog-body");
+    expect(body.className).toContain("overflow-y-auto");
+    expect(body.contains(screen.getByRole("button", { name: "save" }))).toBe(false);
+    expect(body.contains(screen.getByRole("button", { name: "cancel" }))).toBe(false);
+  });
+});
+
 describe("service line types", () => {
+  it("collapses the description after a registered service is picked, and re-opens it with the pencil", async () => {
+    servicesResponse = {
+      data: [{ id: "svc-1", name_en: "Physiotherapy", name_ar: "علاج طبيعي", default_price: 250, is_active: true, deleted_at: null }],
+      error: null,
+    };
+    render(<CreateInvoiceDialog open onOpenChange={vi.fn()} onSaved={vi.fn()} presetPatientId="pat-1" />);
+
+    expect(screen.getByPlaceholderText("Description")).toBeInTheDocument();
+    const option = await screen.findByRole("option", { name: /Physiotherapy/ });
+    fireEvent.change(option.closest("select") as HTMLSelectElement, { target: { value: "svc-1" } });
+
+    await waitFor(() => expect(screen.queryByPlaceholderText("Description")).toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: "Edit description" }));
+    expect(screen.getByPlaceholderText("Description")).toBeInTheDocument();
+  });
+
   it("offers the tenant's services with their price, and picks that price", async () => {
     servicesResponse = {
       data: [{ id: "svc-1", name_en: "Physiotherapy", name_ar: "علاج طبيعي", default_price: 250, is_active: true, deleted_at: null }],

@@ -435,23 +435,27 @@ export default function PlatformConsole() {
         {filtered.length === 0 ? <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">{view === "archived" ? (isAr ? "لا توجد مساحات مؤرشفة." : "No archived workspaces.") : (isAr ? "لا يوجد عملاء بعد." : "No tenants yet.")}</div> : filtered.map((tenant) => {
           const plan = tenant.subscription_plans;
           const count = branchCount.get(tenant.id) ?? 0;
-          return <div key={tenant.id} className="flex flex-wrap items-center gap-3 rounded-xl border p-4">
-            <div className="flex min-w-0 flex-1 items-center gap-3">
+          return <div key={tenant.id} className="flex flex-wrap items-start justify-between gap-3 rounded-xl border p-4">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
               <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Building2 className="size-5" /></div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="truncate font-semibold">{tenantDisplayName(tenant)}</div>
-                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span className="font-mono">{tenant.slug}</span><span>·</span>
-                  <span className="inline-flex items-center gap-1"><Users className="size-3" />{count} {isAr ? "فرع" : "branch(es)"}</span>
-                  {view === "archived" && tenant.archived_at ? <><span>·</span><span>{isAr ? "أُرشفت" : "archived"} {new Date(tenant.archived_at).toLocaleDateString(isAr ? "ar-EG" : "en-EG")}</span></> : null}
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                  <span className="min-w-0 max-w-full truncate font-mono">{tenant.slug}</span>
+                  <span aria-hidden="true">·</span>
+                  <span className="inline-flex shrink-0 items-center gap-1"><Users className="size-3" />{count} {isAr ? "فرع" : "branch(es)"}</span>
+                  <span aria-hidden="true">·</span>
+                  <span className="shrink-0">{tenant.subscription_ends_at || tenant.trial_ends_at ? `${isAr ? "حتى" : "until"} ${new Date(tenant.subscription_ends_at ?? tenant.trial_ends_at!).toLocaleDateString(isAr ? "ar-EG" : "en-EG")}` : (isAr ? "بدون مدة محددة" : "No term set")}</span>
+                  {view === "archived" && tenant.archived_at ? <><span aria-hidden="true">·</span><span>{isAr ? "أُرشفت" : "archived"} {new Date(tenant.archived_at).toLocaleDateString(isAr ? "ar-EG" : "en-EG")}</span></> : null}
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Badge variant={statusTone(tenant.subscription_status, tenant.is_active)}>{tenant.is_active ? tenant.subscription_status : (isAr ? "متوقف" : "Inactive")}</Badge>
+                  <Badge variant="outline">{plan ? (isAr ? plan.name_ar : plan.name_en) : (isAr ? "بدون خطة" : "No plan")}</Badge>
                 </div>
                 {view === "archived" && tenant.archive_reason ? <div className="mt-1 truncate text-xs text-muted-foreground">{isAr ? "السبب: " : "Reason: "}{tenant.archive_reason}</div> : null}
               </div>
             </div>
-            <Badge variant={statusTone(tenant.subscription_status, tenant.is_active)}>{tenant.is_active ? tenant.subscription_status : (isAr ? "متوقف" : "Inactive")}</Badge>
-            <Badge variant="outline">{plan ? (isAr ? plan.name_ar : plan.name_en) : (isAr ? "بدون خطة" : "No plan")}</Badge>
-            <span className="text-xs text-muted-foreground">{tenant.subscription_ends_at || tenant.trial_ends_at ? `${isAr ? "حتى" : "until"} ${new Date(tenant.subscription_ends_at ?? tenant.trial_ends_at!).toLocaleDateString(isAr ? "ar-EG" : "en-EG")}` : (isAr ? "بدون مدة محددة" : "No term set")}</span>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2 md:justify-end">
               {view === "archived" ? <>
                 <Button size="sm" onClick={() => openRestore(tenant)}><RotateCcw className="me-1 size-3.5" />{isAr ? "استعادة" : "Restore"}</Button>
                 <Button size="sm" variant="outline" onClick={() => setDomainTenant(tenant)}><Globe2 className="me-1 size-3.5" />{isAr ? "الدومينات" : "Domains"}</Button>

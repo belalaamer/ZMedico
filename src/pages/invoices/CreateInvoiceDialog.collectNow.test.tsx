@@ -114,6 +114,14 @@ describe("dialog layout", () => {
     expect(body.contains(screen.getByRole("button", { name: "save" }))).toBe(false);
     expect(body.contains(screen.getByRole("button", { name: "cancel" }))).toBe(false);
   });
+
+  it("keeps the item columns on one grid with a real gap and shrinkable cells", () => {
+    render(<CreateInvoiceDialog open onOpenChange={vi.fn()} onSaved={vi.fn()} presetPatientId="pat-1" />);
+    const row = screen.getAllByTestId("invoice-item-row")[0];
+    expect(row.className).toContain("gap-3");
+    expect(row.className).toContain("md:grid-cols-12");
+    expect(screen.getByTestId("invoice-item-description").className).toContain("min-w-0");
+  });
 });
 
 describe("service line types", () => {

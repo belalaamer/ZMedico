@@ -688,17 +688,17 @@ export function CreateInvoiceDialog({
         )}
 
         <div className="border border-border rounded-lg overflow-hidden">
-          <div className="hidden md:grid grid-cols-12 gap-2 bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground">
-            <div className="col-span-2">{t("itemType")}</div>
-            <div className="col-span-3">{t("description")}</div>
-            <div className="col-span-2 text-end">{t("quantity")}</div>
-            <div className="col-span-2 text-end">{t("unitPrice")}</div>
-            <div className="col-span-2 text-end">{t("total")}</div>
-            <div className="col-span-1"></div>
+          <div className="hidden md:grid grid-cols-12 items-center gap-3 bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground">
+            <div className="col-span-2 min-w-0">{t("itemType")}</div>
+            <div className="col-span-3 min-w-0">{t("description")}</div>
+            <div className="col-span-2 min-w-0 text-end">{t("quantity")}</div>
+            <div className="col-span-2 min-w-0 text-end">{t("unitPrice")}</div>
+            <div className="col-span-2 min-w-0 text-end">{t("total")}</div>
+            <div className="col-span-1 min-w-0"></div>
           </div>
           {items.map((it, idx) => (
-            <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-2 px-3 py-3 border-t border-border">
-              <div className="md:col-span-2">
+            <div key={idx} data-testid="invoice-item-row" className="grid grid-cols-1 items-start gap-3 border-t border-border px-3 py-3 md:grid-cols-12">
+              <div className="min-w-0 md:col-span-2">
                 <div className="mb-1 text-[11px] text-muted-foreground md:hidden">{t("itemType")}</div>
                 <Select value={it.item_type} onValueChange={(v) => updateItem(idx, { item_type: v as Item["item_type"], product_id: v === "product" ? it.product_id : null })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -709,7 +709,7 @@ export function CreateInvoiceDialog({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="md:col-span-3 grid gap-1">
+              <div data-testid="invoice-item-description" className="grid min-w-0 gap-1 md:col-span-3">
                 <div className="text-[11px] text-muted-foreground md:hidden">{t("description")}</div>
                 {it.item_type === "product" ? (
                   <Select value={it.product_id ?? ""} onValueChange={(v) => pickProduct(idx, v)}>
@@ -747,7 +747,7 @@ export function CreateInvoiceDialog({
                   </Select>
                 ) : (
                   <div className="space-y-1">
-                    <div className="flex items-center gap-1">
+                    <div className="flex min-w-0 items-center gap-1">
                       <Select
                         value={it.product_id ?? "__none__"}
                         onValueChange={(v) => {
@@ -790,21 +790,21 @@ export function CreateInvoiceDialog({
                   </div>
                 )}
               </div>
-              <div className="md:col-span-2">
+              <div className="min-w-0 md:col-span-2">
                 <div className="mb-1 text-[11px] text-muted-foreground md:hidden">{t("quantity")}</div>
                 <NumberInput className="w-full text-end" value={it.quantity} onChange={(v) => updateItem(idx, { quantity: v })} />
               </div>
-              <div className="md:col-span-2">
+              <div className="min-w-0 md:col-span-2">
                 <div className="mb-1 text-[11px] text-muted-foreground md:hidden">{t("unitPrice")}</div>
                 <NumberInput className="w-full text-end" value={it.unit_price} onChange={(v) => updateItem(idx, { unit_price: v })} />
               </div>
-              <div className="md:col-span-2 md:text-end self-center">
+              <div className="min-w-0 self-center md:col-span-2 md:text-end">
                 <div className="mb-1 text-[11px] text-muted-foreground md:hidden">{t("total")}</div>
                 <div className="font-medium tabular-nums">
                   {formatMoney((Number(it.quantity)||0) * (Number(it.unit_price)||0), lang)}
                 </div>
               </div>
-              <div className="md:col-span-1 self-center flex justify-end">
+              <div className="flex min-w-0 justify-end self-center md:col-span-1">
                 <Button
                   type="button"
                   variant="ghost"

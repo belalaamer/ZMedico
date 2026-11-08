@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Printer, CreditCard, X, Copy, Download, MessageCircle, Shield, Receipt, Wallet } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,6 +49,8 @@ const statusIconTint: Record<string, string> = {
 export default function InvoiceDetail() {
   const { id } = useParams();
   const { t, lang } = useI18n();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const printButtonRef = useRef<HTMLButtonElement | null>(null);
   const { user } = useAuth();
   const [inv, setInv] = useState<Inv | null>(null);
   const [items, setItems] = useState<any[]>([]);
@@ -74,6 +76,18 @@ export default function InvoiceDetail() {
     else setCoupon(null);
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
+
+  // Arriving from the payments row (or the invoices menu) with ?print=1 prints the receipt
+  // once, then drops the flag so a refresh does not print it again.
+  useEffect(() => {
+    if (!inv) return;
+    if (searchParams.get("print") !== "1") return;
+    const next = new URLSearchParams(searchParams);
+    next.delete("print");
+    setSearchParams(next, { replace: true });
+    const timer = window.setTimeout(() => printButtonRef.current?.click(), 300);
+    return () => window.clearTimeout(timer);
+  }, [inv, searchParams, setSearchParams]);
 
   if (!inv) return <div className="text-center text-muted-foreground py-10">…</div>;
 
@@ -206,7 +220,7 @@ export default function InvoiceDetail() {
               </Button>
             </Can>
           )}
-          <Button variant="outline" onClick={() => runPdfAction("print")} disabled={pdfLoading} aria-busy={pdfLoading}><Printer className="me-2 size-4" />{t("print")}</Button>
+          <Button ref={printButtonRef} variant="outline" onClick={() => runPdfAction("print")} disabled={pdfLoading} aria-busy={pdfLoading}><Printer className="me-2 size-4" />{t("print")}</Button>
           <Button variant="outline" onClick={() => runPdfAction("download")} disabled={pdfLoading} aria-busy={pdfLoading}><Download className="me-2 size-4" />{t("downloadPdf")}</Button>
           <Button variant="outline" onClick={sendWhatsApp} className="bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#128C7E] border-[#25D366]/30 dark:text-[#25D366] dark:border-[#25D366]/40">
             <MessageCircle className="me-2 size-4"/>WhatsApp

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useDataSync } from "@/lib/dataSync";
-import { Plus, CreditCard, Banknote, Wallet, Shield, Landmark, Smartphone, AlertCircle } from "lucide-react";
+import { Plus, CreditCard, Banknote, Wallet, Shield, Landmark, Smartphone, AlertCircle, FileText, Printer } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,8 @@ import { RowActions } from "@/components/RowActions";
 import { TablePager } from "@/components/TablePager";
 import { ListSkeleton } from "@/components/ListSkeleton";
 import { Can } from "@/components/Can";
+import { Switch } from "@/components/ui/switch";
+import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { patientDisplayDirection, patientDisplayName } from "@/lib/patientName";
 import { enumCopy, PAYMENT_METHOD_KEY } from "@/lib/enumKeys";
 
@@ -34,6 +36,9 @@ const methodStyle = (m: string): { badge: string; icon: string; Icon: any } => {
 export default function Payments() {
   const { t, lang } = useI18n();
   const { currentBranchId, branchSelectionReady } = useBranch();
+  const navigate = useNavigate();
+  const { authz } = useAuthorization("Payments");
+  const [todayOnly, setTodayOnly] = useState(false);
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -72,6 +77,11 @@ export default function Payments() {
       .is("deleted_at", null)
       .order("created_at", { ascending: false }).range(from, to);
     q = q.eq("branch_id", branchId);
+    if (todayOnly) {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      q = q.gte("created_at", start.toISOString());
+    }
     const { data, error, count } = await q;
     if (requestId !== loadRequestRef.current) return;
     setLoading(false);
@@ -79,8 +89,8 @@ export default function Payments() {
     setItems(data ?? []);
     setTotal(count ?? 0);
   };
-  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [branchSelectionReady, currentBranchId, page]);
-  useEffect(() => { setPage(0); }, [branchSelectionReady, currentBranchId]);
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [branchSelectionReady, currentBranchId, page, todayOnly]);
+  useEffect(() => { setPage(0); }, [branchSelectionReady, currentBranchId, todayOnly]);
   useDataSync(["payments", "invoices"], () => { void load(); });
 
   const softDelete = async (p: any): Promise<void> => {
@@ -105,11 +115,17 @@ export default function Payments() {
           <span className="font-medium text-foreground">{t("payments")}</span>
           <span className="text-xs">· {total}</span>
         </div>
-        <Can permission="invoices.create">
-          <Button className="gradient-primary text-primary-foreground shadow-md hover:shadow-lg transition-shadow" onClick={() => setOpen(true)}>
-            <Plus className="me-2 size-4" />{t("recordPayment")}
-          </Button>
-        </Can>
+        <div className="flex items-center gap-3 flex-wrap">
+          <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer" htmlFor="payments-today">
+            <Switch id="payments-today" checked={todayOnly} onCheckedChange={setTodayOnly} />
+            {lang === "ar" ? "مدفوعات اليوم" : "Today's payments"}
+          </label>
+          <Can permission="invoices.create">
+            <Button className="gradient-primary text-primary-foreground shadow-md hover:shadow-lg transition-shadow" onClick={() => setOpen(true)}>
+              <Plus className="me-2 size-4" />{t("recordPayment")}
+            </Button>
+          </Can>
+        </div>
       </div>
 
       <Card className="shadow-card overflow-hidden">
@@ -153,9 +169,15 @@ export default function Payments() {
                     <div className="text-lg font-bold tabular-nums text-success">{formatMoney(p.amount, lang)}</div>
                     {p.reference_number && <Badge variant="outline" className="text-[10px] mt-1">{p.reference_number}</Badge>}
                   </div>
-                  <Can permission="treasury.delete">
-                    <RowActions canEdit={false} onDelete={() => softDelete(p)} />
-                  </Can>
+                  <RowActions
+                    canEdit={false}
+                    canDelete={authz.can("treasury.delete")}
+                    onDelete={() => softDelete(p)}
+                    extraItems={[
+                      ...(p.invoice_id ? [{ label: lang === "ar" ? "طباعة الإيصال" : "Print receipt", icon: <Printer className="size-4" />, onClick: () => navigate(`/invoices/${p.invoice_id}?print=1`) }] : []),
+                      ...(p.invoice_id ? [{ label: lang === "ar" ? "عرض الفاتورة" : "View invoice", icon: <FileText className="size-4" />, onClick: () => navigate(`/invoices/${p.invoice_id}`) }] : []),
+                    ]}
+                  />
                 </div>
               );
             })}

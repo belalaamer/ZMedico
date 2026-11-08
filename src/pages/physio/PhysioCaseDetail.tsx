@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Plus, TrendingUp, TrendingDown, Minus, Trash2, AlertCircle, Calendar, BellRing, CheckCircle2, Clock, CalendarCheck, Activity, ClipboardList, FileText, Stethoscope } from "lucide-react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, Plus, TrendingUp, TrendingDown, Minus, Trash2, AlertCircle, Calendar, CalendarDays, BellRing, CheckCircle2, Clock, CalendarCheck, Activity, ClipboardList, FileText, Receipt, Stethoscope } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Can } from "@/components/Can";
+import { CreateInvoiceDialog } from "@/pages/invoices/CreateInvoiceDialog";
 import { useAuthorization } from "@/lib/authz/useAuthorization";
 import { ListSkeleton } from "@/components/ListSkeleton";
 import { subscribeResilient } from "@/lib/realtime";
@@ -29,6 +30,7 @@ import { localDateOnly } from "@/lib/localDate";
 
 export default function PhysioCaseDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { t, lang } = useI18n();
   // R2: canonical authorization entry point.
   const { authz } = useAuthorization("PhysioCaseDetail");
@@ -42,6 +44,7 @@ export default function PhysioCaseDetail() {
   const [appointmentMap, setAppointmentMap] = useState<Record<string, any>>({});
   const [sessOpen, setSessOpen] = useState(false);
   const [reOpen, setReOpen] = useState(false);
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [statusDraft, setStatusDraft] = useState<{ status: "completed" | "paused"; text: string } | null>(null);
   const phiLogged = useRef(false);
 
@@ -340,6 +343,11 @@ export default function PhysioCaseDetail() {
               therapists={therapists} lang={lang} defaultTherapistId={c.therapist_id}
               onSaved={loadAll}
             />
+            <Can permission="appointments.create">
+              <Button variant="outline" size="sm" onClick={() => navigate(`/calendar?patient_id=${c.patient_id}&book=1`)}>
+                <CalendarDays className="size-4 me-1" />{lang === "ar" ? "حجز الجلسة القادمة" : "Book next session"}
+              </Button>
+            </Can>
           </div>
         </Card>
       </Can>
@@ -401,6 +409,18 @@ export default function PhysioCaseDetail() {
                           {s.interventions && <div className="text-sm"><span className="text-muted-foreground">{lang === "ar" ? "التدخلات: " : "Interventions: "}</span>{s.interventions}</div>}
                           {s.progress_note && <div className="text-sm"><span className="text-muted-foreground">{lang === "ar" ? "التقدم: " : "Progress: "}</span>{s.progress_note}</div>}
                           {s.next_recommendation && <div className="text-sm"><span className="text-muted-foreground">{lang === "ar" ? "الخطة التالية: " : "Next: "}</span>{s.next_recommendation}</div>}
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            <Can permission="invoices.create">
+                              <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => setInvoiceOpen(true)}>
+                                <Receipt className="size-3.5 me-1" />{lang === "ar" ? "فاتورة الجلسة" : "Invoice this session"}
+                              </Button>
+                            </Can>
+                            <Can permission="appointments.create">
+                              <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => navigate(`/calendar?patient_id=${c.patient_id}&book=1`)}>
+                                <CalendarDays className="size-3.5 me-1" />{lang === "ar" ? "الجلسة القادمة" : "Next session"}
+                              </Button>
+                            </Can>
+                          </div>
                         </Card>
                       </li>
                     );
@@ -541,6 +561,15 @@ export default function PhysioCaseDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {invoiceOpen && (
+        <CreateInvoiceDialog
+          open
+          onOpenChange={(next) => { if (!next) setInvoiceOpen(false); }}
+          presetPatientId={c.patient_id}
+          onSaved={() => setInvoiceOpen(false)}
+        />
+      )}
     </div>
   );
 }

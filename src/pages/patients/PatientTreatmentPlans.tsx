@@ -9,9 +9,9 @@ import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Check, X, Trash2, FileText } from "lucide-react";
+import { Plus, Check, X, Trash2, FileText, Receipt, CalendarDays } from "lucide-react";
 import { Calendar as CalendarIcon } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useI18n } from "@/contexts/I18nContext";
 import { enumLabel } from "@/lib/enumLabels";
 import { useBranch } from "@/contexts/BranchContext";
@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatDate, formatMoney } from "@/lib/format";
 import { toast } from "sonner";
 import { Can } from "@/components/Can";
+import { CreateInvoiceDialog } from "@/pages/invoices/CreateInvoiceDialog";
 import { doctorDisplayName } from "@/lib/doctorName";
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { localDateOnly } from "@/lib/localDate";
@@ -29,6 +30,7 @@ type Session = any;
 
 export default function PatientTreatmentPlans({ patientId }: { patientId: string }) {
   const { lang } = useI18n();
+  const navigate = useNavigate();
   const { currentBranchId } = useBranch();
   const { user } = useAuth();
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -42,6 +44,7 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
   const [conflict, setConflict] = useState<{ clash: any; reason: string } | null>(null);
   const [cancelPlanTarget, setCancelPlanTarget] = useState<Plan | null>(null);
   const [deletePlanTarget, setDeletePlanTarget] = useState<Plan | null>(null);
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
 
   const load = async () => {
     const { data } = await (supabase as any)
@@ -369,6 +372,14 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
                         <Button size="sm" variant="outline"><FileText className="size-4 me-1" />{lang === "ar" ? "الفاتورة" : "Invoice"}</Button>
                       </Link>
                     )}
+                    {!p.invoice_id && (
+                      <Can permission="invoices.create">
+                        <Button size="sm" variant="outline" onClick={() => setInvoiceOpen(true)}><Receipt className="size-4 me-1" />{lang === "ar" ? "إنشاء فاتورة" : "Create invoice"}</Button>
+                      </Can>
+                    )}
+                    <Can permission="appointments.create">
+                      <Button size="sm" variant="outline" onClick={() => navigate(`/calendar?patient_id=${patientId}&book=1`)}><CalendarDays className="size-4 me-1" />{lang === "ar" ? "الجلسة القادمة" : "Next session"}</Button>
+                    </Can>
                     {p.status === "active" && (
                       <Can permission="treatment_plans.edit">
                         <AlertDialog open={cancelPlanTarget?.id === p.id} onOpenChange={(o) => { if (!o) setCancelPlanTarget(null); }}>
@@ -517,6 +528,15 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {invoiceOpen && (
+        <CreateInvoiceDialog
+          open
+          onOpenChange={(next) => { if (!next) setInvoiceOpen(false); }}
+          presetPatientId={patientId}
+          onSaved={() => { setInvoiceOpen(false); load(); }}
+        />
+      )}
     </div>
   );
 }

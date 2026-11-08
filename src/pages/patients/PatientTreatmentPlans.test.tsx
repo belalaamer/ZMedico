@@ -21,7 +21,7 @@ vi.mock("@/lib/authz/useAuthorization", () => ({
   useAuthorization: () => ({ authz: { can: () => true }, loading: false }),
 }));
 vi.mock("sonner", () => ({ toast: { error: api.error, success: api.success } }));
-vi.mock("react-router-dom", () => ({ Link: ({ children }: any) => children }));
+vi.mock("react-router-dom", () => ({ Link: ({ children }: any) => children, useNavigate: () => vi.fn() }));
 vi.mock("@/integrations/supabase/client", () => {
   const builder = (table: string) => {
     const st = { table, op: "select", asked: false, filters: [] as string[], payload: undefined as any };

@@ -17,11 +17,13 @@ type Resp = { data?: unknown; error?: { message: string } | null };
 let invoicesResponse: Resp = {};
 let paymentsResponse: Resp = {};
 let walletResponse: Resp = {};
+let servicesResponse: Resp = { data: [], error: null };
 
 function responseFor(table: string): Resp {
   if (table === "invoices") return invoicesResponse;
   if (table === "payments") return paymentsResponse;
   if (table === "patient_wallets") return walletResponse;
+  if (table === "services") return servicesResponse;
   if (table === "patients") return { data: { id: "pat-1", insurance_company_id: null } };
   return { data: [], error: null };
 }
@@ -95,10 +97,27 @@ beforeEach(() => {
   invoicesResponse = { data: { id: "inv-1", invoice_number: "INV-0001" }, error: null };
   paymentsResponse = { data: null, error: null };
   walletResponse = { data: { balance: 100 } };
+  servicesResponse = { data: [], error: null };
   mocks.rpc.mockResolvedValue({ data: [], error: null });
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+
+describe("service line types", () => {
+  it("offers the tenant's services with their price, and picks that price", async () => {
+    servicesResponse = {
+      data: [{ id: "svc-1", name_en: "Physiotherapy", name_ar: "علاج طبيعي", default_price: 250, is_active: true, deleted_at: null }],
+      error: null,
+    };
+    render(<CreateInvoiceDialog open onOpenChange={vi.fn()} onSaved={vi.fn()} presetPatientId="pat-1" />);
+
+    const option = await screen.findByRole("option", { name: /Physiotherapy/ });
+    const select = option.closest("select") as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: "svc-1" } });
+
+    expect(screen.getByDisplayValue("250")).toBeInTheDocument();
+  });
+});
 
 describe("collecting money on the invoice screen", () => {
   it("posts the invoice and the payment from one click, with the money columns the ledger expects", async () => {

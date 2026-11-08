@@ -74,6 +74,18 @@ export function usePatientSearch(input: {
     [input.ready, input.branchId, input.lang, limit],
   );
 
+  // A picker can mount before the branch context resolves (QuickConsult does), and the
+  // combobox only asks once on mount. Re-run the last term when the branch or language
+  // becomes usable, so the first page appears without requiring a keystroke.
+  const lastQuery = useRef<string | null>(null);
+  useEffect(() => {
+    if (!input.ready || !input.branchId) { lastQuery.current = null; return; }
+    const key = `${input.branchId}:${input.lang}`;
+    if (lastQuery.current === key) return;
+    lastQuery.current = key;
+    void search(lastTerm.current);
+  }, [input.ready, input.branchId, input.lang, search]);
+
   const reload = useCallback(() => {
     void search(lastTerm.current);
   }, [search]);

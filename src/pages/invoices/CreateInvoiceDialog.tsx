@@ -48,6 +48,7 @@ export function CreateInvoiceDialog({
   const { user } = useAuth();
   const [products, setProducts] = useState<any[]>([]);
   const [procedures, setProcedures] = useState<any[]>([]);
+  const [services, setServices] = useState<any[]>([]);
   const [doctors, setDoctors] = useState<Array<{ id: string; full_name: string | null; full_name_en?: string | null; full_name_ar?: string | null }>>([]);
   const [doctorId, setDoctorId] = useState<string>("");
   const [stocks, setStocks] = useState<Record<string, number>>({});
@@ -124,13 +125,17 @@ export function CreateInvoiceDialog({
   useEffect(() => {
     if (!open) return;
     if (!branchSelectionReady || !currentBranchId || !subscription?.tenant_id) {
-      setProducts([]); setProcedures([]); setDoctors([]); setStocks({});
+      setProducts([]); setProcedures([]); setServices([]); setDoctors([]); setStocks({});
       return;
     }
     supabase.from("products").select("id,sku,name_en,name_ar,selling_price,min_stock_level").eq("tenant_id", subscription.tenant_id).eq("is_active", true).is("deleted_at", null).order("name_en").limit(1000)
       .then(({ data }) => setProducts(data ?? []));
     supabase.from("procedures").select("id,name_en,name_ar,default_price,is_active,deleted_at").eq("is_active", true).is("deleted_at", null).eq("tenant_id", subscription.tenant_id).order("name_en").limit(1000)
       .then(({ data }) => setProcedures((data ?? []).filter((p: any) => p.deleted_at == null && p.is_active !== false)));
+    // Services are the third billable line type. They are tenant-scoped and active, exactly
+    // like products and procedures; the price comes from services.default_price.
+    supabase.from("services").select("id,name_en,name_ar,default_price,is_active,deleted_at").eq("tenant_id", subscription.tenant_id).eq("is_active", true).is("deleted_at", null).order("name_en").limit(1000)
+      .then(({ data }) => setServices((data ?? []).filter((s: any) => s.deleted_at == null && s.is_active !== false)));
     supabase.from("insurance_companies").select("id,name_en,name_ar,default_coverage_ratio,is_active").eq("is_active", true).order("name_en")
       .then(({ data }) => setInsuranceCompanies(data ?? []));
     // Strict doctor list via SECURITY DEFINER RPC so non-admin staff (e.g. Front Desk)
@@ -307,6 +312,18 @@ export function CreateInvoiceDialog({
       description_en: p.name_en,
       description_ar: p.name_ar || p.name_en,
       unit_price: Number(p.default_price) || 0,
+    });
+  };
+
+  const pickService = (idx: number, serviceId: string) => {
+    const s = services.find((x) => x.id === serviceId);
+    if (!s) return;
+    updateItem(idx, {
+      item_type: "service",
+      product_id: serviceId,
+      description_en: s.name_en,
+      description_ar: s.name_ar || s.name_en,
+      unit_price: Number(s.default_price) || 0,
     });
   };
 
@@ -723,7 +740,22 @@ export function CreateInvoiceDialog({
                     </SelectContent>
                   </Select>
                 ) : (
-                  <Input value={it.description_en} placeholder="Description" onChange={(e) => updateItem(idx, { description_en: e.target.value, description_ar: e.target.value })} />
+                  <div className="grid gap-1">
+                    <Select value={it.product_id ?? ""} onValueChange={(v) => pickService(idx, v)}>
+                      <SelectTrigger><SelectValue placeholder={lang === "ar" ? "اختر خدمة" : "Select service"} /></SelectTrigger>
+                      <SelectContent>
+                        {services.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            <span className="flex items-center gap-2">
+                              <span>{lang === "ar" ? (s.name_ar || s.name_en) : s.name_en}</span>
+                              <span className="text-[10px] tabular-nums text-muted-foreground">· {formatMoney(Number(s.default_price) || 0, lang)}</span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input value={it.description_en} placeholder="Description" onChange={(e) => updateItem(idx, { description_en: e.target.value, description_ar: e.target.value })} />
+                  </div>
                 )}
               </div>
               <div className="md:col-span-2">

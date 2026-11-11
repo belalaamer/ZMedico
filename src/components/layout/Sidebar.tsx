@@ -156,6 +156,10 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {})
       label: lang === "ar" ? "الرعاية والمتابعات" : "Care & Follow-ups",
       icon: Stethoscope,
       items: [
+        // First in the group on purpose: this is the only surface where a patient is
+        // actively waiting for a person (the AI has stepped aside), so it outranks
+        // reading history.
+        authz.can("communication.view") && { to: "/inbox", icon: Bot, label: lang === "ar" ? "محادثات المرضى" : "Conversations" },
         authz.can("medical_records.view") && isModuleEnabled("medical") && { to: "/medical/records", icon: FileText, label: t("medicalRecords") },
         authz.can("medical_records.view") && isModuleEnabled("medical") && { to: "/medical/prescriptions", icon: Pill, label: t("prescriptions") },
         authz.can("medical_records.view") && isModuleEnabled("medical") && { to: "/medical/documents", icon: FolderOpen, label: t("documentsCenter") },

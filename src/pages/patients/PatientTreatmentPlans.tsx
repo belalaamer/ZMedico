@@ -24,6 +24,7 @@ import { CreateInvoiceDialog } from "@/pages/invoices/CreateInvoiceDialog";
 import { doctorDisplayName } from "@/lib/doctorName";
 import { notConfirmedCopy, rowsWritten } from "@/lib/writeOutcome";
 import { localDateOnly } from "@/lib/localDate";
+import { planProgress, summariseByService } from "@/lib/serviceSessionProgress";
 
 type Plan = any;
 type Session = any;
@@ -36,9 +37,13 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
   const [plans, setPlans] = useState<Plan[]>([]);
   const [sessionsByPlan, setSessionsByPlan] = useState<Record<string, Session[]>>({});
   const [doctors, setDoctors] = useState<{ id: string; full_name: string; full_name_en?: string | null; full_name_ar?: string | null }[]>([]);
+  // The catalog row a plan delivers. Linking the plan to a service is what makes
+  // "how many sessions of this service does this patient still owe?" answerable;
+  // before this the plan name was the only clue.
+  const [services, setServices] = useState<{ id: string; name_en: string | null; name_ar: string | null; default_price: number | null }[]>([]);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name_ar: "", name_en: "", doctor_id: "", total_sessions: 10, price: 0, start_date: localDateOnly(new Date()) });
+  const [form, setForm] = useState({ name_ar: "", name_en: "", doctor_id: "", service_id: "", total_sessions: 10, price: 0, start_date: localDateOnly(new Date()) });
   const [schedSession, setSchedSession] = useState<Session | null>(null);
   const [schedAt, setSchedAt] = useState<string>("");
   const [conflict, setConflict] = useState<{ clash: any; reason: string } | null>(null);
@@ -88,6 +93,27 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
     })();
   }, [currentBranchId]);
 
+  useEffect(() => {
+    (async () => {
+      if (!currentBranchId) { setServices([]); return; }
+      // services is a tenant-level catalog, so the tenant is resolved through the
+      // branch instead of assuming it matches the current session.
+      const { data: branch } = await (supabase as any)
+        .from("branches").select("tenant_id").eq("id", currentBranchId).maybeSingle();
+      const tenantId = branch?.tenant_id ?? null;
+      if (!tenantId) { setServices([]); return; }
+      const { data } = await (supabase as any)
+        .from("services")
+        .select("id,name_en,name_ar,default_price")
+        .eq("tenant_id", tenantId)
+        .eq("is_active", true)
+        .is("deleted_at", null)
+        .order("name_en")
+        .limit(1000);
+      setServices((data ?? []) as any[]);
+    })();
+  }, [currentBranchId]);
+
   const createPlan = async () => {
     if (!form.name_en && !form.name_ar) { toast.error(lang === "ar" ? "أدخل اسم الخطة" : "Enter plan name"); return; }
     setSaving(true);
@@ -100,6 +126,7 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
       total_sessions: form.total_sessions,
       price: form.price,
       start_date: form.start_date,
+      service_id: form.service_id || null,
       created_by: user?.id ?? null,
     }).select("id").single();
     if (error) { setSaving(false); toast.error(error.message); return; }
@@ -124,7 +151,7 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
     const { error: sessionError } = await (supabase as any).from("treatment_sessions").insert(rows);
     setSaving(false);
     setOpen(false);
-    setForm({ name_ar: "", name_en: "", doctor_id: "", total_sessions: 10, price: 0, start_date: localDateOnly(new Date()) });
+    setForm({ name_ar: "", name_en: "", doctor_id: "", service_id: "", total_sessions: 10, price: 0, start_date: localDateOnly(new Date()) });
     // The plan row is committed by now, so a failed session batch must be said
     // out loud instead of showing an empty plan under a "created" toast.
     if (sessionError) {
@@ -305,6 +332,17 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
     load();
   };
 
+  // What the patient still owes, per service, across every live plan. This is the
+  // question the desk actually asks ("كم جلسة باقية له من العلاج الطبيعي؟") and it
+  // could not be answered before plans knew which service they deliver.
+  const serviceSummary = summariseByService(plans as any[], sessionsByPlan as any);
+  const serviceLabel = (serviceId: string | null) => {
+    if (!serviceId) return lang === "ar" ? "خطط بدون خدمة" : "Plans without a service";
+    const svc = services.find((item) => item.id === serviceId);
+    if (!svc) return lang === "ar" ? "خدمة محذوفة" : "Removed service";
+    return lang === "ar" ? (svc.name_ar || svc.name_en || "—") : (svc.name_en || svc.name_ar || "—");
+  };
+
   const statusBadge = (s: string) => {
     const map: Record<string, string> = { active: "status-progress", completed: "status-completed", cancelled: "status-cancelled", paused: "status-pending" };
     return map[s] || "";
@@ -323,6 +361,36 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
             <DialogHeader><DialogTitle>{lang === "ar" ? "إنشاء خطة علاج" : "Create Treatment Plan"}</DialogTitle></DialogHeader>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1 sm:col-span-2"><Label>{lang === "ar" ? "اسم الخطة" : "Plan Name"}</Label><Input dir="auto" value={lang === "ar" ? form.name_ar : form.name_en} onChange={(e) => setForm({ ...form, [lang === "ar" ? "name_ar" : "name_en"]: e.target.value } as any)} placeholder={lang === "ar" ? "مثال: علاج طبيعي" : "e.g. Physiotherapy"} /></div>
+              <div className="space-y-1 sm:col-span-2">
+                <Label>{lang === "ar" ? "الخدمة" : "Service"}</Label>
+                <Select
+                  value={form.service_id || "none"}
+                  onValueChange={(v) => {
+                    const picked = services.find((svc) => svc.id === v) ?? null;
+                    setForm((current) => {
+                      const next = { ...current, service_id: v === "none" ? "" : v };
+                      // A picked service seeds the plan's name and price so the plan
+                      // and the service it delivers cannot disagree at creation time.
+                      if (picked) {
+                        if (!next.name_en) next.name_en = picked.name_en ?? "";
+                        if (!next.name_ar) next.name_ar = picked.name_ar ?? "";
+                        if (!next.price) next.price = Number(picked.default_price ?? 0);
+                      }
+                      return next;
+                    });
+                  }}
+                >
+                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— {lang === "ar" ? "بدون خدمة" : "No service"} —</SelectItem>
+                    {services.map((svc) => (
+                      <SelectItem key={svc.id} value={svc.id}>
+                        {lang === "ar" ? (svc.name_ar || svc.name_en || svc.id.slice(0, 8)) : (svc.name_en || svc.name_ar || svc.id.slice(0, 8))}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-1"><Label>{lang === "ar" ? "الطبيب" : "Doctor"}</Label>
                 <Select value={form.doctor_id || "none"} onValueChange={(v) => setForm({ ...form, doctor_id: v === "none" ? "" : v })}>
                   <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
@@ -345,14 +413,38 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
         </Can>
       </div>
 
+      {serviceSummary.length > 0 ? (
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {serviceSummary.map((row) => (
+            <Card key={row.serviceId ?? "unlinked"} className="p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="min-w-0 truncate text-sm font-semibold">{serviceLabel(row.serviceId)}</span>
+                <Badge variant={row.remaining > 0 ? "secondary" : "outline"}>
+                  {lang === "ar" ? `متبقٍ ${row.remaining}` : `${row.remaining} left`}
+                </Badge>
+              </div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                {lang === "ar"
+                  ? `${row.completed} من ${row.total} جلسة · ${row.plans} خطة`
+                  : `${row.completed} of ${row.total} sessions · ${row.plans} plan(s)`}
+              </div>
+            </Card>
+          ))}
+        </div>
+      ) : null}
+
       {plans.length === 0 ? (
         <Card className="p-10 text-center text-muted-foreground">{lang === "ar" ? "لا توجد خطط علاج بعد" : "No treatment plans yet"}</Card>
       ) : (
         <div className="space-y-3">
           {plans.map((p) => {
             const sessions = sessionsByPlan[p.id] ?? [];
-            const done = sessions.filter((s) => s.status === "completed").length;
-            const pct = p.total_sessions ? Math.round((done / p.total_sessions) * 100) : 0;
+            // Counted in `serviceSessionProgress` so "remaining" can never read
+            // negative and a plan whose rows drifted from its total says so.
+            const progress = planProgress(p, sessions);
+            const done = progress.completed;
+            const pct = progress.percent ?? 0;
+            const planService = services.find((svc) => svc.id === p.service_id) ?? null;
             const doc = doctors.find((d) => d.id === p.doctor_id);
             return (
               <Card key={p.id} className="p-5 shadow-card space-y-3">
@@ -437,11 +529,33 @@ export default function PatientTreatmentPlans({ patientId }: { patientId: string
                   </div>
                 </div>
                 <div>
-                  <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                    <span>{lang === "ar" ? `${done} من ${p.total_sessions} جلسات` : `${done} of ${p.total_sessions} sessions`}</span>
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground mb-1">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span>{lang === "ar" ? `${done} من ${p.total_sessions} جلسات` : `${done} of ${p.total_sessions} sessions`}</span>
+                      <Badge variant="outline">
+                        {lang === "ar" ? `متبقٍ ${progress.remaining}` : `${progress.remaining} left`}
+                      </Badge>
+                      {planService ? (
+                        <span className="truncate">
+                          {lang === "ar" ? (planService.name_ar || planService.name_en) : (planService.name_en || planService.name_ar)}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground/80">{lang === "ar" ? "بدون خدمة مرتبطة" : "No linked service"}</span>
+                      )}
+                      {progress.nextSessionDate ? (
+                        <span>{lang === "ar" ? `القادمة ${formatDate(progress.nextSessionDate, lang)}` : `next ${formatDate(progress.nextSessionDate, lang)}`}</span>
+                      ) : null}
+                    </span>
                     <span>{pct}%</span>
                   </div>
                   <Progress value={pct} />
+                  {progress.drifted ? (
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      {lang === "ar"
+                        ? `الخطة تقول ${progress.total} جلسة ولها ${progress.planned} صفًا فعليًا — راجع عدد الجلسات.`
+                        : `The plan says ${progress.total} sessions but has ${progress.planned} rows — check the session count.`}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                   {sessions.map((s) => (

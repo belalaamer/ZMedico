@@ -74,7 +74,12 @@ it("leaves the remaining functions at the platform default instead of weakening 
   for (const slug of remaining) {
     expect(declared.get(slug) ?? true, `[functions.${slug}] must stay verified`).toBe(true);
   }
-  expect(remaining.length).toBe(13);
+  // 14 since `send-conversation-reply` landed: it is called by the signed-in
+  // inbox screen with the user's own JWT, so it keeps the platform default
+  // (`verify_jwt = true`) and belongs in this set, not in the exempt list. The
+  // count is here so a future function cannot be added without someone deciding
+  // which side of this line it sits on.
+  expect(remaining.length).toBe(14);
 });
 
 it("documents why each declared function is exempt, in the file itself", () => {

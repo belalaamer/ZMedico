@@ -221,12 +221,14 @@ export default function CommunicationInbox() {
     const patch: Record<string, unknown> = { status: statusForAction(action) };
     if (action === "take_over") {
       patch.assigned_staff_id = user?.id ?? null;
-      patch.handoff_at = new Date().toISOString();
+      // S1: keep the original `handoff_at`. It is when the patient was escalated,
+      // and the screen shows wait time from it; overwriting it with "now" erased
+      // how long the patient actually waited.
     }
     if (action === "hand_back") {
-      // Clear the handoff ledger so the next escalation is a fresh, visible event.
-      patch.handoff_reason = null;
-      patch.handoff_at = null;
+      // S2: keep `handoff_reason`/`handoff_at`. Clearing them destroyed the record
+      // of why the patient was escalated in the first place. A later escalation
+      // overwrites them itself, so preserving them here is safe.
       patch.assigned_staff_id = null;
     }
     const { data, error } = await supabase
@@ -247,6 +249,14 @@ export default function CommunicationInbox() {
       void loadConversations();
       return;
     }
+    // S6: record the action in the audit trail. Best-effort: the status change has
+    // already happened, and an audit RPC that is not yet deployed must not make a
+    // completed handover look failed. The RPC attributes the row to auth.uid().
+    void supabase
+      .rpc("log_conversation_action" as never, { p_conversation_id: selected.id, p_action: action } as never)
+      .then(({ error: auditError }) => {
+        if (auditError) console.warn("[inbox] conversation audit failed", auditError.message);
+      }, () => undefined);
     setRows((current) => current.map((row) => (row.id === selected.id ? { ...row, ...patch } as Conversation : row)));
     toast({
       title:
@@ -284,7 +294,8 @@ export default function CommunicationInbox() {
     }
 
     const messageId = (data as { id: string }).id;
-    setDraft("");
+    // S3: the draft is NOT cleared yet. If sending fails the operator must not
+    // have to retype a paragraph they just wrote.
     // Optimistic row so the thread shows the sentence immediately; the reload below
     // replaces it with what was actually recorded.
     setMessages((current) => [
@@ -308,18 +319,37 @@ export default function CommunicationInbox() {
     await loadThread(selected.id);
     void loadConversations();
 
+    // S4: on a non-2xx reply `supabase.functions.invoke` returns `data = null` and
+    // puts the response on `error.context`; the function's `code` is only reachable
+    // there. Reading `payload.code` alone always saw undefined and fell through to
+    // a raw error string.
     const payload = (result ?? {}) as { sent?: boolean; recorded?: boolean; error?: string; code?: string };
+    let resolvedCode = payload.code;
+    let resolvedMessage = payload.error ?? sendError?.message;
+    const context = (sendError as { context?: Response } | null)?.context;
+    if (!resolvedCode && context && typeof context.clone === "function") {
+      try {
+        const parsed = await context.clone().json() as { code?: string; error?: string };
+        resolvedCode = parsed?.code;
+        resolvedMessage = parsed?.error ?? resolvedMessage;
+      } catch { /* the body was not JSON; keep the generic message */ }
+    }
+
     if (sendError || !payload.sent) {
-      const reason = payload.code === "NOT_HUMAN_HELD"
+      const reason = resolvedCode === "NOT_HUMAN_HELD"
         ? lang === "ar" ? "أُعيدت المحادثة للمساعد، فلم يُرسل الرد." : "The conversation went back to the assistant, so the reply was not sent."
-        : payload.code === "WHATSAPP_DISABLED"
+        : resolvedCode === "WHATSAPP_DISABLED"
           ? lang === "ar" ? "إرسال واتساب معطّل لهذا الفرع." : "WhatsApp delivery is disabled for this branch."
-          : payload.code === "WHATSAPP_NOT_CONFIGURED"
+          : resolvedCode === "WHATSAPP_NOT_CONFIGURED"
             ? lang === "ar" ? "واتساب غير مُهيّأ لهذا الفرع." : "WhatsApp is not configured for this branch."
-            : payload.error ?? sendError?.message ?? (lang === "ar" ? "تعذّر الإرسال." : "The reply was not sent.");
+            : resolvedCode === "ALREADY_SENT"
+              ? lang === "ar" ? "هذا الرد أُرسل بالفعل." : "This reply was already sent."
+              : resolvedMessage ?? (lang === "ar" ? "تعذّر الإرسال." : "The reply was not sent.");
       toast({ title: reason, description: lang === "ar" ? "الرسالة محفوظة في المحادثة ولم تُسلَّم للمريض." : "The message is kept in the thread and was not delivered.", variant: "destructive" });
       return;
     }
+    // Only a delivered reply consumes the draft.
+    setDraft("");
     toast({
       title: payload.recorded === false
         ? lang === "ar" ? "أُرسل للمريض، لكن لم يُسجَّل تأكيد التسليم" : "Sent to the patient, but the delivery confirmation was not recorded"

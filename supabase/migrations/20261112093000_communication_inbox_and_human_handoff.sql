@@ -1,51 +1,49 @@
--- Communication inbox: make the AI -> human handoff reachable, and close an
--- RLS hole on the two tables that carry patient conversations.
+-- Communication inbox: make the AI -> human handoff reachable, and harden the
+-- two tables that carry patient conversations -- without widening their access.
 --
--- Two facts measured on `main` before this migration, not assumed:
+-- What is TRUE on `main` (measured, not assumed):
 --
---   1. The AI receptionist already escalates correctly. `ai-agent-respond`
---      (edge function) writes `conversations.status = 'human_active'`,
---      `handoff_reason` and `handoff_at` on `handoff_to_human`, and again when a
---      turn fails outright; `whatsapp-webhook` does the same on a failed turn.
---      The AI also refuses to speak while a human holds the conversation
---      (ai-agent-respond bails unless status = 'ai_active'), so the handoff is
---      *exclusive* -- the machine goes quiet and the patient waits for a person.
---   2. Nothing in the product can see that handoff. `grep 'from("conversations")'`
---      and `from("messages")` over `src/**` return no client reads at all, and
---      there is no route, page, or navigation entry for messaging. A patient
---      handed to a human therefore waits forever: the only actor who could
---      answer is never shown the conversation.
+--   1. The AI receptionist already escalates. `ai-agent-respond` writes
+--      `conversations.status = 'human_active'` plus `handoff_reason`/`handoff_at`
+--      when the model calls `handoff_to_human`, and again when a turn fails
+--      outright; `whatsapp-webhook` does the same on a failed turn. The AI then
+--      refuses to speak (it bails unless status = 'ai_active'), so a handoff is
+--      exclusive: the machine goes quiet and the patient waits for a person.
+--   2. Nothing in the product can see that handoff. There is no route, page or
+--      nav entry for messaging and no client read of `conversations`/`messages`
+--      at all. A handed-off patient therefore waits forever.
 --
--- The same sweep found the reason a screen was never possible: `row level
--- security` is not enabled on `public.conversations` or `public.messages`
--- anywhere in the 436-migration history, so the restrictive
--- `zmedico_live_actor_boundary` policy added in 20261018142245 is inert on both
--- tables. With RLS off and no other policy, any authenticated user of any clinic
--- could read -- and write -- every other clinic's patient conversations.
+-- The tables themselves were created OUTSIDE this repository (see `ai_messaging_
+-- platform_phase1`, which has no migration file). Their RLS, policies and
+-- triggers exist in Production but not in the migration history. This file is
+-- written to be correct against Production as it actually is, and to be safe if
+-- that surface is later reconstructed by T1:
 --
--- This migration does three things and nothing else:
---   * adds the two permissions the inbox needs to the authz catalog and grants
---     them to the role bundles that already answer patients;
---   * turns RLS on for both tables and gives them tenant/branch-scoped policies
---     keyed on those permissions (the service role, which owns the webhooks and
---     the AI orchestrator, bypasses RLS by design and is unaffected);
---   * leaves the data, the AI behaviour and every existing policy untouched.
+--   * Every policy added here is `AS RESTRICTIVE`. Permissive policies are OR-ed
+--     together, so a new `FOR INSERT` permissive policy would silently widen an
+--     existing one. A RESTRICTIVE policy is AND-ed, so it can only ever NARROW.
+--     This migration therefore cannot grant access that Production does not
+--     already grant; the worst it can do is deny, and each denial is deliberate.
+--   * `system_owner` is allowed explicitly, because `has_permission` short-
+--     circuits only `admin`, not `system_owner`.
+--   * A conversation with `branch_id IS NULL` (legacy rows) is scoped by
+--     `tenant_id` via `user_has_tenant_access`, never by "NULL branch is fine".
 --
--- Status: NOT APPLIED. Analysed and written only; nothing here has run against
--- Production `rqcmnfzfytyyicelvifk`.
+-- Status: NOT APPLIED. Nothing here has run against Production
+-- `rqcmnfzfytyyicelvifk`.
 
 -- ---------------------------------------------------------------------------
 -- 1. Permissions
 -- ---------------------------------------------------------------------------
 -- Reading a conversation is a patient-data act (a WhatsApp thread is a clinical
 -- conversation), so it is its own permission rather than riding on
--- `patients.view`. Responding is separated from reading because a clinic may
--- want a queue that more staff can triage than can reply from.
+-- `patients.view`. Responding is separate from reading because a clinic may want
+-- more staff able to triage than able to reply.
 insert into public.authz_permissions
   (key, group_key, display_name, description, risk_level, default_scope)
 values
-  ('communication.view',    'communication', 'View patient conversations', 'Read WhatsApp/conversation threads and their messages', 'high',   'branch'),
-  ('communication.respond', 'communication', 'Respond to patients',        'Take over a conversation from the AI and send replies', 'high',   'branch')
+  ('communication.view',    'communication', 'View patient conversations', 'Read WhatsApp/conversation threads and their messages', 'high', 'branch'),
+  ('communication.respond', 'communication', 'Respond to patients',        'Take over a conversation from the AI and send replies', 'high', 'branch')
 on conflict (key) do update
   set deprecated = false,
       display_name = excluded.display_name,
@@ -55,10 +53,9 @@ on conflict (key) do update
       default_scope = excluded.default_scope,
       updated_at = now();
 
--- Grant to the bundles that already deal with patients face to face. The owner
--- role (`admin`) is short-circuited inside `has_permission` and needs no grant;
--- `bundle.role.staff` and `bundle.role.hr` deliberately get nothing: neither
--- answers patients, and a conversation thread is patient data.
+-- Grant to the bundles that already deal with patients face to face. `admin` is
+-- short-circuited inside `has_permission`; `staff` and `hr` deliberately get
+-- nothing -- neither answers patients, and a thread is patient data.
 insert into public.authz_bundle_permissions (bundle_key, permission_key)
 values
   ('bundle.role.admin',        'communication.view'),
@@ -74,74 +71,212 @@ values
 on conflict do nothing;
 
 -- ---------------------------------------------------------------------------
--- 2. Row level security
+-- 2. Row level security: narrow, never widen
 -- ---------------------------------------------------------------------------
--- `enable row level security` is idempotent, so this is safe on a table that a
--- future migration might already have protected, and it is the change that turns
--- the inert boundary policy above back on.
+-- Idempotent; on Production both tables already have it on. Kept so a rebuilt
+-- database cannot end up with conversations readable by every authenticated
+-- user just because the original DDL lived outside this repository.
 alter table public.conversations enable row level security;
 alter table public.messages enable row level security;
 
--- A conversation is visible to a staff member who may read conversations AND has
--- access to its branch. `branch_id` is nullable on legacy rows; `user_has_branch_access`
--- already answers true for a NULL branch, which keeps those rows reachable exactly
--- as the rest of the product treats branch-less legacy data.
-drop policy if exists conversations_read on public.conversations;
-create policy conversations_read
-  on public.conversations for select to authenticated
+-- A conversation is visible when the caller may read conversations AND either
+-- owns the branch it belongs to, or -- for a branch-less legacy row -- has
+-- tenant access. `system_owner` is named explicitly so the platform console
+-- keeps working. RESTRICTIVE: AND-ed with whatever Production already enforces.
+drop policy if exists conversations_read_permission on public.conversations;
+create policy conversations_read_permission
+  on public.conversations as restrictive for select to authenticated
   using (
-    public.has_permission(auth.uid(), 'communication.view')
-    and public.user_has_branch_access(conversations.branch_id)
+    public.has_role(auth.uid(), 'system_owner'::public.app_role)
+    or (
+      public.has_permission(auth.uid(), 'communication.view')
+      and (
+        (conversations.branch_id is not null and public.user_has_branch_access(conversations.branch_id))
+        or (conversations.branch_id is null and public.user_has_tenant_access(conversations.tenant_id))
+      )
+    )
   );
 
--- Taking over, handing back and closing are all updates of `status`. The check is
--- deliberately not narrowed further: the branch scope is the security boundary,
--- and which status transition is allowed is enforced by the screen so a future
--- transition value does not need a migration.
-drop policy if exists conversations_update on public.conversations;
-create policy conversations_update
-  on public.conversations for update to authenticated
+-- Taking over / handing back / closing are updates of `status`. Same scope, with
+-- `communication.respond` rather than `.view`.
+drop policy if exists conversations_update_permission on public.conversations;
+create policy conversations_update_permission
+  on public.conversations as restrictive for update to authenticated
   using (
-    public.has_permission(auth.uid(), 'communication.respond')
-    and public.user_has_branch_access(conversations.branch_id)
+    public.has_role(auth.uid(), 'system_owner'::public.app_role)
+    or (
+      public.has_permission(auth.uid(), 'communication.respond')
+      and (
+        (conversations.branch_id is not null and public.user_has_branch_access(conversations.branch_id))
+        or (conversations.branch_id is null and public.user_has_tenant_access(conversations.tenant_id))
+      )
+    )
   )
   with check (
-    public.has_permission(auth.uid(), 'communication.respond')
-    and public.user_has_branch_access(conversations.branch_id)
-  );
-
--- Messages are read through their conversation so the scope is defined once.
-drop policy if exists messages_read on public.messages;
-create policy messages_read
-  on public.messages for select to authenticated
-  using (
-    public.has_permission(auth.uid(), 'communication.view')
-    and exists (
-      select 1 from public.conversations c
-       where c.id = messages.conversation_id
-         and public.user_has_branch_access(c.branch_id)
+    public.has_role(auth.uid(), 'system_owner'::public.app_role)
+    or (
+      public.has_permission(auth.uid(), 'communication.respond')
+      and (
+        (conversations.branch_id is not null and public.user_has_branch_access(conversations.branch_id))
+        or (conversations.branch_id is null and public.user_has_tenant_access(conversations.tenant_id))
+      )
     )
   );
 
--- A staff reply is the only write a person performs here, and it must be an
--- outbound row: an inbound message is something the patient said, so letting a
--- browser insert `direction = 'inbound'` would let staff forge patient speech.
--- Inbound rows are written by `whatsapp-webhook` with the service role, which
--- bypasses RLS and is therefore unaffected by this policy.
-drop policy if exists messages_append_outbound on public.messages;
-create policy messages_append_outbound
+-- Messages are read through their conversation so scope is defined once.
+drop policy if exists messages_read_permission on public.messages;
+create policy messages_read_permission
+  on public.messages as restrictive for select to authenticated
+  using (
+    public.has_role(auth.uid(), 'system_owner'::public.app_role)
+    or (
+      public.has_permission(auth.uid(), 'communication.view')
+      and exists (
+        select 1 from public.conversations c
+         where c.id = messages.conversation_id
+           and (
+             (c.branch_id is not null and public.user_has_branch_access(c.branch_id))
+             or (c.branch_id is null and public.user_has_tenant_access(c.tenant_id))
+           )
+      )
+    )
+  );
+
+-- THE security fix (B2). A staff reply must be an OUTBOUND message the STAFF
+-- wrote. Without this, a permissive insert policy keyed on `direction` alone
+-- lets a browser insert `sender_type = 'ai'` -- forging the assistant's voice --
+-- and lets it insert an `inbound` row, forging patient speech. RESTRICTIVE, so
+-- it AND-s with the existing `messages_insert_staff_reply` (which already
+-- requires `sender_type = 'staff'`) and cannot widen it. Inbound rows are
+-- written by `whatsapp-webhook` with the service role, which bypasses RLS.
+drop policy if exists messages_insert_staff_only on public.messages;
+create policy messages_insert_staff_only
+  on public.messages as restrictive for insert to authenticated
+  with check (
+    messages.direction = 'outbound'
+    and messages.sender_type = 'staff'
+    and (
+      public.has_role(auth.uid(), 'system_owner'::public.app_role)
+      or public.has_permission(auth.uid(), 'communication.respond')
+    )
+  );
+
+comment on policy messages_insert_staff_only on public.messages is
+  'A browser may only append an outbound message attributed to staff. Blocks forging assistant (sender_type=ai) and patient (direction=inbound) messages. RESTRICTIVE so it narrows, never widens, the existing insert policy.';comment on policy conversations_read_permission on public.conversations is
+  'Requires communication.view plus branch (or tenant, for legacy branch-less) access. system_owner is allowed explicitly. RESTRICTIVE: AND-ed with Production''s existing scoped policy.';
+
+-- The ONE deliberate widening in this file, and it is required: Production's
+-- existing `messages_insert_staff_reply` is PERMISSIVE and has no `system_owner`
+-- arm, so the platform owner can read every thread (the select policy names
+-- them) but cannot insert a reply -- the restrictive policy above only AND-s and
+-- cannot add access. This adds exactly that missing arm, and nothing else: it is
+-- limited to `system_owner`, and it still requires an outbound staff message, so
+-- it cannot widen any other role and cannot forge AI or patient speech.
+-- Verified by `supabase/tests/policies/conversation_inbox_rls.sh`.
+drop policy if exists messages_insert_system_owner on public.messages;
+create policy messages_insert_system_owner
   on public.messages for insert to authenticated
   with check (
-    public.has_permission(auth.uid(), 'communication.respond')
+    public.has_role(auth.uid(), 'system_owner'::public.app_role)
     and messages.direction = 'outbound'
-    and exists (
-      select 1 from public.conversations c
-       where c.id = messages.conversation_id
-         and public.user_has_branch_access(c.branch_id)
-    )
+    and messages.sender_type = 'staff'
   );
 
-comment on policy conversations_read on public.conversations is
-  'Staff inbox: a conversation is readable by whoever may read conversations and has access to its branch. Before this policy both conversations and messages had RLS disabled, so every authenticated user of every clinic could read them.';
-comment on policy messages_append_outbound on public.messages is
-  'Staff replies only: an authenticated client may append an outbound message; inbound rows stay service-role-only so a browser cannot forge patient speech.';
+comment on policy messages_insert_system_owner on public.messages is
+  'Allows the platform owner (system_owner) to insert a staff reply, which Production''s permissive insert policy does not. Constrained to sender_type=staff and direction=outbound, so it implies no other widening.';
+
+-- ---------------------------------------------------------------------------
+-- 3. Audit trail for the human handoff (S6)
+-- ---------------------------------------------------------------------------
+-- Taking over, handing back and closing a patient conversation are patient-data
+-- actions that today leave no trace. A SECURITY DEFINER RPC is used instead of a
+-- client-side insert because `audit_logs` is append-only and its RLS is not a
+-- place to grant broad client INSERT. The actor is always `auth.uid()` -- it is
+-- never taken from a parameter, so the trail cannot be attributed to someone
+-- else. The function checks the same permission the update requires.
+create or replace function public.log_conversation_action(
+  p_conversation_id uuid,
+  p_action text,
+  p_note text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_conv record;
+begin
+  if v_uid is null then
+    raise exception 'Not authenticated' using errcode = '42501';
+  end if;
+  if p_action not in ('take_over', 'hand_back', 'close') then
+    raise exception 'Unknown conversation action: %', p_action using errcode = '22023';
+  end if;
+
+  select id, tenant_id, branch_id into v_conv
+    from public.conversations where id = p_conversation_id;
+  if not found then
+    raise exception 'Conversation not found' using errcode = 'P0002';
+  end if;
+
+  if not (public.has_role(v_uid, 'system_owner'::public.app_role)
+          or public.has_permission(v_uid, 'communication.respond')) then
+    raise exception 'Not permitted' using errcode = '42501';
+  end if;
+  if not ((v_conv.branch_id is not null and public.user_has_branch_access(v_conv.branch_id))
+          or (v_conv.branch_id is null and public.user_has_tenant_access(v_conv.tenant_id))) then
+    raise exception 'Not permitted' using errcode = '42501';
+  end if;
+
+  insert into public.audit_logs (user_id, branch_id, action, entity_type, entity_id, metadata)
+  values (
+    v_uid,
+    v_conv.branch_id,
+    'conversation.' || p_action,
+    'conversation',
+    p_conversation_id,
+    jsonb_build_object('action', p_action, 'note', left(coalesce(p_note, ''), 500))
+  );
+end;
+$$;
+
+revoke all on function public.log_conversation_action(uuid, text, text) from public, anon;
+grant execute on function public.log_conversation_action(uuid, text, text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 4. Atomic send-claim (B4)
+-- ---------------------------------------------------------------------------
+-- Two staff believing they hold a thread, or one retrying a slow send, must not
+-- put the same sentence on a patient's phone twice. The claim is a conditional
+-- UPDATE on the message row that succeeds exactly once: it stamps a marker into
+-- `raw_payload` only while `delivery_status = 'queued'` and no marker exists yet.
+--
+-- A marker is used rather than a new `delivery_status` value because the message
+-- table lives outside this repository and its status CHECK may not accept one;
+-- inventing `sending` could break the webhook's own status updates. Only the
+-- service role (the edge function) may claim, and a claim is not a delivery: the
+-- outcome is still written by `send-conversation-reply`.
+create or replace function public.claim_conversation_reply(p_message_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_id uuid;
+begin
+  update public.messages
+     set raw_payload = coalesce(raw_payload, '{}'::jsonb)
+                        || jsonb_build_object('send_claimed_at', now())
+   where id = p_message_id
+     and delivery_status = 'queued'
+     and (raw_payload is null or raw_payload ->> 'send_claimed_at' is null)
+  returning id into v_id;
+  return v_id is not null;
+end;
+$$;
+
+revoke all on function public.claim_conversation_reply(uuid) from public, anon, authenticated;
+grant execute on function public.claim_conversation_reply(uuid) to service_role;

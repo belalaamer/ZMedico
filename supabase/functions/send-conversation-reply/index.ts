@@ -1,31 +1,34 @@
 // Staff reply to a patient conversation.
 //
-// Why this function exists. `whatsapp-webhook` only ever *receives*, and
-// `ai-agent-respond` is the only thing in the product that sends an outbound
-// WhatsApp text -- it does so as the assistant. A human who has taken a
-// conversation over therefore had no way to answer: the AI stays silent by design
-// (`ai-agent-respond` bails unless status = 'ai_active'), so the patient waited
-// forever. `send-reminder` is not a substitute: it resolves its recipient through
-// `reminders.patient_id`, and `conversations.patient_id` is never populated by the
-// webhook -- every inbound thread is a bare phone number, which is exactly the
-// case that needs a human.
+// Why this exists. `whatsapp-webhook` only receives, and `ai-agent-respond` is
+// the only sender of outbound text -- as the assistant. A human who takes a
+// conversation over had no way to answer, so the patient waited forever.
+// `send-reminder` is not a substitute: it resolves its recipient through
+// `reminders.patient_id`, and `conversations.patient_id` is never populated by
+// the webhook.
 //
 // Contract: the screen inserts the outbound `messages` row first (so the thread
-// shows what was written even if delivery fails), then calls this function with
-// that message's id. This function decides whether the send is allowed *now*,
-// sends, and writes the outcome back onto the row. Same shape as
-// `send-reminder`'s `{ reminder_id }`.
+// shows what was written even if delivery fails), then calls this with the id.
+// This decides whether the send is allowed *now*, sends, and writes the outcome
+// onto the row.
 //
-// Two refusals matter and are not defensive theatre:
-//   * the conversation must still be held by a human. If staff handed it back to
-//     the assistant while the box was open, sending would put a human answer and
-//     an AI answer on the same patient message.
-//   * the branch must have WhatsApp delivery enabled, otherwise the row would
-//     claim a send that never happened.
+// Fixed in this revision:
+//   B1  authorisation now runs as the caller (`caller.rpc`), not the service
+//       role. `user_has_branch_access` reads `auth.uid()`; the service client has
+//       no `sub`, so it always answered false and every reply was refused 403.
+//       A branch-less conversation is scoped by `user_has_tenant_access` instead
+//       of treating a NULL branch as "allowed".
+//   S5  sending goes through `_shared/whatsapp-send`, which honours the branch's
+//       provider (twilio | meta | custom) and never falls back to platform-wide
+//       credentials, so a reply cannot leave from another clinic's number.
+//   B4  every exit path records a terminal outcome. Previously six early returns
+//       left the row at `queued`, so the UI showed "sending" forever. Sending is
+//       claimed atomically, so a retry or a concurrent request cannot double-send.
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { sessionGuardResponse } from "../_shared/active-session.ts";
+import { sendConversationReply } from "../_shared/whatsapp-send.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -40,24 +43,7 @@ function corsPreflight() { return new Response("ok", { headers: corsHeaders }); 
 
 /** Roles that may answer a patient. Mirrors `communication.respond`. */
 const allowedRoles = new Set(["system_owner", "admin", "manager", "receptionist", "doctor", "nurse"]);
-const META_GRAPH_VERSION = Deno.env.get("META_GRAPH_VERSION") ?? "v23.0";
 const MAX_REPLY_CHARS = 4096;
-
-/**
- * Same normalisation the rest of the WhatsApp code uses: Egyptian numbers arrive
- * as `01xxxxxxxxx`, Meta wants `201xxxxxxxxx`. Never invent a country code for a
- * number that already has one.
- */
-function normalizeWhatsAppRecipient(raw: string): string {
-  let digits = String(raw ?? "").replace(/\D/g, "");
-  if (digits.startsWith("00")) digits = digits.slice(2);
-  if (digits.startsWith("0")) digits = `20${digits.slice(1)}`;
-  return digits;
-}
-
-function safeProviderError(raw: string): string {
-  return raw.replace(/[\x00-\x1f\x7f]+/g, " ").trim().slice(0, 200);
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return corsPreflight();
@@ -72,12 +58,12 @@ Deno.serve(async (req) => {
   if (!supabaseUrl || !anonKey || !serviceKey) return jsonResponse({ error: "Server configuration error" }, 500);
 
   const token = authorization.slice("Bearer ".length).trim();
+  // The caller's own client, carrying the caller's JWT. Used for identity checks
+  // (B1) so `auth.uid()` is the staff member, not the service role.
   const caller = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authorization } } });
   const { data: userData, error: userError } = await caller.auth.getUser(token);
   if (userError || !userData.user) return jsonResponse({ error: "Unauthorized" }, 401);
 
-  // An inactive/revoked session must not be able to speak to a patient, exactly as
-  // every other staff-facing function enforces.
   const guard = await sessionGuardResponse(caller, jsonResponse);
   if (guard) return guard;
 
@@ -97,106 +83,96 @@ Deno.serve(async (req) => {
     .maybeSingle();
   if (messageError || !message) return jsonResponse({ error: "Message not found" }, 404);
   if (message.direction !== "outbound") return jsonResponse({ error: "Only an outbound reply can be sent" }, 400);
-  if (message.delivery_status === "sent") return jsonResponse({ error: "This reply was already sent" }, 409);
+  // A browser may not ask us to deliver a row it does not own as staff speech.
+  if (message.sender_type !== "staff") return jsonResponse({ error: "Only a staff reply can be sent" }, 400);
+
+  // B4: every exit below, except a genuine "already sent", records a terminal
+  // outcome so the row never stays `queued` while nothing is happening.
+  const fail = async (code: string, error: string, status: number) => {
+    await service
+      .from("messages")
+      .update({ delivery_status: "failed", raw_payload: { provider_error: { code, message: error } } })
+      .eq("id", messageId)
+      .neq("delivery_status", "sent");
+    return jsonResponse({ error, code }, status);
+  };
+
+  if (message.delivery_status === "sent") return jsonResponse({ error: "This reply was already sent", code: "ALREADY_SENT" }, 409);
   const content = String(message.content ?? "").trim();
-  if (!content) return jsonResponse({ error: "The reply is empty" }, 400);
-  if (content.length > MAX_REPLY_CHARS) return jsonResponse({ error: "The reply is too long" }, 400);
+  if (!content) return fail("EMPTY_REPLY", "The reply is empty", 400);
+  if (content.length > MAX_REPLY_CHARS) return fail("REPLY_TOO_LONG", "The reply is too long", 400);
 
   const { data: conversation, error: conversationError } = await service
     .from("conversations")
     .select("id,tenant_id,branch_id,channel_account_id,external_contact_id,status")
     .eq("id", message.conversation_id)
     .maybeSingle();
-  if (conversationError || !conversation) return jsonResponse({ error: "Conversation not found" }, 404);
-  if (conversation.tenant_id !== message.tenant_id) return jsonResponse({ error: "Conversation does not belong to this message" }, 400);
+  if (conversationError || !conversation) return fail("CONVERSATION_MISSING", "Conversation not found", 404);
+  if (conversation.tenant_id !== message.tenant_id) return fail("TENANT_MISMATCH", "Conversation does not belong to this message", 400);
 
-  // The caller must hold the same authority the RLS policy gives them for reading
-  // the thread: permission + branch access. Checked here because this function
-  // reads with the service role, which bypasses RLS.
-  const { data: permitted } = await service.rpc("has_permission", {
+  // B1: authorise as the caller. `has_permission` takes an explicit user id, but
+  // `user_has_branch_access` / `user_has_tenant_access` read `auth.uid()`, so they
+  // MUST run on the caller's client -- running them on the service client returns
+  // false for everyone and refused every reply.
+  const { data: permitted } = await caller.rpc("has_permission", {
     _user_id: userData.user.id,
     _permission_key: "communication.respond",
   });
-  const { data: branchAllowed } = await service.rpc("user_has_branch_access", {
-    _branch: conversation.branch_id,
-  });
-  if (!permitted || !branchAllowed) return jsonResponse({ error: "Forbidden" }, 403);
+  if (!permitted) return fail("FORBIDDEN", "Forbidden", 403);
+
+  const scopeOk = conversation.branch_id
+    ? (await caller.rpc("user_has_branch_access", { _branch: conversation.branch_id })).data === true
+    : (await caller.rpc("user_has_tenant_access", { _tenant_id: conversation.tenant_id })).data === true;
+  if (!scopeOk) return fail("FORBIDDEN", "Forbidden", 403);
 
   if (conversation.status !== "human_active") {
-    return jsonResponse({ error: "The assistant is handling this conversation again", code: "NOT_HUMAN_HELD" }, 409);
+    return fail("NOT_HUMAN_HELD", "The assistant is handling this conversation again", 409);
   }
 
-  // The phone number id that received the message is the only correct sender for a
-  // multi-tenant deployment: a branch-level id would answer from another clinic's
-  // number.
-  let phoneNumberId: string | null = null;
+  // B4: claim the send exactly once. A retry, or two staff racing, gets false
+  // here and does not send a second copy.
+  const { data: claimed, error: claimError } = await service.rpc("claim_conversation_reply", { p_message_id: messageId });
+  if (claimError) return fail("CLAIM_FAILED", "The reply could not be claimed for sending", 500);
+  if (claimed !== true) return jsonResponse({ error: "This reply is already being sent or was sent", code: "ALREADY_SENT" }, 409);
+
+  const { data: branchSettings } = await service
+    .from("notification_settings")
+    .select("whatsapp_enabled,whatsapp_provider,whatsapp_api_key,whatsapp_api_url,meta_phone_number_id,twilio_account_sid,twilio_auth_token,twilio_from_whatsapp")
+    .eq("branch_id", conversation.branch_id)
+    .maybeSingle();
+
+  let fromAccountId: string | null = null;
   if (conversation.channel_account_id) {
     const { data: account } = await service
       .from("channel_accounts")
       .select("external_account_id,is_active")
       .eq("id", conversation.channel_account_id)
       .maybeSingle();
-    if (account?.is_active && account.external_account_id) phoneNumberId = String(account.external_account_id);
+    if (account?.is_active && account.external_account_id) fromAccountId = String(account.external_account_id);
   }
 
-  const { data: branchSettings } = await service
-    .from("notification_settings")
-    .select("whatsapp_enabled,whatsapp_provider,whatsapp_api_key,meta_phone_number_id")
-    .eq("branch_id", conversation.branch_id)
-    .maybeSingle();
-  if (branchSettings?.whatsapp_enabled === false) {
-    return jsonResponse({ error: "WhatsApp delivery is disabled for this branch", code: "WHATSAPP_DISABLED" }, 400);
-  }
-  const accessToken = branchSettings?.whatsapp_api_key ?? Deno.env.get("META_ACCESS_TOKEN");
-  phoneNumberId = phoneNumberId ?? branchSettings?.meta_phone_number_id ?? Deno.env.get("META_PHONE_NUMBER_ID") ?? null;
-  if (!phoneNumberId || !accessToken) {
-    return jsonResponse({ error: "Meta WhatsApp is not configured for this branch", code: "WHATSAPP_NOT_CONFIGURED" }, 503);
+  const outcome = await sendConversationReply({
+    settings: branchSettings,
+    to: String(conversation.external_contact_id ?? ""),
+    body: content,
+    fromAccountId,
+  });
+
+  if (!outcome.ok) {
+    return fail(outcome.code, outcome.error, outcome.status ?? 502);
   }
 
-  const recipient = normalizeWhatsAppRecipient(String(conversation.external_contact_id ?? ""));
-  if (!recipient) {
-    await service.from("messages").update({ delivery_status: "failed" }).eq("id", messageId);
-    return jsonResponse({ error: "The contact number is not a valid WhatsApp recipient" }, 400);
-  }
-
-  let providerStatus = 0;
-  let raw = "";
-  try {
-    const res = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/${encodeURIComponent(phoneNumberId)}/messages`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to: recipient,
-        type: "text",
-        text: { body: content, preview_url: false },
-      }),
-    });
-    providerStatus = res.status;
-    raw = await res.text().catch(() => "");
-  } catch (err) {
-    await service.from("messages").update({ delivery_status: "failed" }).eq("id", messageId);
-    return jsonResponse({ error: safeProviderError(String((err as Error)?.message ?? err)) || "The provider did not answer" }, 502);
-  }
-
-  let parsed: { messages?: Array<{ id?: string }>; error?: { message?: string } } = {};
-  try { parsed = JSON.parse(raw); } catch { /* reported below */ }
-  const providerMessageId = parsed.messages?.[0]?.id ?? null;
-
-  if (providerStatus < 200 || providerStatus >= 300 || !providerMessageId) {
-    await service.from("messages").update({ delivery_status: "failed" }).eq("id", messageId);
-    const detail = safeProviderError(parsed.error?.message ?? raw) || `Meta rejected the message (HTTP ${providerStatus})`;
-    return jsonResponse({ error: detail, code: "PROVIDER_REJECTED" }, providerStatus >= 500 ? 502 : 400);
-  }
-
-  const { error: patchError } = await service
+  // The row may only move forward from a claimed state; a concurrent writer that
+  // already marked it sent wins and we must not overwrite it.
+  const { data: patched, error: patchError } = await service
     .from("messages")
-    .update({ delivery_status: "sent", external_message_id: providerMessageId })
-    .eq("id", messageId);
-  if (patchError) {
+    .update({ delivery_status: "sent", external_message_id: outcome.providerMessageId ?? null })
+    .eq("id", messageId)
+    .neq("delivery_status", "sent")
+    .select("id");
+  if (patchError || (patched ?? []).length === 0) {
     // The patient did get the message; say so instead of implying it failed.
-    return jsonResponse({ sent: true, recorded: false, provider_message_id: providerMessageId }, 200);
+    return jsonResponse({ sent: true, recorded: false, provider_message_id: outcome.providerMessageId ?? null }, 200);
   }
 
   await service
@@ -204,5 +180,5 @@ Deno.serve(async (req) => {
     .update({ last_message_at: new Date().toISOString() })
     .eq("id", conversation.id);
 
-  return jsonResponse({ sent: true, recorded: true, provider_message_id: providerMessageId });
+  return jsonResponse({ sent: true, recorded: true, provider: outcome.provider, provider_message_id: outcome.providerMessageId ?? null });
 });

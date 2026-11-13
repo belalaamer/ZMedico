@@ -114,26 +114,46 @@ Deno.serve(async (req) => {
   // `user_has_branch_access` / `user_has_tenant_access` read `auth.uid()`, so they
   // MUST run on the caller's client -- running them on the service client returns
   // false for everyone and refused every reply.
+  //
+  // Authorisation failures return WITHOUT writing. `fail()` runs with the service
+  // role and would let a caller from another branch flip the delivery status of a
+  // row they are not allowed to touch; refusing must be a no-op, not a write.
   const { data: permitted } = await caller.rpc("has_permission", {
     _user_id: userData.user.id,
     _permission_key: "communication.respond",
   });
-  if (!permitted) return fail("FORBIDDEN", "Forbidden", 403);
+  if (!permitted) return jsonResponse({ error: "Forbidden", code: "FORBIDDEN" }, 403);
 
   const scopeOk = conversation.branch_id
     ? (await caller.rpc("user_has_branch_access", { _branch: conversation.branch_id })).data === true
     : (await caller.rpc("user_has_tenant_access", { _tenant_id: conversation.tenant_id })).data === true;
-  if (!scopeOk) return fail("FORBIDDEN", "Forbidden", 403);
+  if (!scopeOk) return jsonResponse({ error: "Forbidden", code: "FORBIDDEN" }, 403);
 
   if (conversation.status !== "human_active") {
     return fail("NOT_HUMAN_HELD", "The assistant is handling this conversation again", 409);
   }
 
-  // B4: claim the send exactly once. A retry, or two staff racing, gets false
-  // here and does not send a second copy.
+  // B4: claim the send exactly once per attempt window. A retry, or two staff
+  // racing, gets false here and does not send a second copy. The claim is a
+  // database guard, NOT a provider-level exactly-once guarantee: a crash after
+  // the provider accepted the message but before `delivery_status='sent'` is
+  // written can still resend once the claim goes stale. See the migration.
   const { data: claimed, error: claimError } = await service.rpc("claim_conversation_reply", { p_message_id: messageId });
   if (claimError) return fail("CLAIM_FAILED", "The reply could not be claimed for sending", 500);
-  if (claimed !== true) return jsonResponse({ error: "This reply is already being sent or was sent", code: "ALREADY_SENT" }, 409);
+  if (claimed !== true) {
+    // Either it is already delivered, or another attempt holds a live claim. Say
+    // which, so the operator is not told "already sent" about a message that may
+    // still be in flight.
+    const { data: current } = await service
+      .from("messages")
+      .select("delivery_status")
+      .eq("id", messageId)
+      .maybeSingle();
+    if (current?.delivery_status === "sent") {
+      return jsonResponse({ error: "This reply was already sent", code: "ALREADY_SENT" }, 409);
+    }
+    return jsonResponse({ error: "This reply is already being sent", code: "IN_FLIGHT" }, 409);
+  }
 
   const { data: branchSettings } = await service
     .from("notification_settings")

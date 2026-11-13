@@ -344,7 +344,9 @@ export default function CommunicationInbox() {
             ? lang === "ar" ? "واتساب غير مُهيّأ لهذا الفرع." : "WhatsApp is not configured for this branch."
             : resolvedCode === "ALREADY_SENT"
               ? lang === "ar" ? "هذا الرد أُرسل بالفعل." : "This reply was already sent."
-              : resolvedMessage ?? (lang === "ar" ? "تعذّر الإرسال." : "The reply was not sent.");
+              : resolvedCode === "IN_FLIGHT"
+                ? lang === "ar" ? "هذا الرد قيد الإرسال بالفعل. انتظر لحظة ثم أعد المحاولة." : "This reply is already being sent. Wait a moment, then retry."
+                : resolvedMessage ?? (lang === "ar" ? "تعذّر الإرسال." : "The reply was not sent.");
       toast({ title: reason, description: lang === "ar" ? "الرسالة محفوظة في المحادثة ولم تُسلَّم للمريض." : "The message is kept in the thread and was not delivered.", variant: "destructive" });
       return;
     }

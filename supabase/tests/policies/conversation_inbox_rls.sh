@@ -9,10 +9,9 @@
 #   ./conversation_inbox_rls.sh              # tests the fix (expects AI insert DENIED)
 #   ./conversation_inbox_rls.sh --pre-fix    # tests the shipped PR #280 policies (expects AI insert ALLOWED)
 #
-# The --pre-fix mode applies the PREVIOUS version of the same file (git HEAD),
-# which used permissive policies keyed on `direction`. It must ALLOW a staff
-# member to forge an assistant message; if it does not, the harness is not
-# proving anything and exits non-zero.
+# The --pre-fix mode applies a COMMITTED fixture of the original (permissive)
+# migration under supabase/tests/policies/fixtures/. It does not read git history,
+# so it behaves identically from a clean checkout, a shallow clone, or CI.
 #
 # Requires: psql and CREATEDB. Creates and drops its own database.
 set -uo pipefail
@@ -153,9 +152,13 @@ SQL
 
 # ---------------------------------------------------------------- migration under test
 if [ "$MODE" = "pre-fix" ]; then
-  git -C "$REPO" show "HEAD:supabase/migrations/20261112093000_communication_inbox_and_human_handoff.sql" > "/tmp/b2_migration_$$.sql" \
-    || die "could not read the previous migration from git HEAD"
-  MIGRATION="/tmp/b2_migration_$$.sql"
+  MIGRATION="$HERE/fixtures/conversation_inbox_rls.prefix.sql"
+  [ -f "$MIGRATION" ] || die "pre-fix fixture missing at $MIGRATION"
+  # Guard: the fixture must really be the permissive version. If it ever grows a
+  # RESTRICTIVE policy it is no longer the pre-fix state and the proof is void.
+  if grep -qiE "as restrictive" "$MIGRATION"; then
+    die "pre-fix fixture already contains a RESTRICTIVE policy; it cannot demonstrate the old behaviour"
+  fi
 fi
 psql -qX -d "$DB" -v ON_ERROR_STOP=1 -f "$MIGRATION" >/dev/null 2>"/tmp/b2_mig_err_$$" || {
   echo "FATAL: migration did not apply:"; cat "/tmp/b2_mig_err_$$"; exit 2; }
@@ -210,7 +213,16 @@ VIS2=$(count_as "$STAFF2" "select count(*) from public.conversations" | tail -1)
 NULL_VIS=$(count_as "$STAFF2" "select count(*) from public.conversations where branch_id is null" | tail -1)
 [ "$NULL_VIS" = "0" ] && pass "a branch-less conversation is not visible without tenant access" || fail "branch-less conversations leaked to a user with no tenant access"
 
-if [ "$FAILS" = "0" ]; then echo "FIXED: all policy assertions hold."; rm -f "/tmp/b2_migration_$$.sql" "/tmp/b2_mig_err_$$"; exit 0; fi
+# A branch-less conversation must be insertable only with tenant access. This is
+# the case the first revision missed: `user_has_branch_access(NULL)` is TRUE, so
+# Production's permissive insert policy alone would let any responder in.
+try_insert "$STAFF1" "$CONV_NULL" staff outbound >/dev/null && pass "a respondent with tenant access may reply on a branch-less conversation" || fail "a respondent with tenant access was blocked on a branch-less conversation"
+if try_insert "$STAFF2" "$CONV_NULL" staff outbound >/dev/null; then fail "a respondent WITHOUT tenant access could write to a branch-less conversation"; else pass "a respondent without tenant access cannot write to a branch-less conversation"; fi
+
+NULL_AFTER=$(psql -qX -tA -d "$DB" -c "select count(*) from public.messages where conversation_id='$CONV_NULL'" | tail -1)
+[ "$NULL_AFTER" = "1" ] && pass "the refused branch-less write left no row behind" || fail "the refused branch-less write still wrote $NULL_AFTER row(s)"
+
+if [ "$FAILS" = "0" ]; then echo "FIXED: all policy assertions hold."; rm -f "/tmp/b2_mig_err_$$"; exit 0; fi
 echo "FAILED: $FAILS assertion(s)."
-rm -f "/tmp/b2_migration_$$.sql" "/tmp/b2_mig_err_$$"
+rm -f "/tmp/b2_mig_err_$$"
 exit 1

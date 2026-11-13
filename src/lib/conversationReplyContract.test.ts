@@ -14,6 +14,10 @@ const SHARED = readFileSync(
   resolve(process.cwd(), "supabase/functions/_shared/whatsapp-send.ts"),
   "utf8",
 );
+const MIGRATION = readFileSync(
+  resolve(process.cwd(), "supabase/migrations/20261112093000_communication_inbox_and_human_handoff.sql"),
+  "utf8",
+);
 
 describe("B1 — authorisation runs as the caller, not the service role", () => {
   it("checks branch access on the caller's client", () => {
@@ -49,17 +53,29 @@ describe("S5 — no silent platform-wide credential fallback", () => {
 describe("B4 — every outcome is recorded, and sends are claimed once", () => {
   it("claims the send atomically before contacting a provider", () => {
     expect(SRC).toMatch(/claim_conversation_reply/);
-    expect(SRC).toMatch(/already being sent or was sent/);
+    expect(SRC).toMatch(/already being sent/);
   });
 
-  it("routes post-lookup refusals through fail(), so no row is left queued", () => {
+  it("does not write when the caller is not authorised", () => {
+    // A refusal must be a no-op: `fail()` runs with the service role, so calling
+    // it on an authorisation failure would let a staff member from another branch
+    // flip the delivery status of a row they may not touch.
+    const start = SRC.indexOf("const { data: permitted }");
+    const end = SRC.indexOf("if (conversation.status !==");
+    expect(start).toBeGreaterThan(0);
+    expect(end).toBeGreaterThan(start);
+    expect(SRC.slice(start, end)).not.toMatch(/\bfail\(/);
+  });
+
+  it("routes post-authorisation refusals through fail(), so no row is left queued", () => {
     // Everything after `const fail` must not return a bare error without first
-    // marking the message failed. The only allowed bare errors are the two
-    // "already sent" answers, which are a terminal success state, not a stuck one.
+    // marking the message failed. The allowed bare errors are: an authorisation
+    // refusal (deliberately a no-op), and the two "already sent / in flight"
+    // answers, which are terminal states rather than stuck ones.
     const tail = SRC.slice(SRC.indexOf("const fail ="));
     const bare = [...tail.matchAll(/return jsonResponse\(\{ error:[^\n]*\n?/g)].map((m) => m[0]);
     for (const line of bare) {
-      expect(line).toMatch(/ALREADY_SENT/);
+      expect(line).toMatch(/FORBIDDEN|ALREADY_SENT|IN_FLIGHT/);
     }
     expect(tail).toMatch(/delivery_status: "failed"/);
   });
@@ -70,5 +86,26 @@ describe("B4 — every outcome is recorded, and sends are claimed once", () => {
 
   it("only advances a claimed row that is not already sent", () => {
     expect(SRC).toMatch(/\.neq\("delivery_status", "sent"\)/);
+  });
+});
+
+describe("review point 3 — the claim can recover from a crash", () => {
+  it("bounds the claim in time so a dead attempt cannot wedge the row", () => {
+    expect(MIGRATION).toMatch(/p_stale_after_seconds/);
+    expect(MIGRATION).toMatch(/make_interval\(secs =>/);
+  });
+
+  it("counts attempts so a recovery is visible, and never reclaims a sent row", () => {
+    expect(MIGRATION).toMatch(/send_attempt/);
+    expect(MIGRATION).toMatch(/delivery_status = 'queued'/);
+  });
+
+  it("distinguishes 'already sent' from 'in flight' instead of assuming success", () => {
+    expect(SRC).toMatch(/current\?\.delivery_status === "sent"/);
+    expect(SRC).toMatch(/IN_FLIGHT/);
+  });
+
+  it("does not claim exactly-once delivery at the provider", () => {
+    expect(MIGRATION).toMatch(/does NOT[\s\S]{0,80}exactly-once/i);
   });
 });

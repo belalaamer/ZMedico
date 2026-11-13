@@ -142,19 +142,52 @@ create policy messages_read_permission
     )
   );
 
+-- A conversation is "reachable" for a write when the caller owns its branch, or
+-- -- for a branch-less legacy row -- has tenant access. This exists as a
+-- SECURITY DEFINER helper so a policy can use it without inheriting the read
+-- policy's requirements (a responder need not also hold `communication.view`),
+-- and so the NULL-branch case is answered by tenant scope rather than by
+-- `user_has_branch_access`, which treats NULL as allowed.
+create or replace function public.conversation_scope_allows(p_conversation_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.has_role(auth.uid(), 'system_owner'::public.app_role)
+      or exists (
+    select 1 from public.conversations c
+     where c.id = p_conversation_id
+       and (
+         (c.branch_id is not null and public.user_has_branch_access(c.branch_id))
+         or (c.branch_id is null and public.user_has_tenant_access(c.tenant_id))
+       )
+  );
+$$;
+
+revoke all on function public.conversation_scope_allows(uuid) from public, anon;
+grant execute on function public.conversation_scope_allows(uuid) to authenticated;
+
 -- THE security fix (B2). A staff reply must be an OUTBOUND message the STAFF
--- wrote. Without this, a permissive insert policy keyed on `direction` alone
--- lets a browser insert `sender_type = 'ai'` -- forging the assistant's voice --
--- and lets it insert an `inbound` row, forging patient speech. RESTRICTIVE, so
--- it AND-s with the existing `messages_insert_staff_reply` (which already
--- requires `sender_type = 'staff'`) and cannot widen it. Inbound rows are
--- written by `whatsapp-webhook` with the service role, which bypasses RLS.
+-- wrote, in a conversation the caller can actually reach. Without this, a
+-- permissive insert policy keyed on `direction` alone lets a browser insert
+-- `sender_type = 'ai'` (forging the assistant) or `direction = 'inbound'`
+-- (forging patient speech). RESTRICTIVE, so it AND-s with the existing
+-- `messages_insert_staff_reply` and cannot widen it.
+--
+-- The scope is checked by `conversation_scope_allows`, NOT by the existing
+-- permissive policy: that policy scopes through `user_has_branch_access`, which
+-- answers TRUE for a NULL branch, so a branch-less conversation of another
+-- tenant would otherwise be insertable by any responder who guessed its id.
+-- The helper requires tenant access when the branch is NULL.
 drop policy if exists messages_insert_staff_only on public.messages;
 create policy messages_insert_staff_only
   on public.messages as restrictive for insert to authenticated
   with check (
     messages.direction = 'outbound'
     and messages.sender_type = 'staff'
+    and public.conversation_scope_allows(messages.conversation_id)
     and (
       public.has_role(auth.uid(), 'system_owner'::public.app_role)
       or public.has_permission(auth.uid(), 'communication.respond')
@@ -258,7 +291,10 @@ grant execute on function public.log_conversation_action(uuid, text, text) to au
 -- inventing `sending` could break the webhook's own status updates. Only the
 -- service role (the edge function) may claim, and a claim is not a delivery: the
 -- outcome is still written by `send-conversation-reply`.
-create or replace function public.claim_conversation_reply(p_message_id uuid)
+create or replace function public.claim_conversation_reply(
+  p_message_id uuid,
+  p_stale_after_seconds integer default 120
+)
 returns boolean
 language plpgsql
 security definer
@@ -267,16 +303,31 @@ as $$
 declare
   v_id uuid;
 begin
+  -- The claim is bounded in time on purpose. If the edge function dies after
+  -- claiming but before recording an outcome, the row stays `queued` with a
+  -- stale marker; without a staleness window it could never be retried. After
+  -- `p_stale_after_seconds` a later attempt may claim it again.
+  --
+  -- This prevents *concurrent* double-sends inside the database. It does NOT
+  -- give exactly-once delivery at the provider: a crash after the provider
+  -- accepted the message but before `delivery_status='sent'` was written can
+  -- still cause a resend on recovery. That limit is real and is not claimed away.
   update public.messages
      set raw_payload = coalesce(raw_payload, '{}'::jsonb)
-                        || jsonb_build_object('send_claimed_at', now())
+                        || jsonb_build_object(
+                             'send_claimed_at', now(),
+                             'send_attempt', coalesce((raw_payload ->> 'send_attempt')::int, 0) + 1)
    where id = p_message_id
      and delivery_status = 'queued'
-     and (raw_payload is null or raw_payload ->> 'send_claimed_at' is null)
+     and (
+       raw_payload is null
+       or raw_payload ->> 'send_claimed_at' is null
+       or (raw_payload ->> 'send_claimed_at')::timestamptz < now() - make_interval(secs => greatest(p_stale_after_seconds, 1))
+     )
   returning id into v_id;
   return v_id is not null;
 end;
 $$;
 
-revoke all on function public.claim_conversation_reply(uuid) from public, anon, authenticated;
-grant execute on function public.claim_conversation_reply(uuid) to service_role;
+revoke all on function public.claim_conversation_reply(uuid, integer) from public, anon, authenticated;
+grant execute on function public.claim_conversation_reply(uuid, integer) to service_role;

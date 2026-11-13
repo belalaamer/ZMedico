@@ -121,6 +121,7 @@ const SystemSelfAudit = lazy(() => import("@/pages/system/SystemSelfAudit"));
 const Branches = lazy(() => import("@/pages/branches/Branches"));
 const BranchDashboard = lazy(() => import("@/pages/branches/BranchDashboard"));
 const PlatformConsole = lazy(() => import("@/pages/platform/PlatformConsole"));
+const CommunicationInbox = lazy(() => import("@/pages/communication/Inbox"));
 const Reminders = lazy(() => import("@/pages/reminders/Reminders"));
 const ScheduledReminders = lazy(() => import("@/pages/reminders/ScheduledReminders"));
 
@@ -213,6 +214,7 @@ function AppContent() {
               <Route path="/physio/followups" element={<PermissionRoute><PhysioFollowups /></PermissionRoute>} />
               <Route path="/physio/:id" element={<PermissionRoute><PhysioCaseDetail /></PermissionRoute>} />
               <Route path="/coupons" element={<PermissionRoute><Coupons /></PermissionRoute>} />
+              <Route path="/inbox" element={<PermissionRoute permission="communication.view"><CommunicationInbox /></PermissionRoute>} />
               <Route path="/reminders" element={<PermissionRoute><Reminders /></PermissionRoute>} />
               <Route path="/reminders/scheduled" element={<PermissionRoute><Reminders /></PermissionRoute>}>
                 <Route index element={<ScheduledReminders />} />

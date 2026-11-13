@@ -87,14 +87,24 @@ Deno.serve(async (req) => {
   if (message.sender_type !== "staff") return jsonResponse({ error: "Only a staff reply can be sent" }, 400);
 
   // B4: every exit below, except a genuine "already sent", records a terminal
-  // outcome so the row never stays `queued` while nothing is happening.
+  // outcome so the row never stays `queued` while nothing is happening. The
+  // outcome write is checked: a failed send and a failed *recording* of that send
+  // are different facts, and the caller is told which one happened via
+  // `recorded`.
   const fail = async (code: string, error: string, status: number) => {
-    await service
+    const { data: patched, error: patchError } = await service
       .from("messages")
       .update({ delivery_status: "failed", raw_payload: { provider_error: { code, message: error } } })
       .eq("id", messageId)
-      .neq("delivery_status", "sent");
-    return jsonResponse({ error, code }, status);
+      .neq("delivery_status", "sent")
+      .select("id");
+    const recorded = !patchError && (patched ?? []).length > 0;
+    if (!recorded) {
+      // The row may already be `sent` (a concurrent attempt won) or the write may
+      // have failed. Either way the caller must not be told the failure was saved.
+      console.error(`[send-conversation-reply] outcome not recorded for message_id=${messageId} code=${code}`, patchError?.message ?? "no row updated");
+    }
+    return jsonResponse({ error, code, recorded }, status);
   };
 
   if (message.delivery_status === "sent") return jsonResponse({ error: "This reply was already sent", code: "ALREADY_SENT" }, 409);

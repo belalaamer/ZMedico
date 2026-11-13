@@ -176,6 +176,14 @@ insert into public.messages (tenant_id, conversation_id, direction, sender_type,
 values ('$TENANT','$2','$4','$3','probe','queued');
 SQL
 }
+try_audit() { # uid conversation
+  psql -qX -tA -d "$DB" -v ON_ERROR_STOP=1 2>"${B2_ERRF:-/dev/null}" <<SQL
+select set_config('test.uid','$1',false);
+set role authenticated;
+select public.log_conversation_action('$2','take_over',null);
+SQL
+}
+
 count_as() { # uid sql
   psql -qX -tA -d "$DB" -v ON_ERROR_STOP=1 2>"${B2_ERRF:-/dev/null}" <<SQL
 select set_config('test.uid','$1',false);
@@ -221,6 +229,19 @@ if try_insert "$STAFF2" "$CONV_NULL" staff outbound >/dev/null; then fail "a res
 
 NULL_AFTER=$(psql -qX -tA -d "$DB" -c "select count(*) from public.messages where conversation_id='$CONV_NULL'" | tail -1)
 [ "$NULL_AFTER" = "1" ] && pass "the refused branch-less write left no row behind" || fail "the refused branch-less write still wrote $NULL_AFTER row(s)"
+
+# S6 must grant exactly what the update policy grants. A platform owner with no
+# direct branch membership is allowed by `conversations_update_permission`; the
+# audit RPC must therefore allow them too, or the trail can reject an action that
+# already happened. A user without the permission or the branch must be rejected.
+try_audit "$OWNER" "$CONV" >/dev/null && pass "system_owner (no branch membership) can write the audit row" || fail "system_owner was rejected by the audit RPC"
+if try_audit "$STAFF3" "$CONV" >/dev/null; then fail "a user without communication.respond wrote an audit row"; else pass "a user without the permission cannot write an audit row"; fi
+if try_audit "$STAFF2" "$CONV" >/dev/null; then fail "a foreign-branch user wrote an audit row"; else pass "a foreign-branch user cannot write an audit row"; fi
+
+AUDIT_OWNER=$(psql -qX -tA -d "$DB" -c "select count(*) from public.audit_logs where user_id='$OWNER' and action='conversation.take_over' and entity_id='$CONV'" | tail -1)
+[ "$AUDIT_OWNER" = "1" ] && pass "the audit row is attributed to the acting system_owner" || fail "audit attribution is wrong ($AUDIT_OWNER rows)"
+AUDIT_TOTAL=$(psql -qX -tA -d "$DB" -c "select count(*) from public.audit_logs" | tail -1)
+[ "$AUDIT_TOTAL" = "1" ] && pass "the refused audit attempts wrote nothing" || fail "$AUDIT_TOTAL audit rows exist (expected 1)"
 
 if [ "$FAILS" = "0" ]; then echo "FIXED: all policy assertions hold."; rm -f "/tmp/b2_mig_err_$$"; exit 0; fi
 echo "FAILED: $FAILS assertion(s)."

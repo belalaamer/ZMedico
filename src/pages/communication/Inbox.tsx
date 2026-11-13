@@ -326,12 +326,14 @@ export default function CommunicationInbox() {
     const payload = (result ?? {}) as { sent?: boolean; recorded?: boolean; error?: string; code?: string };
     let resolvedCode = payload.code;
     let resolvedMessage = payload.error ?? sendError?.message;
+    let resolvedRecorded = payload.recorded;
     const context = (sendError as { context?: Response } | null)?.context;
     if (!resolvedCode && context && typeof context.clone === "function") {
       try {
-        const parsed = await context.clone().json() as { code?: string; error?: string };
+        const parsed = await context.clone().json() as { code?: string; error?: string; recorded?: boolean };
         resolvedCode = parsed?.code;
         resolvedMessage = parsed?.error ?? resolvedMessage;
+        resolvedRecorded = parsed?.recorded ?? resolvedRecorded;
       } catch { /* the body was not JSON; keep the generic message */ }
     }
 
@@ -347,7 +349,14 @@ export default function CommunicationInbox() {
               : resolvedCode === "IN_FLIGHT"
                 ? lang === "ar" ? "هذا الرد قيد الإرسال بالفعل. انتظر لحظة ثم أعد المحاولة." : "This reply is already being sent. Wait a moment, then retry."
                 : resolvedMessage ?? (lang === "ar" ? "تعذّر الإرسال." : "The reply was not sent.");
-      toast({ title: reason, description: lang === "ar" ? "الرسالة محفوظة في المحادثة ولم تُسلَّم للمريض." : "The message is kept in the thread and was not delivered.", variant: "destructive" });
+      // A send that failed AND whose outcome could not be recorded leaves the row
+      // looking like it is still sending; say so instead of implying it is settled.
+      const description = resolvedRecorded === false
+        ? lang === "ar"
+          ? "لم يُسلَّم الرد، ولم تُسجَّل حالته. قد تظل الرسالة ظاهرة كقيد الإرسال."
+          : "The reply was not delivered, and its status could not be recorded. It may still show as sending."
+        : lang === "ar" ? "الرسالة محفوظة في المحادثة ولم تُسلَّم للمريض." : "The message is kept in the thread and was not delivered.";
+      toast({ title: reason, description, variant: "destructive" });
       return;
     }
     // Only a delivered reply consumes the draft.

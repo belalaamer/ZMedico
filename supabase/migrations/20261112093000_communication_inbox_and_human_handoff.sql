@@ -254,12 +254,18 @@ begin
     raise exception 'Conversation not found' using errcode = 'P0002';
   end if;
 
-  if not (public.has_role(v_uid, 'system_owner'::public.app_role)
-          or public.has_permission(v_uid, 'communication.respond')) then
-    raise exception 'Not permitted' using errcode = '42501';
-  end if;
-  if not ((v_conv.branch_id is not null and public.user_has_branch_access(v_conv.branch_id))
-          or (v_conv.branch_id is null and public.user_has_tenant_access(v_conv.tenant_id))) then
+  -- This must mirror `conversations_update_permission` exactly, or the trail can
+  -- diverge from the action it describes: the update policy names
+  -- `system_owner` and scopes through the same helper, so the audit RPC does too.
+  -- A platform owner without direct branch membership is therefore not rejected
+  -- for an action the policy allowed.
+  if not (
+    public.has_role(v_uid, 'system_owner'::public.app_role)
+    or (
+      public.has_permission(v_uid, 'communication.respond')
+      and public.conversation_scope_allows(p_conversation_id)
+    )
+  ) then
     raise exception 'Not permitted' using errcode = '42501';
   end if;
 

@@ -84,6 +84,20 @@ describe("B4 — every outcome is recorded, and sends are claimed once", () => {
     expect(SRC).toMatch(/raw_payload: \{ provider_error: \{ code, message: error \} \}/);
   });
 
+  it("checks the outcome write and reports whether it landed", () => {
+    // A failed send and a failed *recording* of that send are different facts. If
+    // the outcome UPDATE is ignored, the caller is told `failed` was saved while
+    // the row is still `queued`.
+    const block = SRC.slice(SRC.indexOf("const fail ="), SRC.indexOf("if (message.delivery_status === \"sent\")"));
+    expect(block).toMatch(/\.select\("id"\)/);
+    expect(block).toMatch(/const recorded = !patchError/);
+    expect(block).toMatch(/jsonResponse\(\{ error, code, recorded \}/);
+  });
+
+  it("rejects a message the browser did not attribute to staff", () => {
+    expect(SRC).toMatch(/message\.sender_type !== "staff"/);
+  });
+
   it("only advances a claimed row that is not already sent", () => {
     expect(SRC).toMatch(/\.neq\("delivery_status", "sent"\)/);
   });

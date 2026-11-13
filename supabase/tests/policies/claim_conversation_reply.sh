@@ -23,7 +23,8 @@ MIGRATION="$REPO/supabase/migrations/20261112093000_communication_inbox_and_huma
 [ -f "$MIGRATION" ] || { echo "FATAL: migration not found"; exit 2; }
 
 DB="zmed_claim_probe_$$"
-cleanup() { psql -qX -d postgres -c "drop database if exists $DB" >/dev/null 2>&1 || true; rm -f "/tmp/claim_$$.sql"; }
+WORK="$(mktemp -d)"
+cleanup() { psql -qX -d postgres -c "drop database if exists $DB" >/dev/null 2>&1 || true; rm -rf "$WORK" "/tmp/claim_$$.sql"; }
 trap cleanup EXIT
 die() { echo "FATAL: $*"; exit 2; }
 
@@ -68,6 +69,45 @@ psql -qX -d "$DB" -c "update public.messages set raw_payload = raw_payload || js
 # A delivered row is terminal.
 psql -qX -d "$DB" -c "update public.messages set delivery_status='sent', raw_payload = raw_payload || jsonb_build_object('send_claimed_at', now() - interval '1 hour') where id='$MID'" >/dev/null
 [ "$(claim)" = "f" ] && pass "a delivered row is never reclaimable, even when stale" || fail "a delivered row was reclaimed"
+
+# ---------------------------------------------------------------------------
+# A genuinely concurrent race. Two independent psql sessions contend for the same
+# row: the first claims it and holds the row lock for a moment before committing;
+# the second reaches its claim inside that window and must block, then find the
+# fresh marker after the first commits. Exactly one claim must succeed.
+# ---------------------------------------------------------------------------
+RID="77777777-7777-7777-7777-777777777777"
+psql -qX -d "$DB" -c "insert into public.messages(id) values ('$RID')" >/dev/null
+
+cat > "$WORK/race_a.sql" <<SQL
+\\o $WORK/a.out
+begin;
+select public.claim_conversation_reply('$RID');
+select pg_sleep(1.5);
+commit;
+SQL
+cat > "$WORK/race_b.sql" <<SQL
+\\o $WORK/b.out
+begin;
+select pg_sleep(0.3);
+select public.claim_conversation_reply('$RID');
+commit;
+SQL
+
+psql -qX -tA -d "$DB" -f "$WORK/race_a.sql" >/dev/null 2>&1 &
+PA=$!
+psql -qX -tA -d "$DB" -f "$WORK/race_b.sql" >/dev/null 2>&1 &
+PB=$!
+wait $PA $PB
+
+A=$(grep -m1 -E '^[tf]$' "$WORK/a.out" 2>/dev/null | tr -d '[:space:]')
+B=$(grep -m1 -E '^[tf]$' "$WORK/b.out" 2>/dev/null | tr -d '[:space:]')
+WINS=$(printf "%s\n%s\n" "$A" "$B" | grep -c '^t$' || true)
+ATT=$(psql -qX -tA -d "$DB" -c "select coalesce(raw_payload->>'send_attempt','0') from public.messages where id='$RID'" | tail -1)
+
+echo "  race: session A=$A session B=$B"
+[ "$WINS" = "1" ] && pass "exactly one of two concurrent sessions wins the claim" || fail "concurrent claim produced $WINS winners (expected exactly 1)"
+[ "$ATT" = "1" ] && pass "the losing session did not increment the attempt counter" || fail "attempt counter is $ATT after a single winning claim"
 
 if [ "$FAILS" = "0" ]; then echo "PASS: claim lifecycle holds."; exit 0; fi
 echo "FAILED: $FAILS assertion(s)."; exit 1

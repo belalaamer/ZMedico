@@ -130,5 +130,19 @@ describe("S3 + S4 — a refused send keeps the draft and explains itself", () =>
     // S3: the paragraph is still in the box, not lost.
     expect((box as HTMLTextAreaElement).value).toBe("We can move you to 4pm.");
   });
+
+  it("says so when the failure itself could not be recorded", async () => {
+    const context = new Response(JSON.stringify({ code: "PROVIDER_REJECTED", error: "boom", recorded: false }), { status: 400 });
+    api.invoke.mockResolvedValue({ data: null, error: Object.assign(new Error("non-2xx"), { context }) });
+
+    await openConversation("201000000002");
+    const box = await screen.findByPlaceholderText(/write a reply|reply/i);
+    fireEvent.change(box, { target: { value: "hello" } });
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+
+    await waitFor(() => expect(api.toast).toHaveBeenCalled());
+    const last = api.toast.mock.calls.at(-1)?.[0] ?? {};
+    expect(String(last.description)).toContain("could not be recorded");
+  });
 });
 });

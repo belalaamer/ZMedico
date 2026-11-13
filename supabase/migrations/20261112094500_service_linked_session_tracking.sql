@@ -57,66 +57,15 @@ create index if not exists treatment_sessions_plan_status_idx
   on public.treatment_sessions (treatment_plan_id, status);
 
 -- ---------------------------------------------------------------------------
--- 2. The completion guard
+-- 2. (removed) The completion guard
 -- ---------------------------------------------------------------------------
--- A plan sells N sessions. Without this, `treatment_sessions.status = 'completed'`
--- is an unbounded write: a duplicate request, a retried click, or a future bulk
--- import can record more delivered sessions than the patient paid for, and the
--- remaining count silently goes negative at the desk.
---
--- Only the transition *into* 'completed' is guarded. Re-opening a completed session
--- (completed -> missed/pending) stays allowed, because that is a correction a
--- clinician may legitimately record, and blocking it would strand a mistake.
-create or replace function public.tg_treatment_sessions_guard_completion()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_total integer;
-  v_completed integer;
-begin
-  -- `performed_at` is the timestamp the status claims. Filling it here means the
-  -- column cannot disagree with 'completed' because a client forgot to send it.
-  if new.status = 'completed' and new.performed_at is null then
-    new.performed_at := coalesce(new.updated_at, now());
-  end if;
-
-  if new.status = 'completed'
-     and (tg_op = 'INSERT' or coalesce(old.status, '') <> 'completed') then
-    select total_sessions into v_total
-      from public.treatment_plans
-     where id = new.treatment_plan_id;
-
-    -- No plan row: leave the referential failure to the foreign key rather than
-    -- inventing a different error here.
-    if v_total is null then
-      return new;
-    end if;
-
-    select count(*) into v_completed
-      from public.treatment_sessions
-     where treatment_plan_id = new.treatment_plan_id
-       and status = 'completed'
-       and id <> new.id;
-
-    if v_completed >= v_total then
-      raise exception 'TREATMENT_PLAN_SESSION_CAP: this plan sold % sessions and % are already completed; re-open a session before completing another one', v_total, v_completed
-        using errcode = '23514';
-    end if;
-  end if;
-
-  return new;
-end;
-$$;
-
-revoke all on function public.tg_treatment_sessions_guard_completion() from public, anon, authenticated;
-
-drop trigger if exists treatment_sessions_guard_completion on public.treatment_sessions;
-create trigger treatment_sessions_guard_completion
-  before insert or update on public.treatment_sessions
-  for each row execute function public.tg_treatment_sessions_guard_completion();
+-- An earlier revision of this file ALSO installed a `treatment_sessions` completion
+-- guard. It was removed deliberately: that guard could not be made safe under
+-- concurrency (no row lock, so two completions could both pass), it left
+-- `performed_at` stale on some transitions, and it was bypassed by moving a
+-- completed session between plans or by lowering `total_sessions`. Those defects
+-- are owned by the T4/T5 migration, which installs one canonical guard. Keeping a
+-- second, weaker guard here would mean two triggers racing on the same rows.
 
 -- ---------------------------------------------------------------------------
 -- 3. The progress view

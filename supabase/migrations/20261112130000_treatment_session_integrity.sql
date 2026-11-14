@@ -27,8 +27,16 @@
 --     ("tre" < "trg"), so at the moment this guard runs, `new.updated_at` still
 --     holds the row's PREVIOUS value. Using `coalesce(new.updated_at, now())`
 --     would stamp `performed_at` with the last edit's time, which is not "when
---     the session was completed". This guard therefore uses `now()` (the
---     transaction's start time) and ignores `new.updated_at` entirely.
+--     the session was completed". This guard therefore ignores `new.updated_at`.
+--
+--   * Time source. `performed_at` means "when the completing statement ran", so
+--     this uses `statement_timestamp()`, NOT `now()`. `now()` is
+--     `transaction_timestamp()`: a transaction that begins, does other work for
+--     ten minutes, and only then completes a session would record a completion
+--     time ten minutes early. `statement_timestamp()` is fixed at the start of
+--     the completing command and is immune to earlier work in the same
+--     transaction. (Verified in the harness by completing inside a transaction
+--     that sleeps first.)
 --
 --   * Lock order. This guard takes the plan row(s) with `FOR UPDATE` BEFORE it
 --     counts. When #281 (T3) is applied, its invoice trigger takes the plan row
@@ -69,7 +77,7 @@ begin
   -- has not run yet at this point (see the header).
   if new.status = 'completed' then
     if new.performed_at is null then
-      new.performed_at := now();
+      new.performed_at := statement_timestamp();
     end if;
   else
     new.performed_at := null;

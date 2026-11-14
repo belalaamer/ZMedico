@@ -23,6 +23,7 @@ MODE="integration"
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../../.." && pwd)"
+WORK="$(mktemp -d)"
 GUARD="$REPO/supabase/migrations/20261112130000_treatment_session_integrity.sql"
 # Prefer the real #281 migration when this checkout has it; otherwise use the
 # committed fixture so the integration proof is reproducible from this branch
@@ -38,8 +39,26 @@ if [ -f "$LIVE_T3" ] && [ -f "$FIXTURE_T3" ]; then
 fi
 grep -q "FOR UPDATE" "$INVOICE_MIGRATION" || { echo "FATAL: #281 trigger text has no FOR UPDATE"; exit 2; }
 
+# The fixture is pinned to one commit of #281. If either the committed fixture or
+# that commit's file changes, this fails instead of silently reporting green.
+FIXTURE_SUM="$HERE/fixtures/t3_invoice_lock.sha256"
+FIXTURE_COMMIT="$HERE/fixtures/t3_invoice_lock.commit"
+if [ "$INVOICE_MIGRATION" = "$FIXTURE_T3" ] || [ -f "$FIXTURE_SUM" ]; then
+  [ -f "$FIXTURE_SUM" ] || { echo "FATAL: fixture checksum missing"; exit 2; }
+  EXPECTED=$(tr -d '[:space:]' < "$FIXTURE_SUM")
+  ACTUAL=$(shasum -a 256 "$FIXTURE_T3" | awk '{print $1}')
+  [ "$EXPECTED" = "$ACTUAL" ] || { echo "FATAL: #281 fixture drifted (expected $EXPECTED, got $ACTUAL)"; exit 2; }
+  if [ -f "$FIXTURE_COMMIT" ] && git -C "$REPO" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    PIN=$(tr -d '[:space:]' < "$FIXTURE_COMMIT")
+    if git -C "$REPO" cat-file -e "$PIN" 2>/dev/null; then
+      git -C "$REPO" show "$PIN:supabase/migrations/20261112110000_treatment_plan_invoice_idempotency.sql" > "$WORK/at_commit.sql" 2>/dev/null \
+        && cmp -s "$WORK/at_commit.sql" "$FIXTURE_T3" \
+        || { echo "FATAL: fixture does not match #281 at pinned commit $PIN"; exit 2; }
+    fi
+  fi
+fi
+
 DB="zmed_int_probe_$$"
-WORK="$(mktemp -d)"
 cleanup() { psql -qX -d postgres -c "drop database if exists $DB" >/dev/null 2>&1 || true; rm -rf "$WORK"; }
 trap cleanup EXIT
 die() { echo "FATAL: $*"; exit 2; }
@@ -104,8 +123,8 @@ SQL
 
 # Order: #282 guard, then #281 trigger. The two touch different objects, so this
 # order models "#282 merged, then T3 merged" without either overwriting the other.
-psql -qX -d "$DB" -v ON_ERROR_STOP=1 -f "$GUARD" >/dev/null 2>"$WORK/e" || { echo "FATAL: #282 did not apply:"; cat "$WORK/e"; exit 2; }
-
+# Migrations are applied in timestamp order: 20261112110000 (#281) then
+# 20261112130000 (#282). This is the order a fresh database would replay them in.
 if [ "$MODE" = "pre-t3" ]; then
   sed -e 's/FOR UPDATE//' "$INVOICE_MIGRATION" > "$WORK/t3.sql"
   grep -q "treatment_plans WHERE id = plan_id;" "$WORK/t3.sql" \
@@ -114,6 +133,7 @@ else
   cp "$INVOICE_MIGRATION" "$WORK/t3.sql"
 fi
 psql -qX -d "$DB" -v ON_ERROR_STOP=1 -f "$WORK/t3.sql" >/dev/null 2>"$WORK/e" || { echo "FATAL: #281 did not apply:"; cat "$WORK/e"; exit 2; }
+psql -qX -d "$DB" -v ON_ERROR_STOP=1 -f "$GUARD" >/dev/null 2>"$WORK/e" || { echo "FATAL: #282 did not apply after #281:"; cat "$WORK/e"; exit 2; }
 
 # #281 only REPLACES the function; the trigger that calls it already exists in
 # Production (it was created outside this repository, see T1). The harness models
@@ -128,6 +148,16 @@ FAILS=0
 pass() { echo "  ok   $1"; }
 fail() { echo "  FAIL $1"; FAILS=$((FAILS+1)); }
 q() { psql -qX -tA -d "$DB" -c "$1" 2>/dev/null | tail -1; }
+lock_wait_seen() { # holder_pid query_pattern
+  local pid="$1" pat="$2" i c
+  for i in $(seq 1 40); do
+    c=$(q "select count(*) from pg_stat_activity where datname=current_database() and wait_event_type='Lock' and query ilike '$pat'")
+    [ "${c:-0}" -ge 1 ] && return 0
+    kill -0 "$pid" 2>/dev/null || return 1
+    sleep 0.2
+  done
+  return 1
+}
 
 PLAN="12121212-1212-1212-1212-121212121212"
 PAT="13131313-1313-1313-1313-131313131313"
@@ -145,7 +175,7 @@ SQL
 cat > "$WORK/one.sql" <<SQL
 begin;
 update public.treatment_sessions set notes='edited by A' where id='aaaaaaaa-1111-0000-0000-000000000001';
-select pg_sleep(1.2);
+select pg_sleep(3.0);
 commit;
 SQL
 cat > "$WORK/two.sql" <<SQL
@@ -157,6 +187,7 @@ commit;
 SQL
 psql -qX -v ON_ERROR_STOP=1 -d "$DB" -f "$WORK/one.sql" >/dev/null 2>&1 & P1=$!
 psql -qX -v ON_ERROR_STOP=1 -d "$DB" -f "$WORK/two.sql" >/dev/null 2>&1 & P2=$!
+lock_wait_seen "$P1" '%treatment_sessions%' && WAITING=1 || WAITING=0
 wait $P1; wait $P2
 
 INVOICES=$(q "select count(*) from public.invoices")
@@ -171,6 +202,7 @@ if [ "$MODE" = "pre-t3" ]; then
   [ "$FAILS" = "0" ] && { echo "PASS (pre-t3)."; exit 0; } || exit 1
 fi
 
+[ "$WAITING" -ge 1 ] && pass "the second invoice-trigger run genuinely waited on the plan lock" || fail "no backend was waiting on a plan lock during the invoice race"
 [ "$INVOICES" = "1" ] && pass "with #281 + #282 exactly one invoice is issued" || fail "$INVOICES invoices issued (expected 1)"
 [ "$ORPHANS" = "0" ] && pass "no orphan invoice is left" || fail "$ORPHANS orphan invoice(s)"
 [ "$LINKED" = "1" ] && pass "the plan links to the single invoice" || fail "plan invoice link count=$LINKED"

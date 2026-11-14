@@ -57,6 +57,7 @@ create table public.audit_logs (
   action text, entity_type text, entity_id uuid, old_values jsonb, new_values jsonb,
   metadata jsonb, created_at timestamptz default now());
 create table public.probe (label text, sqlstate text);
+create table public.t0 (ts timestamptz);
 
 -- Production has `trg_ts_updated_at`; it sorts AFTER `treatment_sessions_integrity`
 -- ("tre" < "trg"), which is exactly why the guard must not read new.updated_at.
@@ -89,6 +90,20 @@ SQL
 }
 reset_probe() { psql -qX -d "$DB" -c "truncate public.probe" >/dev/null 2>&1; }
 
+# Poll until a backend is seen waiting on a lock matching the pattern, while the
+# lock holder is still alive. Polling (rather than one sample) removes the race
+# with psql startup; asserting the *sender* is alive keeps it a real overlap.
+lock_wait_seen() { # holder_pid query_pattern
+  local pid="$1" pat="$2" i c
+  for i in $(seq 1 40); do
+    c=$(q "select count(*) from pg_stat_activity where datname=current_database() and wait_event_type='Lock' and query ilike '$pat'")
+    [ "${c:-0}" -ge 1 ] && return 0
+    kill -0 "$pid" 2>/dev/null || return 1
+    sleep 0.2
+  done
+  return 1
+}
+
 seed() { # plan_id total completed
   psql -qX -d "$DB" -v ON_ERROR_STOP=1 >/dev/null <<SQL
 insert into public.treatment_plans(id, total_sessions) values ('$1', $2);
@@ -117,6 +132,32 @@ if [ "$MODE" = "pre-fix" ]; then
 else
   [ "$RECENT" = "t" ] && pass "performed_at is the completion time, not NULL and not the stale updated_at" || fail "performed_at=$REC is not the completion time"
   [ "$STALE" = "f" ] && pass "performed_at is not the old updated_at value" || fail "performed_at was copied from the stale updated_at"
+fi
+
+# ---- A1b. performed_at is the completion statement time, not the transaction start
+if [ "$MODE" = "fix" ]; then
+  P1B="11111111-1111-1111-1111-1111111111b1"
+  psql -qX -d "$DB" -v ON_ERROR_STOP=1 >/dev/null <<SQL
+insert into public.treatment_plans(id, total_sessions) values ('$P1B', 2);
+insert into public.treatment_sessions(id, treatment_plan_id, session_number, status)
+values ('b1000000-0000-0000-0000-0000000000b1','$P1B',1,'pending');
+SQL
+  cat > "$WORK/long.sql" <<SQL
+insert into public.t0(ts) values (clock_timestamp());
+begin;
+select pg_sleep(3);
+update public.treatment_sessions set status='completed' where id='b1000000-0000-0000-0000-0000000000b1';
+commit;
+SQL
+  psql -qX -v ON_ERROR_STOP=1 -d "$DB" -f "$WORK/long.sql" >/dev/null 2>&1
+  LAG=$(q "select extract(epoch from (s.performed_at - (select ts from public.t0 order by ts desc limit 1))) from public.treatment_sessions s where s.id='b1000000-0000-0000-0000-0000000000b1'")
+  # If the guard used now()/transaction_timestamp(), the lag would be ~0. It must
+  # reflect the UPDATE, which ran ~3s after the transaction began.
+  if awk "BEGIN{exit !($LAG > 2)}"; then
+    pass "performed_at reflects the completing statement (${LAG}s after the transaction began)"
+  else
+    fail "performed_at lag is ${LAG}s: it followed the transaction start, not the completion"
+  fi
 fi
 
 # ===========================================================================
@@ -216,7 +257,7 @@ SQL
   cat > "$WORK/a.sql" <<SQL
 begin;
 update public.treatment_sessions set status='completed' where id='bbbbbbbb-0000-0000-0000-0000000000b1';
-select pg_sleep(2.5);
+select pg_sleep(3.0);
 commit;
 SQL
   # Session B waits for the lock, then is refused. A DO block captures SQLSTATE.
@@ -234,10 +275,8 @@ SQL
   psql -qX -v ON_ERROR_STOP=1 -d "$DB" -f "$WORK/a.sql" >/dev/null 2>&1 & PA=$!
   sleep 0.2
   psql -qX -v ON_ERROR_STOP=1 -d "$DB" -f "$WORK/b.sql" >/dev/null 2>&1 & PB=$!
-  sleep 1.0
-  # While A still holds the lock, B must be waiting on a Lock, not merely sleeping.
-  WAITING=$(q "select count(*) from pg_stat_activity where datname=current_database() and wait_event_type='Lock' and query ilike '%treatment_sessions%'")
-  [ "$WAITING" -ge 1 ] && pass "the second writer is genuinely waiting on a lock held by the first" || fail "no backend was waiting on a lock during the overlap"
+  # While A still holds the lock, B must be seen waiting on a Lock, not merely sleeping.
+  lock_wait_seen "$PA" '%treatment_sessions%' && pass "the second writer is genuinely waiting on a lock held by the first" || fail "no backend was waiting on a lock during the overlap"
   wait $PA; wait $PB
   BSTATE=$(q "select sqlstate from public.probe where label='B' order by ctid desc limit 1")
   DONE=$(q "select count(*) from public.treatment_sessions where treatment_plan_id='$P7' and status='completed'")
@@ -258,7 +297,7 @@ SQL
   cat > "$WORK/c.sql" <<SQL
 begin;
 update public.treatment_plans set total_sessions=4 where id='$P9';
-select pg_sleep(1.5);
+select pg_sleep(4.0);
 commit;
 SQL
   cat > "$WORK/d.sql" <<SQL
@@ -275,6 +314,7 @@ SQL
   psql -qX -v ON_ERROR_STOP=1 -d "$DB" -f "$WORK/c.sql" >/dev/null 2>&1 & PC=$!
   sleep 0.2
   psql -qX -v ON_ERROR_STOP=1 -d "$DB" -f "$WORK/d.sql" >/dev/null 2>&1 & PD=$!
+  lock_wait_seen "$PC" '%treatment_sessions%' && pass "the completion is genuinely waiting on the plan lock held by the total_sessions update" || fail "no backend was waiting during the total_sessions overlap"
   wait $PC; wait $PD
   DSTATE=$(q "select sqlstate from public.probe where label='D' order by ctid desc limit 1")
   TOT=$(q "select total_sessions from public.treatment_plans where id='$P9'")

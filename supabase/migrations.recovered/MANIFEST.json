@@ -1,0 +1,633 @@
+{
+  "generated_at": "2026-11-14T12:17:02.577690Z",
+  "production_ref": "rqcmnfzfytyyicelvifk",
+  "production_rows": 486,
+  "repo_files": 436,
+  "content_matched_elsewhere": 397,
+  "recovered_count": 89,
+  "entries": [
+    {
+      "version": "20260803100146",
+      "name": "fix_real_data_branch_and_role_scoping",
+      "file": "20260803100146_fix_real_data_branch_and_role_scoping.sql",
+      "sha256": "0e01746f1190a1e92469e398a6f18d20fea7ef933b6c5f62bf9652b11bfd287c",
+      "bytes": 2995
+    },
+    {
+      "version": "20260803100221",
+      "name": "fix_insert_update_branch_scoping_real_data",
+      "file": "20260803100221_fix_insert_update_branch_scoping_real_data.sql",
+      "sha256": "1d59ad0b2d6a6043424546b6ea8070a24ed12aa2a8c7523da0d15ff342a6f6c0",
+      "bytes": 5151
+    },
+    {
+      "version": "20260803100303",
+      "name": "systematic_branch_scoping_fix_real_data",
+      "file": "20260803100303_systematic_branch_scoping_fix_real_data.sql",
+      "sha256": "25aa4d225f743c07ee13876e7eb7d0d61482ffe061f23b699f7d894dbeab6028",
+      "bytes": 1487
+    },
+    {
+      "version": "20260803100327",
+      "name": "lockdown_security_definer_functions_real_project",
+      "file": "20260803100327_lockdown_security_definer_functions_real_project.sql",
+      "sha256": "25b3dc571ddb60dafe7412db90f5cb27800657820199f43dfa45387303f6c5e4",
+      "bytes": 531
+    },
+    {
+      "version": "20260803195911",
+      "name": "multi_branch_staff_access",
+      "file": "20260803195911_multi_branch_staff_access.sql",
+      "sha256": "128989f16fd560422bced0268b6ca142b9fef42e5eee19c982c02bddd03ff4c2",
+      "bytes": 3206
+    },
+    {
+      "version": "20260803211100",
+      "name": "system_owner_and_per_branch_invoice_numbering",
+      "file": "20260803211100_system_owner_and_per_branch_invoice_numbering.sql",
+      "sha256": "304f16eaae15d3c709801d843297f46ecbf67ee327ed78c46fb6b62112b86dc1",
+      "bytes": 5852
+    },
+    {
+      "version": "20260803213241",
+      "name": "financial_regression_test_suite",
+      "file": "20260803213241_financial_regression_test_suite.sql",
+      "sha256": "bf954169f7d7bdb241437024fdecf41ec6724c8a2b7c168953e1f0680ad3ba6c",
+      "bytes": 13077
+    },
+    {
+      "version": "20260804112214",
+      "name": "repair_data_damaged_by_permission_tests_v4",
+      "file": "20260804112214_repair_data_damaged_by_permission_tests_v4.sql",
+      "sha256": "f41c24a2535b735cb68e810fbf047ac25e25d3b8f652a4964d6aac193cecfe99",
+      "bytes": 6525
+    },
+    {
+      "version": "20260805103212",
+      "name": "scope_legacy_role_permissions_read",
+      "file": "20260805103212_scope_legacy_role_permissions_read.sql",
+      "sha256": "f2e3ace196ffe48fd30faf5016c8c9727eb7a58afd50c3b642fffcb30f0e7ed2",
+      "bytes": 1311
+    },
+    {
+      "version": "20260806073546",
+      "name": "fix_first_line_item_on_discounted_invoice",
+      "file": "20260806073546_fix_first_line_item_on_discounted_invoice.sql",
+      "sha256": "1bed97d17531740e79c96589d34252eb7fabe1361ca0869fbb4b16e47d925cea",
+      "bytes": 2536
+    },
+    {
+      "version": "20260806074052",
+      "name": "align_bundles_with_clinical_rls_and_clear_dead_staff_refs",
+      "file": "20260806074052_align_bundles_with_clinical_rls_and_clear_dead_staff_refs.sql",
+      "sha256": "faf6a6419d97567e241227ecef063d28b9ac3c5819854a2de6af9f7bf06856c2",
+      "bytes": 3784
+    },
+    {
+      "version": "20260806074331",
+      "name": "close_two_empty_screens_reminders_and_accountant_calendar",
+      "file": "20260806074331_close_two_empty_screens_reminders_and_accountant_calendar.sql",
+      "sha256": "20ba406975c222b2a6e84ec823cef2646904b4fb2c17311db508bf57ec6c7272",
+      "bytes": 3370
+    },
+    {
+      "version": "20260806110358",
+      "name": "tighten_physio_write_policies_to_clinical_roles",
+      "file": "20260806110358_tighten_physio_write_policies_to_clinical_roles.sql",
+      "sha256": "72da33730d926df91c0ede2c8d862d117bf46441166ea67452adbfb9d6559659",
+      "bytes": 3453
+    },
+    {
+      "version": "20260817093835",
+      "name": "add_patient_name_language",
+      "file": "20260817093835_add_patient_name_language.sql",
+      "sha256": "3c946d25dd1d52671c33b5f5b2dbba514493aa44858c7122f18a2321deffdf1f",
+      "bytes": 600
+    },
+    {
+      "version": "20260818065943",
+      "name": "bilingual_physio_therapists",
+      "file": "20260818065943_bilingual_physio_therapists.sql",
+      "sha256": "b1a97499277359bc16e1e7bf4dec40aa24d24c2938a6cd3c48c0311f8f0df8d3",
+      "bytes": 1070
+    },
+    {
+      "version": "20260818104209",
+      "name": "secure_notification_settings_upsert",
+      "file": "20260818104209_secure_notification_settings_upsert.sql",
+      "sha256": "535e129048de52c626b81f099e3918e73cbadc46a68226aee367dd97f0ee1347",
+      "bytes": 6341
+    },
+    {
+      "version": "20260822200849",
+      "name": "platform_onboarding_rpc",
+      "file": "20260822200849_platform_onboarding_rpc.sql",
+      "sha256": "15adfba312a16bbe648fd85dbf7320b73aec69b06f3db9a92c471a7989f48697",
+      "bytes": 5340
+    },
+    {
+      "version": "20260823084238",
+      "name": "provider_subdomain_rate_limit",
+      "file": "20260823084238_provider_subdomain_rate_limit.sql",
+      "sha256": "91f9f21250aaf60d4a457a4416c1ceb8bf67e260a3fdd696efb8ba71b65ee517",
+      "bytes": 1540
+    },
+    {
+      "version": "20260823145432",
+      "name": "secure_sensitive_views_and_public_rpc_grants",
+      "file": "20260823145432_secure_sensitive_views_and_public_rpc_grants.sql",
+      "sha256": "5f7fc7425125fbb4a4be66ec2c972392abb5d8c09580f083ef9188a11317eaf3",
+      "bytes": 2091
+    },
+    {
+      "version": "20260824094800",
+      "name": "repair_queue_alert_schedule",
+      "file": "20260824094800_repair_queue_alert_schedule.sql",
+      "sha256": "5e23a0f5fb6b0fc080ccd3977b04b985536baa506ad0d7ccd48f773e17f0ab85",
+      "bytes": 605
+    },
+    {
+      "version": "20260824102047",
+      "name": "restrict_legacy_public_booking_authenticated",
+      "file": "20260824102047_restrict_legacy_public_booking_authenticated.sql",
+      "sha256": "d22c41868637d8a63a2e8e80a60cf23c4d3933e72491b7a1f3fef674a1017c5d",
+      "bytes": 628
+    },
+    {
+      "version": "20260824102242",
+      "name": "remove_legacy_booking_authenticated_grants",
+      "file": "20260824102242_remove_legacy_booking_authenticated_grants.sql",
+      "sha256": "ded92568f4345506744954c883dbc7fc5906f2ff625aa0c1856ff12f32b07b81",
+      "bytes": 649
+    },
+    {
+      "version": "20260825205309",
+      "name": "platform_save_tenant_branding",
+      "file": "20260825205309_platform_save_tenant_branding.sql",
+      "sha256": "7a4011308411fc756682f233e6b28d762bfaa94c55f508a5b6908ceaf6a50d52",
+      "bytes": 2690
+    },
+    {
+      "version": "20260825215352",
+      "name": "restore_authenticated_scope_helper_exec",
+      "file": "20260825215352_restore_authenticated_scope_helper_exec.sql",
+      "sha256": "202f5705fd949c1d560eb3482eb07f0b0ef1bf163538841fa9458a1184c4961b",
+      "bytes": 4604
+    },
+    {
+      "version": "20260825221231",
+      "name": "whatsapp_clinic_events_and_templates",
+      "file": "20260825221231_whatsapp_clinic_events_and_templates.sql",
+      "sha256": "8df8b01b18cd5b5fd6a08113640f05be5569fcdf96c81ab7eb8a677675e599d7",
+      "bytes": 17121
+    },
+    {
+      "version": "20260826082639",
+      "name": "close_cross_tenant_identity_and_audit_leak",
+      "file": "20260826082639_close_cross_tenant_identity_and_audit_leak.sql",
+      "sha256": "d7e7dc6a6c8e81901ea1222c29312c2f286bd39a58c19345e877d7f253a4041b",
+      "bytes": 7501
+    },
+    {
+      "version": "20260826095342",
+      "name": "booking_resource_capacity_guard",
+      "file": "20260826095342_booking_resource_capacity_guard.sql",
+      "sha256": "807d108345d895a4310a45049bb7ddd6792008b32a458d4665ee613412046577",
+      "bytes": 2607
+    },
+    {
+      "version": "20260826163744",
+      "name": "patient_portal_credential_templates",
+      "file": "20260826163744_patient_portal_credential_templates.sql",
+      "sha256": "6b9c4720860d2d7b5f66efb9464fcb7486d16290877d9b9aea2478a35233f9ab",
+      "bytes": 2835
+    },
+    {
+      "version": "20260826170017",
+      "name": "patient_portal_first_login_guard",
+      "file": "20260826170017_patient_portal_first_login_guard.sql",
+      "sha256": "4423cb95259dc57af948884fb185a13c62bae6c038d51bc325d0d945a28b848b",
+      "bytes": 6115
+    },
+    {
+      "version": "20260831105815",
+      "name": "close_orphan_clinical_row_branch_gate",
+      "file": "20260831105815_close_orphan_clinical_row_branch_gate.sql",
+      "sha256": "fe074456d2852b319e422cb5c8794c69594a0ff3409352584af37ccf22697929",
+      "bytes": 1671
+    },
+    {
+      "version": "20260831112546",
+      "name": "lead_ad_attribution_and_campaign_roi",
+      "file": "20260831112546_lead_ad_attribution_and_campaign_roi.sql",
+      "sha256": "339a88f898fdb68653efcd25fc0c12385acf590fff47f42c80a150edd8c8f2b0",
+      "bytes": 6077
+    },
+    {
+      "version": "20260831113448",
+      "name": "lead_attribution_top_level_utm_fallback",
+      "file": "20260831113448_lead_attribution_top_level_utm_fallback.sql",
+      "sha256": "460233a891b459776b3cc4cbe98f6a792ca371bf78d62da6b8261854da865cfe",
+      "bytes": 3119
+    },
+    {
+      "version": "20260831205010",
+      "name": "meta_lead_ads_ingestion",
+      "file": "20260831205010_meta_lead_ads_ingestion.sql",
+      "sha256": "7305aa26226a05f34d8e9af9fa6d843858e7c50a266f19d30944435cfde054f2",
+      "bytes": 338
+    },
+    {
+      "version": "20260902213450",
+      "name": "settings_assign_user_role_require_branch",
+      "file": "20260902213450_settings_assign_user_role_require_branch.sql",
+      "sha256": "edb68eb467f58334913352f1f2e4f48b3ac554817dfa313b697c77b46e665389",
+      "bytes": 4678
+    },
+    {
+      "version": "20260902213533",
+      "name": "handle_new_user_require_branch",
+      "file": "20260902213533_handle_new_user_require_branch.sql",
+      "sha256": "fc28332f5685bbc466f3f444e317a5569100af8828dd1bf84eee30cc0b54251e",
+      "bytes": 3669
+    },
+    {
+      "version": "20260902213745",
+      "name": "settings_assign_user_role_fix_branch_lookup",
+      "file": "20260902213745_settings_assign_user_role_fix_branch_lookup.sql",
+      "sha256": "a17ecb54b0543fb4d1050930d9ca86650d9bd8b4f4661371e330d02181180c62",
+      "bytes": 5591
+    },
+    {
+      "version": "20260902223851",
+      "name": "public_booking_require_confirmation_default_and_hold",
+      "file": "20260902223851_public_booking_require_confirmation_default_and_hold.sql",
+      "sha256": "d7d19433479395f847201bdc16b71f5b55b086a5579560fbfe76fb715ec15d8f",
+      "bytes": 10927
+    },
+    {
+      "version": "20260903174421",
+      "name": "patient_portal_accounts_select_policy",
+      "file": "20260903174421_patient_portal_accounts_select_policy.sql",
+      "sha256": "76c38ffcb2633cd7f1b158c5546617bb4bbf435aec137fc9cd3113fd6a49bb2c",
+      "bytes": 1045
+    },
+    {
+      "version": "20260903200110",
+      "name": "patient_portal_booking_and_shared_core",
+      "file": "20260903200110_patient_portal_booking_and_shared_core.sql",
+      "sha256": "107681bf4cfdeb34ca06c1ed98b1da265449fa531a36e363b3031b9a63a63b14",
+      "bytes": 13862
+    },
+    {
+      "version": "20260903211803",
+      "name": "add_booking_expiry_staff_alert",
+      "file": "20260903211803_add_booking_expiry_staff_alert.sql",
+      "sha256": "337144f189442b7e5841fa76fea6f0ba28482b8c838a87b44f5a5b70b19399ab",
+      "bytes": 3346
+    },
+    {
+      "version": "20260903211843",
+      "name": "fix_tg_public_booking_to_lead_utm_null",
+      "file": "20260903211843_fix_tg_public_booking_to_lead_utm_null.sql",
+      "sha256": "b54760ce1b95968230ae43f48440f6d4afb82356df7a6bf44485ec508ba1a2ec",
+      "bytes": 2889
+    },
+    {
+      "version": "20260904162501",
+      "name": "create_normalize_phone_digits_helper",
+      "file": "20260904162501_create_normalize_phone_digits_helper.sql",
+      "sha256": "e7dd2c326e49a32c94c0e5c48b220c775de7cc5cb75af431d26faae67de903be",
+      "bytes": 418
+    },
+    {
+      "version": "20260904162514",
+      "name": "fix_public_create_booking_phone_match",
+      "file": "20260904162514_fix_public_create_booking_phone_match.sql",
+      "sha256": "6223d3b21d055a9338b1e35f6c3de6b05551a837765eb5e1d0fcf1d8b68c7e03",
+      "bytes": 2354
+    },
+    {
+      "version": "20260904164936",
+      "name": "fix_user_has_tenant_access_remove_global_admin_bypass",
+      "file": "20260904164936_fix_user_has_tenant_access_remove_global_admin_bypass.sql",
+      "sha256": "48d942f18be20132c473f6d283ebfded6a8dd8be6305c1e0eef3a34ef232c750",
+      "bytes": 560
+    },
+    {
+      "version": "20260904164957",
+      "name": "add_tenant_scoping_to_shared_medical_reference_tables",
+      "file": "20260904164957_add_tenant_scoping_to_shared_medical_reference_tables.sql",
+      "sha256": "f7efb2b2f125b8aa71716a4aee121aa8554ceabd8fdeabc1c636727de8c23f9d",
+      "bytes": 4457
+    },
+    {
+      "version": "20260905123714",
+      "name": "ai_messaging_platform_phase1",
+      "file": "20260905123714_ai_messaging_platform_phase1.sql",
+      "sha256": "a0ab21752d349b19f92495081590cdc612cba2491c6ade83248eb6c08e2343d0",
+      "bytes": 9468
+    },
+    {
+      "version": "20260905161659",
+      "name": "ai_booking_tools_phase2",
+      "file": "20260905161659_ai_booking_tools_phase2.sql",
+      "sha256": "23d97ace11dbe49f822ae1db7c0fcd8d74881da29d97675c2dca0061e6065260",
+      "bytes": 8484
+    },
+    {
+      "version": "20260905161736",
+      "name": "ai_tool_audit_log",
+      "file": "20260905161736_ai_tool_audit_log.sql",
+      "sha256": "9ebf16c36ddb55d6eb14451ec21c32644c76448821197bc57a26794d8ffbbe7b",
+      "bytes": 1262
+    },
+    {
+      "version": "20260905163859",
+      "name": "ai_provider_config_vault",
+      "file": "20260905163859_ai_provider_config_vault.sql",
+      "sha256": "69ac9bd58461498543a5161c9b2845f5ece941bed53d995c21649ec3a91276a2",
+      "bytes": 4214
+    },
+    {
+      "version": "20260922051415",
+      "name": "tenant_scope_inventory_catalog",
+      "file": "20260922051415_tenant_scope_inventory_catalog.sql",
+      "sha256": "7f8c839d865972154601df17d2e1d02838c989727f29deeb18e10b92dd78e69b",
+      "bytes": 10353
+    },
+    {
+      "version": "20260922081824",
+      "name": "restrict_platform_tenant_management_to_system_owner",
+      "file": "20260922081824_restrict_platform_tenant_management_to_system_owner.sql",
+      "sha256": "0cb97b8c8ed6cc64c204197e1c68337ced72fbac48754e46cd3d41faf39217af",
+      "bytes": 10443
+    },
+    {
+      "version": "20260922153206",
+      "name": "optimize_inventory_catalog_policies_and_actor_fks",
+      "file": "20260922153206_optimize_inventory_catalog_policies_and_actor_fks.sql",
+      "sha256": "713084442d46bbb95c0bf4bff84b7cfc58f7668215d8446c2cf291fff5ea1eaa",
+      "bytes": 1164
+    },
+    {
+      "version": "20260923144215",
+      "name": "protect_purchase_order_workflow",
+      "file": "20260923144215_protect_purchase_order_workflow.sql",
+      "sha256": "90d3cc3294475f214e3549011f0d473fe94aa5d38c67cc06548f2713bde4d6d5",
+      "bytes": 16705
+    },
+    {
+      "version": "20260923145536",
+      "name": "protect_inventory_ledger",
+      "file": "20260923145536_protect_inventory_ledger.sql",
+      "sha256": "117ba73b3a3cf39816317d8c0c92dd065db7db2fdbcbf2fa55e3e4276ae3f3f2",
+      "bytes": 7988
+    },
+    {
+      "version": "20260923150131",
+      "name": "harden_inventory_catalog",
+      "file": "20260923150131_harden_inventory_catalog.sql",
+      "sha256": "39bc50f746c8d3bf0235c73baa45a4a19dd8cfddadc739e56434ffd0af3b22c6",
+      "bytes": 12377
+    },
+    {
+      "version": "20260923150852",
+      "name": "fix_invoice_inventory_accounting",
+      "file": "20260923150852_fix_invoice_inventory_accounting.sql",
+      "sha256": "ea9e65552a07ad440755548394c5deb3dd9c8b89c9a85bd32939e3869ff044ea",
+      "bytes": 12899
+    },
+    {
+      "version": "20260924191312",
+      "name": "rate_limit_public_booking",
+      "file": "20260924191312_rate_limit_public_booking.sql",
+      "sha256": "c47acfab04450b053b9f61ca7bf15da88a6d4b487d70c4ed7d9962a1c484131b",
+      "bytes": 2909
+    },
+    {
+      "version": "20260924192609",
+      "name": "harden_phi_access_audit",
+      "file": "20260924192609_harden_phi_access_audit.sql",
+      "sha256": "56c6d92cf5e7fb9b7ab4d93bf162889ddfe8a13d252b5f6448f398fd96945420",
+      "bytes": 4543
+    },
+    {
+      "version": "20260924193104",
+      "name": "phi_audit_collection_compat",
+      "file": "20260924193104_phi_audit_collection_compat.sql",
+      "sha256": "04b2e31ba7c4f5c3370f723a5226a44c95e502a6eb1d6e420a6d6f167d99dd70",
+      "bytes": 4519
+    },
+    {
+      "version": "20260924193459",
+      "name": "enable_secure_patient_docs_storage",
+      "file": "20260924193459_enable_secure_patient_docs_storage.sql",
+      "sha256": "e190fc860964a2ec651ea1d127c937166ae0caade6ebba82d2fa309d939ac770",
+      "bytes": 4464
+    },
+    {
+      "version": "20260925105627",
+      "name": "harden_product_image_storage",
+      "file": "20260925105627_harden_product_image_storage.sql",
+      "sha256": "29a329fc2ef5a90fd721bfac60693cff6f35771d8174e99f01eeadb29223ef4c",
+      "bytes": 1643
+    },
+    {
+      "version": "20260925110046",
+      "name": "harden_public_doctor_directory",
+      "file": "20260925110046_harden_public_doctor_directory.sql",
+      "sha256": "4f8d8c8f04828a6a1276fba790ff382c183829e28801962ca195eb8892c02473",
+      "bytes": 6147
+    },
+    {
+      "version": "20260925110342",
+      "name": "revoke_view_write_grants",
+      "file": "20260925110342_revoke_view_write_grants.sql",
+      "sha256": "39958112538929a6708883e1c5a2cdce8c40da3349a530bf7f9ecbe8104dcc23",
+      "bytes": 1022
+    },
+    {
+      "version": "20260925110635",
+      "name": "harden_physio_realtime_rls",
+      "file": "20260925110635_harden_physio_realtime_rls.sql",
+      "sha256": "a0c4b2f02e818bb1e7c2e76c1bd7af5b2da6eb0f532b6ec54bdce7030a460405",
+      "bytes": 2039
+    },
+    {
+      "version": "20260925111017",
+      "name": "align_clinical_child_rls",
+      "file": "20260925111017_align_clinical_child_rls.sql",
+      "sha256": "d1a9ecbcd0786ecc581059010b3566b0afde9a51b00d045ae9444ef786445e72",
+      "bytes": 17130
+    },
+    {
+      "version": "20260925111232",
+      "name": "align_finance_hr_rls",
+      "file": "20260925111232_align_finance_hr_rls.sql",
+      "sha256": "c253bf81de85ffd3b5b9dd1797a47f5461ef7973fea2d606760720b366e0b3fb",
+      "bytes": 9008
+    },
+    {
+      "version": "20260925111527",
+      "name": "harden_integration_config_writes",
+      "file": "20260925111527_harden_integration_config_writes.sql",
+      "sha256": "b650428d0f568e58cb901d979c45614069e6050c48fc3e2efa740e35a51540af",
+      "bytes": 2199
+    },
+    {
+      "version": "20260925111804",
+      "name": "harden_clinical_catalog_writes",
+      "file": "20260925111804_harden_clinical_catalog_writes.sql",
+      "sha256": "2bd91d90a3a9e21da06a9b0b168f683263fa24be1c68dd30fa8715670bbbe899",
+      "bytes": 5477
+    },
+    {
+      "version": "20260925112224",
+      "name": "reduce_booking_cron_overhead",
+      "file": "20260925112224_reduce_booking_cron_overhead.sql",
+      "sha256": "16b092f65bbbc8d14bed8d513e3e2cf803fb53d64c6addd501f2a241cb980335",
+      "bytes": 1077
+    },
+    {
+      "version": "20260925123608",
+      "name": "revoke_readonly_view_dml",
+      "file": "20260925123608_revoke_readonly_view_dml.sql",
+      "sha256": "ce6a86ea7c95e9c66d5ee497a47d76f807cbfa80068da7e979d50d8f445ee0fa",
+      "bytes": 751
+    },
+    {
+      "version": "20260925123841",
+      "name": "retire_legacy_public_booking_rpcs",
+      "file": "20260925123841_retire_legacy_public_booking_rpcs.sql",
+      "sha256": "a7ea358de6b740e9ee93874ed12166f2f21e7c0ae83ae88e7f293d6b4d3c414d",
+      "bytes": 1135
+    },
+    {
+      "version": "20260925124406",
+      "name": "rate_limit_direct_public_booking_rpc",
+      "file": "20260925124406_rate_limit_direct_public_booking_rpc.sql",
+      "sha256": "b68dfc417ddf6999d45c1afa1ceb74d1bedcd0b47ca34e6ed3d9b2b2c6e2127c",
+      "bytes": 5892
+    },
+    {
+      "version": "20260925124740",
+      "name": "product_image_legacy_owner_compat",
+      "file": "20260925124740_product_image_legacy_owner_compat.sql",
+      "sha256": "9be66dab34c902158adc503c9acd2f2695b8d0c53215db4c60d962ec23810c9b",
+      "bytes": 1183
+    },
+    {
+      "version": "20260925130104",
+      "name": "retire_completed_shadow_telemetry",
+      "file": "20260925130104_retire_completed_shadow_telemetry.sql",
+      "sha256": "ae34dc9fe0490dcd734b7397915c4fd7ccc068f99c9e6c945aa56a09b0e9b469",
+      "bytes": 4905
+    },
+    {
+      "version": "20260925130245",
+      "name": "optimize_hot_auth_rls_initplans",
+      "file": "20260925130245_optimize_hot_auth_rls_initplans.sql",
+      "sha256": "3d69b6c52a89f3c381a349bc6528f4d39727aa5b7e649d512d1c84448dc843ed",
+      "bytes": 5625
+    },
+    {
+      "version": "20260925222555",
+      "name": "fix_invoice_event_status_select",
+      "file": "20260925222555_fix_invoice_event_status_select.sql",
+      "sha256": "3a6b3a79a6ca8165ce37da4dc6dc223f351e096fe4f93866c3915cc3b130144a",
+      "bytes": 3200
+    },
+    {
+      "version": "20261008224944",
+      "name": "guard_expense_self_audit_scope",
+      "file": "20261008224944_guard_expense_self_audit_scope.sql",
+      "sha256": "debcecde84f73eaab359f14db4abe093e2803dbdd3c76e1cd7f2a14beb788b6b",
+      "bytes": 1782
+    },
+    {
+      "version": "20261009010549",
+      "name": "require_active_clinical_role_for_record_edit",
+      "file": "20261009010549_require_active_clinical_role_for_record_edit.sql",
+      "sha256": "1f78985370baa49bb09c9b161347da1a03f62420fb81b65a93cb97d8cb8a6b19",
+      "bytes": 1227
+    },
+    {
+      "version": "20261009123707",
+      "name": "guard_authenticated_financial_period_assertion",
+      "file": "20261009123707_guard_authenticated_financial_period_assertion.sql",
+      "sha256": "2d6a56b1871e9456b1dcf1d0fc1ffdb1313cf862a1bcb7995226ac3dbf4301ca",
+      "bytes": 3422
+    },
+    {
+      "version": "20261009135823",
+      "name": "guard_wallet_finite_amounts",
+      "file": "20261009135823_guard_wallet_finite_amounts.sql",
+      "sha256": "92cecc6f96a4999fc5175d5a2f4ddbb5186530b815e704b1ce4ed6f993cb36e7",
+      "bytes": 2771
+    },
+    {
+      "version": "20261009135852",
+      "name": "fix_wallet_manual_adjustment_audit",
+      "file": "20261009135852_fix_wallet_manual_adjustment_audit.sql",
+      "sha256": "48eaf93afdcb4f75d520228892909e2f86a5eaaeb98d165dc4be8bd841dcf53d",
+      "bytes": 1678
+    },
+    {
+      "version": "20261014095117",
+      "name": "prevent_duplicate_open_queue_alerts",
+      "file": "20261014095117_prevent_duplicate_open_queue_alerts.sql",
+      "sha256": "7044e13f27f93451c5f94dd29010927cf12e7bcd17fc6aa5fa5856ebe346876a",
+      "bytes": 437
+    },
+    {
+      "version": "20261014095325",
+      "name": "atomic_system_language_defaults",
+      "file": "20261014095325_atomic_system_language_defaults.sql",
+      "sha256": "1563373e770f902a6c7177c3e9e0a9dbd5c31a346ea094f231c7b35d1f7af6ba",
+      "bytes": 3489
+    },
+    {
+      "version": "20261015155156",
+      "name": "guard_serialized_invoice_payments_release",
+      "file": "20261015155156_guard_serialized_invoice_payments_release.sql",
+      "sha256": "0818d3a29f2c2eb7294c12857ad4f5ff16200a5becc3b11ca242ca1949a23b04",
+      "bytes": 4899
+    },
+    {
+      "version": "20261021203931",
+      "name": "20261021190000_gate_legacy_appointment_reminder_enqueue",
+      "file": "20261021203931_20261021190000_gate_legacy_appointment_reminder_enqueue.sql",
+      "sha256": "7682df4880f0e9236dad3b4bed327eaa999e1b4bbd2e41acfc41ce9d0d000dbf",
+      "bytes": 10520
+    },
+    {
+      "version": "20261101120000",
+      "name": "20261101120000_p2db_self_checkin_details_reason",
+      "file": "20261101120000_20261101120000_p2db_self_checkin_details_reason.sql",
+      "sha256": "173fed901a801d9a631cb7781274b4c46a8575d3ebe3bf24a8fda788085d8f8b",
+      "bytes": 735
+    },
+    {
+      "version": "20261104130000",
+      "name": "20261104130000_notification_clinic_time_12h",
+      "file": "20261104130000_20261104130000_notification_clinic_time_12h.sql",
+      "sha256": "9f1de253da21d6602684eed1def91680866b1ddad73b8f33ed915df8617fbfe9",
+      "bytes": 688
+    },
+    {
+      "version": "20261104150000",
+      "name": "20261104150000_financial_regression_test8_branch_fixture",
+      "file": "20261104150000_20261104150000_financial_regression_test8_branch_fixture.sql",
+      "sha256": "2a07e50edb41fff847ccd56acc123ec6e28ddaaf1a579334f6a34a1496623c57",
+      "bytes": 837
+    },
+    {
+      "version": "20261105112453",
+      "name": "20261105131000_treasury_close_rigour_optional",
+      "file": "20261105112453_20261105131000_treasury_close_rigour_optional.sql",
+      "sha256": "05504dae9ec2234dbb06de19d22906eab06911921db8d6abb614c9c2f5a1a062",
+      "bytes": 6766
+    }
+  ]
+}

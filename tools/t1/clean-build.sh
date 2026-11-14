@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # T1: build a database from the repository alone and report how far it gets.
 #
+# WARNING: this harness is superseded by docs/t1/CLEAN_BUILD_DESIGN.md.
+# It is kept only to reproduce the first-pass result. Do not use
+# --with-recovered for T1 acceptance: it copies two histories into one
+# directory, silently overwrites the two same-filename collisions, and can
+# apply two files with the same version. The replacement uses two separate
+# manifests and fails closed on those conditions.
+#
 #   ./clean-build.sh                 # supabase/migrations only
 #   ./clean-build.sh --with-recovered # + supabase/migrations.recovered, by version
 #

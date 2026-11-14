@@ -5,13 +5,22 @@
 -- `auth` schema, and later ones insert into `storage.buckets`. None of this is
 -- in `supabase/migrations`; on Supabase it is provisioned by the platform.
 --
--- This file is the T1 declaration of that contract. It is NOT a migration and is
--- never applied to Production. `clean-build.sh` loads it first so the repository
--- migrations can be replayed on a scratch database.
+-- This file is an APPLY-COMPATIBLE SUBSET, not a verified Supabase contract.
+-- It is NOT a migration and is never applied to Production. `clean-build.sh`
+-- loads it first so the repository migrations can start on a scratch database.
 --
--- Every object here exists on Supabase by default. If a future migration needs
--- something not listed, the clean build will fail and the prerequisite must be
--- added here deliberately.
+-- It is enough for the current migrations to begin applying, but it does not
+-- model the real platform: auth.uid() only reads the legacy single claim,
+-- auth.jwt() returns {}, storage has no RLS/policies, cron.job lacks the real
+-- columns, net.http_post() is synchronous, vault.decrypted_secrets is a plain
+-- view, and role memberships/default privileges are missing. A green clean
+-- build on this base proves "the repository SQL can run on this declared base",
+-- not "this base is Supabase".
+--
+-- See docs/t1/CLEAN_BUILD_DESIGN.md section 5 for the reference-dump + contract
+-- probe verification that must pass before calling this a platform contract.
+-- If a future migration needs something not listed, the clean build will fail
+-- and the prerequisite must be added here deliberately, with its source.
 do $$ begin
   if not exists (select 1 from pg_roles where rolname='anon') then create role anon nologin; end if;
   if not exists (select 1 from pg_roles where rolname='authenticated') then create role authenticated nologin; end if;

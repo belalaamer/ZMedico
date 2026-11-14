@@ -1,43 +1,46 @@
 -- Treatment-session integrity: status/performed_at consistency, a real session
--- cap, and a guard against shrinking a plan below what was already delivered.
+-- cap, plan reassignment, and a guard against shrinking a plan below what was
+-- already delivered.
 --
 -- Every claim below was reproduced on a local Postgres against the schema shape
--- Production has today (see supabase/tests/sessions/treatment_session_integrity.sh,
--- which shows the defects with --pre-fix and their prevention without it).
+-- Production has today (supabase/tests/sessions/treatment_session_integrity.sh
+-- shows the defects with --pre-fix and their prevention without it).
 --
 -- What is wrong on `main`:
 --
 --   1. `performed_at` and `status` can disagree. The screen sets `performed_at`
 --      when completing and clears it when returning to `pending`, but does
---      nothing for `completed -> missed`. A direct SQL update leaves a session
---      marked "missed" with a performed timestamp, and reports read it as work
---      that happened. Nothing in the database normalises either direction.
---   2. There is no cap at all. A plan that sold 6 sessions can record a 7th
---      completion by a plain UPDATE, and two completions running at once can both
---      pass any check that counts without locking.
+--      nothing for `completed -> missed`. Nothing in the database normalises
+--      either direction.
+--   2. There is no cap. A plan that sold 6 sessions can record a 7th completion
+--      by a plain UPDATE, and two completions at once can both pass any check
+--      that counts without locking.
 --   3. A completed session moved to another plan is not checked against the
---      receiving plan's cap.
---   4. `treatment_plans.total_sessions` can be lowered below the number of
---      sessions already delivered, which makes `remaining` negative and can
---      re-trigger invoicing logic that keys off `done >= total`.
+--      receiving plan's cap, and the source plan is left inconsistent.
+--   4. `treatment_plans.total_sessions` can be lowered below what was delivered,
+--      which makes `remaining` negative and can re-trigger invoicing logic.
 --
--- The fix is one guard, not four:
---   * `performed_at` is normalised in BOTH directions on every write, so the two
---     columns cannot contradict each other regardless of which client wrote.
---   * Only a transition *into* `completed` (or a completed row moving plan) takes
---     the cap check, and that check first takes `FOR UPDATE` on the plan row. Two
---     concurrent completions therefore serialise: the second counts after the
---     first commits. This is the same lock the invoice trigger takes, and it is
---     always session row -> plan row, so the order is consistent and cannot
---     deadlock with it.
---   * Re-opening a completed session stays allowed, because that is a legitimate
---     correction; the completion is recorded in the audit trail before
---     `performed_at` is cleared.
---   * Lowering `total_sessions` below `completed` is refused.
+-- Two details that decide the implementation and were checked, not assumed:
+--
+--   * Trigger order. Postgres fires same-timing BEFORE triggers in NAME order.
+--     `treatment_sessions_integrity` sorts before `trg_ts_updated_at`
+--     ("tre" < "trg"), so at the moment this guard runs, `new.updated_at` still
+--     holds the row's PREVIOUS value. Using `coalesce(new.updated_at, now())`
+--     would stamp `performed_at` with the last edit's time, which is not "when
+--     the session was completed". This guard therefore uses `now()` (the
+--     transaction's start time) and ignores `new.updated_at` entirely.
+--
+--   * Lock order. This guard takes the plan row(s) with `FOR UPDATE` BEFORE it
+--     counts. When #281 (T3) is applied, its invoice trigger takes the plan row
+--     FOR UPDATE on the AFTER timing, which is strictly after this BEFORE guard
+--     in the same statement, so the lock is already held and re-entry is free.
+--     On `main` today that trigger has no FOR UPDATE at all, so there is no
+--     competing plan lock. Either way the order is: session row -> plan row(s)
+--     in ascending id order, which no other path cycles against.
 --
 -- This file is deliberately independent of PR #280: it depends on nothing that PR
--- adds, and #280 no longer installs its own (weaker, unlocked) completion guard,
--- so there is exactly one guard on these rows.
+-- adds, and #280 no longer installs its own completion guard, so there is exactly
+-- one guard on these rows.
 --
 -- Status: NOT APPLIED. Nothing here has run against Production.
 
@@ -54,34 +57,53 @@ declare
   v_total integer;
   v_completed integer;
   v_entering boolean;
+  v_moving boolean;
+  v_needs_plans boolean;
+  v_src_total integer;
+  v_src_done integer;
+  v_src_invoice uuid;
+  v_src_status text;
 begin
-  -- `performed_at` describes the status. Normalise both directions so a client
-  -- that forgets it (or a direct SQL update) cannot leave the pair contradictory.
+  -- `performed_at` describes the status. Normalise both directions. `now()` is
+  -- the transaction clock, NOT `new.updated_at`, because the updated_at trigger
+  -- has not run yet at this point (see the header).
   if new.status = 'completed' then
     if new.performed_at is null then
-      new.performed_at := coalesce(new.updated_at, now());
+      new.performed_at := now();
     end if;
   else
     new.performed_at := null;
   end if;
 
-  -- Entering `completed` covers: a new completed row, an existing row whose
-  -- status was not completed, and a completed row moved to another plan.
+  v_moving := tg_op = 'UPDATE' and old.treatment_plan_id is distinct from new.treatment_plan_id;
   v_entering := new.status = 'completed' and (
     tg_op = 'INSERT'
     or coalesce(old.status, '') <> 'completed'
-    or old.treatment_plan_id is distinct from new.treatment_plan_id
+    or v_moving
   );
+  v_needs_plans := v_entering or (v_moving and old.status = 'completed');
 
+  -- Lock every plan this statement can change, in a deterministic order, BEFORE
+  -- any count. Two concurrent completions therefore serialise; two opposite moves
+  -- (A->B and B->A) take the same lock order and cannot deadlock.
+  if v_needs_plans then
+    if tg_op = 'INSERT' then
+      perform 1 from public.treatment_plans where id = new.treatment_plan_id for update;
+    else
+      perform 1 from (
+        select id from public.treatment_plans
+         where id in (new.treatment_plan_id, old.treatment_plan_id)
+         order by id
+         for update
+      ) locked;
+    end if;
+  end if;
+
+  -- Cap on the receiving plan.
   if v_entering then
-    -- Serialise concurrent completions on the plan. Without this, two sessions
-    -- both count "one remaining" and both commit.
     select total_sessions into v_total
-      from public.treatment_plans
-     where id = new.treatment_plan_id
-       for update;
+      from public.treatment_plans where id = new.treatment_plan_id;
 
-    -- No plan row: leave the referential failure to the foreign key.
     if v_total is not null then
       select count(*) into v_completed
         from public.treatment_sessions
@@ -94,6 +116,40 @@ begin
           v_total, v_completed
           using errcode = '23514',
                 hint = 'Re-open a completed session, or raise the plan''s total_sessions.';
+      end if;
+    end if;
+  end if;
+
+  -- A completed session leaving its plan. The source plan must stay honest: its
+  -- status is recomputed, and it may not be silently under-delivered if an
+  -- invoice has already been issued for the sessions it recorded.
+  if v_moving and old.status = 'completed' then
+    select total_sessions, invoice_id, status
+      into v_src_total, v_src_invoice, v_src_status
+      from public.treatment_plans where id = old.treatment_plan_id;
+
+    if v_src_total is not null then
+      select count(*) into v_src_done
+        from public.treatment_sessions
+       where treatment_plan_id = old.treatment_plan_id
+         and status = 'completed'
+         and id <> new.id;
+
+      if v_src_done < v_src_total then
+        if v_src_invoice is not null then
+          raise exception 'TREATMENT_PLAN_SESSION_MOVE_INVOICED: plan % already has invoice % for % delivered session(s); moving one out would leave it under-delivered against a bill already issued',
+            old.treatment_plan_id, v_src_invoice, v_src_total
+            using errcode = '23514',
+                  hint = 'Re-open the session (which is audited), then move the reopened placeholder.';
+        end if;
+
+        -- Keep the two plans consistent: a plan that is no longer fully delivered
+        -- is not `completed`. A cancelled plan is left alone.
+        if v_src_status = 'completed' then
+          update public.treatment_plans
+             set status = 'active', updated_at = now()
+           where id = old.treatment_plan_id and status = 'completed';
+        end if;
       end if;
     end if;
   end if;
@@ -124,8 +180,7 @@ create trigger treatment_sessions_integrity
   before insert or update on public.treatment_sessions
   for each row execute function public.tg_treatment_sessions_integrity();
 
--- Remove the unlocked guard an earlier draft of #280 installed, if it is present.
--- One guard, one policy for these rows.
+-- Remove the unlocked guard an earlier draft of #280 installed, if present.
 drop trigger if exists treatment_sessions_guard_completion on public.treatment_sessions;
 drop function if exists public.tg_treatment_sessions_guard_completion();
 

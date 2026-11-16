@@ -55,7 +55,31 @@ export default function Treasury() {
       setToday({ income: {}, expense: {} });
       return;
     }
-    const tq = supabase.from("treasury").select("*").eq("branch_id", branchId).is("deleted_at", null).order("created_at");
+    const { data: cycleRows, error: cycleError } = await (supabase as any).rpc("fn_financial_cycle_current", {
+      _branch_id: branchId,
+    });
+    if (cycleError) {
+      setTreasuries([]); setTxs([]); setToday({ income: {}, expense: {} });
+      toast.error(cycleError.message);
+      return;
+    }
+    const currentCycleId = (cycleRows ?? [])[0]?.cycle_id as string | undefined;
+    const { data: configuredCycles, error: configuredCyclesError } = await (supabase as any).rpc("fn_financial_cycles_for_branch", {
+      _branch_id: branchId,
+    });
+    if (configuredCyclesError) {
+      setTreasuries([]); setTxs([]); setToday({ income: {}, expense: {} });
+      toast.error(configuredCyclesError.message);
+      return;
+    }
+    let tq = supabase.from("treasury").select("*").eq("branch_id", branchId).is("deleted_at", null).order("created_at");
+    if (currentCycleId) tq = tq.eq("financial_cycle_id", currentCycleId);
+    else if ((configuredCycles ?? []).length > 0) {
+      setTreasuries([]); setTxs([]); setToday({ income: {}, expense: {} });
+      return;
+    } else {
+      tq = tq.eq("is_active", true);
+    }
     const { data: trs, error: trsError } = await tq;
     if (trsError) { toast.error(trsError.message); return; }
     if (requestId !== loadRequestRef.current) return;

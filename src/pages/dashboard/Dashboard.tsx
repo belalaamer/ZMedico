@@ -239,18 +239,40 @@ export default function Dashboard() {
 
       // Treasury (mirrors Treasury page: filter by treasury_id for this branch,
       // sum transaction_type income vs expense, exclude reversed pairs).
-      const lastCloseRes = await branchEq(
+      let trIds: string[] = [];
+      if (canTreasury) {
+        const { data: cycleRows, error: cycleError } = await (supabase as any).rpc("fn_financial_cycle_current", {
+          _branch_id: currentBranchId,
+        });
+        if (!cycleError) {
+          const currentCycleId = (cycleRows ?? [])[0]?.cycle_id as string | undefined;
+          const { data: configuredCycles, error: configuredCyclesError } = await (supabase as any).rpc("fn_financial_cycles_for_branch", {
+            _branch_id: currentBranchId,
+          });
+          if (!configuredCyclesError) {
+            let trQ = (supabase as any).from("treasury").select("id")
+              .eq("branch_id", currentBranchId).is("deleted_at", null);
+            if (currentCycleId) trQ = trQ.eq("financial_cycle_id", currentCycleId);
+            else if ((configuredCycles ?? []).length > 0) trQ = null;
+            else trQ = trQ.eq("is_active", true);
+            if (trQ) {
+              const { data: trRows } = await trQ;
+              trIds = ((trRows ?? []) as any[]).map((r) => r.id);
+            }
+          }
+        }
+      }
+
+      const lastCloseRes = trIds.length ? await branchEq(
         (supabase as any).from("treasury_daily_closes")
           .select("business_date,counted_cash,variance,branch_id")
+          .in("treasury_id", trIds)
           .order("business_date", { ascending: false })
           .limit(1)
-      );
+      ) : { data: [] };
       const lc = (lastCloseRes?.data ?? [])[0] as any;
       setLastClose(lc ? { business_date: lc.business_date, counted_cash: Number(lc.counted_cash || 0), variance: Number(lc.variance || 0) } : null);
 
-      const trQ = (supabase as any).from("treasury").select("id").eq("branch_id", currentBranchId).is("deleted_at", null);
-      const { data: trRows } = await trQ;
-      const trIds = ((trRows ?? []) as any[]).map((r) => r.id);
       let tIn = 0, tOut = 0;
       if (trIds.length) {
         const { data: tt } = await (supabase as any).from("treasury_transactions")

@@ -7,6 +7,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { enumLabel } from "@/lib/enumLabels";
 import { enumCopy, PAYMENT_METHOD_KEY } from "@/lib/enumKeys";
 import { useBranch } from "@/contexts/BranchContext";
+import { localDateOnly } from "@/lib/localDate";
 import { formatMoney, formatDate } from "@/lib/format";
 import { patientDisplayName } from "@/lib/patientName";
 import { ReportFilterBar, ReportPageHeader } from "./_shared";
@@ -58,6 +59,23 @@ export default function FinancialReports() {
   const dr = defaultDateRange(30);
   const [start, setStart] = useState(dr.start);
   const [end, setEnd] = useState(dr.end);
+
+  useEffect(() => {
+    if (!currentBranchId) return;
+    let active = true;
+    void (async () => {
+      const { data, error } = await (supabase as any).rpc("fn_financial_cycle_current", {
+        _branch_id: currentBranchId,
+      });
+      if (!active || error) return;
+      const cycle = (data ?? [])[0];
+      if (cycle?.start_date) {
+        setStart(cycle.start_date);
+        setEnd(localDateOnly(new Date()));
+      }
+    })();
+    return () => { active = false; };
+  }, [currentBranchId]);
 
   return (
     <div className="space-y-5">

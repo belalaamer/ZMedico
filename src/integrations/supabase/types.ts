@@ -8110,41 +8110,91 @@ export type Database = {
           },
         ]
       }
+      financial_cycles: {
+        Row: {
+          branch_id: string
+          created_at: string
+          created_by: string | null
+          end_date: string | null
+          id: string
+          name_ar: string
+          name_en: string
+          start_date: string
+        }
+        Insert: {
+          branch_id: string
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          name_ar: string
+          name_en: string
+          start_date: string
+        }
+        Update: {
+          branch_id?: string
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          name_ar?: string
+          name_en?: string
+          start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financial_cycles_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       treasury: {
         Row: {
+          account_kind: string
           branch_id: string
           created_at: string
           currency: string
           current_balance: number
           deleted_at: string | null
+          financial_cycle_id: string | null
           id: string
           is_active: boolean
+          is_default: boolean
           name_ar: string
           name_en: string
           non_cash_balance: number
           updated_at: string
         }
         Insert: {
+          account_kind?: string
           branch_id: string
           created_at?: string
           currency?: string
           current_balance?: number
           deleted_at?: string | null
+          financial_cycle_id?: string | null
           id?: string
           is_active?: boolean
+          is_default?: boolean
           name_ar: string
           name_en: string
           non_cash_balance?: number
           updated_at?: string
         }
         Update: {
+          account_kind?: string
           branch_id?: string
           created_at?: string
           currency?: string
           current_balance?: number
           deleted_at?: string | null
+          financial_cycle_id?: string | null
           id?: string
           is_active?: boolean
+          is_default?: boolean
           name_ar?: string
           name_en?: string
           non_cash_balance?: number
@@ -9246,6 +9296,32 @@ export type Database = {
       hr_set_staff_user_link: {
         Args: { p_new_user_id?: string | null; p_staff_id: string }
         Returns: Json
+      }
+      fn_financial_cycle_current: {
+        Args: { _branch_id: string }
+        Returns: {
+          cycle_id: string
+          name_en: string
+          name_ar: string
+          start_date: string
+          end_date: string | null
+          status: string
+        }[]
+      }
+      fn_financial_cycles_for_branch: {
+        Args: { _branch_id: string }
+        Returns: {
+          cycle_id: string
+          name_en: string
+          name_ar: string
+          start_date: string
+          end_date: string | null
+          status: string
+        }[]
+      }
+      default_bank_treasury_for_branch: {
+        Args: { _branch_id: string }
+        Returns: string | null
       }
       transfer_treasury_funds: {
         Args: {

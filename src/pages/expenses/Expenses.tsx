@@ -44,7 +44,46 @@ export default function Expenses() {
     const requestId = ++loadRequestRef.current;
     const branchId = currentBranchId;
     if (!branchSelectionReady || !branchId) { setItems([]); return; }
-    const q = supabase.from("expenses").select("*, expense_categories(name_en,name_ar)").eq("branch_id", branchId).is("deleted_at", null).order("expense_date", { ascending: false }).limit(200);
+    const { data: cycleRows, error: cycleError } = await (supabase as any).rpc("fn_financial_cycle_current", {
+      _branch_id: branchId,
+    });
+    if (cycleError) {
+      setItems([]);
+      toast.error(cycleError.message);
+      return;
+    }
+    const currentCycleId = (cycleRows ?? [])[0]?.cycle_id as string | undefined;
+    const { data: configuredCycles, error: configuredCyclesError } = await (supabase as any).rpc("fn_financial_cycles_for_branch", {
+      _branch_id: branchId,
+    });
+    if (configuredCyclesError) {
+      setItems([]);
+      toast.error(configuredCyclesError.message);
+      return;
+    }
+    let treasuryQuery = supabase.from("treasury").select("id")
+      .eq("branch_id", branchId).is("deleted_at", null);
+    if (currentCycleId) treasuryQuery = treasuryQuery.eq("financial_cycle_id", currentCycleId);
+    else if ((configuredCycles ?? []).length > 0) {
+      setItems([]);
+      return;
+    } else {
+      treasuryQuery = treasuryQuery.eq("is_active", true);
+    }
+    const { data: treasuryRows, error: treasuryError } = await treasuryQuery;
+    if (treasuryError) {
+      setItems([]);
+      toast.error(treasuryError.message);
+      return;
+    }
+    const treasuryIds = (treasuryRows ?? []).map((row: any) => row.id as string);
+    if (treasuryIds.length === 0) {
+      setItems([]);
+      return;
+    }
+    const q = supabase.from("expenses").select("*, expense_categories(name_en,name_ar)")
+      .eq("branch_id", branchId).in("treasury_id", treasuryIds)
+      .is("deleted_at", null).order("expense_date", { ascending: false }).limit(200);
     const { data, error } = await q;
     if (error) { toast.error(error.message); return; }
     if (requestId !== loadRequestRef.current) return;

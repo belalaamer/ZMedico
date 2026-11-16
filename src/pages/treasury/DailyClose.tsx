@@ -72,8 +72,44 @@ export default function DailyClose() {
     }
     let active = true;
     (async () => {
-      const { data } = await supabase.from("treasury").select("*").eq("branch_id", branchId).is("deleted_at", null).order("created_at");
+      const { data: cycleRows, error: cycleError } = await (supabase as any).rpc("fn_financial_cycle_current", {
+        _branch_id: branchId,
+      });
       if (!active) return;
+      if (cycleError) {
+        setTreasuries([]); setTreasuryId(""); setSummary(null); setExisting(null);
+        toast.error(cycleError.message);
+        return;
+      }
+      const currentCycleId = (cycleRows ?? [])[0]?.cycle_id as string | undefined;
+      const { data: configuredCycles, error: configuredCyclesError } = await (supabase as any).rpc("fn_financial_cycles_for_branch", {
+        _branch_id: branchId,
+      });
+      if (!active) return;
+      if (configuredCyclesError) {
+        setTreasuries([]); setTreasuryId(""); setSummary(null); setExisting(null);
+        toast.error(configuredCyclesError.message);
+        return;
+      }
+      let query = supabase.from("treasury").select("*")
+        .eq("branch_id", branchId)
+        .eq("account_kind", "cash")
+        .is("deleted_at", null)
+        .order("created_at");
+      if (currentCycleId) query = query.eq("financial_cycle_id", currentCycleId);
+      else if ((configuredCycles ?? []).length > 0) {
+        setTreasuries([]); setTreasuryId(""); setSummary(null); setExisting(null);
+        return;
+      } else {
+        query = query.eq("is_active", true);
+      }
+      const { data, error } = await query;
+      if (!active) return;
+      if (error) {
+        setTreasuries([]); setTreasuryId(""); setSummary(null); setExisting(null);
+        toast.error(error.message);
+        return;
+      }
       const next = data ?? [];
       setTreasuries(next);
       setTreasuryId((previous) => next.some((tr) => tr.id === previous) ? previous : (next[0]?.id ?? ""));

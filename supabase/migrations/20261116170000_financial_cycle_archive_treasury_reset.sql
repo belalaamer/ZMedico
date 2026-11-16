@@ -175,7 +175,6 @@ do $seed$
 declare
   v_branch uuid := 'd0c1a50b-8de3-4a32-9b8f-19ff6309a773';
   v_old_cycle uuid;
-  v_new_cycle uuid;
   v_old_treasury uuid;
   v_start date;
 begin
@@ -223,44 +222,6 @@ begin
          is_active = true
    where id = v_old_treasury;
 
-  select fc.id into v_new_cycle
-  from public.financial_cycles fc
-  where fc.branch_id = v_branch and fc.start_date = date '2026-12-01';
-
-  if v_new_cycle is null then
-    insert into public.financial_cycles
-      (branch_id,name_en,name_ar,start_date,end_date)
-    values
-      (v_branch,'Blitz Physio – 2026/2027','بليتز فيزيو – 2026/2027',
-       date '2026-12-01',null)
-    returning id into v_new_cycle;
-  end if;
-
-  if not exists (
-    select 1 from public.treasury
-    where financial_cycle_id = v_new_cycle and lower(name_en) = 'clinic safe'
-      and deleted_at is null
-  ) then
-    insert into public.treasury
-      (branch_id,name_en,name_ar,current_balance,non_cash_balance,currency,
-       is_active,financial_cycle_id,account_kind,is_default)
-    values
-      (v_branch,'Clinic Safe','خزينة العيادة',0,0,'EGP',
-       false,v_new_cycle,'cash',true);
-  end if;
-
-  if not exists (
-    select 1 from public.treasury
-    where financial_cycle_id = v_new_cycle and lower(name_en) = 'bank treasury'
-      and deleted_at is null
-  ) then
-    insert into public.treasury
-      (branch_id,name_en,name_ar,current_balance,non_cash_balance,currency,
-       is_active,financial_cycle_id,account_kind,is_default)
-    values
-      (v_branch,'Bank Treasury','الخزينة البنكية',0,0,'EGP',
-       false,v_new_cycle,'bank',false);
-  end if;
 end;
 $seed$;
 
@@ -781,31 +742,26 @@ $function$;
 -- Cycle state is derived from its Cairo-local date range at read/write time.
 -- This avoids relying on pg_cron, which is not currently executing reliably on this project.
 
--- Immediate, read-only invariants: the current old treasury remains the default until Dec 1.
+-- Verify the existing Clinic Safe is the active default for the seeded historical cycle.
 do $verify$
 declare
   v_branch uuid := 'd0c1a50b-8de3-4a32-9b8f-19ff6309a773';
   v_current uuid;
   v_current_default uuid;
-  v_new_count integer;
+  v_expected_default uuid;
 begin
-  v_current := public._financial_cycle_for_date(v_branch,(statement_timestamp() at time zone 'Africa/Cairo')::date);
+  v_current := public._financial_cycle_for_date(
+    v_branch,(statement_timestamp() at time zone 'Africa/Cairo')::date
+  );
   select public.default_treasury_for_branch(v_branch) into v_current_default;
-  select count(*) into v_new_count
+  select t.id into v_expected_default
   from public.treasury t
-  where t.financial_cycle_id = (
-    select fc.id from public.financial_cycles fc
-    where fc.branch_id=v_branch and fc.start_date=date '2026-12-01'
-  )
-  and t.current_balance=0 and t.non_cash_balance=0
-  and t.is_active=false
-  and t.name_en in ('Clinic Safe','Bank Treasury');
+  where t.branch_id=v_branch and t.financial_cycle_id=v_current
+    and t.is_default and t.deleted_at is null;
 
-  if v_current is null or v_current_default is null then
-    raise exception 'Financial cycle seed verification failed: no current cycle/default treasury';
-  end if;
-  if v_new_count <> 2 then
-    raise exception 'Financial cycle seed verification failed: expected two zero opening treasuries, got %',v_new_count;
+  if v_current is null or v_current_default is null
+     or v_current_default is distinct from v_expected_default then
+    raise exception 'Financial cycle seed verification failed: current Clinic Safe is not the cycle default';
   end if;
 end;
 $verify$;

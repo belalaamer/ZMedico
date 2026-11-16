@@ -350,7 +350,11 @@ begin
       and t.deleted_at is null
     order by t.created_at,t.id
     limit 1;
-    return v_id;
+    if v_id is not null then
+      return v_id;
+    end if;
+    -- Until a cycle has a dedicated bank account, preserve the prior non-cash bucket.
+    return public.default_treasury_for_branch(_branch_id);
   end if;
 
   if exists (select 1 from public.financial_cycles fc where fc.branch_id = _branch_id) then

@@ -20,6 +20,7 @@ vi.mock("@/components/RowActions", () => ({ RowActions: () => null }));
 vi.mock("./TransferDialog", () => ({ TransferDialog: () => null }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
+    rpc: vi.fn().mockResolvedValue({ data: [], error: null }),
     from: (table: string) => {
       let selected = "";
       const api: Record<string, unknown> = {

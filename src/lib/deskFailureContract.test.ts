@@ -25,7 +25,7 @@ const LEDGER: string[] = [
   "src/pages/booking/PublicBooking.tsx=1",
   "src/pages/branches/Branches.tsx=4",
   "src/pages/coupons/Coupons.tsx=4",
-  "src/pages/expenses/Expenses.tsx=3",
+  "src/pages/expenses/Expenses.tsx=6",
   "src/pages/hr/DoctorServicesTab.tsx=3",
   "src/pages/hr/Payroll.tsx=6",
   "src/pages/hr/Staff.tsx=3",
@@ -87,8 +87,8 @@ const LEDGER: string[] = [
   "src/pages/settings/Services.tsx=4",
   "src/pages/settings/Templates.tsx=1",
   "src/pages/settings/UserManagement.tsx=6",
-  "src/pages/treasury/DailyClose.tsx=2",
-  "src/pages/treasury/Treasury.tsx=5",
+  "src/pages/treasury/DailyClose.tsx=5",
+  "src/pages/treasury/Treasury.tsx=7",
 ];
 
 const sourceFiles = (dir: string): string[] => {

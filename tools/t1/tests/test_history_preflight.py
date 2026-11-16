@@ -182,6 +182,42 @@ class RepoHistoryTests(unittest.TestCase):
             self.assertTrue(any("repository file missing from manifest" in e for e in v.errors))
 
 
+    def test_real_repo_plans_all_436_files_once_under_a_temporary_annotation(self):
+        """A human decision that both patient-code files apply plans 436/436.
+
+        This temp annotation proves the harness does not drop or duplicate a
+        file. It does not resolve the real ambiguity in the committed manifest.
+        """
+        manifest = os.path.join(REPO_ROOT, "tools/t1/history/repo-history.json")
+        with tempfile.TemporaryDirectory() as root:
+            os.makedirs(os.path.join(root, "supabase"), exist_ok=True)
+            os.symlink(
+                os.path.join(REPO_ROOT, "supabase", "migrations"),
+                os.path.join(root, "supabase", "migrations"),
+            )
+            write(
+                os.path.join(root, "tools", "t1", "history", "repo-annotations.json"),
+                json.dumps({"duplicate_groups": [
+                    {
+                        "versions": ["20260503000512", "20260503000555"],
+                        "status": "intentional_reapply",
+                        "reason": "test-only decision: prove both files are planned once",
+                    },
+                    {
+                        "versions": ["20260826030000", "20261025090000"],
+                        "status": "intentional_reapply",
+                        "reason": "real deliberate coverage-grant re-application",
+                    },
+                ]}),
+            )
+            v = hp.Validation()
+            plan = hp.check_repo(manifest, root, 436, v)
+            self.assertTrue(v.ok(), v.errors)
+            self.assertEqual(len(plan), 436)
+            self.assertEqual(len({p["version"] for p in plan}), 436)
+            self.assertEqual(len({p["path"] for p in plan}), 436)
+
+
 class ProductionHistoryTests(unittest.TestCase):
     def build_three_sources(self, root):
         write(os.path.join(root, "supabase", "migrations", "20260101000000_a.sql"), "SELECT 1;\n")
@@ -208,6 +244,37 @@ class ProductionHistoryTests(unittest.TestCase):
             self.assertEqual([p["ordinal"] for p in plan], [1, 2, 3])
             self.assertEqual([p["version"] for p in plan], ["20260101000000", "20260101000001", "20260101000002"])
             self.assertEqual(len({p["version"] for p in plan}), 3)
+
+    def test_real_production_plans_all_486_rows_in_order_with_a_temporary_source(self):
+        """A test-only source for row 554 proves all 486 rows are kept in order.
+
+        It does not choose the real source for the ambiguous row.
+        """
+        source = os.path.join(REPO_ROOT, "tools/t1/history/production-history.jsonl")
+        rows = read_jsonl(source)
+        target = next(r for r in rows if r["version"] == "20260503000554")
+        repo_path = "supabase/migrations/20260503000512_reset_patient_code_to_active_max.sql"
+        with open(os.path.join(REPO_ROOT, repo_path), errors="ignore") as fh:
+            repo_text = fh.read()
+        target["resolution"] = "single_candidate"
+        target["source"] = {
+            "type": "repo",
+            "path": repo_path,
+            "sha256": file_sha(os.path.join(REPO_ROOT, repo_path)),
+            "token_sha256": mm.statement_hash(repo_text),
+        }
+        with tempfile.TemporaryDirectory() as root:
+            temp_manifest = os.path.join(root, "production-history.jsonl")
+            with open(temp_manifest, "w") as fh:
+                for row in rows:
+                    fh.write(json.dumps(row, sort_keys=True) + "\n")
+            v = hp.Validation()
+            plan = hp.check_production(temp_manifest, REPO_ROOT, 486, v)
+            self.assertTrue(v.ok(), v.errors)
+            self.assertEqual(len(plan), 486)
+            self.assertEqual([p["ordinal"] for p in plan], list(range(1, 487)))
+            self.assertEqual([p["version"] for p in plan], [r["version"] for r in rows])
+            self.assertEqual(len({p["version"] for p in plan}), 486)
 
     def test_out_of_order_rows_are_rejected(self):
         with tempfile.TemporaryDirectory() as root:

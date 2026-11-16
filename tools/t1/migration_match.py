@@ -338,7 +338,8 @@ def load_repo(repo: str):
     for path in files:
         base = os.path.basename(path)
         version = base[:14]
-        text = open(path, errors="ignore").read()
+        with open(path, errors="ignore") as fh:
+            text = fh.read()
         entry = {
             "file": base,
             "version": version,
@@ -356,7 +357,8 @@ def load_recovered(repo: str):
     for path in sorted(glob.glob(os.path.join(repo, "supabase", "migrations.recovered", "*.sql"))):
         base = os.path.basename(path)
         version = base[:14]
-        text = open(path, errors="ignore").read()
+        with open(path, errors="ignore") as fh:
+            text = fh.read()
         body = re.sub(r"^(?:--[^\n]*\n)+", "", text)
         out[version] = {
             "file": base,

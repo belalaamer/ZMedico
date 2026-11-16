@@ -52,6 +52,28 @@ class StatementBoundaryTests(unittest.TestCase):
     def test_statement_order_matters(self):
         self.assertNotEqual(self.h("SELECT 1; SELECT 2;"), self.h("SELECT 2; SELECT 1;"))
 
+    def test_semantically_different_statement_sequences_are_not_merged(self):
+        two_updates = (
+            "UPDATE accounts SET balance = balance - 10 WHERE id = 1; "
+            "UPDATE accounts SET balance = balance + 10 WHERE id = 2;"
+        )
+        reversed_updates = (
+            "UPDATE accounts SET balance = balance + 10 WHERE id = 2; "
+            "UPDATE accounts SET balance = balance - 10 WHERE id = 1;"
+        )
+        one_do_block = (
+            "DO $$ BEGIN "
+            "UPDATE accounts SET balance = balance - 10 WHERE id = 1; "
+            "UPDATE accounts SET balance = balance + 10 WHERE id = 2; "
+            "END $$;"
+        )
+        # Same tokens, different execution order: not the same history.
+        self.assertNotEqual(self.h(two_updates), self.h(reversed_updates))
+        # Same inner statements, different execution context: not merged.
+        self.assertNotEqual(self.h(two_updates), self.h(one_do_block))
+        self.assertLess(mm.similarity(two_updates, reversed_updates), 1.0)
+        self.assertLess(mm.similarity(two_updates, one_do_block), 1.0)
+
     def test_outer_begin_commit_are_ignored(self):
         self.assertEqual(
             self.h("BEGIN; CREATE TABLE t(); COMMIT;"),

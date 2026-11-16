@@ -110,7 +110,7 @@ Run them with:
 python3 -m unittest discover -s tools/t1/tests -v
 ```
 
-At the reviewed commit this is 50 tests (24 matcher, 5 ambiguity, 21 history
+At the reviewed commit this is 54 tests (25 matcher, 6 ambiguity, 23 history
 preflight). A green test run proves the matcher is boundary-safe; it does not
 prove the SQL is semantically identical.
 
@@ -525,15 +525,20 @@ python3 tools/t1/history_preflight.py --history production --repo . --expect 486
 python3 -m unittest discover -s tools/t1/tests -v
 ```
 
-The 21 history tests include:
+The 23 history tests include:
 
 - repo fixture: every file planned exactly once, and an unlisted `.sql` file in
   `supabase/migrations/` fails the manifest;
+- repo real data: with a temporary `intentional_reapply` annotation for the
+  patient-code pair, the plan contains all 436 files, each version once;
 - repo fixture: duplicate content without an annotation stops with both files;
 - repo fixture: an `intentional_reapply` annotation keeps both files;
 - repo fixture: duplicate version, missing file and hash drift are rejected;
 - production fixture: all rows planned once, in order, with repo, recovered
   and exact-production sources;
+- production real data: with a test-only source for row `20260503000554`, the
+  plan contains all 486 rows, ordinals 1…486, in the manifest order; this
+  proves retention and order, not the real choice for that row;
 - production fixture: out-of-order rows, duplicate versions, missing sources,
   hash drift and cross-history source paths are rejected;
 - production fixture: same content needs `content_duplicate_of` and a
@@ -543,6 +548,13 @@ The 21 history tests include:
 - real data: the repo preflight stops on the patient-code pair, the Production
   preflight stops on `20260503000554`, and both manifests contain every row
   exactly once.
+
+The matcher test `test_semantically_different_statement_sequences_are_not_merged`
+proves that the same tokens in a different statement order, or the same inner
+statements inside a `DO` block instead of at top level, do not hash equal. The
+ambiguity test `test_ambiguity_never_auto_selects_a_candidate` runs the same
+ambiguous input twice, checks that both candidates are still listed, and checks
+that `repo_file` stays empty with a `STOP` action both times.
 
 No test writes to a database and no test edits a migration.
 

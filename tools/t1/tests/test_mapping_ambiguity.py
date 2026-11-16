@@ -41,6 +41,33 @@ class AmbiguityTests(unittest.TestCase):
             self.assertIn("20260101000001_b.sql", row["repo_candidates"])
             self.assertTrue(row["action"].startswith("STOP"))
 
+    def test_ambiguity_never_auto_selects_a_candidate(self):
+        with tempfile.TemporaryDirectory() as root:
+            write_repo(root, {
+                "20260101000000_a.sql": "SELECT 1;\n",
+                "20260101000001_b.sql": "SELECT 1;\n",
+            })
+            production = [{
+                "version": "20260101000002",
+                "name": "",
+                "statements": ["SELECT 1"],
+            }]
+            first = mm.classify(production, root)[0][0]
+            second = mm.classify(production, root)[0][0]
+            candidates = set(first["repo_candidates"].split("|"))
+            self.assertEqual(candidates, {
+                "20260101000000_a.sql",
+                "20260101000001_b.sql",
+            })
+            self.assertEqual(first["resolution"], "unresolved")
+            self.assertEqual(first["repo_file"], "")
+            self.assertTrue(first["action"].startswith("STOP"))
+            # The result is deterministic and still unresolved; it did not
+            # silently choose the first candidate on either run.
+            self.assertEqual(first["resolution"], second["resolution"])
+            self.assertEqual(first["repo_file"], second["repo_file"])
+            self.assertEqual(first["repo_candidates"], second["repo_candidates"])
+
     def test_unique_name_resolves_a_content_tie(self):
         with tempfile.TemporaryDirectory() as root:
             write_repo(root, {

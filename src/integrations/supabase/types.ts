@@ -8112,7 +8112,6 @@ export type Database = {
       }
       financial_cycles: {
         Row: {
-          archived_at: string | null
           branch_id: string
           created_at: string
           created_by: string | null
@@ -8121,10 +8120,8 @@ export type Database = {
           name_ar: string
           name_en: string
           start_date: string
-          status: string
         }
         Insert: {
-          archived_at?: string | null
           branch_id: string
           created_at?: string
           created_by?: string | null
@@ -8133,10 +8130,8 @@ export type Database = {
           name_ar: string
           name_en: string
           start_date: string
-          status?: string
         }
         Update: {
-          archived_at?: string | null
           branch_id?: string
           created_at?: string
           created_by?: string | null
@@ -8145,7 +8140,6 @@ export type Database = {
           name_ar?: string
           name_en?: string
           start_date?: string
-          status?: string
         }
         Relationships: [
           {

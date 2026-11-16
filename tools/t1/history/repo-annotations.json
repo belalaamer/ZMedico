@@ -1,0 +1,20 @@
+{
+  "duplicate_groups": [
+    {
+      "versions": [
+        "20260503000512",
+        "20260503000555"
+      ],
+      "status": "unresolved",
+      "reason": "token-identical repo files; Production has one row with this content. Choose the canonical file and mark the other duplicate_of before the build."
+    },
+    {
+      "versions": [
+        "20260826030000",
+        "20261025090000"
+      ],
+      "status": "intentional_reapply",
+      "reason": "the same REVOKE/GRANT is a deliberate second application at a later version; both files are real repository history and neither is a duplicate to drop."
+    }
+  ]
+}

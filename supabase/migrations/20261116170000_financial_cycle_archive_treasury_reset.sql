@@ -95,6 +95,8 @@ begin
      or not (
        public.has_permission(v_actor,'treasury.view')
        or public.has_permission(v_actor,'treasury.shift.use')
+       or public.has_permission(v_actor,'expenses.view')
+       or public.has_permission(v_actor,'expenses.create')
        or public.has_permission(v_actor,'reports.view')
        or public.has_role(v_actor,'accountant'::public.app_role)
        or public.has_role(v_actor,'manager'::public.app_role)
@@ -142,6 +144,8 @@ begin
   if v_actor is null
      or not (
        public.has_permission(v_actor,'treasury.view')
+       or public.has_permission(v_actor,'expenses.view')
+       or public.has_permission(v_actor,'expenses.create')
        or public.has_permission(v_actor,'reports.view')
        or public.has_role(v_actor,'accountant'::public.app_role)
        or public.has_role(v_actor,'manager'::public.app_role)
@@ -516,6 +520,55 @@ end;
 $function$;
 
 revoke all on function public._tg_financial_reception_backdate_guard() from public, anon, authenticated;
+
+-- Manual adjustments and transfers can only touch the cycle currently open for new work.
+-- Reversals are deliberately exempt: cancelling an old payment/expense must reverse
+-- the exact historical treasury row, even after its financial cycle has been archived.
+create or replace function public._tg_treasury_tx_cycle_guard()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_branch uuid;
+  v_treasury_cycle uuid;
+  v_current_cycle uuid;
+  v_today date := (statement_timestamp() at time zone 'Africa/Cairo')::date;
+begin
+  if new.reference_type not in ('manual','adjustment','transfer') then
+    return new;
+  end if;
+
+  select t.branch_id, t.financial_cycle_id
+    into v_branch, v_treasury_cycle
+  from public.treasury t
+  where t.id = new.treasury_id and t.deleted_at is null;
+
+  if not found then
+    raise exception 'Treasury not found for financial-cycle transaction'
+      using errcode='23503';
+  end if;
+
+  if not exists (select 1 from public.financial_cycles fc where fc.branch_id = v_branch) then
+    return new;
+  end if;
+
+  v_current_cycle := public._financial_cycle_for_date(v_branch,v_today);
+  if v_current_cycle is null or v_treasury_cycle is distinct from v_current_cycle then
+    raise exception 'Manual treasury entries and transfers must use the current financial cycle'
+      using errcode='23514';
+  end if;
+  return new;
+end;
+$function$;
+
+revoke all on function public._tg_treasury_tx_cycle_guard() from public, anon, authenticated;
+
+drop trigger if exists treasury_tx_cycle_guard on public.treasury_transactions;
+create trigger treasury_tx_cycle_guard
+before insert on public.treasury_transactions
+for each row execute function public._tg_treasury_tx_cycle_guard();
 
 drop trigger if exists financial_reception_backdate_guard on public.invoices;
 create trigger financial_reception_backdate_guard

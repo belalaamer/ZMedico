@@ -9,11 +9,8 @@ create table if not exists public.financial_cycles (
   name_ar text not null,
   start_date date not null,
   end_date date,
-  status text not null default 'scheduled'
-    check (status in ('scheduled','active','archived')),
   created_by uuid references auth.users(id) on delete set null,
   created_at timestamptz not null default now(),
-  archived_at timestamptz,
   constraint financial_cycles_valid_dates check (end_date is null or end_date >= start_date)
 );
 
@@ -202,10 +199,10 @@ begin
 
   if v_old_cycle is null then
     insert into public.financial_cycles
-      (branch_id,name_en,name_ar,start_date,end_date,status)
+      (branch_id,name_en,name_ar,start_date,end_date)
     values
       (v_branch,'Blitz Physio – Initial Cycle','بليتز فيزيو – الدورة السابقة',
-       v_start,date '2026-11-30','active')
+       v_start,date '2026-11-30')
     returning id into v_old_cycle;
   end if;
 
@@ -232,10 +229,10 @@ begin
 
   if v_new_cycle is null then
     insert into public.financial_cycles
-      (branch_id,name_en,name_ar,start_date,end_date,status)
+      (branch_id,name_en,name_ar,start_date,end_date)
     values
       (v_branch,'Blitz Physio – 2026/2027','بليتز فيزيو – 2026/2027',
-       date '2026-12-01',null,'scheduled')
+       date '2026-12-01',null)
     returning id into v_new_cycle;
   end if;
 
@@ -781,74 +778,8 @@ begin
 end;
 $function$;
 
--- Materialize date-driven cycle activation and archive the prior cycle without deleting history.
-create or replace function public.fn_activate_due_financial_cycles()
-returns jsonb
-language plpgsql
-security definer
-set search_path = 'public'
-as $function$
-declare
-  v_today date := (statement_timestamp() at time zone 'Africa/Cairo')::date;
-  v_archived integer := 0;
-  v_activated integer := 0;
-begin
-  update public.financial_cycles fc
-     set status='archived',
-         archived_at=coalesce(fc.archived_at,statement_timestamp())
-   where fc.status='active'
-     and fc.end_date is not null
-     and fc.end_date < v_today;
-  get diagnostics v_archived = row_count;
-
-  update public.treasury t
-     set is_active=false
-    from public.financial_cycles fc
-   where t.financial_cycle_id=fc.id
-     and fc.status='archived'
-     and t.is_active is distinct from false;
-
-  update public.financial_cycles fc
-     set status='active',
-         archived_at=null
-   where fc.status='scheduled'
-     and fc.start_date <= v_today
-     and (fc.end_date is null or fc.end_date >= v_today);
-  get diagnostics v_activated = row_count;
-
-  update public.treasury t
-     set is_active=true
-    from public.financial_cycles fc
-   where t.financial_cycle_id=fc.id
-     and fc.status='active'
-     and t.deleted_at is null
-     and t.is_active is distinct from true;
-
-  return jsonb_build_object(
-    'business_date',v_today,
-    'archived_cycles',v_archived,
-    'activated_cycles',v_activated
-  );
-end;
-$function$;
-
-revoke all on function public.fn_activate_due_financial_cycles() from public, anon, authenticated;
-
-do $cron$
-declare
-  v_job_id bigint;
-begin
-  select jobid into v_job_id from cron.job where jobname='financial-cycle-activation';
-  if v_job_id is not null then
-    perform cron.unschedule(v_job_id);
-  end if;
-  perform cron.schedule(
-    'financial-cycle-activation',
-    '0 22 * * *',
-    'select public.fn_activate_due_financial_cycles();'
-  );
-end;
-$cron$;
+-- Cycle state is derived from its Cairo-local date range at read/write time.
+-- This avoids relying on pg_cron, which is not currently executing reliably on this project.
 
 -- Immediate, read-only invariants: the current old treasury remains the default until Dec 1.
 do $verify$

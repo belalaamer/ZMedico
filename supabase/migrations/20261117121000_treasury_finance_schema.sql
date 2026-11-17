@@ -59,6 +59,11 @@ create index if not exists treasury_parent_idx
   on public.treasury (parent_treasury_id)
   where parent_treasury_id is not null;
 
+-- Referenced by treasury_payment_routes so a route cannot point at a treasury
+-- that belongs to another branch.
+create unique index if not exists treasury_id_branch_uq
+  on public.treasury (id, branch_id);
+
 -- ---------------------------------------------------------------------------
 -- 2. treasury_shifts: status, custody, and settlement links
 -- ---------------------------------------------------------------------------
@@ -146,6 +151,10 @@ create unique index if not exists treasury_shifts_one_unsettled_per_drawer
   on public.treasury_shifts (treasury_id)
   where settled_at is null;
 
+-- Referenced by payments so a payment cannot point at a shift in another branch.
+create unique index if not exists treasury_shifts_id_branch_uq
+  on public.treasury_shifts (id, branch_id);
+
 create or replace function public._tg_treasury_shift_status()
 returns trigger
 language plpgsql
@@ -198,6 +207,12 @@ alter table public.payments
       or
       (payment_batch_id is not null and split_index is not null)
     );
+
+-- MATCH SIMPLE would let a null branch_id skip the composite shift FK below.
+-- A payment attached to a shift must therefore carry its branch.
+alter table public.payments
+  add constraint payments_shift_branch_required
+    check (shift_id is null or branch_id is not null);
 
 create unique index if not exists payments_batch_split_uq
   on public.payments (payment_batch_id, split_index)
@@ -277,6 +292,11 @@ revoke all on table public.treasury_payment_routes from public, anon, authentica
 -- 5. foreign keys between the new columns and their source rows
 -- ---------------------------------------------------------------------------
 
+-- Referenced by payment_batches so a batch cannot point at an invoice in
+-- another branch.
+create unique index if not exists invoices_id_branch_uq
+  on public.invoices (id, branch_id);
+
 alter table public.payments
   add constraint payments_shift_fk
     foreign key (shift_id) references public.treasury_shifts(id)
@@ -301,6 +321,38 @@ alter table public.treasury_transactions
   add constraint treasury_tx_cycle_fk
     foreign key (financial_cycle_id) references public.financial_cycles(id)
     on delete restrict;
+
+-- Branch consistency across the new links. Each pair is validated after the
+-- unique indexes above; the NOT VALID/validate split keeps the locks short.
+alter table public.payments
+  add constraint payments_shift_branch_fk
+    foreign key (shift_id, branch_id)
+    references public.treasury_shifts (id, branch_id)
+    on delete restrict
+    not valid;
+
+alter table public.payments
+  validate constraint payments_shift_branch_fk;
+
+alter table public.payment_batches
+  add constraint payment_batches_invoice_branch_fk
+    foreign key (invoice_id, branch_id)
+    references public.invoices (id, branch_id)
+    on delete restrict
+    not valid;
+
+alter table public.payment_batches
+  validate constraint payment_batches_invoice_branch_fk;
+
+alter table public.treasury_payment_routes
+  add constraint treasury_payment_routes_treasury_branch_fk
+    foreign key (treasury_id, branch_id)
+    references public.treasury (id, branch_id)
+    on delete restrict
+    not valid;
+
+alter table public.treasury_payment_routes
+  validate constraint treasury_payment_routes_treasury_branch_fk;
 
 -- ---------------------------------------------------------------------------
 -- 6. branch/cycle composite FKs

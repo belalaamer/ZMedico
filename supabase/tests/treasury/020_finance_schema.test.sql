@@ -5,7 +5,7 @@
 
 begin;
 
-select plan(33);
+select plan(46);
 
 -- treasury: drawer metadata
 select ok(
@@ -162,6 +162,74 @@ select ok(
   (select count(*) from pg_policies
     where schemaname='public' and tablename in ('payment_batches','treasury_payment_routes')) = 0,
   'new finance tables expose no direct RLS policy');
+
+-- branch consistency: treasury_payment_routes -> treasury
+select ok(
+  to_regclass('public.treasury_id_branch_uq') is not null,
+  'treasury (id,branch_id) unique index exists');
+select ok(
+  exists (select 1 from pg_constraint
+           where conrelid='public.treasury_payment_routes'::regclass
+             and conname='treasury_payment_routes_treasury_branch_fk'),
+  'treasury payment route branch/treasury FK exists');
+select ok(
+  (select convalidated from pg_constraint
+    where conrelid='public.treasury_payment_routes'::regclass
+      and conname='treasury_payment_routes_treasury_branch_fk'),
+  'treasury payment route branch/treasury FK is validated');
+select ok(
+  (select pg_get_constraintdef(oid) from pg_constraint
+    where conrelid='public.treasury_payment_routes'::regclass
+      and conname='treasury_payment_routes_treasury_branch_fk')
+    ilike '%(treasury_id, branch_id)%references treasury(id, branch_id)%',
+  'treasury payment route FK compares both branch_id and treasury_id');
+
+-- branch consistency: payment_batches -> invoices
+select ok(
+  to_regclass('public.invoices_id_branch_uq') is not null,
+  'invoices (id,branch_id) unique index exists');
+select ok(
+  exists (select 1 from pg_constraint
+           where conrelid='public.payment_batches'::regclass
+             and conname='payment_batches_invoice_branch_fk'),
+  'payment batch branch/invoice FK exists');
+select ok(
+  (select convalidated from pg_constraint
+    where conrelid='public.payment_batches'::regclass
+      and conname='payment_batches_invoice_branch_fk'),
+  'payment batch branch/invoice FK is validated');
+select ok(
+  (select pg_get_constraintdef(oid) from pg_constraint
+    where conrelid='public.payment_batches'::regclass
+      and conname='payment_batches_invoice_branch_fk')
+    ilike '%(invoice_id, branch_id)%references invoices(id, branch_id)%',
+  'payment batch FK compares both branch_id and invoice_id');
+
+-- branch consistency: payments -> treasury_shifts
+select ok(
+  to_regclass('public.treasury_shifts_id_branch_uq') is not null,
+  'treasury_shifts (id,branch_id) unique index exists');
+select ok(
+  exists (select 1 from pg_constraint
+           where conrelid='public.payments'::regclass
+             and conname='payments_shift_branch_required'),
+  'payments shift branch-required check exists');
+select ok(
+  exists (select 1 from pg_constraint
+           where conrelid='public.payments'::regclass
+             and conname='payments_shift_branch_fk'),
+  'payments branch/shift FK exists');
+select ok(
+  (select convalidated from pg_constraint
+    where conrelid='public.payments'::regclass
+      and conname='payments_shift_branch_fk'),
+  'payments branch/shift FK is validated');
+select ok(
+  (select pg_get_constraintdef(oid) from pg_constraint
+    where conrelid='public.payments'::regclass
+      and conname='payments_shift_branch_fk')
+    ilike '%(shift_id, branch_id)%references treasury_shifts(id, branch_id)%',
+  'payments FK compares both branch_id and shift_id');
 
 select * from finish();
 

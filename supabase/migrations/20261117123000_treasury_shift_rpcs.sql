@@ -6,15 +6,16 @@
 -- historical ledger entries.
 --
 -- Canonical lock order:
---   1. the shift row (when the operation owns one),
---   2. the advisory lock keyed by that shift id (the same key used by
+--   1. the advisory lock keyed by the shift id (the same key used by
 --      transfer_treasury_funds),
+--   2. the shift row,
 --   3. treasury rows in UUID order,
 --   4. re-read and revalidate all metadata after the locks.
 --
--- transfer_treasury_funds has no shift row, so it starts at step 2. Every
--- operation that does have a shift takes the shift before the advisory lock;
--- nothing takes a treasury row before the advisory lock.
+-- close, settle, and close-and-settle read the shift id without a lock, take
+-- the advisory reference, then lock the shift row and revalidate it. Transfer
+-- has no shift row and is the shorter advisory -> treasury prefix. No path
+-- takes a treasury row before the advisory lock, or a shift row after one.
 
 set local lock_timeout = '5s';
 set local statement_timeout = '120s';
@@ -47,6 +48,15 @@ alter table public.treasury_shifts
         or (expected_closing = 0 and closing_counted = 0)
       ))
   );
+
+-- Idempotency identity for the close-and-settle wrapper. Null means a call
+-- made through the old 4-argument signature, which deliberately has no retry.
+alter table public.treasury_shifts
+  add column if not exists close_request_id uuid;
+
+create unique index if not exists treasury_shifts_close_request_uq
+  on public.treasury_shifts(treasury_id, close_request_id)
+  where close_request_id is not null;
 
 -- ---------------------------------------------------------------------------
 -- 2. signed shifts accept settlement once, and nothing after it
@@ -96,6 +106,7 @@ begin
        or new.expected_closing is distinct from old.expected_closing
        or new.closing_counted is distinct from old.closing_counted
        or new.handed_over_to  is distinct from old.handed_over_to
+       or new.close_request_id is distinct from old.close_request_id
        or new.notes           is distinct from old.notes then
       raise exception 'settlement can only add settlement facts'
         using errcode = '23514';
@@ -192,9 +203,10 @@ revoke all on function public.audit_treasury_shift_v1()
 -- 3. replace close with the canonical lock order
 -- ---------------------------------------------------------------------------
 
--- The public close signature and behaviour are unchanged. It now locks the
--- shift first, then the advisory reference, then the drawer treasury. This is
--- the same prefix close_and_settle and settle use.
+-- The public close signature and behaviour are unchanged. It reads the open
+-- shift id without a lock, takes the advisory reference first, then locks the
+-- shift row and the drawer. This is the same order the wrapper and settle use,
+-- and transfer_treasury_funds is the shorter advisory -> treasury prefix.
 create or replace function public.fn_treasury_shift_close(
   _treasury_id uuid,
   _closing_counted numeric,
@@ -210,6 +222,7 @@ declare
   v_branch uuid;
   v_actor uuid := auth.uid();
   v_book numeric;
+  v_shift_id uuid;
   v_shift public.treasury_shifts%rowtype;
 begin
   v_branch := public._treasury_shift_authorize_treasury(_treasury_id, 'treasury.shift.use');
@@ -221,20 +234,30 @@ begin
     raise exception 'The counted amount cannot be negative' USING ERRCODE = '23514';
   end if;
 
-  select * into v_shift
+  -- Read the id without a lock, then take the advisory lock it names, then
+  -- lock the row and revalidate. The id can only be stale if another close won.
+  select s.id into v_shift_id
     from public.treasury_shifts s
    where s.treasury_id = _treasury_id
      and s.closed_at is null
    order by s.opened_at desc
-   limit 1
-     for update;
-  if not found then
+   limit 1;
+  if v_shift_id is null then
     raise exception 'No open shift for this till' USING ERRCODE = '55000';
   end if;
 
   perform pg_advisory_xact_lock(
-    hashtextextended('treasury-transfer:' || v_shift.id::text, 0)
+    hashtextextended('treasury-transfer:' || v_shift_id::text, 0)
   );
+
+  select * into v_shift
+    from public.treasury_shifts s
+   where s.id = v_shift_id
+     and s.closed_at is null
+     for update;
+  if not found then
+    raise exception 'No open shift for this till' USING ERRCODE = '55000';
+  end if;
 
   select t.current_balance into v_book
     from public.treasury t
@@ -246,41 +269,95 @@ begin
     raise exception 'Treasury not found' USING ERRCODE = '23503';
   end if;
 
-  if _handed_over_to is not null then
-    if _handed_over_to = v_actor then
-      raise exception 'Hand the drawer to another person, or close the till' USING ERRCODE = '23514';
-    end if;
-    if not exists (
-      select 1
-        from public.profiles p
-        join public.staff_profiles sp on sp.linked_user_id = p.id
-        join auth.users u on u.id = p.id
-       where p.id = _handed_over_to
-         and sp.branch_id = v_branch
-         and sp.deleted_at is null
-         and u.deleted_at is null
-         and sp.status not in ('suspended'::public.staff_status, 'terminated'::public.staff_status)
-         and public.has_permission(_handed_over_to, 'treasury.shift.use')
-    ) then
-      raise exception 'The receiving person does not work this till' USING ERRCODE = '23503';
-    end if;
-  end if;
+  perform public._fn_treasury_shift_validate_handover(
+    v_branch, _handed_over_to, v_actor
+  );
 
+  return public._fn_treasury_shift_close_locked(
+    v_shift, v_book, _closing_counted, _handed_over_to, _notes, null
+  );
+end;
+$function$;
+
+-- ---------------------------------------------------------------------------
+-- 3b. internal close core -- assumes advisory, shift, and drawer are locked
+-- ---------------------------------------------------------------------------
+
+create or replace function public._fn_treasury_shift_close_locked(
+  _shift public.treasury_shifts,
+  _book numeric,
+  _closing_counted numeric,
+  _handed_over_to uuid,
+  _notes text,
+  _request_id uuid
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $function$
+begin
   perform set_config('app.allow_treasury_shift_close', 'on', true);
 
   update public.treasury_shifts s
-     set expected_closing = s.opening_counted + v_book - s.opening_book,
+     set expected_closing = s.opening_counted + _book - s.opening_book,
          closing_counted  = _closing_counted,
          closed_at        = statement_timestamp(),
-         closed_by        = v_actor,
+         closed_by        = auth.uid(),
          handed_over_to   = _handed_over_to,
          notes            = coalesce(nullif(btrim(coalesce(_notes, '')), ''), s.notes),
+         close_request_id = _request_id,
          updated_at       = statement_timestamp()
-   where s.id = v_shift.id;
+   where s.id = _shift.id;
 
-  return v_shift.id;
+  return _shift.id;
 end;
 $function$;
+
+revoke all on function public._fn_treasury_shift_close_locked(
+  public.treasury_shifts, numeric, numeric, uuid, text, uuid
+) from public, anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 3c. handover validation shared by close and the wrapper
+-- ---------------------------------------------------------------------------
+
+create or replace function public._fn_treasury_shift_validate_handover(
+  _branch_id uuid,
+  _handed_over_to uuid,
+  _actor uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $function$
+begin
+  if _handed_over_to is null then
+    return;
+  end if;
+  if _handed_over_to = _actor then
+    raise exception 'Hand the drawer to another person, or close the till' USING ERRCODE = '23514';
+  end if;
+  if not exists (
+    select 1
+      from public.profiles p
+      join public.staff_profiles sp on sp.linked_user_id = p.id
+      join auth.users u on u.id = p.id
+     where p.id = _handed_over_to
+       and sp.branch_id = _branch_id
+       and sp.deleted_at is null
+       and u.deleted_at is null
+       and sp.status not in ('suspended'::public.staff_status, 'terminated'::public.staff_status)
+       and public.has_permission(_handed_over_to, 'treasury.shift.use')
+  ) then
+    raise exception 'The receiving person does not work this till' USING ERRCODE = '23503';
+  end if;
+end;
+$function$;
+
+revoke all on function public._fn_treasury_shift_validate_handover(uuid, uuid, uuid)
+  from public, anon, authenticated;
 
 -- ---------------------------------------------------------------------------
 -- 4. settle a closed drawer into its parent
@@ -297,23 +374,11 @@ set search_path = public
 as $function$
 declare
   v_branch uuid;
-  v_actor uuid := auth.uid();
   v_t public.treasury%rowtype;
   v_parent public.treasury%rowtype;
   v_parent_id uuid;
+  v_shift_id uuid;
   v_shift public.treasury_shifts%rowtype;
-  v_transfer jsonb;
-  v_settlement_tx uuid;
-  v_opening_tx uuid;
-  v_variance_tx uuid;
-  v_current numeric;
-  v_opening_gap numeric;
-  v_variance numeric;
-  v_business_date date;
-  v_cycle uuid;
-  v_cycle_end date;
-  v_today date;
-  v_note text := nullif(btrim(coalesce(_notes, '')), '');
 begin
   v_branch := public._treasury_shift_authorize_treasury(_treasury_id, 'treasury.tx.write');
 
@@ -331,13 +396,26 @@ begin
   end if;
   v_parent_id := v_t.parent_treasury_id;
 
-  -- 1. shift row first.
-  select * into v_shift
+  -- Read the id without a lock, then take the advisory reference, then lock
+  -- and revalidate. This is the same order as close and the wrapper.
+  select s.id into v_shift_id
     from public.treasury_shifts s
    where s.treasury_id = _treasury_id
      and s.closed_at is not null
    order by s.closed_at desc
-   limit 1
+   limit 1;
+  if v_shift_id is null then
+    raise exception 'No closed shift to settle for this drawer' using errcode = '55000';
+  end if;
+
+  perform pg_advisory_xact_lock(
+    hashtextextended('treasury-transfer:' || v_shift_id::text, 0)
+  );
+
+  select * into v_shift
+    from public.treasury_shifts s
+   where s.id = v_shift_id
+     and s.closed_at is not null
      for update;
   if not found then
     raise exception 'No closed shift to settle for this drawer' using errcode = '55000';
@@ -346,12 +424,6 @@ begin
     return v_shift.id;
   end if;
 
-  -- 2. the same advisory reference transfer_treasury_funds uses.
-  perform pg_advisory_xact_lock(
-    hashtextextended('treasury-transfer:' || v_shift.id::text, 0)
-  );
-
-  -- 3. treasury rows in UUID order.
   perform 1
     from public.treasury t
    where t.id in (_treasury_id, v_parent_id)
@@ -359,7 +431,6 @@ begin
    order by t.id
      for update;
 
-  -- 4. re-read and revalidate after the locks.
   select * into v_t
     from public.treasury t
    where t.id = _treasury_id and t.branch_id = v_branch and t.deleted_at is null
@@ -392,37 +463,99 @@ begin
     raise exception 'Shift custodian does not match the drawer custodian'
       using errcode = '23514';
   end if;
-  if v_shift.expected_closing is null
-     or v_shift.closing_counted is null
-     or v_shift.opening_counted is null
-     or v_shift.opening_book is null
-     or v_shift.opening_gap is null then
+
+  return public._fn_treasury_shift_settle_locked(v_shift, v_t, v_parent, _notes);
+end;
+$function$;
+
+-- ---------------------------------------------------------------------------
+-- 4b. internal settle core -- assumes advisory, shift, and both treasuries are locked
+-- ---------------------------------------------------------------------------
+
+create or replace function public._fn_treasury_shift_settle_locked(
+  _shift public.treasury_shifts,
+  _drawer public.treasury,
+  _parent public.treasury,
+  _notes text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $function$
+declare
+  v_branch uuid := _drawer.branch_id;
+  v_actor uuid := auth.uid();
+  v_transfer jsonb;
+  v_settlement_tx uuid;
+  v_opening_tx uuid;
+  v_variance_tx uuid;
+  v_current numeric;
+  v_opening_gap numeric;
+  v_variance numeric;
+  v_business_date date;
+  v_cycle uuid;
+  v_cycle_end date;
+  v_today date;
+  v_parent_before numeric;
+  v_parent_after numeric;
+  v_drawer_after numeric;
+  v_note text := nullif(btrim(coalesce(_notes, '')), '');
+begin
+  if _shift.settled_at is not null then
+    return _shift.id;
+  end if;
+  if _drawer.id = _parent.id then
+    raise exception 'Drawer and parent must be different treasuries' using errcode = '23514';
+  end if;
+  if _drawer.branch_id <> v_branch
+     or _parent.branch_id <> v_branch
+     or _drawer.account_kind <> 'cash'
+     or _parent.account_kind <> 'cash'
+     or _drawer.custodian_user_id is null
+     or _parent.custodian_user_id is not null
+     or _parent.parent_treasury_id is not null then
+    raise exception 'Settlement requires a cash custody drawer and a plain cash parent'
+      using errcode = '23514';
+  end if;
+  if _shift.custodian_user_id <> _drawer.custodian_user_id then
+    raise exception 'Shift custodian does not match the drawer custodian'
+      using errcode = '23514';
+  end if;
+  if _shift.expected_closing is null
+     or _shift.closing_counted is null
+     or _shift.opening_counted is null
+     or _shift.opening_book is null
+     or _shift.opening_gap is null then
     raise exception 'Shift does not carry a complete close' using errcode = '23514';
   end if;
 
-  -- The close equation protects against later movement without assuming the
-  -- opening count equalled the opening book.
-  if (v_shift.opening_counted + v_t.current_balance - v_shift.opening_book)
-       is distinct from v_shift.expected_closing then
+  -- current_balance is the book. The opening count is physical. The equation
+  -- protects against later book movement without treating the opening gap as
+  -- cash that is already inside current_balance.
+  if (_shift.opening_counted + _drawer.current_balance - _shift.opening_book)
+       is distinct from _shift.expected_closing then
     raise exception 'Drawer moved after the close; reconcile before settlement'
       using errcode = '23514';
   end if;
 
-  v_current := v_t.current_balance;
-  v_opening_gap := v_shift.opening_gap;
-  v_variance := v_shift.variance;
-  v_business_date := (v_shift.closed_at at time zone 'Africa/Cairo')::date;
+  v_current := _drawer.current_balance;
+  v_opening_gap := _shift.opening_gap;
+  v_variance := _shift.variance;
+  v_business_date := (_shift.closed_at at time zone 'Africa/Cairo')::date;
   v_today := (statement_timestamp() at time zone 'Africa/Cairo')::date;
 
   if v_current < 0 then
     raise exception 'Drawer is negative; reconcile before settlement'
       using errcode = '23514';
   end if;
+  if v_current + v_opening_gap + v_variance is distinct from _shift.closing_counted then
+    raise exception 'Settlement accounting identity failed before posting'
+      using errcode = '23514';
+  end if;
 
-  -- Apply the closed-period policy to every settlement movement, including the
-  -- variance-only and opening-gap-only paths that bypass transfer_treasury_funds.
-  perform public._treasury_assert_open_period(v_branch, _treasury_id, v_business_date);
-  perform public._treasury_assert_open_period(v_branch, v_parent.id, v_business_date);
+  perform public._treasury_assert_open_period(v_branch, _drawer.id, v_business_date);
+  perform public._treasury_assert_open_period(v_branch, _parent.id, v_business_date);
 
   v_cycle := public._financial_cycle_for_date(v_branch, v_business_date);
   if v_cycle is null then
@@ -437,15 +570,17 @@ begin
       using errcode = '23514';
   end if;
 
-  -- Move the drawer book (opening_book + shift movement), not the expected
-  -- closing figure. The opening gap is then posted explicitly, so a positive
-  -- gap is income and a negative gap is a shortage expense.
+  v_parent_before := _parent.current_balance;
+
+  -- Move the book, not expected_closing. The opening gap and variance are
+  -- separate, auditable postings so current_balance + gap + variance equals
+  -- closing_counted exactly once.
   if v_current > 0 then
     v_transfer := public.transfer_treasury_funds(
-      _treasury_id,
-      v_parent.id,
+      _drawer.id,
+      _parent.id,
       v_current,
-      v_shift.id,
+      _shift.id,
       coalesce(v_note, 'Shift settlement')
     );
     v_settlement_tx := (v_transfer->>'credit_id')::uuid;
@@ -454,11 +589,11 @@ begin
   if v_opening_gap <> 0 then
     if v_opening_gap > 0 then
       v_opening_tx := public.add_treasury_tx(
-        v_parent.id,
+        _parent.id,
         'income'::public.treasury_tx_type,
         v_opening_gap,
         'treasury_shift_opening_gap',
-        v_shift.id,
+        _shift.id,
         'Opening gap — over',
         'فرق افتتاحي — زيادة',
         v_actor,
@@ -466,11 +601,11 @@ begin
       );
     else
       v_opening_tx := public.add_treasury_tx(
-        v_parent.id,
+        _parent.id,
         'expense'::public.treasury_tx_type,
         abs(v_opening_gap),
         'treasury_shift_opening_gap',
-        v_shift.id,
+        _shift.id,
         'Opening gap — short',
         'فرق افتتاحي — عجز',
         v_actor,
@@ -479,17 +614,14 @@ begin
     end if;
   end if;
 
-  -- The parent receives the counted closing figure after the opening gap and
-  -- closing variance adjustments. A positive variance is income; a negative
-  -- variance is a shortage expense.
   if v_variance is not null and v_variance <> 0 then
     if v_variance > 0 then
       v_variance_tx := public.add_treasury_tx(
-        v_parent.id,
+        _parent.id,
         'income'::public.treasury_tx_type,
         v_variance,
         'treasury_shift_variance',
-        v_shift.id,
+        _shift.id,
         'Shift variance — over',
         'فرق وردية — زيادة',
         v_actor,
@@ -497,11 +629,11 @@ begin
       );
     else
       v_variance_tx := public.add_treasury_tx(
-        v_parent.id,
+        _parent.id,
         'expense'::public.treasury_tx_type,
         abs(v_variance),
         'treasury_shift_variance',
-        v_shift.id,
+        _shift.id,
         'Shift variance — short',
         'فرق وردية — عجز',
         v_actor,
@@ -514,6 +646,22 @@ begin
     v_settlement_tx := coalesce(v_opening_tx, v_variance_tx);
   end if;
 
+  -- Runtime proof: the parent gained exactly the counted closing figure and
+  -- the drawer retained nothing. If not, the whole settlement rolls back.
+  select t.current_balance into v_parent_after
+    from public.treasury t where t.id = _parent.id;
+  select t.current_balance into v_drawer_after
+    from public.treasury t where t.id = _drawer.id;
+  if v_parent_after - v_parent_before is distinct from _shift.closing_counted then
+    raise exception 'Settlement invariant failed: parent delta % != closing_counted %',
+      v_parent_after - v_parent_before, _shift.closing_counted
+      using errcode = '23514';
+  end if;
+  if v_drawer_after is distinct from 0 then
+    raise exception 'Settlement invariant failed: drawer % != 0', v_drawer_after
+      using errcode = '23514';
+  end if;
+
   perform set_config('app.allow_treasury_shift_settle', 'on', true);
 
   update public.treasury_shifts s
@@ -521,21 +669,28 @@ begin
          settlement_tx_id = v_settlement_tx,
          variance_tx_id = v_variance_tx,
          updated_at = statement_timestamp()
-   where s.id = v_shift.id;
+   where s.id = _shift.id;
 
-  return v_shift.id;
+  return _shift.id;
 end;
 $function$;
+
+revoke all on function public._fn_treasury_shift_settle_locked(
+  public.treasury_shifts, public.treasury, public.treasury, text
+) from public, anon, authenticated;
 
 -- ---------------------------------------------------------------------------
 -- 5. one-step close + settlement for the desk
 -- ---------------------------------------------------------------------------
 
-create or replace function public.fn_treasury_shift_close_and_settle(
+-- Internal request-id-aware core. Public 5-arg requires a request id; the old
+-- 4-arg delegates with null and therefore deliberately has no retry contract.
+create or replace function public._fn_treasury_shift_close_and_settle_internal(
   _treasury_id uuid,
   _closing_counted numeric,
-  _handed_over_to uuid default null,
-  _notes text default null
+  _handed_over_to uuid,
+  _notes text,
+  _request_id uuid
 )
 returns uuid
 language plpgsql
@@ -548,8 +703,10 @@ declare
   v_t public.treasury%rowtype;
   v_parent public.treasury%rowtype;
   v_parent_id uuid;
-  v_shift public.treasury_shifts%rowtype;
   v_shift_id uuid;
+  v_shift public.treasury_shifts%rowtype;
+  v_closed public.treasury_shifts%rowtype;
+  v_existing public.treasury_shifts%rowtype;
 begin
   if _closing_counted is null or _closing_counted::text in ('NaN','Infinity','-Infinity') then
     raise exception 'The counted amount must be a real amount' USING ERRCODE = '22023';
@@ -558,9 +715,24 @@ begin
     raise exception 'The counted amount cannot be negative' USING ERRCODE = '23514';
   end if;
 
-  -- The wrapper needs both duties: close signs custody, settle moves money.
   v_branch := public._treasury_shift_authorize_treasury(_treasury_id, 'treasury.shift.use');
   perform public._treasury_shift_authorize_treasury(_treasury_id, 'treasury.tx.write');
+
+  if _request_id is not null then
+    select * into v_existing
+      from public.treasury_shifts s
+     where s.treasury_id = _treasury_id
+       and s.close_request_id = _request_id;
+    if found then
+      if v_existing.settled_at is not null
+         and v_existing.closing_counted = _closing_counted
+         and v_existing.handed_over_to is not distinct from _handed_over_to then
+        return v_existing.id;
+      end if;
+      raise exception 'Request id % was already used with different close facts', _request_id
+        using errcode = '23505';
+    end if;
+  end if;
 
   select * into v_t
     from public.treasury t
@@ -575,39 +747,53 @@ begin
   end if;
   v_parent_id := v_t.parent_treasury_id;
 
-  -- 1. shift row first.
-  select * into v_shift
+  select s.id into v_shift_id
     from public.treasury_shifts s
    where s.treasury_id = _treasury_id
      and s.closed_at is null
    order by s.opened_at desc
-   limit 1
-     for update;
-  if not found then
-    -- Retry contract: a settled shift with the same count and handover target
-    -- is the same completed wrapper call. No money is moved again.
-    select * into v_shift
-      from public.treasury_shifts s
-     where s.treasury_id = _treasury_id
-       and s.closed_at is not null
-     order by s.closed_at desc
-     limit 1;
-    if found
-       and v_shift.settled_at is not null
-       and v_shift.closing_counted = _closing_counted
-       and v_shift.handed_over_to is not distinct from _handed_over_to then
-      return v_shift.id;
+   limit 1;
+  if v_shift_id is null then
+    if _request_id is not null then
+      select * into v_existing
+        from public.treasury_shifts s
+       where s.treasury_id = _treasury_id
+         and s.close_request_id = _request_id;
+      if found
+         and v_existing.settled_at is not null
+         and v_existing.closing_counted = _closing_counted
+         and v_existing.handed_over_to is not distinct from _handed_over_to then
+        return v_existing.id;
+      end if;
     end if;
     raise exception 'No open shift for this till' USING ERRCODE = '55000';
   end if;
-  v_shift_id := v_shift.id;
 
-  -- 2. advisory reference.
   perform pg_advisory_xact_lock(
     hashtextextended('treasury-transfer:' || v_shift_id::text, 0)
   );
 
-  -- 3. treasury rows in UUID order.
+  select * into v_shift
+    from public.treasury_shifts s
+   where s.id = v_shift_id
+     and s.closed_at is null
+     for update;
+  if not found then
+    if _request_id is not null then
+      select * into v_existing
+        from public.treasury_shifts s
+       where s.treasury_id = _treasury_id
+         and s.close_request_id = _request_id;
+      if found
+         and v_existing.settled_at is not null
+         and v_existing.closing_counted = _closing_counted
+         and v_existing.handed_over_to is not distinct from _handed_over_to then
+        return v_existing.id;
+      end if;
+    end if;
+    raise exception 'No open shift for this till' USING ERRCODE = '55000';
+  end if;
+
   perform 1
     from public.treasury t
    where t.id in (_treasury_id, v_parent_id)
@@ -615,7 +801,6 @@ begin
    order by t.id
      for update;
 
-  -- 4. re-read and revalidate after the locks.
   select * into v_t
     from public.treasury t
    where t.id = _treasury_id and t.branch_id = v_branch and t.deleted_at is null
@@ -648,11 +833,67 @@ begin
       using errcode = '23514';
   end if;
 
-  v_shift_id := public.fn_treasury_shift_close(
-    _treasury_id, _closing_counted, _handed_over_to, _notes
+  perform public._fn_treasury_shift_validate_handover(
+    v_branch, _handed_over_to, v_actor
   );
-  perform public.fn_treasury_shift_settle(_treasury_id, _notes);
-  return v_shift_id;
+
+  -- One advisory, one shift lock, one ordered treasury lock: the cores below
+  -- do not acquire any of them again.
+  perform public._fn_treasury_shift_close_locked(
+    v_shift, v_t.current_balance, _closing_counted, _handed_over_to, _notes, _request_id
+  );
+
+  select * into v_closed
+    from public.treasury_shifts s
+   where s.id = v_shift.id;
+
+  return public._fn_treasury_shift_settle_locked(v_closed, v_t, v_parent, _notes);
+end;
+$function$;
+
+revoke all on function public._fn_treasury_shift_close_and_settle_internal(
+  uuid, numeric, uuid, text, uuid
+) from public, anon, authenticated;
+
+create or replace function public.fn_treasury_shift_close_and_settle(
+  _treasury_id uuid,
+  _closing_counted numeric,
+  _handed_over_to uuid,
+  _notes text,
+  _request_id uuid
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $function$
+begin
+  if _request_id is null then
+    raise exception 'A close request id is required for idempotent close-and-settle'
+      using errcode = '22023';
+  end if;
+  return public._fn_treasury_shift_close_and_settle_internal(
+    _treasury_id, _closing_counted, _handed_over_to, _notes, _request_id
+  );
+end;
+$function$;
+
+create or replace function public.fn_treasury_shift_close_and_settle(
+  _treasury_id uuid,
+  _closing_counted numeric,
+  _handed_over_to uuid default null,
+  _notes text default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $function$
+begin
+  -- Compatibility path: no request id, therefore no retry matching at all.
+  return public._fn_treasury_shift_close_and_settle_internal(
+    _treasury_id, _closing_counted, _handed_over_to, _notes, null
+  );
 end;
 $function$;
 
@@ -664,8 +905,12 @@ revoke all on function public.fn_treasury_shift_settle(uuid, text)
   from public, anon;
 revoke all on function public.fn_treasury_shift_close_and_settle(uuid, numeric, uuid, text)
   from public, anon;
+revoke all on function public.fn_treasury_shift_close_and_settle(uuid, numeric, uuid, text, uuid)
+  from public, anon;
 
 grant execute on function public.fn_treasury_shift_settle(uuid, text)
   to authenticated, service_role;
 grant execute on function public.fn_treasury_shift_close_and_settle(uuid, numeric, uuid, text)
+  to authenticated, service_role;
+grant execute on function public.fn_treasury_shift_close_and_settle(uuid, numeric, uuid, text, uuid)
   to authenticated, service_role;

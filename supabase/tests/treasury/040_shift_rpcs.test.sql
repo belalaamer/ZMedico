@@ -1,140 +1,171 @@
--- Static contract test for 20261117123000_treasury_shift_rpcs.sql.
+-- Behavioral pgTAP contract for 20261117123000_treasury_shift_rpcs.sql.
 --
--- Shift RPCs cannot be exercised here without a live authenticated session,
--- branch access, and a custody fixture. This test checks the security and
--- settlement contract instead: the one-time settlement window, the zero-drawer
--- allowance, the money path, and the EXECUTE grants.
+-- Run against the disposable local harness, never Production. Fixtures are
+-- committed by the harness; this test transaction is rolled back.
 
 begin;
+select plan(50);
 
-select plan(25);
+-- 1-6: zero drawer (the behavioural replacement for old textual test #8)
+set local role authenticated;
+set local request.jwt.claim.sub = 'f0000000-0000-4000-8000-000000000001';
+set local app.test_session_active = 'on';
+select lives_ok($$ select public.fn_treasury_shift_settle('d0000000-0000-4000-8000-000000000021') $$, 'zero drawer settles');
+reset role;
+select is((select current_balance from public.treasury where id='d0000000-0000-4000-8000-000000000021'), 0::numeric, 'zero drawer ends at zero');
+select is((select current_balance from public.treasury where id='a0000000-0000-4000-8000-000000000001'), 0::numeric, 'zero parent receives zero');
+select is((select status from public.treasury_shifts where id='e0000000-0000-4000-8000-000000000001'), 'settled', 'zero shift is settled');
+select is((select settlement_tx_id from public.treasury_shifts where id='e0000000-0000-4000-8000-000000000001'), null::uuid, 'zero settlement has no transaction');
+select is((select count(*) from public.treasury_transactions where reference_id='e0000000-0000-4000-8000-000000000001'), 0::bigint, 'zero settlement writes no ledger row');
 
--- 1-4: the immutable guard accepts exactly one settlement update
-select ok(
-  to_regprocedure('public._tg_treasury_shift_immutable()') is not null,
-  'shift immutability guard exists');
-select ok(
-  position('app.allow_treasury_shift_settle' in
-    pg_get_functiondef('public._tg_treasury_shift_immutable()'::regprocedure)) > 0,
-  'immutability guard has a one-time settlement gate');
-select ok(
-  position('a settled shift is permanent' in
-    pg_get_functiondef('public._tg_treasury_shift_immutable()'::regprocedure)) > 0,
-  'immutability guard makes a settled shift permanent');
-select ok(
-  position('settlement can only add settlement facts' in
-    pg_get_functiondef('public._tg_treasury_shift_immutable()'::regprocedure)) > 0,
-  'immutability guard rejects changes outside settlement facts');
+-- 6b-11: zero drawer with a counted overage (variance-only path)
+set local role authenticated;
+set local request.jwt.claim.sub = 'f0000000-0000-4000-8000-000000000001';
+set local app.test_session_active = 'on';
+select lives_ok($$ select public.fn_treasury_shift_settle('d0000000-0000-4000-8000-000000000031') $$, 'zero drawer with counted overage settles');
+reset role;
+select is((select current_balance from public.treasury where id='d0000000-0000-4000-8000-000000000031'), 0::numeric, 'zero drawer with overage ends at zero');
+select is((select current_balance from public.treasury where id='a0000000-0000-4000-8000-000000000018'), 5::numeric, 'zero drawer overage reaches the parent');
+select is((select count(*) from public.treasury_transactions where reference_id='e0000000-0000-4000-8000-000000000011' and reference_type='treasury_shift_variance' and transaction_type='income' and amount=5), 1::bigint, 'zero drawer overage posts a 5 income');
+select isnt((select settlement_tx_id from public.treasury_shifts where id='e0000000-0000-4000-8000-000000000011'), null::uuid, 'variance-only settlement records a settlement transaction');
+select is((select settlement_tx_id from public.treasury_shifts where id='e0000000-0000-4000-8000-000000000011'), (select variance_tx_id from public.treasury_shifts where id='e0000000-0000-4000-8000-000000000011'), 'variance-only settlement points at its variance transaction');
 
--- 5-6: settlement is audited as settlement, not as a second close
-select ok(
-  to_regprocedure('public.audit_treasury_shift_v1()') is not null,
-  'shift audit trigger function exists');
-select ok(
-  position('treasury_shift.settle' in
-    pg_get_functiondef('public.audit_treasury_shift_v1()'::regprocedure)) > 0,
-  'shift audit records settlement separately');
+-- 11b-12b: variance-only paths still obey closed-day and archived-cycle policy
+set local role authenticated;
+set local request.jwt.claim.sub = 'f0000000-0000-4000-8000-000000000001';
+set local app.test_session_active = 'on';
+select throws_ok($$ select public.fn_treasury_shift_settle('d0000000-0000-4000-8000-000000000033') $$, '23514', null, 'variance-only settlement rejects a closed day');
+reset role;
+select is((select count(*) from public.treasury_transactions where reference_id='e0000000-0000-4000-8000-000000000013'), 0::bigint, 'closed-day variance rejection writes no ledger row');
+set local role authenticated;
+set local request.jwt.claim.sub = 'f0000000-0000-4000-8000-000000000001';
+set local app.test_session_active = 'on';
+select throws_ok($$ select public.fn_treasury_shift_settle('d0000000-0000-4000-8000-000000000034') $$, '23514', null, 'variance-only settlement rejects an archived cycle');
+reset role;
+select is((select count(*) from public.treasury_transactions where reference_id='e0000000-0000-4000-8000-000000000014'), 0::bigint, 'archived variance rejection writes no ledger row');
 
--- 7-8: zero-drawer shape
-select ok(
-  exists (select 1 from pg_constraint
-           where conrelid='public.treasury_shifts'::regclass
-             and conname='treasury_shift_status_shape'),
-  'shift status shape constraint exists');
-select ok(
-  position('expected_closing = 0' in
-    (select pg_get_constraintdef(oid) from pg_constraint
-      where conrelid='public.treasury_shifts'::regclass
-        and conname='treasury_shift_status_shape')) > 0
-  and position('closing_counted = 0' in
-    (select pg_get_constraintdef(oid) from pg_constraint
-      where conrelid='public.treasury_shifts'::regclass
-        and conname='treasury_shift_status_shape')) > 0,
-  'status shape allows a zero drawer with no settlement transaction');
+-- 7-10: shortage
+set local role authenticated;
+set local request.jwt.claim.sub = 'f0000000-0000-4000-8000-000000000001';
+set local app.test_session_active = 'on';
+select lives_ok($$ select public.fn_treasury_shift_settle('d0000000-0000-4000-8000-000000000022') $$, 'shortage settles');
+reset role;
+select is((select current_balance from public.treasury where id='d0000000-0000-4000-8000-000000000022'), 0::numeric, 'shortage drawer ends at zero');
+select is((select current_balance from public.treasury where id='a0000000-0000-4000-8000-000000000002'), 90::numeric, 'shortage parent receives counted 90');
+select is((select count(*) from public.treasury_transactions where reference_id='e0000000-0000-4000-8000-000000000002' and reference_type='treasury_shift_variance' and transaction_type='expense' and amount=10), 1::bigint, 'shortage variance is a 10 expense');
 
--- 9-16: settle RPC
-select ok(
-  to_regprocedure('public.fn_treasury_shift_settle(uuid,text)') is not null,
-  'settle RPC exists');
-select ok(
-  (select prosecdef from pg_proc
-    where oid='public.fn_treasury_shift_settle(uuid,text)'::regprocedure),
-  'settle RPC is security definer');
-select ok(
-  (select array_to_string(proconfig, ',') from pg_proc
-    where oid='public.fn_treasury_shift_settle(uuid,text)'::regprocedure)
-    like '%search_path=public%',
-  'settle RPC pins search_path');
-select ok(
-  position('transfer_treasury_funds' in
-    pg_get_functiondef('public.fn_treasury_shift_settle(uuid,text)'::regprocedure)) > 0,
-  'settle RPC uses the existing transfer writer');
-select ok(
-  position('parent_treasury_id' in
-    pg_get_functiondef('public.fn_treasury_shift_settle(uuid,text)'::regprocedure)) > 0,
-  'settle RPC requires a parent treasury');
-select ok(
-  position('treasury_shift_variance' in
-    pg_get_functiondef('public.fn_treasury_shift_settle(uuid,text)'::regprocedure)) > 0,
-  'settle RPC records variance separately');
-select ok(
-  position('expected_closing' in
-    pg_get_functiondef('public.fn_treasury_shift_settle(uuid,text)'::regprocedure)) > 0,
-  'settle RPC settles the signed expected amount');
-select ok(
-  position('app.allow_treasury_shift_settle' in
-    pg_get_functiondef('public.fn_treasury_shift_settle(uuid,text)'::regprocedure)) > 0,
-  'settle RPC opens the one-time settlement gate');
+-- 11-13: overage
+set local role authenticated;
+set local request.jwt.claim.sub = 'f0000000-0000-4000-8000-000000000001';
+set local app.test_session_active = 'on';
+select lives_ok($$ select public.fn_treasury_shift_settle('d0000000-0000-4000-8000-000000000023') $$, 'overage settles');
+reset role;
+select is((select current_balance from public.treasury where id='d0000000-0000-4000-8000-000000000023'), 0::numeric, 'overage drawer ends at zero');
+select is((select current_balance from public.treasury where id='a0000000-0000-4000-8000-000000000003'), 110::numeric, 'overage parent receives counted 110');
+select is((select count(*) from public.treasury_transactions where reference_id='e0000000-0000-4000-8000-000000000003' and reference_type='treasury_shift_variance' and transaction_type='income' and amount=10), 1::bigint, 'overage variance is a 10 income');
 
--- 17-19: close + settle wrapper
-select ok(
-  to_regprocedure('public.fn_treasury_shift_close_and_settle(uuid,numeric,uuid,text)') is not null,
-  'close-and-settle RPC exists');
-select ok(
-  position('fn_treasury_shift_close' in
-    pg_get_functiondef('public.fn_treasury_shift_close_and_settle(uuid,numeric,uuid,text)'::regprocedure)) > 0,
-  'close-and-settle RPC calls the signed close');
-select ok(
-  position('fn_treasury_shift_settle' in
-    pg_get_functiondef('public.fn_treasury_shift_close_and_settle(uuid,numeric,uuid,text)'::regprocedure)) > 0,
-  'close-and-settle RPC calls settlement');
+-- 14-16: positive opening gap
+set local role authenticated;
+set local request.jwt.claim.sub = 'f0000000-0000-4000-8000-000000000001';
+set local app.test_session_active = 'on';
+select lives_ok($$ select public.fn_treasury_shift_settle('d0000000-0000-4000-8000-000000000024') $$, 'positive opening gap settles');
+reset role;
+select is((select current_balance from public.treasury where id='d0000000-0000-4000-8000-000000000024'), 0::numeric, 'positive gap drawer ends at zero');
+select is((select current_balance from public.treasury where id='a0000000-0000-4000-8000-000000000004'), 110::numeric, 'positive gap parent receives opening count 110');
+select is((select count(*) from public.treasury_transactions where reference_id='e0000000-0000-4000-8000-000000000004' and reference_type='treasury_shift_opening_gap' and transaction_type='income' and amount=10), 1::bigint, 'positive opening gap is a 10 income');
 
--- 20-25: grants
-select ok(
-  has_function_privilege('authenticated',
-    'public.fn_treasury_shift_settle(uuid,text)', 'EXECUTE'),
-  'authenticated may execute settle');
-select ok(
-  not has_function_privilege('anon',
-    'public.fn_treasury_shift_settle(uuid,text)', 'EXECUTE'),
-  'anon may not execute settle');
-select ok(
-  not exists (
-    select 1
-    from pg_proc p,
-         aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
-    where p.oid = 'public.fn_treasury_shift_settle(uuid,text)'::regprocedure
-      and a.grantee = 0
-      and a.privilege_type = 'EXECUTE'),
-  'PUBLIC may not execute settle');
-select ok(
-  has_function_privilege('authenticated',
-    'public.fn_treasury_shift_close_and_settle(uuid,numeric,uuid,text)', 'EXECUTE'),
-  'authenticated may execute close-and-settle');
-select ok(
-  not has_function_privilege('anon',
-    'public.fn_treasury_shift_close_and_settle(uuid,numeric,uuid,text)', 'EXECUTE'),
-  'anon may not execute close-and-settle');
-select ok(
-  not exists (
-    select 1
-    from pg_proc p,
-         aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
-    where p.oid = 'public.fn_treasury_shift_close_and_settle(uuid,numeric,uuid,text)'::regprocedure
-      and a.grantee = 0
-      and a.privilege_type = 'EXECUTE'),
-  'PUBLIC may not execute close-and-settle');
+-- 17-19: negative opening gap
+set local role authenticated;
+set local request.jwt.claim.sub = 'f0000000-0000-4000-8000-000000000001';
+set local app.test_session_active = 'on';
+select lives_ok($$ select public.fn_treasury_shift_settle('d0000000-0000-4000-8000-000000000025') $$, 'negative opening gap settles');
+reset role;
+select is((select current_balance from public.treasury where id='d0000000-0000-4000-8000-000000000025'), 0::numeric, 'negative gap drawer ends at zero');
+select is((select current_balance from public.treasury where id='a0000000-0000-4000-8000-000000000005'), 90::numeric, 'negative gap parent receives opening count 90');
+select is((select count(*) from public.treasury_transactions where reference_id='e0000000-0000-4000-8000-000000000005' and reference_type='treasury_shift_opening_gap' and transaction_type='expense' and amount=10), 1::bigint, 'negative opening gap is a 10 expense');
+
+-- 20-21: bank parent
+set local role authenticated;
+set local request.jwt.claim.sub = 'f0000000-0000-4000-8000-000000000001';
+set local app.test_session_active = 'on';
+select throws_ok($$ select public.fn_treasury_shift_settle('d0000000-0000-4000-8000-000000000026') $$, '23514', null, 'bank parent is rejected');
+reset role;
+select is((select count(*) from public.treasury_transactions where reference_id='e0000000-0000-4000-8000-000000000006'), 0::bigint, 'bank parent writes no ledger row');
+
+-- 22-23: archived cycle
+set local role authenticated;
+set local request.jwt.claim.sub = 'f0000000-0000-4000-8000-000000000001';
+set local app.test_session_active = 'on';
+select throws_ok($$ select public.fn_treasury_shift_settle('d0000000-0000-4000-8000-000000000027') $$, '23514', null, 'archived cycle is rejected');
+reset role;
+select is((select count(*) from public.treasury_transactions where reference_id='e0000000-0000-4000-8000-000000000007'), 0::bigint, 'archived cycle writes no ledger row');
+
+-- 24-25: movement after close
+set local role authenticated;
+set local request.jwt.claim.sub = 'f0000000-0000-4000-8000-000000000001';
+set local app.test_session_active = 'on';
+select throws_ok($$ select public.fn_treasury_shift_settle('d0000000-0000-4000-8000-00000000002e') $$, '23514', null, 'movement after close is rejected');
+reset role;
+select is((select count(*) from public.treasury_transactions where reference_id='e0000000-0000-4000-8000-00000000000e'), 0::bigint, 'movement after close writes no ledger row');
+
+-- 26-28: wrapper atomic rollback when settlement fails after close
+set local role authenticated;
+set local request.jwt.claim.sub = 'f0000000-0000-4000-8000-000000000001';
+set local app.test_session_active = 'on';
+select throws_ok($$ select public.fn_treasury_shift_close_and_settle('d0000000-0000-4000-8000-000000000028', 100) $$, '23514', null, 'wrapper rolls back when settlement fails');
+reset role;
+select is((select closed_at from public.treasury_shifts where id='e0000000-0000-4000-8000-000000000008'), null::timestamptz, 'wrapper rollback leaves the shift open');
+select is((select count(*) from public.treasury_transactions where reference_id='e0000000-0000-4000-8000-000000000008'), 0::bigint, 'wrapper rollback writes no ledger row');
+
+-- 29-31: wrapper retry contract
+set local role authenticated;
+set local request.jwt.claim.sub = 'f0000000-0000-4000-8000-000000000001';
+set local app.test_session_active = 'on';
+create temp table retry_first as
+  select public.fn_treasury_shift_close_and_settle('d0000000-0000-4000-8000-000000000029', 100) as id;
+reset role;
+create temp table retry_counts as
+  select count(*) as n from public.treasury_transactions
+   where reference_id='e0000000-0000-4000-8000-000000000009';
+select is((select count(*) from retry_first), 1::bigint, 'first wrapper call completes');
+set local role authenticated;
+set local request.jwt.claim.sub = 'f0000000-0000-4000-8000-000000000001';
+set local app.test_session_active = 'on';
+create temp table retry_second as
+  select public.fn_treasury_shift_close_and_settle('d0000000-0000-4000-8000-000000000029', 100) as id;
+reset role;
+select is((select id from retry_second), (select id from retry_first), 'retry returns the same shift id');
+select is((select count(*) from public.treasury_transactions where reference_id='e0000000-0000-4000-8000-000000000009'), (select n from retry_counts), 'retry writes no duplicate ledger rows');
+
+-- 32-33: permission
+set local role authenticated;
+set local request.jwt.claim.sub = 'f0000000-0000-4000-8000-000000000003';
+set local app.test_session_active = 'on';
+select throws_ok($$ select public.fn_treasury_shift_settle('d0000000-0000-4000-8000-00000000002c') $$, '42501', null, 'settle rejects a user without treasury.tx.write');
+reset role;
+select is((select count(*) from public.treasury_transactions where reference_id='e0000000-0000-4000-8000-00000000000c'), 0::bigint, 'permission rejection writes no ledger row');
+
+-- 34: branch scope
+set local role authenticated;
+set local request.jwt.claim.sub = 'f0000000-0000-4000-8000-000000000004';
+set local app.test_session_active = 'on';
+select throws_ok($$ select public.fn_treasury_shift_settle('d0000000-0000-4000-8000-00000000002c') $$, '42501', null, 'settle rejects a user outside the branch');
+reset role;
+
+-- 35: inactive session
+set local role authenticated;
+set local request.jwt.claim.sub = 'f0000000-0000-4000-8000-000000000001';
+set local app.test_session_active = 'off';
+select throws_ok($$ select public.fn_treasury_shift_settle('d0000000-0000-4000-8000-00000000002c') $$, '42501', null, 'settle rejects an inactive session');
+reset role;
+
+-- 36-37: wrapper needs both permissions and leaves the shift open
+set local role authenticated;
+set local request.jwt.claim.sub = 'f0000000-0000-4000-8000-000000000003';
+set local app.test_session_active = 'on';
+select throws_ok($$ select public.fn_treasury_shift_close_and_settle('d0000000-0000-4000-8000-00000000002d', 100) $$, '42501', null, 'wrapper rejects a user without treasury.tx.write');
+reset role;
+select is((select closed_at from public.treasury_shifts where id='e0000000-0000-4000-8000-00000000000d'), null::timestamptz, 'permission rejection leaves the wrapper shift open');
 
 select * from finish();
-
 rollback;

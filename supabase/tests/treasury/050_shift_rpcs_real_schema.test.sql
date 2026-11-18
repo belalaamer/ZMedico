@@ -14,8 +14,23 @@ select has_column(
 select has_index(
   'public', 'treasury_shifts', 'treasury_shifts_close_request_uq',
   'real schema has the per-treasury request unique index');
-select col_is_unique(
-  'public', 'treasury_shifts', array['treasury_id','close_request_id'],
+select ok(
+  exists (
+    select 1
+      from pg_index i
+      join pg_class c on c.oid = i.indexrelid
+      join pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'public'
+       and c.relname = 'treasury_shifts_close_request_uq'
+       and i.indisunique
+       and i.indpred is not null
+       and (
+         select array_agg(a.attname order by k.ord)
+           from unnest(i.indkey) with ordinality as k(attnum, ord)
+           join pg_attribute a
+             on a.attrelid = i.indrelid and a.attnum = k.attnum
+       ) = array['treasury_id','close_request_id']::name[]
+  ),
   'real schema enforces one request id per treasury');
 
 select has_function(

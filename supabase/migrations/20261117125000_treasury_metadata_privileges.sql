@@ -19,17 +19,32 @@
 --   * current_balance / non_cash_balance -- money is changed only by the ledger
 --   * custodian_user_id / parent_treasury_id -- drawer shape and ownership
 --   * branch_id / id / created_at / deleted_at -- identity and lifecycle
+--   * currency -- changing it reinterprets every balance, payment, transfer,
+--     and report already stored for this treasury; no guard currently proves
+--     a currency change is safe for a treasury with history
 --
 -- Allowed for `authenticated`:
---   * name_en, name_ar, currency, is_active
+--   * name_en, name_ar, is_active
 --
--- `service_role`, the table owner, and SECURITY DEFINER functions keep their
--- existing access. Reviewed RPCs therefore remain the path for privileged
--- changes. This is a privilege allowlist, not RLS and not a trigger.
+-- `is_active` policy: deactivation never moves money or changes a balance.
+-- PR-5 rejects a collection whose route points at an inactive treasury; PR-4
+-- close/settle/close-and-settle revalidate the shift and treasury but do not
+-- require `is_active`, so an open or closed-unsettled shift can still be
+-- closed and settled after deactivation. Operators must settle or transfer
+-- any remaining balance and repoint/deactivate active routes before retiring
+-- a treasury. This migration does not add a deactivation trigger; it records
+-- the privilege boundary and the operational policy.
 --
--- Forward-only rollback: restore table-level UPDATE to `authenticated` with a
--- separately reviewed migration. Do not reverse this file, and do not grant
--- UPDATE on the sensitive columns above to `authenticated` again.
+-- The table owner and SECURITY DEFINER functions run with the owner's
+-- privileges. The owner must still hold the necessary privileges; this
+-- migration does not grant anything to a function owner implicitly. The
+-- reviewed functions in this stack are owned by postgres in the local
+-- harness, and their owner must be checked in each target environment.
+--
+-- Forward-only rollback: stop the affected edit UI, then either grant a
+-- missing safe column after review or use a reviewed RPC for a sensitive
+-- change. Do not restore table-level UPDATE to `authenticated` as a rollback
+-- shortcut; that would reopen every sensitive column.
 
 set local lock_timeout = '5s';
 set local statement_timeout = '120s';
@@ -40,9 +55,20 @@ set local statement_timeout = '120s';
 revoke update on table public.treasury
   from public, anon, authenticated;
 
+-- Revoke any pre-existing column-level UPDATE grants too. A table-level
+-- REVOKE does not remove a column grant that was issued separately.
+revoke update (
+  id, branch_id, name_en, name_ar, current_balance, non_cash_balance,
+  currency, account_kind, custodian_user_id, parent_treasury_id, is_active,
+  deleted_at, created_at, updated_at, financial_cycle_id, is_default
+) on table public.treasury
+  from public, anon, authenticated;
+
 -- Grant only the columns that are safe to edit directly. `updated_at` is set
--- by trg_treasury_updated, so it is intentionally not in this list.
-grant update (name_en, name_ar, currency, is_active)
+-- by trg_treasury_updated, so it is intentionally not in this list. Currency
+-- is deliberately excluded: it changes the interpretation of every existing
+-- balance and movement, and there is no currency-change guard or migration.
+grant update (name_en, name_ar, is_active)
   on table public.treasury
   to authenticated;
 
@@ -52,6 +78,9 @@ grant update (name_en, name_ar, currency, is_active)
 grant update on table public.treasury
   to service_role;
 
--- The table owner and SECURITY DEFINER functions are unaffected by role
--- privileges. They remain the only paths that may change balances, cycles,
--- account_kind, is_default, custody, or lifecycle fields.
+-- The table owner and SECURITY DEFINER functions remain the only paths that
+-- may change balances, cycles, account_kind, is_default, custody, currency, or
+-- lifecycle fields. Their owner must still have the required privileges.
+-- No reviewed PR-4/PR-5 RPC currently changes account_kind, is_default,
+-- financial_cycle_id, or currency; those are service-role/owner operations
+-- until a reviewed RPC exists.

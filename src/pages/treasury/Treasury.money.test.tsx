@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   treasury: [] as Record<string, unknown>[],
   ledger: [] as Record<string, unknown>[],
   today: [] as Record<string, unknown>[],
+  rpc: vi.fn().mockResolvedValue({ data: [], error: null }),
 }));
 
 vi.mock("@/contexts/I18nContext", () => ({ useI18n: () => ({ lang: "en", t: (key: string) => key }) }));
@@ -23,7 +24,7 @@ vi.mock("@/components/RowActions", () => ({
 vi.mock("./TransferDialog", () => ({ TransferDialog: () => null }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    rpc: vi.fn().mockResolvedValue({ data: [], error: null }),
+    rpc: mocks.rpc,
     from: (table: string) => {
       let selected = "";
       const api: Record<string, unknown> = {
@@ -95,6 +96,7 @@ describe("treasury money truthfulness", () => {
 
   it("archives through the reviewed RPC instead of a direct treasury update", async () => {
     mocks.treasury = [treasuryRow("t1", "EGP", 1000)];
+    mocks.rpc.mockResolvedValue({ data: "t1", error: null });
     await openPage();
     fireEvent.click(await screen.findByText("delete"));
     await waitFor(() => expect(mocks.rpc).toHaveBeenCalledWith("fn_treasury_archive", {

@@ -1,4 +1,4 @@
-import { act, cleanup, render, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
@@ -16,7 +16,10 @@ vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ user: { id: "actor"
 vi.mock("@/lib/dataSync", () => ({ useDataSync: () => undefined }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock("@/components/Can", () => ({ Can: ({ children }: { children: ReactNode }) => <>{children}</> }));
-vi.mock("@/components/RowActions", () => ({ RowActions: () => null }));
+vi.mock("@/components/RowActions", () => ({
+  RowActions: ({ onDelete }: { onDelete?: () => void }) =>
+    onDelete ? <button onClick={onDelete}>delete</button> : null,
+}));
 vi.mock("./TransferDialog", () => ({ TransferDialog: () => null }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -88,6 +91,15 @@ describe("treasury money truthfulness", () => {
     await waitFor(() => expect(container.textContent).toContain(formatMoney(5, "en", "USD")));
     expect(container.textContent).toContain(formatMoney(7, "en", "EGP"));
     expect(container.textContent).not.toContain(formatMoney(12, "en", "EGP"));
+  });
+
+  it("archives through the reviewed RPC instead of a direct treasury update", async () => {
+    mocks.treasury = [treasuryRow("t1", "EGP", 1000)];
+    await openPage();
+    fireEvent.click(await screen.findByText("delete"));
+    await waitFor(() => expect(mocks.rpc).toHaveBeenCalledWith("fn_treasury_archive", {
+      _treasury_id: "t1",
+    }));
   });
 
   it("labels a ledger row in the currency of the treasury it was posted to", async () => {

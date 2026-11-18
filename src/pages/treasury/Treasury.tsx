@@ -122,7 +122,12 @@ export default function Treasury() {
     if (!branchSelectionReady || !currentBranchId || tr.branch_id !== currentBranchId) { toast.error(t("selectBranch")); return; }
     const { count } = await supabase.from("treasury_transactions").select("id", { count: "exact", head: true }).eq("treasury_id", tr.id);
     if ((count ?? 0) > 0) { toast.error(t("transactionsExist")); return; }
-    const { data, error } = await supabase.from("treasury").update({ deleted_at: new Date().toISOString() } as any).eq("id", tr.id).eq("branch_id", currentBranchId).select("id");
+    // deleted_at is no longer in the authenticated column allowlist. The
+    // reviewed RPC repeats the same empty-history/open-shift checks under a row
+    // lock and records the archive without restoring table-level UPDATE.
+    const { data, error } = await (supabase as any).rpc("fn_treasury_archive", {
+      _treasury_id: tr.id,
+    });
     if (error) { toast.error(error.message); return; }
     if (rowsWritten(data) === 0) { toast.error(notConfirmedCopy(lang, "delete")); load(); return; }
     toast.success(t("delete")); load();

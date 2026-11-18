@@ -1,4 +1,4 @@
--- Real-schema regression for 20261117127000_treasury_archive_rpc.sql.
+-- Real-schema regression for 20261117125600_treasury_archive_rpc.sql.
 --
 -- Run against an isolated real-schema replay, never Production. The fixture is
 -- synthetic and rolls back with the test transaction.

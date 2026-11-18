@@ -1,4 +1,4 @@
--- Privilege contract for 20261117125000_treasury_metadata_privileges.sql.
+-- Privilege contract for 20261117125700_treasury_metadata_privileges.sql.
 --
 -- Run only against the disposable local harness. The harness grants baseline
 -- table-level UPDATE and baseline column-level UPDATE on sensitive columns to

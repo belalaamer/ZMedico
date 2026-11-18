@@ -1,5 +1,11 @@
 -- PR-6: restrict direct treasury metadata edits to a column allowlist.
 --
+-- Release ordering: this file is timestamped after the custodian guard
+-- (20261117125500) and the archive RPC (20261117125600). Apply the prefix,
+-- deploy the client that uses fn_treasury_archive, and only then apply this
+-- revoke. A generic `supabase db push` applies every pending file in one run
+-- and is not the compatible rollout path for this migration.
+--
 -- This migration changes privileges only. It does not delete rows, tables,
 -- columns, indexes, or historical ledger entries, and it does not rewrite any
 -- existing treasury row. It also does not change RLS policies.

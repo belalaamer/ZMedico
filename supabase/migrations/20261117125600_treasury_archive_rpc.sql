@@ -1,6 +1,6 @@
 -- PR-6 compatibility: the reviewed path for archiving a treasury row.
 --
--- 20261117125000_treasury_metadata_privileges.sql deliberately removed the
+-- 20261117125700_treasury_metadata_privileges.sql deliberately removed the
 -- direct authenticated UPDATE grant on public.treasury, including deleted_at.
 -- The existing Treasury screen used to soft-delete with a direct table update,
 -- so that screen would otherwise fail with 42501 after the privilege migration.
@@ -11,10 +11,17 @@
 -- history remain. The existing treasury.delete permission and branch scope are
 -- enforced by the same authorization helper the other treasury RPCs use.
 --
--- The existing UI guard rejects a treasury with any treasury_transactions row.
--- The RPC repeats that check under the row lock and also rejects an unsettled
--- shift, so a concurrent payment cannot slip between the screen's check and
--- the archive, and an active drawer cannot be archived out from under a shift.
+-- The RPC rejects every state that can still own money or future postings:
+--   * a non-zero book or non-cash balance;
+--   * any ledger row, including a zero-value historical row;
+--   * an open or closed-but-unsettled shift;
+--   * an active payment route that can still select this treasury;
+--   * a live child treasury whose parent link would be broken.
+--
+-- The checks run after the treasury row lock, so a concurrent payment, open,
+-- settle, or archive either finishes first (and is seen here) or waits and
+-- then sees deleted_at. This keeps the archive from stranding a balance or a
+-- route while still allowing an empty, inactive, fully settled treasury.
 --
 -- Forward-only rollback: ship a reviewed replacement RPC; do not restore direct
 -- UPDATE on deleted_at or table-level UPDATE on public.treasury.
@@ -31,6 +38,8 @@ as $function$
 declare
   v_branch uuid;
   v_id uuid;
+  v_book numeric;
+  v_non_cash numeric;
 begin
   v_branch := public._treasury_shift_authorize_treasury(
     _treasury_id, 'treasury.delete'
@@ -38,7 +47,8 @@ begin
 
   -- Lock the row first, then re-check the children. The same lock order as the
   -- treasury write paths keeps this from racing a payment or a shift close.
-  perform 1
+  select t.current_balance, t.non_cash_balance
+    into v_book, v_non_cash
     from public.treasury t
    where t.id = _treasury_id
      and t.branch_id = v_branch
@@ -57,12 +67,35 @@ begin
       using errcode = '23514';
   end if;
 
+  if coalesce(v_book, 0) <> 0 or coalesce(v_non_cash, 0) <> 0 then
+    raise exception 'Treasury has a non-zero balance and cannot be archived'
+      using errcode = '23514';
+  end if;
+
   if exists (
     select 1 from public.treasury_shifts s
      where s.treasury_id = _treasury_id
-       and s.closed_at is null
+       and s.settled_at is null
   ) then
-    raise exception 'Treasury has an open shift and cannot be archived'
+    raise exception 'Treasury has an unsettled shift and cannot be archived'
+      using errcode = '23514';
+  end if;
+
+  if exists (
+    select 1 from public.treasury_payment_routes r
+     where r.treasury_id = _treasury_id
+       and r.is_active
+  ) then
+    raise exception 'Treasury is still selected by an active payment route'
+      using errcode = '23514';
+  end if;
+
+  if exists (
+    select 1 from public.treasury child
+     where child.parent_treasury_id = _treasury_id
+       and child.deleted_at is null
+  ) then
+    raise exception 'Treasury has a live child treasury and cannot be archived'
       using errcode = '23514';
   end if;
 

@@ -1,4 +1,4 @@
--- Real-schema regression for 20261117126000_treasury_shift_open_custodian_guard.sql.
+-- Real-schema regression for 20261117125500_treasury_shift_open_custodian_guard.sql.
 --
 -- Run against an isolated real-schema replay, never Production. The fixture is
 -- synthetic and rolls back with the test transaction.

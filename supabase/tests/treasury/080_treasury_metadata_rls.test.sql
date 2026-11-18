@@ -8,25 +8,44 @@
 -- the local harness to test ACLs and financial compatibility. This file keeps
 -- RLS enabled and tests the existing treasury policies against a real schema.
 --
--- The file creates its own branch, users, roles, and treasury inside one
--- transaction and rolls everything back.
+-- The file creates its own branch, users, live Auth sessions, branch membership,
+-- roles, and treasury inside one transaction and rolls everything back. Adding
+-- auth.users and user_roles alone is not enough: the real schema also requires
+-- request.jwt.claims (iss/sub/session_id/exp), an auth.sessions row, and
+-- staff_profiles/staff_branches membership before has_role(), branch isolation,
+-- and session_is_active() can pass.
 
 begin;
-select plan(11);
+select plan(13);
 
-insert into auth.users (id, email) values
-  ('f9999999-9999-4999-8999-999999999991', 'pr6-rls-admin@example.test'),
-  ('f9999999-9999-4999-8999-999999999992', 'pr6-rls-other@example.test')
+insert into auth.users (id, email, is_anonymous, banned_until, deleted_at) values
+  ('f9999999-9999-4999-8999-999999999991', 'pr6-rls-admin@example.test', false, null, null),
+  ('f9999999-9999-4999-8999-999999999992', 'pr6-rls-other@example.test', false, null, null)
 on conflict (id) do nothing;
+
+insert into auth.sessions (id, user_id, not_after) values
+  ('e9999999-9999-4999-8999-999999999991', 'f9999999-9999-4999-8999-999999999991', now() + interval '1 hour'),
+  ('e9999999-9999-4999-8999-999999999992', 'f9999999-9999-4999-8999-999999999992', now() + interval '1 hour')
+on conflict (id) do nothing;
+
+insert into public.branches (id, name_en, name_ar) values
+  ('b9999999-9999-4999-8999-999999999991', 'PR6 RLS Branch', 'فرع RLS')
+on conflict (id) do nothing;
+
+insert into public.staff_profiles (id, linked_user_id, branch_id, status) values
+  ('c9999999-9999-4999-8999-999999999991', 'f9999999-9999-4999-8999-999999999991', 'b9999999-9999-4999-8999-999999999991', 'active'),
+  ('c9999999-9999-4999-8999-999999999992', 'f9999999-9999-4999-8999-999999999992', 'b9999999-9999-4999-8999-999999999991', 'active')
+on conflict (id) do nothing;
+
+insert into public.staff_branches (user_id, branch_id) values
+  ('f9999999-9999-4999-8999-999999999991', 'b9999999-9999-4999-8999-999999999991'),
+  ('f9999999-9999-4999-8999-999999999992', 'b9999999-9999-4999-8999-999999999991')
+on conflict do nothing;
 
 insert into public.user_roles (user_id, role) values
   ('f9999999-9999-4999-8999-999999999991', 'admin'),
   ('f9999999-9999-4999-8999-999999999992', 'receptionist')
 on conflict do nothing;
-
-insert into public.branches (id, name_en, name_ar) values
-  ('b9999999-9999-4999-8999-999999999991', 'PR6 RLS Branch', 'فرع RLS')
-on conflict (id) do nothing;
 
 insert into public.treasury (
   id, branch_id, name_en, name_ar, current_balance, non_cash_balance,
@@ -57,8 +76,31 @@ select ok(
   'treasury select and admin policies exist'
 );
 
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'iss', 'https://rqcmnfzfytyyicelvifk.supabase.co/auth/v1',
+    'sub', 'f9999999-9999-4999-8999-999999999991',
+    'role', 'authenticated',
+    'session_id', 'e9999999-9999-4999-8999-999999999991',
+    'exp', extract(epoch from now() + interval '1 hour')::bigint
+  )::text,
+  true
+);
+select set_config('request.jwt.claim.sub', 'f9999999-9999-4999-8999-999999999991', true);
 set local role authenticated;
-set local request.jwt.claim.sub = 'f9999999-9999-4999-8999-999999999991';
+
+select is(
+  zmedico_security.session_is_active(),
+  true,
+  'seeded Auth session is active for the RLS admin'
+);
+
+select is(
+  public.has_role('f9999999-9999-4999-8999-999999999991', 'admin'),
+  true,
+  'seeded admin role is visible through the real authorization helper'
+);
 
 select is(
   (select count(*) from public.treasury
@@ -86,7 +128,18 @@ select throws_ok($q$
    where id = 'a9999999-9999-4999-8999-999999999991'
 $q$, '42501', null, 'ACL still blocks account_kind even for an RLS admin');
 
-set local request.jwt.claim.sub = 'f9999999-9999-4999-8999-999999999992';
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'iss', 'https://rqcmnfzfytyyicelvifk.supabase.co/auth/v1',
+    'sub', 'f9999999-9999-4999-8999-999999999992',
+    'role', 'authenticated',
+    'session_id', 'e9999999-9999-4999-8999-999999999992',
+    'exp', extract(epoch from now() + interval '1 hour')::bigint
+  )::text,
+  true
+);
+select set_config('request.jwt.claim.sub', 'f9999999-9999-4999-8999-999999999992', true);
 
 select is(
   (select count(*) from public.treasury

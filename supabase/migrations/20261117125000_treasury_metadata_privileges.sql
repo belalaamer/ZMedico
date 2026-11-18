@@ -50,8 +50,9 @@ set local lock_timeout = '5s';
 set local statement_timeout = '120s';
 
 -- Remove the table-level grant that currently covers every column, including
--- the sensitive metadata. `public` is included because it applies to every
--- role unless a direct grant overrides it.
+-- the sensitive metadata. Revoking UPDATE from PUBLIC removes that source of
+-- the privilege for every role; it does not remove a grant made directly to a
+-- role. The direct grants are revoked separately below.
 revoke update on table public.treasury
   from public, anon, authenticated;
 

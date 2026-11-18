@@ -54,7 +54,8 @@ select lives_ok($q$
       'd1111111-1111-4111-8111-111111111111',
       'e1111111-1111-4111-8111-111111111111',
       '[{"amount":10,"payment_method":"cash"}]'::jsonb,
-      'pr5-race-key-0001'
+      'pr5-race-key-0001',
+      '11111111-1111-4111-8111-111111111111'
     )
   $sql$) as t(x jsonb)
 $q$, 'session A posts the first collection');
@@ -66,9 +67,10 @@ select is(dblink_send_query('b', $q$select public.fn_treasury_payment_collect(
     'd1111111-1111-4111-8111-111111111111',
     'e1111111-1111-4111-8111-111111111111',
     '[{"amount":10,"payment_method":"cash"}]'::jsonb,
-    'pr5-race-key-0001'
+    'pr5-race-key-0001',
+      '11111111-1111-4111-8111-111111111111'
   )$q$), 1, 'session B starts the same key');
-select ok(pg_temp.wait_lock(), 'session B waits on the batch idempotency lock');
+select ok(pg_temp.wait_lock(), 'session B waits on the shift/treasury prefix');
 select is(dblink_exec('a', 'commit'), 'COMMIT', 'session A commits');
 create temp table race_b_result as
   select * from dblink_get_result('b') as t(x jsonb);
@@ -107,7 +109,8 @@ select is(dblink_send_query('d', $q$select public.fn_treasury_payment_collect(
     'd1111111-1111-4111-8111-111111111111',
     'e1111111-1111-4111-8111-111111111111',
     '[{"amount":5,"payment_method":"cash"}]'::jsonb,
-    'pr5-race-lock-key-0001'
+    'pr5-race-lock-key-0001',
+      '11111111-1111-4111-8111-111111111112'
   )$q$), 1, 'session D starts a collection behind the shift lock');
 select ok(pg_temp.wait_lock(), 'session D waits for the shift advisory lock');
 select is(dblink_exec('c', 'commit'), 'COMMIT', 'session C releases the shift lock');
@@ -133,7 +136,8 @@ select lives_ok($q$
       'd1111111-1111-4111-8111-111111111111',
       'e1111111-1111-4111-8111-111111111111',
       '[{"amount":5,"payment_method":"cash"}]'::jsonb,
-      'pr5-race-shift-a-key-0001'
+      'pr5-race-shift-a-key-0001',
+      '11111111-1111-4111-8111-111111111113'
     )
   $sql$) as t(x jsonb)
 $q$, 'session E posts one collection');
@@ -145,7 +149,8 @@ select is(dblink_send_query('f', $q$select public.fn_treasury_payment_collect(
     'd1111111-1111-4111-8111-111111111111',
     'e1111111-1111-4111-8111-111111111111',
     '[{"amount":7,"payment_method":"cash"}]'::jsonb,
-    'pr5-race-shift-b-key-0001'
+    'pr5-race-shift-b-key-0001',
+      '11111111-1111-4111-8111-111111111114'
   )$q$), 1, 'session F starts a second collection');
 select ok(pg_temp.wait_lock(), 'session F waits on the first collection shift lock');
 select is(dblink_exec('e', 'commit'), 'COMMIT', 'session E commits');
@@ -173,7 +178,8 @@ select lives_ok($q$
       'd1111111-1111-4111-8111-111111111111',
       'e1111111-1111-4111-8111-111111111111',
       '[{"amount":10,"payment_method":"cash"}]'::jsonb,
-      'pr5-race-conflict-key-0001'
+      'pr5-race-conflict-key-0001',
+      '11111111-1111-4111-8111-111111111115'
     )
   $sql$) as t(x jsonb)
 $q$, 'session G posts the conflict key');
@@ -185,7 +191,8 @@ select is(dblink_send_query('h', $q$select public.fn_treasury_payment_collect(
     'd1111111-1111-4111-8111-111111111111',
     'e1111111-1111-4111-8111-111111111111',
     '[{"amount":20,"payment_method":"cash"}]'::jsonb,
-    'pr5-race-conflict-key-0001'
+    'pr5-race-conflict-key-0001',
+      '11111111-1111-4111-8111-111111111115'
   )$q$), 1, 'session H starts a conflicting retry');
 select ok(pg_temp.wait_lock(), 'session H waits for the conflict key');
 select is(dblink_exec('g', 'commit'), 'COMMIT', 'session G commits');
@@ -219,7 +226,8 @@ select is(dblink_send_query('j', $q$select public.fn_treasury_payment_collect(
     'd1111111-1111-4111-8111-111111111111',
     'e1111111-1111-4111-8111-111111111111',
     '[{"amount":3,"payment_method":"cash"}]'::jsonb,
-    'pr5-race-treasury-key-0001'
+    'pr5-race-treasury-key-0001',
+      '11111111-1111-4111-8111-111111111116'
   )$q$), 1, 'session J starts a collection behind the drawer lock');
 select ok(pg_temp.wait_lock(), 'session J waits for the drawer row');
 select is(dblink_exec('i', 'commit'), 'COMMIT', 'session I releases the drawer');

@@ -14,16 +14,17 @@
 --   * reuses the existing payment AFTER INSERT trigger for the ledger and
 --     invoice recalculation, so there is only one posting path per payment.
 --
--- Canonical lock order is the same as PR-4:
---   1. advisory lock for the payment idempotency key (batch creation only),
---   2. advisory lock keyed by each shift id, in id order,
---   3. shift rows, in id order,
---   4. treasury rows, in id order,
---   5. re-read and revalidate route, shift and treasury metadata.
+-- Canonical lock order is a single order shared with PR-4:
+--   1. advisory lock keyed by each shift id, in id order,
+--   2. shift rows, in id order,
+--   3. treasury rows, in id order,
+--   4. batch/request advisory lock, only after the shift/treasury prefix.
 --
--- The batch advisory lock serialises retries of the same key. The shift
--- advisory lock is the same key used by transfer_treasury_funds and by the
--- shift close/settle RPCs, so a collection cannot interleave with a handover.
+-- PR-4 close, settle, close-and-settle and transfer never take the batch
+-- advisory lock, so each of their paths is a strict prefix of this one:
+--   PR-4: shift advisory -> shift -> treasury
+--   PR-5: shift advisory -> shift -> treasury -> batch advisory
+-- No path takes the batch lock before a shift lock or a treasury row.
 
 set local lock_timeout = '5s';
 set local statement_timeout = '120s';
@@ -91,6 +92,115 @@ for each row execute function public._tg_treasury_tx_payment_cycle();
 revoke all on function public._tg_treasury_tx_payment_cycle()
   from public, anon, authenticated;
 
+-- The explicit request identity is separate from the idempotency key. A retry
+-- must present both the same key and the same request id; a new attempt that
+-- merely happens to look identical is not a replay.
+alter table public.payment_batches
+  add column if not exists request_id uuid;
+
+create unique index if not exists payment_batches_request_uq
+  on public.payment_batches(branch_id, request_id)
+  where request_id is not null;
+
+create or replace function public._fn_treasury_payment_replay(
+  _branch_id uuid,
+  _patient_id uuid,
+  _invoice_id uuid,
+  _idempotency_key text,
+  _request_id uuid,
+  _cycle_id uuid,
+  _total numeric,
+  _normalized jsonb,
+  _payment_date date
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $fn$
+declare
+  v_existing record;
+  v_existing_norm jsonb;
+  v_existing_count integer;
+  v_existing_min_date date;
+  v_existing_max_date date;
+  v_payment_ids jsonb;
+begin
+  select b.id, b.patient_id, b.invoice_id, b.financial_cycle_id,
+         b.shift_id, b.total_amount, b.status,
+         b.idempotency_key, b.request_id
+    into v_existing
+    from public.payment_batches b
+   where b.branch_id = _branch_id
+     and (b.idempotency_key = _idempotency_key
+          or b.request_id = _request_id)
+   order by (b.idempotency_key = _idempotency_key) desc, b.id
+   limit 1;
+
+  if not found then
+    return null;
+  end if;
+
+  if v_existing.idempotency_key is distinct from _idempotency_key then
+    raise exception 'Request id % was already used with a different idempotency key',
+      _request_id using errcode = '23505';
+  end if;
+  if v_existing.request_id is distinct from _request_id then
+    raise exception 'Idempotency key % was already used with a different request id',
+      _idempotency_key using errcode = '23505';
+  end if;
+  if v_existing.status <> 'posted' then
+    raise exception 'Idempotency key % belongs to a % batch',
+      _idempotency_key, v_existing.status using errcode = '23514';
+  end if;
+
+  select jsonb_agg(jsonb_build_object(
+           'index', p.split_index,
+           'amount', p.amount,
+           'payment_method', p.payment_method::text
+         ) order by p.split_index),
+         count(*),
+         min(p.payment_date),
+         max(p.payment_date)
+    into v_existing_norm, v_existing_count,
+         v_existing_min_date, v_existing_max_date
+    from public.payments p
+   where p.payment_batch_id = v_existing.id;
+
+  if v_existing.patient_id is distinct from _patient_id
+     or v_existing.invoice_id is distinct from _invoice_id
+     or v_existing.financial_cycle_id is distinct from _cycle_id
+     or v_existing.total_amount is distinct from _total
+     or v_existing_count is distinct from jsonb_array_length(_normalized)
+     or v_existing_norm is distinct from _normalized
+     or (_payment_date is not null
+         and (v_existing_min_date is distinct from _payment_date
+              or v_existing_max_date is distinct from _payment_date)) then
+    raise exception 'Request % / key % was already used with different payment facts',
+      _request_id, _idempotency_key using errcode = '23505';
+  end if;
+
+  select coalesce(jsonb_agg(p.id order by p.split_index), '[]'::jsonb)
+    into v_payment_ids
+    from public.payments p
+   where p.payment_batch_id = v_existing.id;
+
+  return jsonb_build_object(
+    'batch_id', v_existing.id,
+    'request_id', v_existing.request_id,
+    'payment_ids', v_payment_ids,
+    'total_amount', v_existing.total_amount,
+    'financial_cycle_id', v_existing.financial_cycle_id,
+    'shift_id', v_existing.shift_id,
+    'idempotent_replay', true
+  );
+end;
+$fn$;
+
+revoke all on function public._fn_treasury_payment_replay(
+  uuid, uuid, uuid, text, uuid, uuid, numeric, jsonb, date
+) from public, anon, authenticated;
+
 -- ---------------------------------------------------------------------------
 -- 2. collection RPC
 -- ---------------------------------------------------------------------------
@@ -101,6 +211,7 @@ create or replace function public.fn_treasury_payment_collect(
   _invoice_id uuid,
   _splits jsonb,
   _idempotency_key text,
+  _request_id uuid,
   _payment_date date default null,
   _shift_id uuid default null,
   _notes text default null
@@ -113,7 +224,7 @@ as $fn$
 declare
   v_actor uuid := auth.uid();
   v_key text := nullif(btrim(_idempotency_key), '');
-  v_count integer;
+  v_replay jsonb;
   v_i integer;
   v_elem jsonb;
   v_method public.payment_method;
@@ -126,11 +237,6 @@ declare
   v_cycle_id uuid;
   v_cycle_date date;
   v_payment_date date;
-  v_existing record;
-  v_existing_norm jsonb;
-  v_existing_count integer;
-  v_existing_min_date date;
-  v_existing_max_date date;
   v_route record;
   v_resolved jsonb := '[]'::jsonb;
   v_shift record;
@@ -168,6 +274,9 @@ begin
   if v_key is null or char_length(v_key) < 8 or char_length(v_key) > 200 then
     raise exception 'idempotency key must be between 8 and 200 characters'
       using errcode = '22023';
+  end if;
+  if _request_id is null then
+    raise exception 'request id is required' using errcode = '22023';
   end if;
 
   if _splits is null
@@ -269,9 +378,11 @@ begin
         v_elem ->> 'payment_method' using errcode = '22023';
     end;
 
-    -- Wallet top-ups have a separate funding RPC and a different ledger path.
+    -- Wallet top-ups and wallet spends use the existing payments/patient-wallet
+    -- path, which has its own funding and ledger rules. This route RPC refuses
+    -- them explicitly so a wallet movement cannot be posted as a normal split.
     if v_method = 'wallet'::public.payment_method then
-      raise exception 'Wallet top-ups are not handled by the collection RPC'
+      raise exception 'Wallet movements are not handled by the collection RPC'
         using errcode = '0A000';
     end if;
 
@@ -290,65 +401,14 @@ begin
       using errcode = '23514';
   end if;
 
-  -- -----------------------------------------------------------------------
-  -- Idempotency: serialise the key, then replay or continue
-  -- -----------------------------------------------------------------------
-  perform pg_advisory_xact_lock(
-    hashtextextended('payment-batch:' || _branch_id::text || ':' || v_key, 0)
+  -- Fast replay without taking any write lock. A retry must still match both
+  -- the idempotency key and the explicit request id.
+  v_replay := public._fn_treasury_payment_replay(
+    _branch_id, _patient_id, _invoice_id, v_key, _request_id,
+    v_cycle_id, v_total, v_normalized, _payment_date
   );
-
-  select b.id, b.patient_id, b.invoice_id, b.financial_cycle_id,
-         b.shift_id, b.total_amount, b.status
-    into v_existing
-    from public.payment_batches b
-   where b.branch_id = _branch_id
-     and b.idempotency_key = v_key;
-
-  if found then
-    if v_existing.status <> 'posted' then
-      raise exception 'Idempotency key % belongs to a % batch', v_key, v_existing.status
-        using errcode = '23514';
-    end if;
-
-    select jsonb_agg(jsonb_build_object(
-             'index', p.split_index,
-             'amount', p.amount,
-             'payment_method', p.payment_method::text
-           ) order by p.split_index),
-           count(*),
-           min(p.payment_date),
-           max(p.payment_date)
-      into v_existing_norm, v_existing_count,
-           v_existing_min_date, v_existing_max_date
-      from public.payments p
-     where p.payment_batch_id = v_existing.id;
-
-    if v_existing.patient_id is distinct from _patient_id
-       or v_existing.invoice_id is distinct from _invoice_id
-       or v_existing.financial_cycle_id is distinct from v_cycle_id
-       or v_existing.total_amount is distinct from v_total
-       or v_existing_count is distinct from jsonb_array_length(v_normalized)
-       or v_existing_norm is distinct from v_normalized
-       or (_payment_date is not null
-           and (v_existing_min_date is distinct from _payment_date
-                or v_existing_max_date is distinct from _payment_date)) then
-      raise exception 'Idempotency key % was already used with different payment facts', v_key
-        using errcode = '23505';
-    end if;
-
-    select coalesce(jsonb_agg(p.id order by p.split_index), '[]'::jsonb)
-      into v_payment_ids
-      from public.payments p
-     where p.payment_batch_id = v_existing.id;
-
-    return jsonb_build_object(
-      'batch_id', v_existing.id,
-      'payment_ids', v_payment_ids,
-      'total_amount', v_existing.total_amount,
-      'financial_cycle_id', v_existing.financial_cycle_id,
-      'shift_id', v_existing.shift_id,
-      'idempotent_replay', true
-    );
+  if v_replay is not null then
+    return v_replay;
   end if;
 
   -- -----------------------------------------------------------------------
@@ -359,6 +419,10 @@ begin
     v_method := (v_elem ->> 'payment_method')::public.payment_method;
     v_amount := (v_elem ->> 'amount')::numeric(14,2);
 
+    -- Route policy: the PR-2 unique indexes forbid a second route for the
+    -- same branch/method/cycle (including the NULL default cycle), so there is
+    -- never a tie to resolve. When both a cycle route and the default exist,
+    -- the cycle route is selected; otherwise the default is selected.
     select r.id, r.treasury_id, r.requires_shift
       into v_route
       from public.treasury_payment_routes r
@@ -378,6 +442,13 @@ begin
     v_treasury_id := null;
 
     if v_route.requires_shift then
+      -- A physical drawer belongs to cash. A non-cash route that asks for a
+      -- shift is a configuration error, not an invitation to use a cash row.
+      if v_method <> 'cash'::public.payment_method then
+        raise exception 'Only cash routes may require a shift (route %, method %)',
+          v_route.id, v_method using errcode = '23514';
+      end if;
+
       if _shift_id is not null then
         select s.id, s.treasury_id
           into v_shift
@@ -385,6 +456,7 @@ begin
           join public.treasury t on t.id = s.treasury_id
          where s.id = _shift_id
            and s.branch_id = _branch_id
+           and s.custodian_user_id = v_actor
            and s.closed_at is null
            and s.settled_at is null
            and t.branch_id = _branch_id
@@ -402,6 +474,7 @@ begin
           from public.treasury_shifts s
           join public.treasury t on t.id = s.treasury_id
          where s.branch_id = _branch_id
+           and s.custodian_user_id = v_actor
            and s.closed_at is null
            and s.settled_at is null
            and t.branch_id = _branch_id
@@ -424,6 +497,7 @@ begin
           from public.treasury_shifts s
           join public.treasury t on t.id = s.treasury_id
          where s.branch_id = _branch_id
+           and s.custodian_user_id = v_actor
            and s.closed_at is null
            and s.settled_at is null
            and t.branch_id = _branch_id
@@ -550,6 +624,7 @@ begin
           join public.treasury t on t.id = s.treasury_id
          where s.id = (v_r.e ->> 'shift_id')::uuid
            and s.branch_id = _branch_id
+           and s.custodian_user_id = v_actor
            and s.closed_at is null
            and s.settled_at is null
            and t.id = (v_r.e ->> 'treasury_id')::uuid
@@ -582,15 +657,32 @@ begin
     end if;
   end loop;
 
+  -- Creation is serialised after the shift/treasury prefix. PR-4 never takes
+  -- the batch advisory lock, so its order is a strict prefix of this one:
+  -- shift advisory -> shift row -> treasury row -> batch/request advisory.
+  perform pg_advisory_xact_lock(
+    hashtextextended('payment-batch:' || _branch_id::text || ':' || v_key, 0)
+  );
+
+  -- A same-key winner may have committed while this call waited for the
+  -- shift/treasury locks. Re-read before creating anything.
+  v_replay := public._fn_treasury_payment_replay(
+    _branch_id, _patient_id, _invoice_id, v_key, _request_id,
+    v_cycle_id, v_total, v_normalized, _payment_date
+  );
+  if v_replay is not null then
+    return v_replay;
+  end if;
+
   -- -----------------------------------------------------------------------
   -- Write the batch and its split rows
   -- -----------------------------------------------------------------------
   insert into public.payment_batches (
     branch_id, shift_id, patient_id, invoice_id, financial_cycle_id,
-    idempotency_key, total_amount, status, created_by
+    idempotency_key, request_id, total_amount, status, created_by
   ) values (
     _branch_id, v_batch_shift, _patient_id, _invoice_id, v_cycle_id,
-    v_key, v_total, 'posted', v_actor
+    v_key, _request_id, v_total, 'posted', v_actor
   ) returning id into v_batch_id;
 
   for v_r in
@@ -647,9 +739,9 @@ end;
 $fn$;
 
 revoke all on function public.fn_treasury_payment_collect(
-  uuid, uuid, uuid, jsonb, text, date, uuid, text
+  uuid, uuid, uuid, jsonb, text, uuid, date, uuid, text
 ) from public, anon, authenticated;
 
 grant execute on function public.fn_treasury_payment_collect(
-  uuid, uuid, uuid, jsonb, text, date, uuid, text
+  uuid, uuid, uuid, jsonb, text, uuid, date, uuid, text
 ) to authenticated, service_role;

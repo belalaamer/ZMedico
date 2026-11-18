@@ -5,7 +5,29 @@
 -- and route rows; this test transaction is rolled back.
 
 begin;
-select plan(67);
+select plan(88);
+
+-- The harness supplies a deterministic request id from the key. Tests that
+-- need two different request ids call the public 9-argument RPC directly.
+create function pg_temp.collect(
+  _branch_id uuid,
+  _patient_id uuid,
+  _invoice_id uuid,
+  _splits jsonb,
+  _idempotency_key text,
+  _request_id uuid default null,
+  _payment_date date default null,
+  _shift_id uuid default null,
+  _notes text default null
+) returns jsonb
+language sql
+as $fn$
+  select public.fn_treasury_payment_collect(
+    _branch_id, _patient_id, _invoice_id, _splits, _idempotency_key,
+    coalesce(_request_id, md5(_idempotency_key)::uuid),
+    _payment_date, _shift_id, _notes
+  );
+$fn$;
 
 set local role authenticated;
 set local request.jwt.claim.sub = 'f0000000-0000-4000-8000-000000000001';
@@ -16,7 +38,7 @@ set local app.test_session_active = 'on';
 -- ---------------------------------------------------------------------------
 
 select lives_ok($q$
-  select public.fn_treasury_payment_collect(
+  select pg_temp.collect(
     'b1111111-1111-4111-8111-111111111111',
     'd1111111-1111-4111-8111-111111111111',
     'e1111111-1111-4111-8111-111111111111',
@@ -35,6 +57,7 @@ select is((select current_balance from public.treasury where id='a1111111-1111-4
 select is((select count(*) from public.treasury_transactions where reference_type='payment' and amount=100), 1::bigint, 'cash posts exactly one ledger row');
 select is((select financial_cycle_id from public.treasury_transactions where reference_type='payment' and amount=100), 'c1111111-1111-4111-8111-111111111111'::uuid, 'the payment ledger row carries the cycle');
 select is((select paid_amount from public.invoices where id='e1111111-1111-4111-8111-111111111111'), 100::numeric, 'invoice paid amount is recalculated');
+select is((select request_id from public.payment_batches), md5('pr5-cash-key-0001')::uuid, 'batch stores the explicit request id');
 select is((select total_amount from public.payment_batches), 100::numeric, 'batch total equals the split');
 select is((select shift_id from public.payment_batches), 'f1111111-1111-4111-8111-111111111111'::uuid, 'batch carries the cash shift');
 select is((select status from public.payment_batches), 'posted', 'batch is posted');
@@ -44,7 +67,7 @@ select is((select status from public.payment_batches), 'posted', 'batch is poste
 -- ---------------------------------------------------------------------------
 
 select lives_ok($q$
-  select public.fn_treasury_payment_collect(
+  select pg_temp.collect(
     'b1111111-1111-4111-8111-111111111111',
     'd1111111-1111-4111-8111-111111111111',
     'e1111111-1111-4111-8111-111111111111',
@@ -65,7 +88,7 @@ select is((select shift_id from public.payment_batches where idempotency_key='pr
 -- ---------------------------------------------------------------------------
 
 select lives_ok($q$
-  select public.fn_treasury_payment_collect(
+  select pg_temp.collect(
     'b1111111-1111-4111-8111-111111111111',
     'd1111111-1111-4111-8111-111111111111',
     'e1111111-1111-4111-8111-111111111111',
@@ -89,7 +112,7 @@ select is((select count(*) from public.treasury_transactions where reference_typ
 -- 4. Idempotency: exact replay, conflicting replay, reversed batch
 -- ---------------------------------------------------------------------------
 
-select is((public.fn_treasury_payment_collect(
+select is((pg_temp.collect(
     'b1111111-1111-4111-8111-111111111111',
     'd1111111-1111-4111-8111-111111111111',
     'e1111111-1111-4111-8111-111111111111',
@@ -99,7 +122,7 @@ select is((public.fn_treasury_payment_collect(
   (select id from public.payment_batches where idempotency_key='pr5-split-key-0001'),
   'exact replay returns the same batch');
 
-select is((public.fn_treasury_payment_collect(
+select is((pg_temp.collect(
     'b1111111-1111-4111-8111-111111111111',
     'd1111111-1111-4111-8111-111111111111',
     'e1111111-1111-4111-8111-111111111111',
@@ -112,7 +135,7 @@ select is((select count(*) from public.payments where idempotency_key='pr5-split
 select is((select count(*) from public.treasury_transactions where reference_type='payment' and amount in (30,20)), 2::bigint, 'replay does not duplicate ledger rows');
 
 select throws_ok($q$
-  select public.fn_treasury_payment_collect(
+  select pg_temp.collect(
     'b1111111-1111-4111-8111-111111111111',
     'd1111111-1111-4111-8111-111111111111',
     'e1111111-1111-4111-8111-111111111111',
@@ -122,12 +145,13 @@ select throws_ok($q$
 $q$, '23505', null, 'same key with different amounts is rejected');
 
 select throws_ok($q$
-  select public.fn_treasury_payment_collect(
+  select pg_temp.collect(
     'b1111111-1111-4111-8111-111111111111',
     'd1111111-1111-4111-8111-111111111111',
     'e1111111-1111-4111-8111-111111111111',
     '[{"amount":30,"payment_method":"cash"},{"amount":20,"payment_method":"card"}]'::jsonb,
     'pr5-split-key-0001',
+    null,
     '2026-06-02'
   )
 $q$, '23505', null, 'same key with a different explicit payment date is rejected');
@@ -137,7 +161,7 @@ select lives_ok($q$
 $q$, 'test marks the split batch reversed');
 
 select throws_ok($q$
-  select public.fn_treasury_payment_collect(
+  select pg_temp.collect(
     'b1111111-1111-4111-8111-111111111111',
     'd1111111-1111-4111-8111-111111111111',
     'e1111111-1111-4111-8111-111111111111',
@@ -146,17 +170,77 @@ select throws_ok($q$
   )
 $q$, '23514', null, 'replay of a reversed batch is rejected');
 
+-- A new attempt with the same key but a different explicit request id is not
+-- a replay, even when every money fact is identical.
+select throws_ok($q$
+  select public.fn_treasury_payment_collect(
+    'b1111111-1111-4111-8111-111111111111',
+    'd1111111-1111-4111-8111-111111111111',
+    'e1111111-1111-4111-8111-111111111111',
+    '[{"amount":100,"payment_method":"cash"}]'::jsonb,
+    'pr5-cash-key-0001',
+    '11111111-1111-4111-8111-111111111111'
+  )
+$q$, '23505', null, 'same key with a different request id is rejected');
+
+-- A different key cannot reuse the first request id.
+select throws_ok($q$
+  select public.fn_treasury_payment_collect(
+    'b1111111-1111-4111-8111-111111111111',
+    'd1111111-1111-4111-8111-111111111111',
+    'e1111111-1111-4111-8111-111111111111',
+    '[{"amount":100,"payment_method":"cash"}]'::jsonb,
+    'pr5-request-reuse-key-0001',
+    md5('pr5-cash-key-0001')::uuid
+  )
+$q$, '23505', null, 'a request id cannot be reused with a different key');
+
+select throws_ok($q$
+  select public.fn_treasury_payment_collect(
+    'b1111111-1111-4111-8111-111111111111',
+    'd1111111-1111-4111-8111-111111111111',
+    'e1111111-1111-4111-8111-111111111111',
+    '[{"amount":100,"payment_method":"cash"}]'::jsonb,
+    'pr5-nullrequest-key-0001',
+    null
+  )
+$q$, '22023', null, 'a null request id is rejected');
+
+-- A genuinely new attempt with a new key and a new request id is allowed even
+-- when every money fact is identical to an earlier payment.
+select lives_ok($q$
+  select pg_temp.collect(
+    'b1111111-1111-4111-8111-111111111111',
+    'd1111111-1111-4111-8111-111111111111',
+    'e1111111-1111-4111-8111-111111111111',
+    '[{"amount":10,"payment_method":"cash"}]'::jsonb,
+    'pr5-newattempt-key-0001',
+    '33333333-3333-4333-8333-333333333333'
+  )
+$q$, 'a new key and request id may repeat the same facts');
+
+select is((select count(*) from public.payment_batches where idempotency_key='pr5-newattempt-key-0001'), 1::bigint, 'new attempt writes one batch');
+select is((pg_temp.collect(
+    'b1111111-1111-4111-8111-111111111111',
+    'd1111111-1111-4111-8111-111111111111',
+    'e1111111-1111-4111-8111-111111111111',
+    '[{"amount":10,"payment_method":"cash"}]'::jsonb,
+    'pr5-newattempt-key-0001',
+    '33333333-3333-4333-8333-333333333333'
+  ) ->> 'idempotent_replay')::boolean, true, 'the new attempt is replayable by its own request id');
+
 -- ---------------------------------------------------------------------------
 -- 5. A payment without an invoice still carries a cycle and batch
 -- ---------------------------------------------------------------------------
 
 select lives_ok($q$
-  select public.fn_treasury_payment_collect(
+  select pg_temp.collect(
     'b1111111-1111-4111-8111-111111111111',
     'd1111111-1111-4111-8111-111111111111',
     null,
     '[{"amount":40,"payment_method":"cash"}]'::jsonb,
     'pr5-noinvoice-key-0001',
+    null,
     '2026-06-05'
   )
 $q$, 'collection without an invoice succeeds');
@@ -170,7 +254,7 @@ select is((select shift_id from public.payments where idempotency_key='pr5-noinv
 -- ---------------------------------------------------------------------------
 
 select throws_ok($q$
-  select public.fn_treasury_payment_collect(
+  select pg_temp.collect(
     'b1111111-1111-4111-8111-111111111111',
     'd1111111-1111-4111-8111-111111111111',
     'e1111111-1111-4111-8111-111111111111',
@@ -178,23 +262,35 @@ select throws_ok($q$
 $q$, '22023', null, 'empty splits are rejected');
 
 select throws_ok($q$
-  select public.fn_treasury_payment_collect(
+  select pg_temp.collect(
     'b1111111-1111-4111-8111-111111111111',
     'd1111111-1111-4111-8111-111111111111',
     'e1111111-1111-4111-8111-111111111111',
     '[{"amount":-1,"payment_method":"cash"}]'::jsonb, 'pr5-badamount-key-0001')
 $q$, '22023', null, 'a non-positive split is rejected');
 
+create temp table wallet_counts as
+  select (select count(*) from public.payment_batches) as batches,
+         (select count(*) from public.payments) as payments,
+         (select count(*) from public.treasury_transactions) as ledger;
+
 select throws_ok($q$
-  select public.fn_treasury_payment_collect(
+  select pg_temp.collect(
     'b1111111-1111-4111-8111-111111111111',
     'd1111111-1111-4111-8111-111111111111',
     'e1111111-1111-4111-8111-111111111111',
     '[{"amount":1,"payment_method":"wallet"}]'::jsonb, 'pr5-wallet-key-0001')
 $q$, '0A000', null, 'wallet is not handled by the collection RPC');
 
+select is((select count(*) from public.payment_batches),
+  (select batches from wallet_counts), 'wallet rejection writes no batch');
+select is((select count(*) from public.payments),
+  (select payments from wallet_counts), 'wallet rejection writes no payment');
+select is((select count(*) from public.treasury_transactions),
+  (select ledger from wallet_counts), 'wallet rejection writes no ledger row');
+
 select throws_ok($q$
-  select public.fn_treasury_payment_collect(
+  select pg_temp.collect(
     'b1111111-1111-4111-8111-111111111111',
     'd1111111-1111-4111-8111-111111111111',
     'e1111111-1111-4111-8111-111111111111',
@@ -202,7 +298,7 @@ select throws_ok($q$
 $q$, '22023', null, 'an unknown payment method is rejected');
 
 select throws_ok($q$
-  select public.fn_treasury_payment_collect(
+  select pg_temp.collect(
     'b1111111-1111-4111-8111-111111111111',
     'd2222222-2222-4222-8222-222222222222',
     'e1111111-1111-4111-8111-111111111111',
@@ -210,7 +306,7 @@ select throws_ok($q$
 $q$, '23514', null, 'a patient from another branch is rejected');
 
 select throws_ok($q$
-  select public.fn_treasury_payment_collect(
+  select pg_temp.collect(
     'b1111111-1111-4111-8111-111111111111',
     'd1111111-1111-4111-8111-111111111111',
     'e2222222-2222-4222-8222-222222222222',
@@ -218,7 +314,7 @@ select throws_ok($q$
 $q$, '23514', null, 'an invoice from another branch is rejected');
 
 select throws_ok($q$
-  select public.fn_treasury_payment_collect(
+  select pg_temp.collect(
     'b1111111-1111-4111-8111-111111111111',
     'd1111111-1111-4111-8111-111111111111',
     'e1111111-1111-4111-8111-111111111113',
@@ -226,7 +322,7 @@ select throws_ok($q$
 $q$, '23514', null, 'a cancelled invoice is rejected');
 
 select throws_ok($q$
-  select public.fn_treasury_payment_collect(
+  select pg_temp.collect(
     'b1111111-1111-4111-8111-111111111111',
     'd1111111-1111-4111-8111-111111111111',
     'e1111111-1111-4111-8111-111111111112',
@@ -234,7 +330,7 @@ select throws_ok($q$
 $q$, '23514', null, 'a batch that overpays the invoice is rejected');
 
 select throws_ok($q$
-  select public.fn_treasury_payment_collect(
+  select pg_temp.collect(
     'b2222222-2222-4222-8222-222222222222',
     'd2222222-2222-4222-8222-222222222222',
     'e2222222-2222-4222-8222-222222222222',
@@ -242,7 +338,7 @@ select throws_ok($q$
 $q$, '23514', null, 'a branch without a route is rejected');
 
 select throws_ok($q$
-  select public.fn_treasury_payment_collect(
+  select pg_temp.collect(
     'b2222222-2222-4222-8222-222222222222',
     'd2222222-2222-4222-8222-222222222222',
     'e2222222-2222-4222-8222-222222222223',
@@ -250,30 +346,54 @@ select throws_ok($q$
 $q$, '23514', null, 'a payment outside every financial cycle is rejected');
 
 select throws_ok($q$
-  select public.fn_treasury_payment_collect(
+  select pg_temp.collect(
     'b1111111-1111-4111-8111-111111111111',
     'd1111111-1111-4111-8111-111111111111',
     'e1111111-1111-4111-8111-111111111111',
     '[{"amount":1,"payment_method":"card"}]'::jsonb, 'pr5-cardshift-key-0001',
-    null, 'f1111111-1111-4111-8111-111111111111')
+    null, null, 'f1111111-1111-4111-8111-111111111111')
 $q$, '23514', null, 'a non-shift route cannot be given a shift');
 
 select throws_ok($q$
-  select public.fn_treasury_payment_collect(
+  select pg_temp.collect(
     'b1111111-1111-4111-8111-111111111111',
     'd1111111-1111-4111-8111-111111111111',
     'e1111111-1111-4111-8111-111111111111',
     '[{"amount":1,"payment_method":"cash"}]'::jsonb, 'pr5-wrongshift-key-0001',
-    null, 'f9999999-9999-4999-8999-999999999999')
+    null, null, 'f9999999-9999-4999-8999-999999999999')
 $q$, '23514', null, 'an unknown shift is rejected');
 
 select throws_ok($q$
-  select public.fn_treasury_payment_collect(
+  select pg_temp.collect(
     'b1111111-1111-4111-8111-111111111111',
     'd1111111-1111-4111-8111-111111111111',
     'e1111111-1111-4111-8111-111111111111',
     '[{"amount":1,"payment_method":"bank_transfer"}]'::jsonb, 'pr5-oldbank-key-0001')
 $q$, '23514', null, 'a route to a treasury in another cycle is rejected');
+
+-- Route selection is deterministic because the PR-2 unique indexes forbid a
+-- second route for the same branch/method/cycle, active or not.
+reset role;
+
+select throws_ok($q$
+  insert into public.treasury_payment_routes
+    (branch_id, financial_cycle_id, payment_method, treasury_id)
+  values
+    ('b1111111-1111-4111-8111-111111111111',
+     'c1111111-1111-4111-8111-111111111111', 'card',
+     'a1111111-1111-4111-8111-111111111113')
+$q$, '23505', null, 'a duplicate cycle-specific route is rejected');
+
+select throws_ok($q$
+  insert into public.treasury_payment_routes
+    (branch_id, payment_method, requires_shift)
+  values
+    ('b1111111-1111-4111-8111-111111111111', 'cash', true)
+$q$, '23505', null, 'a duplicate default cash route is rejected');
+
+set local role authenticated;
+set local request.jwt.claim.sub = 'f0000000-0000-4000-8000-000000000001';
+set local app.test_session_active = 'on';
 
 -- ---------------------------------------------------------------------------
 -- 7. Authorization
@@ -281,7 +401,7 @@ $q$, '23514', null, 'a route to a treasury in another cycle is rejected');
 
 set local request.jwt.claim.sub = 'f0000000-0000-4000-8000-000000000003';
 select throws_ok($q$
-  select public.fn_treasury_payment_collect(
+  select pg_temp.collect(
     'b1111111-1111-4111-8111-111111111111',
     'd1111111-1111-4111-8111-111111111111',
     'e1111111-1111-4111-8111-111111111112',
@@ -290,12 +410,68 @@ $q$, '42501', null, 'a manager without invoices.create cannot collect');
 
 set local request.jwt.claim.sub = 'f0000000-0000-4000-8000-000000000002';
 select lives_ok($q$
-  select public.fn_treasury_payment_collect(
+  select pg_temp.collect(
     'b1111111-1111-4111-8111-111111111111',
     'd1111111-1111-4111-8111-111111111111',
     'e1111111-1111-4111-8111-111111111112',
-    '[{"amount":10,"payment_method":"cash"}]'::jsonb, 'pr5-accountant-key-0001')
-$q$, 'an accountant with invoices.create can collect through the derived ledger path');
+    '[{"amount":10,"payment_method":"cash"}]'::jsonb, 'pr5-accountant-key-0001',
+    null, null, 'f1111111-1111-4111-8111-111111111113')
+$q$, 'an accountant with invoices.create can collect on their own shift');
+
+set local request.jwt.claim.sub = 'f0000000-0000-4000-8000-000000000001';
+
+-- ---------------------------------------------------------------------------
+-- 7b. Shift resolution is scoped to caller, route, branch and cycle
+-- ---------------------------------------------------------------------------
+
+select throws_ok($q$
+  select pg_temp.collect(
+    'b1111111-1111-4111-8111-111111111111',
+    'd1111111-1111-4111-8111-111111111111',
+    'e1111111-1111-4111-8111-111111111111',
+    '[{"amount":1,"payment_method":"cash"}]'::jsonb,
+    'pr5-otheruser-key-0001', null, null,
+    'f1111111-1111-4111-8111-111111111113')
+$q$, '23514', null, 'a shift belonging to another user is rejected');
+
+select throws_ok($q$
+  select pg_temp.collect(
+    'b1111111-1111-4111-8111-111111111111',
+    'd1111111-1111-4111-8111-111111111111',
+    'e1111111-1111-4111-8111-111111111111',
+    '[{"amount":1,"payment_method":"cash"}]'::jsonb,
+    'pr5-othercycle-key-0001', null, null,
+    'f1111111-1111-4111-8111-111111111114')
+$q$, '23514', null, 'a shift in another cycle is rejected');
+
+select throws_ok($q$
+  select pg_temp.collect(
+    'b1111111-1111-4111-8111-111111111111',
+    'd1111111-1111-4111-8111-111111111111',
+    'e1111111-1111-4111-8111-111111111111',
+    '[{"amount":1,"payment_method":"cash"}]'::jsonb,
+    'pr5-closedshift-key-0001', null, null,
+    'f1111111-1111-4111-8111-111111111115')
+$q$, '23514', null, 'a closed shift is rejected');
+
+select throws_ok($q$
+  select pg_temp.collect(
+    'b1111111-1111-4111-8111-111111111111',
+    'd1111111-1111-4111-8111-111111111111',
+    'e1111111-1111-4111-8111-111111111111',
+    '[{"amount":1,"payment_method":"cash"}]'::jsonb,
+    'pr5-settledshift-key-0001', null, null,
+    'f1111111-1111-4111-8111-111111111116')
+$q$, '23514', null, 'a settled shift is rejected');
+
+select lives_ok($q$
+  select pg_temp.collect(
+    'b1111111-1111-4111-8111-111111111111',
+    'd1111111-1111-4111-8111-111111111111',
+    'e1111111-1111-4111-8111-111111111111',
+    '[{"amount":2,"payment_method":"cash"}]'::jsonb,
+    'pr5-ownshift-key-0001')
+$q$, 'automatic shift selection ignores another user open shift');
 
 -- ---------------------------------------------------------------------------
 -- 8. Route deactivation and multiple open shifts
@@ -313,7 +489,7 @@ set local request.jwt.claim.sub = 'f0000000-0000-4000-8000-000000000001';
 set local app.test_session_active = 'on';
 
 select throws_ok($q$
-  select public.fn_treasury_payment_collect(
+  select pg_temp.collect(
     'b1111111-1111-4111-8111-111111111111',
     'd1111111-1111-4111-8111-111111111111',
     'e1111111-1111-4111-8111-111111111111',
@@ -332,7 +508,7 @@ set local request.jwt.claim.sub = 'f0000000-0000-4000-8000-000000000001';
 set local app.test_session_active = 'on';
 
 select throws_ok($q$
-  select public.fn_treasury_payment_collect(
+  select pg_temp.collect(
     'b1111111-1111-4111-8111-111111111111',
     'd1111111-1111-4111-8111-111111111111',
     'e1111111-1111-4111-8111-111111111111',
@@ -340,12 +516,12 @@ select throws_ok($q$
 $q$, '23514', null, 'two open cash drawers require an explicit shift');
 
 select lives_ok($q$
-  select public.fn_treasury_payment_collect(
+  select pg_temp.collect(
     'b1111111-1111-4111-8111-111111111111',
     'd1111111-1111-4111-8111-111111111111',
     'e1111111-1111-4111-8111-111111111111',
     '[{"amount":5,"payment_method":"cash"}]'::jsonb, 'pr5-explicitshift-key-0001',
-    null, 'f1111111-1111-4111-8111-111111111111')
+    null, null, 'f1111111-1111-4111-8111-111111111111')
 $q$, 'an explicit shift resolves the ambiguity');
 
 reset role;
@@ -362,7 +538,7 @@ set local request.jwt.claim.sub = 'f0000000-0000-4000-8000-000000000001';
 set local app.test_session_active = 'on';
 
 select throws_ok($q$
-  select public.fn_treasury_payment_collect(
+  select pg_temp.collect(
     'b1111111-1111-4111-8111-111111111111',
     'd1111111-1111-4111-8111-111111111111',
     'e1111111-1111-4111-8111-111111111111',
@@ -394,6 +570,63 @@ select throws_ok($q$
   update public.payments set split_index = 2
    where id = (select id from public.payments where idempotency_key='pr5-cash-key-0001')
 $q$, '23514', null, 'a payment split index cannot be rewritten');
+
+-- ---------------------------------------------------------------------------
+-- 10. A failure in the second split rolls back the whole collection
+-- ---------------------------------------------------------------------------
+
+reset role;
+
+create function pg_temp.fail_second_split()
+returns trigger
+language plpgsql
+as $$
+begin
+  if NEW.split_index = 2 and NEW.idempotency_key = 'pr5-atomic-key-0001' then
+    raise exception 'forced second-split failure' using errcode = '23514';
+  end if;
+  return NEW;
+end;
+$$;
+
+create trigger trg_payment_atomic_fail
+before insert on public.payments
+for each row execute function pg_temp.fail_second_split();
+
+create temp table atomic_counts as
+  select (select count(*) from public.payment_batches) as batches,
+         (select count(*) from public.payments) as payments,
+         (select count(*) from public.treasury_transactions) as ledger;
+
+insert into public.treasury(id,branch_id,name_en,name_ar,current_balance,non_cash_balance,account_kind,custodian_user_id,parent_treasury_id,financial_cycle_id) values
+  ('a1111111-1111-4111-8111-111111111135','b1111111-1111-4111-8111-111111111111','PR5 Atomic Drawer','درج ذري',0,0,'cash','f0000000-0000-4000-8000-000000000001','a1111111-1111-4111-8111-111111111111','c1111111-1111-4111-8111-111111111111');
+
+insert into public.treasury_shifts(id,branch_id,treasury_id,opened_by,custodian_user_id,opening_counted,opening_book) values
+  ('f1111111-1111-4111-8111-111111111125','b1111111-1111-4111-8111-111111111111','a1111111-1111-4111-8111-111111111135','f0000000-0000-4000-8000-000000000001','f0000000-0000-4000-8000-000000000001',0,0);
+
+set local role authenticated;
+set local request.jwt.claim.sub = 'f0000000-0000-4000-8000-000000000001';
+set local app.test_session_active = 'on';
+
+select throws_ok($q$
+  select public.fn_treasury_payment_collect(
+    'b1111111-1111-4111-8111-111111111111',
+    'd1111111-1111-4111-8111-111111111111',
+    'e1111111-1111-4111-8111-111111111111',
+    '[{"amount":10,"payment_method":"cash"},{"amount":10,"payment_method":"card"}]'::jsonb,
+    'pr5-atomic-key-0001',
+    '22222222-2222-4222-8222-222222222222',
+    null,
+    'f1111111-1111-4111-8111-111111111125'
+  )
+$q$, '23514', null, 'a second-split failure aborts the collection');
+
+reset role;
+drop trigger trg_payment_atomic_fail on public.payments;
+
+select is((select count(*) from public.payment_batches where idempotency_key='pr5-atomic-key-0001'), 0::bigint, 'failed collection leaves no batch');
+select is((select count(*) from public.payments where idempotency_key='pr5-atomic-key-0001'), 0::bigint, 'failed collection leaves no payment');
+select is((select count(*) from public.treasury_transactions), (select ledger from atomic_counts), 'failed collection leaves no ledger row');
 
 select * from finish();
 rollback;

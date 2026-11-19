@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   treasury: [] as Record<string, unknown>[],
   ledger: [] as Record<string, unknown>[],
   today: [] as Record<string, unknown>[],
+  rpc: vi.fn().mockResolvedValue({ data: [], error: null }),
 }));
 
 vi.mock("@/contexts/I18nContext", () => ({ useI18n: () => ({ lang: "en", t: (key: string) => key }) }));
@@ -16,11 +17,14 @@ vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ user: { id: "actor"
 vi.mock("@/lib/dataSync", () => ({ useDataSync: () => undefined }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock("@/components/Can", () => ({ Can: ({ children }: { children: ReactNode }) => <>{children}</> }));
-vi.mock("@/components/RowActions", () => ({ RowActions: () => null }));
+vi.mock("@/components/RowActions", () => ({
+  RowActions: ({ onDelete }: { onDelete?: () => void }) =>
+    onDelete ? <button onClick={onDelete}>delete</button> : null,
+}));
 vi.mock("./TransferDialog", () => ({ TransferDialog: () => null }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    rpc: vi.fn().mockResolvedValue({ data: [], error: null }),
+    rpc: mocks.rpc,
     from: (table: string) => {
       let selected = "";
       const api: Record<string, unknown> = {

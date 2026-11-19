@@ -75,6 +75,12 @@ const FILES = [
 ];
 
 const MARKER = "zero-rows-ok";
+// PR-6 moved Treasury.tsx's soft-delete from a direct UPDATE (which the new
+// column allowlist revokes) to the reviewed fn_treasury_archive RPC. An RPC
+// rejection is an error, not a zero-row success, so this screen has no
+// browser-authored .update()/.delete() left for the contract to freeze. Keep
+// this exception narrow and prove the RPC call is actually present.
+const RPC_ONLY = new Set(["src/pages/treasury/Treasury.tsx"]);
 const source = (path: string) => readFileSync(new URL("../../" + path, import.meta.url), "utf8");
 
 // Walk upward from a write to the comment block that justifies it, skipping the
@@ -165,13 +171,18 @@ describe("zero-row write contract (batches 13-17)", () => {
 
   it("scans the batch scope and finds the writes it is meant to freeze", () => {
     expect(all).toHaveLength(57);
-    expect(all.filter((e) => e.writes.length === 0)).toEqual([]);
-    // 114 browser-authored deletes/updates remain across the 57 screens. The
+    expect(all.filter((e) => e.writes.length === 0 && !RPC_ONLY.has(e.file))).toEqual([]);
+    for (const e of all.filter((entry) => RPC_ONLY.has(entry.file))) {
+      expect(e.src).toContain('.rpc("fn_treasury_archive"');
+      expect(e.src).not.toMatch(/\.from\(["']treasury["']\)[\s\S]{0,80}\.update\(/);
+    }
+    // 113 browser-authored deletes/updates remain across the 57 screens; the
+    // one removed from Treasury.tsx now goes through fn_treasury_archive. The
     // app-wide census finds 115; the one write outside this list is
     // leads/LeadDetail.tsx:85, proved by `.select("*").single()` — a form this
     // file's rows-back check cannot see, so listing it would fail the screen
     // rather than the defect.
-    expect(all.reduce((n, e) => n + e.writes.length, 0)).toBe(114);
+    expect(all.reduce((n, e) => n + e.writes.length, 0)).toBe(113);
   });
 
   it("proves every browser-authored write, or documents why zero rows is fine", () => {

@@ -41,6 +41,9 @@ begin
     raise exception 'Forbidden: missing branch or payment permission' using errcode = '42501';
   end if;
 
+  -- Activation is per custodian, not per branch sign-up. A branch with an
+  -- active drawer route still keeps an employee without a custody drawer on
+  -- the legacy path, so activating the first cashier cannot stop the others.
   if exists (
     select 1
       from public.treasury_payment_routes r
@@ -48,6 +51,15 @@ begin
        and r.is_active
        and r.payment_method = 'cash'::public.payment_method
        and r.requires_shift
+  ) and exists (
+    select 1
+      from public.treasury t
+     where t.branch_id = _branch_id
+       and t.account_kind = 'cash'
+       and t.custodian_user_id = v_actor
+       and t.parent_treasury_id is not null
+       and t.is_active
+       and t.deleted_at is null
   ) then
     return 'drawer';
   end if;

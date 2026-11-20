@@ -325,7 +325,7 @@ function ShiftCard({ row, onChanged }: { row: ShiftRow; onChanged: () => void })
         _notes: settleNotes || null,
       });
       if (error) {
-        toast.error(error.message ?? (ar ? "تعذّرت تسوية العهدة" : "Could not settle the shift"));
+        toast.error(shiftFailure(error, ar, ar ? "تعذّرت تسوية العهدة" : "Could not settle the shift").title);
         return;
       }
       toast.success(ar ? "تمت تسوية العهدة" : "Shift settled");
@@ -445,8 +445,8 @@ function ShiftCard({ row, onChanged }: { row: ShiftRow; onChanged: () => void })
             </div>
           </div>
           <Can
-            permission="treasury.tx.write"
-            fallback={<div className="text-[11px] text-muted-foreground">{ar ? "تسوية العهدة تتطلب صلاحية حركة الخزينة." : "Settlement requires treasury transaction permission."}</div>}
+            permission="treasury.shift.settle"
+            fallback={<div className="text-[11px] text-muted-foreground">{ar ? "تسوية العهدة تتطلب صلاحية تسوية الوردية." : "Settlement requires the shift-settlement permission."}</div>}
           >
             <Button className="gradient-primary text-primary-foreground w-full" onClick={() => setSettleOpen(true)}>
               <HandCoins className="me-2 size-4" />

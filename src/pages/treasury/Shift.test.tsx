@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   from: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
+  can: vi.fn(() => true),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { rpc: mocks.rpc, from: mocks.from } }));
@@ -18,7 +19,7 @@ vi.mock("@/contexts/BranchContext", () => ({
 }));
 vi.mock("@/lib/dataSync", () => ({ useDataSync: () => undefined }));
 vi.mock("sonner", () => ({ toast: { error: mocks.toastError, success: mocks.toastSuccess } }));
-vi.mock("@/lib/authz/useAuthorization", () => ({ useAuthorization: () => ({ authz: { can: () => true }, loading: false }) }));
+vi.mock("@/lib/authz/useAuthorization", () => ({ useAuthorization: () => ({ authz: { can: mocks.can }, loading: false }) }));
 // Radix Select cannot be opened in jsdom; this is the same stub
 // TransferDialog.test.tsx uses, so the handover choice is a plain option list.
 vi.mock("@/components/ui/select", () => ({
@@ -255,6 +256,25 @@ describe("custody settlement", () => {
     expect(screen.getByText("Expected")).toBeInTheDocument();
     expect(container.textContent).toContain(formatMoney(250, "en", "EGP"));
     expect(container.textContent).toContain(formatMoney(240, "en", "EGP"));
+  });
+
+  it("hides the settlement action from a role without treasury.shift.settle", async () => {
+    mocks.can.mockImplementation((key: string) => key !== "treasury.shift.settle");
+    state.rows = [
+      row({
+        last_closed_at: "2026-11-19T20:00:00.000Z",
+        last_counted: 120,
+        last_expected_closing: 130,
+        last_variance: -10,
+        last_shift_id: "s1",
+        last_status: "closed_pending_settlement",
+      }),
+    ];
+    const { container } = render(<Shift />);
+    await waitFor(() => expect(container.textContent).toContain("Closed — awaiting settlement"));
+    expect(screen.queryByRole("button", { name: "Settle shift" })).toBeNull();
+    expect(container.textContent).toContain("Settlement requires the shift-settlement permission.");
+    mocks.can.mockReturnValue(true);
   });
 
   it("settles the closed shift through fn_treasury_shift_settle and never opens a new one", async () => {

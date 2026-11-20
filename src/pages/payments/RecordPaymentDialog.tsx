@@ -61,9 +61,9 @@ export function RecordPaymentDialog({
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [walletBalanceLoading, setWalletBalanceLoading] = useState<boolean>(false);
   const [isTopup, setIsTopup] = useState<boolean>(false);
-  // The branch decides whether it has been activated for drawer custody. A
-  // branch without an active cash route that requires a shift stays on the
-  // existing payments.insert path; the screen never guesses.
+  // Activation is per custodian: a branch route alone is not enough. An
+  // employee without an active custody drawer stays on the existing
+  // payments.insert path, so one activated cashier does not block the others.
   const [collectionMode, setCollectionMode] = useState<"drawer" | "legacy" | null>(null);
   const [collectionModeError, setCollectionModeError] = useState<string | null>(null);
   const collectionKeyRef = useRef<{ key: string; requestId: string } | null>(null);
@@ -439,8 +439,8 @@ export function RecordPaymentDialog({
           {!collectionModeError && collectionMode === "legacy" && (
             <div className="text-[11px] text-muted-foreground">
               {lang === "ar"
-                ? "هذا الفرع غير مفعّل لعهدة الدرج بعد؛ تُسجّل الدفعة على مسار الخزينة الحالي."
-                : "This branch is not activated for drawer custody yet; the payment uses the existing treasury path."}
+                ? "هذا المستخدم غير مفعّل لعهدة الدرج بعد؛ تُسجّل الدفعة على مسار الخزينة الحالي."
+                : "This user is not activated for drawer custody yet; the payment uses the existing treasury path."}
             </div>
           )}
         </div>

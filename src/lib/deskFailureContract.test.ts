@@ -16,7 +16,7 @@ import { describe, expect, it } from "vitest";
 // server sentence), so it stays counted here until a form-validation batch claims it.
 
 // Call sites whose argument is already translated by a rule, not echoed.
-const MEDIATORS = ["safeEdgeReason", "invokeFailureReason", "portalFailureReason", "deskFailure", "bookingFailureCopy"];
+const MEDIATORS = ["safeEdgeReason", "invokeFailureReason", "portalFailureReason", "deskFailure", "bookingFailureCopy", "collectionRefusal"];
 
 const LEDGER: string[] = [
   "src/components/ConsumablesEditor.tsx=4",

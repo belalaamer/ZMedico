@@ -40,6 +40,7 @@ export default function Treasury() {
   const [adjIsCash, setAdjIsCash] = useState<"cash" | "non_cash">("cash");
   const [today, setToday] = useState<{ income: MoneyByCurrency; expense: MoneyByCurrency }>({ income: {}, expense: {} });
   const [transferOpen, setTransferOpen] = useState(false);
+  const [pendingSettlement, setPendingSettlement] = useState<string[]>([]);
   // Unlike TransferDialog, the manual adjustment had no in-flight guard: a
   // double click posted the ledger entry twice.
   const adjSubmittingRef = useRef(false);
@@ -84,6 +85,19 @@ export default function Treasury() {
     if (trsError) { toast.error(trsError.message); return; }
     if (requestId !== loadRequestRef.current) return;
     setTreasuries(trs ?? []);
+    // The generic transfer is not a custody settlement. Fetch the read model
+    // that names drawers with a closed, unsettled shift and disable them in
+    // the transfer dialog; the database guard remains the authority.
+    void (supabase as any).rpc("fn_treasury_shift_state_v2", { _branch_id: branchId })
+      .then(({ data }: any) => {
+        if (requestId !== loadRequestRef.current) return;
+        setPendingSettlement(
+          (data ?? [])
+            .filter((r: any) => r.last_status === "closed_pending_settlement")
+            .map((r: any) => r.treasury_id),
+        );
+      })
+      .catch(() => { /* the server guard still prevents the transfer */ });
 
     const ids = (trs ?? []).map((t: any) => t.id);
     if (ids.length) {
@@ -350,6 +364,7 @@ export default function Treasury() {
       <TransferDialog
         open={transferOpen} onOpenChange={setTransferOpen}
         treasuries={treasuries}
+        blockedTreasuryIds={pendingSettlement}
         onSaved={() => { setTransferOpen(false); load(); }}
       />
     </div>

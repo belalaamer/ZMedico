@@ -18,6 +18,7 @@ vi.mock("@/contexts/BranchContext", () => ({
 }));
 vi.mock("@/lib/dataSync", () => ({ useDataSync: () => undefined }));
 vi.mock("sonner", () => ({ toast: { error: mocks.toastError, success: mocks.toastSuccess } }));
+vi.mock("@/lib/authz/useAuthorization", () => ({ useAuthorization: () => ({ authz: { can: () => true }, loading: false }) }));
 // Radix Select cannot be opened in jsdom; this is the same stub
 // TransferDialog.test.tsx uses, so the handover choice is a plain option list.
 vi.mock("@/components/ui/select", () => ({
@@ -63,6 +64,13 @@ function row(overrides: Record<string, unknown> = {}) {
     last_counted: null,
     last_variance: null,
     last_handed_over_name: null,
+    last_shift_id: null,
+    last_expected_closing: null,
+    last_settled_at: null,
+    last_status: null,
+    shift_collected_cash: null,
+    shift_collected_non_cash: null,
+    shift_collected_entries: null,
     ...overrides,
   };
 }
@@ -82,6 +90,9 @@ const openRow = (overrides: Record<string, unknown> = {}) =>
     shift_non_cash_income: 0,
     shift_non_cash_outflow: 0,
     shift_entries: 4,
+    shift_collected_cash: 60,
+    shift_collected_non_cash: 15,
+    shift_collected_entries: 4,
     expected_cash: 250,
     unexplained_book_movement: 0,
     ...overrides,
@@ -92,7 +103,7 @@ async function mountDesk() {
   await act(async () => {
     await Promise.resolve();
   });
-  await waitFor(() => expect(mocks.rpc).toHaveBeenCalledWith("fn_treasury_shift_state", { _branch_id: "branch-1" }));
+  await waitFor(() => expect(mocks.rpc).toHaveBeenCalledWith("fn_treasury_shift_state_v2", { _branch_id: "branch-1" }));
   return view;
 }
 
@@ -100,7 +111,7 @@ async function mountDesk() {
 async function mountCloseDialog(till = openRow()) {
   state.rows = [till];
   mocks.rpc.mockImplementation(async (name: string) => {
-    if (name === "fn_treasury_shift_state") return { data: state.rows, error: null };
+    if (name === "fn_treasury_shift_state_v2") return { data: state.rows, error: null };
     if (name === "fn_treasury_shift_handover_candidates") {
       return { data: [{ user_id: "user-2", full_name: "Salma", roles: "receptionist" }], error: null };
     }
@@ -115,7 +126,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.rows = [];
   mocks.rpc.mockImplementation(async (name: string) =>
-    name === "fn_treasury_shift_state" ? { data: state.rows, error: null } : { error: null },
+    name === "fn_treasury_shift_state_v2" ? { data: state.rows, error: null } : { error: null },
   );
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
@@ -126,7 +137,7 @@ afterEach(() => {
 });
 
 describe("the shift desk writes nothing but through the shift RPCs", () => {
-  it("reads through fn_treasury_shift_state and never touches the table", async () => {
+  it("reads through fn_treasury_shift_state_v2 and never touches the table", async () => {
     state.rows = [openRow()];
     await mountDesk();
     await waitFor(() => expect(screen.getByText("Main till")).toBeInTheDocument());
@@ -224,6 +235,63 @@ describe("closing a shift", () => {
     await waitFor(() => expect(screen.getByText("Closed by")).toBeInTheDocument());
     // profiles.full_name is NULL for the identities Production actually holds.
     expect(screen.getAllByText("—")).toHaveLength(1);
+  });
+});
+
+describe("custody settlement", () => {
+  it("shows a closed, unsettled shift as waiting for settlement and does not offer a new opening count", async () => {
+    state.rows = [row({
+      last_closed_at: "2026-11-19T20:00:00.000Z",
+      last_shift_id: "s-closed",
+      last_expected_closing: 250,
+      last_counted: 240,
+      last_variance: -10,
+      last_status: "closed_pending_settlement",
+    })];
+    const { container } = await mountDesk();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Settle shift" })).toBeInTheDocument());
+    expect(container.textContent).toContain("Closed — awaiting settlement");
+    expect(screen.queryByRole("button", { name: "shiftOpen" })).not.toBeInTheDocument();
+    expect(screen.getByText("Expected")).toBeInTheDocument();
+    expect(container.textContent).toContain(formatMoney(250, "en", "EGP"));
+    expect(container.textContent).toContain(formatMoney(240, "en", "EGP"));
+  });
+
+  it("settles the closed shift through fn_treasury_shift_settle and never opens a new one", async () => {
+    state.rows = [row({
+      last_closed_at: "2026-11-19T20:00:00.000Z",
+      last_shift_id: "s-closed",
+      last_expected_closing: 250,
+      last_counted: 240,
+      last_variance: -10,
+      last_status: "closed_pending_settlement",
+    })];
+    await mountDesk();
+    fireEvent.click(screen.getByRole("button", { name: "Settle shift" }));
+    const dialog = within(await screen.findByRole("dialog"));
+    fireEvent.click(dialog.getByRole("button", { name: "Settle custody" }));
+
+    await waitFor(() => expect(mocks.rpc).toHaveBeenCalledWith("fn_treasury_shift_settle", {
+      _treasury_id: "t1",
+      _notes: null,
+    }));
+    expect(mocks.toastSuccess).toHaveBeenCalledWith("Shift settled");
+  });
+
+  it("shows a settled shift and allows the next shift to open", async () => {
+    state.rows = [row({
+      last_closed_at: "2026-11-19T20:00:00.000Z",
+      last_shift_id: "s-closed",
+      last_expected_closing: 250,
+      last_counted: 250,
+      last_variance: 0,
+      last_settled_at: "2026-11-19T20:05:00.000Z",
+      last_status: "settled",
+    })];
+    const { container } = await mountDesk();
+    await waitFor(() => expect(container.textContent).toContain("Custody settled"));
+    expect(screen.queryByRole("button", { name: "Settle shift" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "shiftOpen" })).toBeInTheDocument();
   });
 });
 

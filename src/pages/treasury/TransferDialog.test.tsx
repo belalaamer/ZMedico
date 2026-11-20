@@ -24,14 +24,14 @@ function deferred() {
   const promise = new Promise<Result>((r) => { resolve = r; });
   return { promise, resolve };
 }
-function setup(destinationCurrency = "EGP") {
+function setup(destinationCurrency = "EGP", blockedTreasuryIds: string[] = []) {
   const onSaved = vi.fn();
   const onOpenChange = vi.fn();
   const treasuries = [
     { id: "source", name_en: "Source", name_ar: "مصدر", current_balance: 100, currency: "EGP" },
     { id: "destination", name_en: "Destination", name_ar: "وجهة", current_balance: 0, currency: destinationCurrency },
   ];
-  const view = render(<TransferDialog open onSaved={onSaved} onOpenChange={onOpenChange} treasuries={treasuries} />);
+  const view = render(<TransferDialog open onSaved={onSaved} onOpenChange={onOpenChange} treasuries={treasuries} blockedTreasuryIds={blockedTreasuryIds} />);
   fireEvent.change(screen.getAllByRole("combobox")[0], { target: { value: "source" } });
   fireEvent.change(screen.getAllByRole("combobox")[1], { target: { value: "destination" } });
   fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "10" } });
@@ -46,6 +46,15 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("atomic treasury transfer", () => {
+  it("refuses a generic transfer from a drawer waiting for settlement", () => {
+    const { confirm, onSaved } = setup("EGP", ["source"]);
+    fireEvent.click(confirm);
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(mocks.error).toHaveBeenCalledWith(
+      "This drawer has a closed shift waiting for settlement. Use Settle shift instead of a generic transfer.",
+    );
+  });
   it("rejects new transfers beyond available cash before sending any RPC", () => {
     const { confirm, onSaved } = setup();
     fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '101' } });

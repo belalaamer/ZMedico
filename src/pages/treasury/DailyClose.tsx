@@ -18,6 +18,19 @@ import { formatMoney, formatDateTime } from "@/lib/format";
 import { toast } from "sonner";
 import { localDateOnly } from "@/lib/localDate";
 
+type RelatedShift = {
+  treasury_id: string;
+  shift_id: string | null;
+  shift_status: string;
+  expected_cash: number | string | null;
+  last_closed_at: string | null;
+  last_expected_closing: number | string | null;
+  last_counted: number | string | null;
+  last_variance: number | string | null;
+  last_settled_at: string | null;
+  last_status: string | null;
+};
+
 type Summary = {
   opening_cash: number;
   cash_income: number;
@@ -52,6 +65,7 @@ export default function DailyClose() {
   const [treasuryId, setTreasuryId] = useState<string>("");
   const [summary, setSummary] = useState<Summary | null>(null);
   const [existing, setExisting] = useState<any | null>(null);
+  const [relatedShift, setRelatedShift] = useState<RelatedShift | null>(null);
   const [loading, setLoading] = useState(false);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -94,14 +108,13 @@ export default function DailyClose() {
       let query = supabase.from("treasury").select("*")
         .eq("branch_id", branchId)
         .eq("account_kind", "cash")
+        .eq("is_active", true)
         .is("deleted_at", null)
         .order("created_at");
       if (currentCycleId) query = query.eq("financial_cycle_id", currentCycleId);
       else if ((configuredCycles ?? []).length > 0) {
         setTreasuries([]); setTreasuryId(""); setSummary(null); setExisting(null);
         return;
-      } else {
-        query = query.eq("is_active", true);
       }
       const { data, error } = await query;
       if (!active) return;
@@ -112,7 +125,15 @@ export default function DailyClose() {
       }
       const next = data ?? [];
       setTreasuries(next);
-      setTreasuryId((previous) => next.some((tr) => tr.id === previous) ? previous : (next[0]?.id ?? ""));
+      setTreasuryId((previous) => {
+        if (next.some((tr) => tr.id === previous)) return previous;
+        // Never default to an inactive drawer. Prefer the branch's default cash
+        // treasury, then a non-custody main safe, then the first active cash row.
+        const preferred = next.find((tr: any) => tr.is_default)
+          ?? next.find((tr: any) => !tr.custodian_user_id)
+          ?? next[0];
+        return preferred?.id ?? "";
+      });
     })();
     return () => { active = false; };
   }, [branchSelectionReady, currentBranchId]);
@@ -128,11 +149,12 @@ export default function DailyClose() {
     if (!branchSelectionReady || !currentBranchId || !treasuryId || !businessDate || selectedTreasury?.branch_id !== currentBranchId) {
       setSummary(null);
       setExisting(null);
+      setRelatedShift(null);
       return;
     }
     setLoading(true);
     try {
-      const [{ data: sum, error: sumErr }, { data: ex }] = await Promise.all([
+      const [{ data: sum, error: sumErr }, { data: ex }, shiftState] = await Promise.all([
         supabase.rpc("fn_treasury_day_cash_summary", {
           _treasury_id: treasuryId,
           _business_date: businessDate,
@@ -144,6 +166,7 @@ export default function DailyClose() {
           .eq("branch_id", currentBranchId)
           .eq("business_date", businessDate)
           .maybeSingle(),
+        (supabase as any).rpc("fn_treasury_shift_state_v2", { _branch_id: currentBranchId }),
       ]);
       if (requestId !== loadRequestRef.current) return;
       if (sumErr) toast.error(sumErr.message);
@@ -160,6 +183,10 @@ export default function DailyClose() {
           : null
       );
       setExisting(ex ?? null);
+      const shiftRows = (shiftState as any)?.data ?? [];
+      setRelatedShift(
+        (shiftRows as RelatedShift[]).find((r) => r.treasury_id === treasuryId) ?? null,
+      );
     } finally {
       setLoading(false);
     }
@@ -230,8 +257,13 @@ export default function DailyClose() {
           </h1>
           <p className="text-sm text-muted-foreground">
             {lang === "ar"
-              ? "قارن النقد المعدود مع النقد المتوقع في الدرج. الطرق غير النقدية تظهر للعلم فقط."
-              : "Compare counted cash against expected cash drawer. Non-cash methods are shown for visibility only."}
+              ? "قارن النقد المعدود مع النقد المتوقع في الخزنة المختارة. الطرق غير النقدية تظهر للعلم فقط."
+              : "Compare counted cash against the selected treasury's expected cash. Non-cash methods are shown for visibility only."}
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            {lang === "ar"
+              ? "هذا يُقفل خزنة وتاريخًا محددين فقط؛ لا يُقفل الوردية ولا يسوّي العهدة."
+              : "This closes one selected treasury and date only; it does not close a shift or settle custody."}
           </p>
         </div>
       </div>
@@ -281,6 +313,72 @@ export default function DailyClose() {
             </div>
           )}
         </div>
+      </Card>
+
+      {/* The daily close is not a shift close. Show the related custody state
+          without blocking the close: an overnight shift is a business rule we
+          have not defined yet, so the screen states the fact instead of guessing. */}
+      <Card className="p-4 shadow-card space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            {lang === "ar" ? "الوردية المرتبطة بهذه الخزنة" : "Related shift on this treasury"}
+          </div>
+          {relatedShift ? (
+            <Badge
+              variant="outline"
+              className={
+                relatedShift.shift_id ? "status-progress"
+                  : relatedShift.last_settled_at ? "status-completed"
+                    : relatedShift.last_closed_at ? "status-review"
+                      : "status-cancelled"
+              }
+            >
+              {relatedShift.shift_id
+                ? (lang === "ar" ? "مفتوحة" : "Open")
+                : relatedShift.last_settled_at
+                  ? (lang === "ar" ? "مُسوّاة" : "Settled")
+                  : relatedShift.last_closed_at
+                    ? (lang === "ar" ? "مقفولة — بانتظار التسوية" : "Closed — awaiting settlement")
+                    : (lang === "ar" ? "لا توجد وردية" : "No shift")}
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="status-cancelled">{lang === "ar" ? "غير معروف" : "Unavailable"}</Badge>
+          )}
+        </div>
+        {relatedShift && (relatedShift.shift_id || relatedShift.last_closed_at) ? (
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            <div>{lang === "ar" ? "المتوقع" : "Expected"}: <span className="font-semibold tabular-nums">{formatMoney(Number(relatedShift.shift_id ? relatedShift.expected_cash : relatedShift.last_expected_closing) || 0, lang, currency)}</span></div>
+            {relatedShift.shift_id ? (
+              <>
+                <div className="text-muted-foreground">{lang === "ar" ? "المعدود" : "Counted"}: —</div>
+                <div className="text-muted-foreground">{lang === "ar" ? "الفرق" : "Variance"}: —</div>
+              </>
+            ) : (
+              <>
+                <div>{lang === "ar" ? "المعدود" : "Counted"}: <span className="font-semibold tabular-nums">{formatMoney(Number(relatedShift.last_counted) || 0, lang, currency)}</span></div>
+                <div>{lang === "ar" ? "الفرق" : "Variance"}: <span className="font-semibold tabular-nums">{formatMoney(Number(relatedShift.last_variance) || 0, lang, currency)}</span></div>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="text-[11px] text-muted-foreground">
+            {lang === "ar" ? "لا توجد وردية مفتوحة أو مقفولة لهذه الخزنة في هذه الدورة." : "No open or closed shift is recorded for this treasury in this cycle."}
+          </div>
+        )}
+        {relatedShift?.last_status === "closed_pending_settlement" && (
+          <div className="text-[11px] text-amber-700 dark:text-amber-400">
+            {lang === "ar"
+              ? "هذه الوردية بانتظار التسوية. الإقفال اليومي لا يسوّيها؛ استخدم شاشة الوردية."
+              : "This shift is waiting for settlement. The daily close does not settle it; use the shift desk."}
+          </div>
+        )}
+        {relatedShift?.shift_id && (
+          <div className="text-[11px] text-muted-foreground">
+            {lang === "ar"
+              ? "الوردية مفتوحة الآن. الإقفال اليومي لا يُقفلها."
+              : "The shift is open now. The daily close does not close it."}
+          </div>
+        )}
       </Card>
 
       {/* Cash drawer summary */}

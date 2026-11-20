@@ -61,6 +61,12 @@ export function RecordPaymentDialog({
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [walletBalanceLoading, setWalletBalanceLoading] = useState<boolean>(false);
   const [isTopup, setIsTopup] = useState<boolean>(false);
+  // The branch decides whether it has been activated for drawer custody. A
+  // branch without an active cash route that requires a shift stays on the
+  // existing payments.insert path; the screen never guesses.
+  const [collectionMode, setCollectionMode] = useState<"drawer" | "legacy" | null>(null);
+  const [collectionModeError, setCollectionModeError] = useState<string | null>(null);
+  const collectionKeyRef = useRef<{ key: string; requestId: string } | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -74,7 +80,30 @@ export function RecordPaymentDialog({
     setRemaining(defaultAmount ?? 0);
     setIsTopup(false);
     setWalletBalance(0);
+    collectionKeyRef.current = null;
   }, [open, patientId, invoiceId, defaultAmount]);
+
+  useEffect(() => {
+    if (!open || !branchSelectionReady || !currentBranchId) {
+      setCollectionMode(null);
+      setCollectionModeError(null);
+      return;
+    }
+    let active = true;
+    setCollectionMode(null);
+    setCollectionModeError(null);
+    void (supabase as any)
+      .rpc("fn_treasury_collection_mode", { _branch_id: currentBranchId })
+      .then(({ data, error }: any) => {
+        if (!active) return;
+        if (error) {
+          setCollectionModeError(error.message ?? (lang === "ar" ? "تعذّر تحديد مسار التحصيل" : "Could not determine the collection path"));
+          return;
+        }
+        setCollectionMode(data === "drawer" ? "drawer" : "legacy");
+      });
+    return () => { active = false; };
+  }, [open, branchSelectionReady, currentBranchId, lang]);
 
   // Load open invoices for the selected patient (when not fixed by parent)
   useEffect(() => {
@@ -156,33 +185,98 @@ export function RecordPaymentDialog({
       const cap = remaining > 0 ? remaining : (defaultAmount ?? 0);
       if (cap > 0 && sum > cap + 0.009) { toast.error(t("splitSumExceeds")); submittingRef.current = false; return; }
     }
-    setSaving(true);
-    const common = {
-      patientId: pid,
-      invoiceId: iid || null,
-      branchId: currentBranchId,
-      date,
-      reference: ref,
-      notes,
-      receivedBy: user?.id ?? null,
-      walletTopup: isTopup,
-    };
-    const rows: Record<string, unknown>[] = [buildPaymentRow({ ...common, amount, method })];
-    if (split) rows.push(buildPaymentRow({ ...common, amount: amount2, method: method2 }));
-    const { error } = await supabase.from("payments").insert(rows as any);
-    setSaving(false);
-    submittingRef.current = false;
-    if (error) {
-      const walletInvolved = method === "wallet" || (split && method2 === "wallet");
-      // Prefer Postgres SQLSTATE for CHECK violations (23514) — the wallet
-      // balance constraint surfaces this code. Fall back to a heuristic string
-      // match for older drivers that don't propagate `code`.
-      const isInsufficient = !isTopup && walletInvolved && isWalletShortfall(error as any);
-      toast.error(isInsufficient ? t("walletInsufficient") : (error.message ?? (lang === "ar" ? "خطأ" : "Error")));
+    const walletInvolved = isTopup || method === "wallet" || (split && method2 === "wallet");
+    if (!currentBranchId) { toast.error(t("selectBranch")); submittingRef.current = false; return; }
+    if (!walletInvolved && !collectionMode) {
+      toast.error(collectionModeError ?? (lang === "ar" ? "تعذّر تحديد مسار التحصيل" : "Could not determine the collection path"));
+      submittingRef.current = false;
       return;
     }
-    toast.success(t("paid"));
-    onSaved();
+    // fn_treasury_payment_collect owns cash routing; wallet lines are not part
+    // of its contract. A mixed cash+wallet split on a drawer branch must not
+    // fall back to the legacy insert, or the cash part would leave the shift.
+    if (collectionMode === "drawer" && !isTopup && walletInvolved
+        && (method !== "wallet" || (split && method2 !== "wallet"))) {
+      toast.error(lang === "ar"
+        ? "الدفع المختلط بين النقد والمحفظة غير مدعوم على فرع مفعّل لعهدة الدرج. سجّل الحركتين منفصلتين."
+        : "A mixed cash+wallet split is not supported on a drawer branch. Record the two payments separately.");
+      submittingRef.current = false;
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // Wallet movements are outside fn_treasury_payment_collect by contract.
+      // They keep the existing wallet ledger path; every other method uses the
+      // drawer-aware RPC once the branch has been activated for it.
+      if (!walletInvolved && collectionMode === "drawer") {
+        const key = collectionKeyRef.current ?? {
+          key: crypto.randomUUID(),
+          requestId: crypto.randomUUID(),
+        };
+        collectionKeyRef.current = key;
+        const splits = [
+          {
+            amount,
+            payment_method: method,
+            reference_number: ref || null,
+            notes: notes || null,
+          },
+          ...(split ? [{
+            amount: amount2,
+            payment_method: method2,
+            reference_number: ref || null,
+            notes: notes || null,
+          }] : []),
+        ];
+        const { error } = await (supabase as any).rpc("fn_treasury_payment_collect", {
+          _branch_id: currentBranchId,
+          _patient_id: pid,
+          _invoice_id: iid || null,
+          _splits: splits,
+          _idempotency_key: key.key,
+          _request_id: key.requestId,
+          _payment_date: date,
+          _shift_id: null,
+          _notes: notes || null,
+        });
+        if (error) {
+          // A missing shift or missing route is a refusal, not an invitation
+          // to write around the contract. Keep the key so a genuine retry can
+          // replay a committed batch instead of posting a second one.
+          toast.error(error.message ?? (lang === "ar" ? "تعذّر التحصيل" : "Could not collect the payment"));
+          return;
+        }
+        collectionKeyRef.current = null;
+        toast.success(t("paid"));
+        onSaved();
+        return;
+      }
+
+      const common = {
+        patientId: pid,
+        invoiceId: iid || null,
+        branchId: currentBranchId,
+        date,
+        reference: ref,
+        notes,
+        receivedBy: user?.id ?? null,
+        walletTopup: isTopup,
+      };
+      const rows: Record<string, unknown>[] = [buildPaymentRow({ ...common, amount, method })];
+      if (split) rows.push(buildPaymentRow({ ...common, amount: amount2, method: method2 }));
+      const { error } = await supabase.from("payments").insert(rows as any);
+      if (error) {
+        const isInsufficient = !isTopup && walletInvolved && isWalletShortfall(error as any);
+        toast.error(isInsufficient ? t("walletInsufficient") : (error.message ?? (lang === "ar" ? "خطأ" : "Error")));
+        return;
+      }
+      toast.success(t("paid"));
+      onSaved();
+    } finally {
+      setSaving(false);
+      submittingRef.current = false;
+    }
   };
 
   return (
@@ -321,6 +415,16 @@ export function RecordPaymentDialog({
             <Label>{t("notes")}</Label>
             <Textarea dir="auto" value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={1000} rows={2} />
           </div>
+          {collectionModeError && !isTopup && method !== "wallet" && !(split && method2 === "wallet") && (
+            <div className="text-[11px] text-destructive" role="alert">{collectionModeError}</div>
+          )}
+          {!collectionModeError && collectionMode === "legacy" && (
+            <div className="text-[11px] text-muted-foreground">
+              {lang === "ar"
+                ? "هذا الفرع غير مفعّل لعهدة الدرج بعد؛ تُسجّل الدفعة على مسار الخزينة الحالي."
+                : "This branch is not activated for drawer custody yet; the payment uses the existing treasury path."}
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>{t("cancel")}</Button>

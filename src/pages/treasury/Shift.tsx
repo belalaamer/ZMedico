@@ -15,6 +15,7 @@ import { useDataSync } from "@/lib/dataSync";
 import { deskFailure, type DeskFailureCopy } from "@/lib/deskFailure";
 import { formatMoney, formatDateTime } from "@/lib/format";
 import { toast } from "sonner";
+import { Can } from "@/components/Can";
 
 // The till shift desk. One read RPC and two write RPCs, and nothing else:
 // `authenticated` holds no table privilege on treasury_shifts at all, so this
@@ -51,6 +52,13 @@ type ShiftRow = {
   last_counted: number | string | null;
   last_variance: number | string | null;
   last_handed_over_name: string | null;
+  last_shift_id: string | null;
+  last_expected_closing: number | string | null;
+  last_settled_at: string | null;
+  last_status: string | null;
+  shift_collected_cash: number | string | null;
+  shift_collected_non_cash: number | string | null;
+  shift_collected_entries: number | null;
 };
 
 type Candidate = { user_id: string; full_name: string | null; roles: string | null };
@@ -112,7 +120,7 @@ export default function Shift() {
     }
     setLoading(true);
     setFailure(null);
-    const { data, error } = await (supabase as any).rpc("fn_treasury_shift_state", { _branch_id: branchId });
+    const { data, error } = await (supabase as any).rpc("fn_treasury_shift_state_v2", { _branch_id: branchId });
     if (requestId !== loadRequestRef.current) return;
     setLoading(false);
     if (error) {
@@ -196,6 +204,8 @@ function ShiftCard({ row, onChanged }: { row: ShiftRow; onChanged: () => void })
   const ar = lang === "ar";
   const currency = row.currency || "EGP";
   const isOpen = row.shift_status === "open";
+  const pendingSettlement = !isOpen && Boolean(row.last_closed_at) && !row.last_settled_at;
+  const isSettled = !isOpen && Boolean(row.last_settled_at);
   const name = ar ? (row.name_ar || row.name_en) : row.name_en;
 
   const [count, setCount] = useState("");
@@ -207,15 +217,20 @@ function ShiftCard({ row, onChanged }: { row: ShiftRow; onChanged: () => void })
   const [closing, setClosing] = useState("");
   const [closeNotes, setCloseNotes] = useState("");
   const [closeBusy, setCloseBusy] = useState(false);
+  const [settleOpen, setSettleOpen] = useState(false);
+  const [settleNotes, setSettleNotes] = useState("");
+  const [settleBusy, setSettleBusy] = useState(false);
   // Both submit paths carry an in-flight ref, not just state: a double click
   // reads the state of the render it was created in, so two posts can both see
   // `false`. Treasury.tsx had exactly this bug on its manual adjustment.
   const busyRef = useRef(false);
   const closeBusyRef = useRef(false);
+  const settleBusyRef = useRef(false);
 
   const parsed = count.trim() === "" ? null : Number(count);
   const parsedClosing = closing.trim() === "" ? null : Number(closing);
   const expected = num(row.expected_cash);
+  const expectedClosing = isOpen ? expected : num(row.last_expected_closing);
 
   const reset = () => {
     setCloseOpen(false);
@@ -300,6 +315,29 @@ function ShiftCard({ row, onChanged }: { row: ShiftRow; onChanged: () => void })
     }
   };
 
+  const submitSettle = async () => {
+    if (settleBusyRef.current) return;
+    settleBusyRef.current = true;
+    setSettleBusy(true);
+    try {
+      const { error } = await (supabase as any).rpc("fn_treasury_shift_settle", {
+        _treasury_id: row.treasury_id,
+        _notes: settleNotes || null,
+      });
+      if (error) {
+        toast.error(error.message ?? (ar ? "تعذّرت تسوية العهدة" : "Could not settle the shift"));
+        return;
+      }
+      toast.success(ar ? "تمت تسوية العهدة" : "Shift settled");
+      setSettleOpen(false);
+      setSettleNotes("");
+      onChanged();
+    } finally {
+      settleBusyRef.current = false;
+      setSettleBusy(false);
+    }
+  };
+
   const gap = num(row.opening_gap);
   const unexplained = num(row.unexplained_book_movement);
   const previewVariance = parsedClosing === null ? 0 : parsedClosing - expected;
@@ -311,9 +349,18 @@ function ShiftCard({ row, onChanged }: { row: ShiftRow; onChanged: () => void })
           <div className="font-semibold truncate">{name}</div>
           <div className="text-[11px] text-muted-foreground">{currency}</div>
         </div>
-        <Badge variant="outline" className={isOpen ? "status-progress" : "status-cancelled"}>
+        <Badge
+          variant="outline"
+          className={isOpen ? "status-progress" : pendingSettlement ? "status-review" : isSettled ? "status-completed" : "status-cancelled"}
+        >
           {isOpen ? <Unlock className="me-1 size-3" /> : <Lock className="me-1 size-3" />}
-          {isOpen ? t("shiftOpen") : t("shiftIdle")}
+          {isOpen
+            ? t("shiftOpen")
+            : pendingSettlement
+              ? (ar ? "مغلقة — بانتظار التسوية" : "Closed — awaiting settlement")
+              : isSettled
+                ? (ar ? "مُسوّاة" : "Settled")
+                : t("shiftIdle")}
         </Badge>
       </div>
 
@@ -329,7 +376,7 @@ function ShiftCard({ row, onChanged }: { row: ShiftRow; onChanged: () => void })
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="rounded-md bg-muted/40 p-2">
               <div className="flex items-center text-muted-foreground"><ArrowDownToLine className="me-1 size-3" />{t("shiftSplit")} — {t("income")}</div>
-              <div className="font-semibold tabular-nums">{formatMoney(num(row.shift_cash_income), lang, currency)}</div>
+              <div className="font-semibold tabular-nums">{formatMoney(num(row.shift_collected_cash), lang, currency)}</div>
             </div>
             <div className="rounded-md bg-muted/40 p-2">
               <div className="flex items-center text-muted-foreground"><ArrowUpFromLine className="me-1 size-3" />{t("shiftSplit")} — {t("expense")}</div>
@@ -337,11 +384,11 @@ function ShiftCard({ row, onChanged }: { row: ShiftRow; onChanged: () => void })
             </div>
             <div className="rounded-md bg-muted/40 p-2">
               <div className="text-muted-foreground">{ar ? "عدد الحركات" : "Entries"}</div>
-              <div className="font-semibold tabular-nums">{row.shift_entries ?? 0}</div>
+              <div className="font-semibold tabular-nums">{row.shift_collected_entries ?? 0}</div>
             </div>
             <div className="rounded-md bg-muted/40 p-2">
               <div className="text-muted-foreground">{t("nonCash")}</div>
-              <div className="font-semibold tabular-nums">{formatMoney(num(row.shift_non_cash_income) - num(row.shift_non_cash_outflow), lang, currency)}</div>
+              <div className="font-semibold tabular-nums">{formatMoney(num(row.shift_collected_non_cash), lang, currency)}</div>
             </div>
           </div>
 
@@ -387,8 +434,36 @@ function ShiftCard({ row, onChanged }: { row: ShiftRow; onChanged: () => void })
             {t("shiftClose")}
           </Button>
         </>
+      ) : pendingSettlement ? (
+        <>
+          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
+            <div className="font-semibold">{ar ? "العهدة مقفولة وبانتظار التسوية" : "Custody closed, waiting for settlement"}</div>
+            <div className="mt-1">
+              {ar
+                ? "لا يمكن فتح وردية جديدة قبل تسوية هذه الوردية إلى الخزنة الرئيسية."
+                : "The next shift cannot open until this one is settled into the parent treasury."}
+            </div>
+          </div>
+          <Can
+            permission="treasury.tx.write"
+            fallback={<div className="text-[11px] text-muted-foreground">{ar ? "تسوية العهدة تتطلب صلاحية حركة الخزينة." : "Settlement requires treasury transaction permission."}</div>}
+          >
+            <Button className="gradient-primary text-primary-foreground w-full" onClick={() => setSettleOpen(true)}>
+              <HandCoins className="me-2 size-4" />
+              {ar ? "تسوية العهدة" : "Settle shift"}
+            </Button>
+          </Can>
+        </>
       ) : (
         <>
+          {isSettled && (
+            <div className="rounded-lg border border-success/30 bg-success/10 p-3 text-xs text-success">
+              <div className="font-semibold">{ar ? "تمت تسوية العهدة" : "Custody settled"}</div>
+              <div className="mt-1 text-muted-foreground">
+                {ar ? "الدرج أصبح صفرًا، والخزنة الرئيسية استلمت المعدود." : "The drawer is at zero and the parent treasury received the count."}
+              </div>
+            </div>
+          )}
           <div className="rounded-lg border border-border bg-muted/30 p-3">
             <div className="text-xs font-medium text-muted-foreground">{t("cumulativeNotYours")}</div>
             <div className="mt-1 text-xl font-bold tabular-nums">{formatMoney(num(row.cumulative_cash), lang, currency)}</div>
@@ -398,7 +473,7 @@ function ShiftCard({ row, onChanged }: { row: ShiftRow; onChanged: () => void })
           </div>
 
           <div className="space-y-2">
-            <Label>{ar ? "عُدّ الدرج" : "Count the drawer"}</Label>
+            <Label>{ar ? "عُدّ الدرج لبدء الوردية التالية" : "Count the drawer to start the next shift"}</Label>
             <Input
               type="number"
               min={0}
@@ -434,6 +509,10 @@ function ShiftCard({ row, onChanged }: { row: ShiftRow; onChanged: () => void })
             <span>{formatDateTime(row.last_closed_at, lang)}</span>
           </div>
           <div className="flex items-center justify-between gap-2">
+            <span>{ar ? "المتوقع" : "Expected"}</span>
+            <span className="tabular-nums">{formatMoney(expectedClosing, lang, currency)}</span>
+          </div>
+          <div className="flex items-center justify-between gap-2">
             <span>{ar ? "عُدّ" : "Counted"}</span>
             <span className="tabular-nums">{formatMoney(num(row.last_counted), lang, currency)}</span>
           </div>
@@ -451,6 +530,12 @@ function ShiftCard({ row, onChanged }: { row: ShiftRow; onChanged: () => void })
             <div className="flex items-center justify-between gap-2">
               <span>{t("shiftHandover")}</span>
               <span>{person(row.last_handed_over_name)}</span>
+            </div>
+          )}
+          {row.last_settled_at && (
+            <div className="flex items-center justify-between gap-2">
+              <span>{ar ? "تمت التسوية" : "Settled at"}</span>
+              <span>{formatDateTime(row.last_settled_at, lang)}</span>
             </div>
           )}
         </div>
@@ -515,6 +600,47 @@ function ShiftCard({ row, onChanged }: { row: ShiftRow; onChanged: () => void })
             <Button variant="ghost" onClick={() => setCloseOpen(false)} disabled={closeBusy}>{t("cancel")}</Button>
             <Button className="gradient-primary text-primary-foreground" onClick={() => void submitClose()} disabled={closeBusy}>
               {closeBusy ? t("loading") : t("shiftClose")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={settleOpen} onOpenChange={(v) => !settleBusy && setSettleOpen(v)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{ar ? "تسوية العهدة" : "Settle shift custody"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              {ar
+                ? "التسوية تنقل نقد الدرج إلى الخزنة الرئيسية، وتسجّل فرق العدّ مرة واحدة. لا يمكن التراجع عنها."
+                : "Settlement moves the drawer cash into the parent treasury and posts the counted variance once. It cannot be undone."}
+            </p>
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              <div className="rounded-md border border-border p-2">
+                <div className="text-muted-foreground">{ar ? "المتوقع" : "Expected"}</div>
+                <div className="font-semibold tabular-nums">{formatMoney(expectedClosing, lang, currency)}</div>
+              </div>
+              <div className="rounded-md border border-border p-2">
+                <div className="text-muted-foreground">{ar ? "المعدود" : "Counted"}</div>
+                <div className="font-semibold tabular-nums">{formatMoney(num(row.last_counted), lang, currency)}</div>
+              </div>
+              <div className="rounded-md border border-border p-2">
+                <div className="text-muted-foreground">{ar ? "الفرق" : "Variance"}</div>
+                <div className={`font-semibold tabular-nums ${num(row.last_variance) < 0 ? "text-destructive" : ""}`}>
+                  {formatMoney(num(row.last_variance), lang, currency)}
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>{t("notes")}</Label>
+              <Textarea value={settleNotes} onChange={(e) => setSettleNotes(e.target.value)} rows={2} maxLength={500} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setSettleOpen(false)} disabled={settleBusy}>{t("cancel")}</Button>
+            <Button className="gradient-primary text-primary-foreground" onClick={() => void submitSettle()} disabled={settleBusy}>
+              {settleBusy ? t("loading") : (ar ? "تأكيد التسوية" : "Settle custody")}
             </Button>
           </DialogFooter>
         </DialogContent>

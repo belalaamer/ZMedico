@@ -12,12 +12,16 @@ import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
 
 export function TransferDialog({
-  open, onOpenChange, treasuries, onSaved,
+  open, onOpenChange, treasuries, onSaved, blockedTreasuryIds = [],
 }: {
   open: boolean; onOpenChange: (v: boolean) => void;
   treasuries: Array<{ id: string; name_en: string; name_ar: string; current_balance: number; currency: string }>;
   onSaved: () => void;
+  /** Drawers with a closed shift waiting for settlement; a generic transfer
+   *  must not be used instead of fn_treasury_shift_settle. */
+  blockedTreasuryIds?: string[];
 }) {
+  const blocked = new Set(blockedTreasuryIds);
   const { t, lang } = useI18n();
   const [fromId, setFromId] = useState("");
   const [toId, setToId] = useState("");
@@ -37,6 +41,12 @@ export function TransferDialog({
   const submit = async () => {
     if (submittingRef.current) return;
     if (!fromId || !toId) { toast.error(t("selectTreasury")); return; }
+    if (blocked.has(fromId)) {
+      toast.error(lang === "ar"
+        ? "هذا الدرج عنده وردية مقفولة بانتظار التسوية. استخدم «تسوية العهدة» بدل التحويل العام."
+        : "This drawer has a closed shift waiting for settlement. Use Settle shift instead of a generic transfer.");
+      return;
+    }
     if (fromId === toId) { toast.error(t("sameTreasuryError")); return; }
     if (!fromTr?.currency?.trim() || !toTr?.currency?.trim() || fromTr.currency !== toTr.currency) {
       toast.error(lang === "ar" ? "التحويل متاح بين خزنتين بنفس العملة فقط." : "Transfers require two treasuries with the same currency.");
@@ -66,10 +76,11 @@ export function TransferDialog({
       toast.success(t("transferSuccess"));
       reset();
       onSaved();
-    } catch {
-      toast.error(lang === "ar"
+    } catch (error) {
+      const message = (error as { message?: string } | null)?.message;
+      toast.error(message || (lang === "ar"
         ? "تعذر تأكيد نتيجة التحويل. راجع حركات الخزنتين قبل إعادة المحاولة."
-        : "Transfer outcome could not be confirmed. Please review both treasury ledgers before retrying.");
+        : "Transfer outcome could not be confirmed. Please review both treasury ledgers before retrying."));
     } finally {
       submittingRef.current = false;
       setSaving(false);
@@ -90,7 +101,12 @@ export function TransferDialog({
               <Select value={fromId} onValueChange={setFromId} disabled={saving}>
                 <SelectTrigger><SelectValue placeholder={t("selectTreasury")} /></SelectTrigger>
                 <SelectContent>
-                  {treasuries.map((tr) => <SelectItem key={tr.id} value={tr.id}>{lang === "ar" ? tr.name_ar : tr.name_en}</SelectItem>)}
+                  {treasuries.map((tr) => (
+                    <SelectItem key={tr.id} value={tr.id} disabled={blocked.has(tr.id)}>
+                      {(lang === "ar" ? tr.name_ar : tr.name_en)}
+                      {blocked.has(tr.id) ? (lang === "ar" ? " — بانتظار التسوية" : " — awaiting settlement") : ""}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -100,7 +116,9 @@ export function TransferDialog({
               <Select value={toId} onValueChange={setToId} disabled={saving}>
                 <SelectTrigger><SelectValue placeholder={t("selectTreasury")} /></SelectTrigger>
                 <SelectContent>
-                  {treasuries.filter((x) => x.id !== fromId).map((tr) => <SelectItem key={tr.id} value={tr.id}>{lang === "ar" ? tr.name_ar : tr.name_en}</SelectItem>)}
+                  {treasuries.filter((x) => x.id !== fromId).map((tr) => (
+                    <SelectItem key={tr.id} value={tr.id}>{lang === "ar" ? tr.name_ar : tr.name_en}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

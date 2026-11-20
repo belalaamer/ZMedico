@@ -157,7 +157,11 @@ begin
      limit 1;
 
     if v_pending_shift is not null
-       and NEW.reference_id is distinct from v_pending_shift then
+       and not (
+         current_setting('app.allow_treasury_shift_settle', true) = 'on'
+         and current_setting('app.treasury_settle_shift', true) = v_pending_shift::text
+         and NEW.reference_id = v_pending_shift
+       ) then
       raise exception 'This drawer has a closed shift waiting for settlement. Settle the shift instead of transferring its cash.'
         using errcode = '23514';
     end if;

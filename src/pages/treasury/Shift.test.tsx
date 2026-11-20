@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   from: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
-  can: vi.fn(() => true),
+  can: vi.fn((_key: string) => true),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { rpc: mocks.rpc, from: mocks.from } }));

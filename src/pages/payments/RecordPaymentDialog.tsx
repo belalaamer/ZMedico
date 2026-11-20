@@ -158,6 +158,24 @@ export function RecordPaymentDialog({
   // appear on the next keystroke; re-running the current query is enough.
   useDataSync(["patients"], () => { if (!patientId) patientSearch.reload(); });
 
+  const collectionRefusal = (message: string | null | undefined) => {
+    const raw = message ?? "";
+    if (/No open cash shift/i.test(raw)) {
+      return lang === "ar"
+        ? "لا توجد وردية درج مفتوحة. افتح وردية قبل تحصيل النقد."
+        : "No open drawer shift. Open a shift before collecting cash.";
+    }
+    if (/No active .*payment route/i.test(raw)) {
+      return lang === "ar"
+        ? "لا يوجد مسار تحصيل مفعّل لهذه الطريقة. راجع إعدادات الخزينة."
+        : "No active payment route for this method. Check the treasury configuration.";
+    }
+    if (/Authentication session is no longer active/i.test(raw)) {
+      return lang === "ar" ? "انتهت الجلسة. سجّل الدخول مرة أخرى." : "Your session has ended. Sign in again.";
+    }
+    return raw || (lang === "ar" ? "تعذّر التحصيل" : "Could not collect the payment");
+  };
+
   const save = async () => {
     if (submittingRef.current) return;
     submittingRef.current = true;
@@ -244,7 +262,7 @@ export function RecordPaymentDialog({
           // A missing shift or missing route is a refusal, not an invitation
           // to write around the contract. Keep the key so a genuine retry can
           // replay a committed batch instead of posting a second one.
-          toast.error(error.message ?? (lang === "ar" ? "تعذّر التحصيل" : "Could not collect the payment"));
+          toast.error(collectionRefusal(error.message));
           return;
         }
         collectionKeyRef.current = null;
